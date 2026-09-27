@@ -1,5 +1,6 @@
 /** Small stroke icons for the app. One set, one weight. */
 const P: Record<string, React.ReactNode> = {
+  home: <><path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5H9v5.5H5.5A1.5 1.5 0 0 1 4 19z" /></>,
   desk: <><rect x="3" y="4" width="18" height="12" rx="2.5" /><path d="M8 20h8M12 16v4" /></>,
   memory: <><path d="M7 3h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></>,
   market: <><path d="M4 9.5 5.6 4h12.8L20 9.5" /><path d="M4 9.5h16V20H4z" /><path d="M9.5 20v-5h5v5" /></>,

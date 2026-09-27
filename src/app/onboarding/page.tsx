@@ -65,7 +65,7 @@ export default function Onboarding() {
   if (s && !s.auth) return (
     <main className="carpet grid min-h-[100svh] place-items-center bg-base px-5 text-center text-ink">
       <div className="max-w-md"><h1 className="display text-[44px]">Sign in first.</h1><p className="mt-3 text-ink/75">Your agent needs to know who it works for.</p>
-        <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center"><Link href="/signin" className="btn btn-brand">Sign in →</Link><button onClick={() => { startDemo(); router.push("/app"); }} className="btn btn-line">Try the demo desk</button></div></div>
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center"><Link href="/signin" className="btn btn-brand">Sign in →</Link><button onClick={() => { startDemo(); router.push("/app"); }} className="btn btn-line">Try the demo</button></div></div>
     </main>
   );
 
@@ -152,7 +152,7 @@ export default function Onboarding() {
             <div data-step>
               <p className="label text-brand-ink">Step 4 of 4 · first day</p>
               <h1 className="display mt-3 text-[56px] sm:text-[96px]">Meet {shown}.</h1>
-              <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Its badge is printed, its computer is on and it already knows {knows.length + (you ? 1 : 0)} things about you. Give it a job on its desk.</p>
+              <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Its badge is printed, its computer is on and it already knows {knows.length + (you ? 1 : 0)} things about you. Say hi and start chatting.</p>
               <ul className="mt-7 grid max-w-[520px] gap-2.5">
                 {[["desk", "Its own computer", "A terminal, a browser and a folder of files"], ["memory", "A brain that keeps", `${knows.length + (you ? 1 : 0)} memories filed on day one`], ["team", "Seats for specialists", "Hire from the marketplace when the work grows"]].map(([i, h, t]) => (
                   <li key={h} className="flex items-center gap-4 rounded-[20px] bg-card p-3.5 ring-1 ring-line"><span className="grid h-11 w-11 place-items-center rounded-xl bg-grape text-white"><Icon name={i} size={21} /></span><span><b className="block text-ink">{h}</b><span className="text-[14px] text-ink/70">{t}</span></span></li>

@@ -15,7 +15,8 @@ import { DemoTag } from "./ui";
 import Toaster from "./Toaster";
 
 export const NAV = [
-  { href: "/app", label: "Desk", icon: "desk" },
+  { href: "/app", label: "Home", icon: "home" },
+  { href: "/app/chat", label: "Chats", icon: "chat" },
   { href: "/app/memory", label: "Brain", icon: "memory" },
   { href: "/app/marketplace", label: "Market", icon: "market" },
   { href: "/app/team", label: "Team", icon: "team" },
@@ -47,7 +48,7 @@ function Sidebar({ s, path }: { s: State; path: string }) {
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#0a0a0a]"><AgentFace look={s.agent?.look} size={46} track /></span>
         <span className="relative min-w-0">
           <span className="display block truncate text-[26px] leading-none">{agentName(s)}</span>
-          <span className="label mt-1.5 flex items-center gap-1.5 text-[9px] text-white/85"><i className={`h-1.5 w-1.5 rounded-full bg-white ${running.length ? "live-dot" : ""}`} />{running.length ? `working · ${running.length} job${running.length > 1 ? "s" : ""}` : "at desk · idle"}</span>
+          <span className="label mt-1.5 flex items-center gap-1.5 text-[9px] text-white/85"><i className={`h-1.5 w-1.5 rounded-full bg-white ${running.length ? "live-dot" : ""}`} />{running.length ? `working · ${running.length} job${running.length > 1 ? "s" : ""}` : "online"}</span>
         </span>
       </Link>
       <nav className="mt-5 grid gap-1" aria-label="App">
@@ -67,7 +68,7 @@ function Sidebar({ s, path }: { s: State; path: string }) {
         <div className="mt-5 px-1">
           <span className="label text-[9.5px] text-ink/60">Hired</span>
           <div className="mt-2 flex -space-x-2">
-            {s.hired.slice(0, 7).map((h) => <Link key={h} href={`/app/marketplace/${h}`} title={h} className="grid h-9 w-9 place-items-center rounded-full bg-tint ring-2 ring-alt transition hover:z-10 hover:-translate-y-1"><SpecFace slug={h} size={30} /></Link>)}
+            {s.hired.slice(0, 7).map((h) => <Link key={h} href={`/app/chat/${h}`} title={`Chat with ${h}`} className="grid h-9 w-9 place-items-center rounded-full bg-tint ring-2 ring-alt transition hover:z-10 hover:-translate-y-1"><SpecFace slug={h} size={30} /></Link>)}
           </div>
         </div>
       )}
@@ -87,13 +88,13 @@ function Sidebar({ s, path }: { s: State; path: string }) {
 }
 
 function MobileBars({ s, path }: { s: State; path: string }) {
-  const items = NAV.slice(0, 5);
+  const items = NAV.slice(0, 6);
   const idx = Math.max(0, items.findIndex((n) => isOn(path, n.href)));
   const onSettings = path.startsWith("/app/settings");
   return (
     <>
       <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-line bg-base/85 px-4 backdrop-blur-md lg:hidden">
-        <Link href="/app" aria-label="Desk"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
+        <Link href="/app" aria-label="Home"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
         <div className="flex items-center gap-2">
           <DemoTag className="hidden min-[400px]:inline-flex" />
           <ThemeToggle />
@@ -101,8 +102,8 @@ function MobileBars({ s, path }: { s: State; path: string }) {
         </div>
       </header>
       <nav aria-label="App" className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-base/92 backdrop-blur-md lg:hidden">
-        <div className="relative mx-auto grid h-[68px] max-w-[520px] grid-cols-5">
-          {!onSettings && <span aria-hidden className="absolute top-2 h-9 w-14 rounded-full bg-grape transition-transform duration-500 [transition-timing-function:cubic-bezier(.3,1.5,.5,1)]" style={{ left: `calc(10% - 28px)`, transform: `translateX(calc(${idx} * (min(100vw, 520px) / 5)))` }} />}
+        <div className="relative mx-auto grid h-[68px] max-w-[560px] grid-cols-6">
+          {!onSettings && <span aria-hidden className="absolute top-2 h-9 w-12 rounded-full bg-grape transition-transform duration-500 [transition-timing-function:cubic-bezier(.3,1.5,.5,1)]" style={{ left: `calc(100% / 12 - 24px)`, transform: `translateX(calc(${idx} * (min(100vw, 560px) / 6)))` }} />}
           {items.map((n, i) => {
             const on = !onSettings && i === idx;
             return (
@@ -120,7 +121,7 @@ function MobileBars({ s, path }: { s: State; path: string }) {
 
 function Loading() {
   return (
-    <div className="min-h-screen bg-base lg:pl-[264px]" aria-busy="true" aria-label="Loading your desk">
+    <div className="min-h-screen bg-base lg:pl-[264px]" aria-busy="true" aria-label="Loading">
       <div className="fixed inset-y-0 left-0 hidden w-[264px] border-r border-line bg-alt p-5 lg:block">
         <div className="skel h-7 w-28" /><div className="skel mt-6 h-20" />
         {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="skel mt-3 h-11" />)}
@@ -140,11 +141,11 @@ function Gate({ s }: { s: State }) {
       <div className="pointer-events-none absolute left-1/2 top-1/3 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-[var(--glow)] blur-[130px]" />
       <div className="relative w-full max-w-[460px] rounded-[32px] bg-card p-7 text-center shadow-[0_14px_0_#5b2bff] ring-1 ring-line sm:p-9">
         <div className="bob mx-auto grid h-24 w-24 place-items-center rounded-[26px] bg-[#0a0a0a]"><Face size={80} track /></div>
-        <h1 className="display mt-6 text-[40px] text-ink sm:text-[48px]">{signedIn ? "Almost there." : "This desk is waiting."}</h1>
-        <p className="mt-3 text-[16px] text-ink/75">{signedIn ? "You are signed in. Name your agent and it clocks in." : "Sign in with Google or a crypto wallet to meet your agent. Or look around a demo desk first."}</p>
+        <h1 className="display mt-6 text-[40px] text-ink sm:text-[48px]">{signedIn ? "Almost there." : "Your agent is waiting."}</h1>
+        <p className="mt-3 text-[16px] text-ink/75">{signedIn ? "You are signed in. Name your agent and it clocks in." : "Sign in with Google or a crypto wallet to meet your agent. Or look around a demo first."}</p>
         <div className="mt-7 grid gap-3">
           {signedIn ? <Link href="/onboarding" className="btn btn-brand">Name your agent →</Link> : <Link href="/signin" className="btn btn-brand">Sign in →</Link>}
-          <button onClick={startDemo} className="btn btn-line text-ink">Try the demo desk</button>
+          <button onClick={startDemo} className="btn btn-line text-ink">Try the demo</button>
         </div>
         <Link href="/" className="mt-6 inline-block text-[14px] font-semibold text-ink/65 hover:text-brand-ink">Back to lexari</Link>
       </div>
@@ -170,12 +171,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!s) return <Loading />;
   if (!ready) return <Gate s={s} />;
+  const inThread = /^\/app\/chat\/.+/.test(path);
+  const bleed = path === "/app/memory" || path.startsWith("/app/chat");
   return (
     <div className="min-h-screen bg-base text-ink">
       <Sidebar s={s} path={path} />
-      <MobileBars s={s} path={path} />
+      {!inThread && <MobileBars s={s} path={path} />}
       <div className="lg:pl-[264px]">
-        {path === "/app/memory" ? <div key={path}>{children}</div> : <div ref={main} key={path} className="mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-8 sm:pt-9 lg:pb-16">{children}</div>}
+        {bleed ? <div key={path}>{children}</div> : <div ref={main} key={path} className="mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-8 sm:pt-9 lg:pb-16">{children}</div>}
       </div>
       <Toaster />
     </div>

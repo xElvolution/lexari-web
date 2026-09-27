@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { specialistBySlug, type Job, type JobStatus } from "@/content/appData";
@@ -12,6 +13,7 @@ import { Empty, PageHead, StatusPill, ago } from "@/components/app/ui";
 const FILTERS: { id: "all" | JobStatus; label: string }[] = [{ id: "all", label: "All" }, { id: "running", label: "Working" }, { id: "needs-you", label: "Needs you" }, { id: "done", label: "Done" }];
 
 function Row({ j, s, now, open, toggle }: { j: Job; s: State; now: number; open: boolean; toggle: () => void }) {
+  const router = useRouter();
   const body = useRef<HTMLDivElement>(null);
   const first = useRef(true);
   useEffect(() => {
@@ -62,8 +64,8 @@ function Row({ j, s, now, open, toggle }: { j: Job; s: State; now: number; open:
             </ul>
             <div className="mt-4 flex flex-wrap gap-2">
               {j.status === "needs-you" && <button onClick={() => { resolveJob(j.id); toast({ text: `Approved. ${jobNo(j.id)} is done.`, face: "home" }); }} className="btn btn-brand btn-sm"><Icon name="check" size={16} />Looks good, approve</button>}
-              {j.status !== "running" && <button onClick={() => { rerunJob(j.id); toast({ text: "Sent to the desk again", face: "home" }); }} className="btn btn-ghost btn-sm"><Icon name="flip" size={15} />Run again</button>}
-              {j.status === "running" && <Link href="/app" className="btn btn-ghost btn-sm">Watch it live <Icon name="arrow" size={15} /></Link>}
+              {j.status !== "running" && <button onClick={() => { const who = rerunJob(j.id); router.push(`/app/chat/${who}`); }} className="btn btn-ghost btn-sm"><Icon name="flip" size={15} />Run again</button>}
+              {j.status === "running" && <Link href={`/app/chat/${j.assignee}`} className="btn btn-ghost btn-sm">Open chat <Icon name="arrow" size={15} /></Link>}
             </div>
           </div>
         </div>
@@ -90,7 +92,7 @@ export default function JobsPage() {
 
   return (
     <>
-      <PageHead kicker="Jobs" demo title="Everything it's done." body="Every job your team has worked on, with the steps it took and the files it saved. Open one to download the outputs." right={<Link href="/app" data-rise className="btn btn-brand btn-sm"><Icon name="plus" size={16} />New job</Link>} />
+      <PageHead kicker="Jobs" demo title="Everything it's done." body="Every job your team has worked on, with the steps it took and the files it saved. Open one to download the outputs." right={<Link href="/app/chat/home" data-rise className="btn btn-brand btn-sm"><Icon name="plus" size={16} />New job</Link>} />
       <div data-rise className="mt-7 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="no-bar -mx-1 flex gap-1.5 overflow-x-auto px-1">
           {FILTERS.map((f) => <button key={f.id} onClick={() => setFilter(f.id)} aria-pressed={filter === f.id} className="chip shrink-0">{f.label}<span className="tab-num opacity-70">{counts[f.id]}</span></button>)}
@@ -103,7 +105,7 @@ export default function JobsPage() {
         ) : s.jobs.length ? (
           <Empty icon="jobs" title="Nothing here." body={filter === "needs-you" ? "Nothing is waiting on you. Nice." : "No jobs match that search."} cta={{ label: "Show all jobs", onClick: () => { setFilter("all"); setQ(""); } }} />
         ) : (
-          <Empty icon="jobs" title="No jobs yet." body={`Give ${agentName(s)} its first job on the desk and it will show up here.`} cta={{ href: "/app", label: "Go to the desk" }} />
+          <Empty icon="jobs" title="No jobs yet." body={`Ask ${agentName(s)} for something in chat and it will show up here.`} cta={{ href: "/app/chat/home", label: "Open chat" }} />
         )}
       </div>
     </>

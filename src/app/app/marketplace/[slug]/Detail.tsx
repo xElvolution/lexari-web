@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { SPECIALISTS, specialistBySlug } from "@/content/appData";
-import { release, sendChat, toast, useApp } from "@/lib/store";
+import { release, sendTo, toast, useApp } from "@/lib/store";
 import Face from "@/components/Face";
 import Icon from "@/components/app/Icon";
 import { SpecFace } from "@/components/app/faces";
@@ -31,7 +31,7 @@ export default function Detail({ slug }: { slug: string }) {
   const similar = SPECIALISTS.filter((x) => x.slug !== a.slug && (x.cat === a.cat || x.words.some((w) => a.words.includes(w)))).concat(SPECIALISTS.filter((x) => x.slug !== a.slug)).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 3);
   const tryJob = (ex: string) => {
     if (!hired) { const r = hireWithFx(a.slug, face.current, () => router.push("/app/team")); if (r !== "ok") return; }
-    sendChat(`@${a.slug} ${ex}`); router.push("/app");
+    sendTo(a.slug, ex); router.push(`/app/chat/${a.slug}`);
   };
 
   return (
@@ -62,7 +62,7 @@ export default function Detail({ slug }: { slug: string }) {
           <div className="mt-6 flex flex-col gap-3 sm:flex-row lg:mt-auto lg:pt-6">
             {hired ? (
               <>
-                <button onClick={() => tryJob(a.examples[0])} className="btn btn-brand flex-1">Give {a.name} a job <Icon name="arrow" size={18} /></button>
+                <Link href={`/app/chat/${a.slug}`} className="btn btn-brand flex-1">Chat with {a.name} <Icon name="arrow" size={18} /></Link>
                 <button onClick={() => { release(a.slug); toast({ text: `${a.name} left the seat. It's open again.`, face: a.seed, color: a.color }); }} className="btn btn-line text-ink">Release seat</button>
               </>
             ) : (

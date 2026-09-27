@@ -68,7 +68,7 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        <Section title="Sign-in" body="Google or a crypto wallet. Connect both if you like; either one opens the same desk.">
+        <Section title="Sign-in" body="Google or a crypto wallet. Connect both if you like; either one opens the same account.">
           <ul className="grid gap-3">
             {methods.map((m) => { const on = s.links[m.id]; const inUse = s.auth?.method === m.id; return (
               <li key={m.id} className="flex flex-wrap items-center gap-4 rounded-[22px] bg-card p-3 pr-4 ring-1 ring-line">

@@ -7,7 +7,7 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
-  DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, scriptFor, shortAddr,
+  DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, cannedReply, scriptFor, shortAddr,
   type Job, type MemoryTag, type PlanId, type ToneId, type WalletId,
 } from "@/content/appData";
 
@@ -19,17 +19,18 @@ export type State = {
   v: 1; auth: Auth | null; links: { google: boolean; wallet: boolean };
   agent: Agent | null; onboarded: boolean; plan: PlanId; hired: string[];
   memory: Note[]; jobs: Job[]; chat: Msg[]; nextJob: number;
+  threads: Record<string, Msg[]>; // one chat per agent: "home" or a specialist slug
 };
 
 const KEY = "lexari-app-v1";
-const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1 };
+const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {} };
 
 let state: State | null = null;
 const subs = new Set<() => void>();
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 function load(): State {
-  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) return { ...EMPTY, ...s }; } } catch {}
+  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; return st; } } } catch {}
   return EMPTY;
 }
 function snapshot() { if (state === null) state = load(); return state; }
@@ -101,8 +102,16 @@ function seeded(s: State, agent: Agent, knows: string[]): State {
     ...(agent.you ? [{ id: uid(), tag: "About you" as MemoryTag, text: `Calls you ${agent.you}${agent.role ? `, ${agent.role.toLowerCase()}` : ""}`, source: "You, day one", at: now }] : []),
     ...SEED_MEMORY.map((m) => ({ id: uid(), tag: m.tag, text: m.text, source: m.source, at: now - m.ago })),
   ];
-  const chat: Msg[] = [{ id: uid(), from: "home", at: now, text: `Hi${agent.you ? ` ${agent.you}` : ""}, I'm ${agent.name}. My computer is on and I've read what you told me. Give me a job and watch my screen.` }];
-  return { ...s, agent, onboarded: true, plan: "pro", hired: ["scout"], memory, jobs, chat, nextJob: jobs.length + 1 };
+  const chat: Msg[] = [{ id: uid(), from: "home", at: now, text: `Hi${agent.you ? ` ${agent.you}` : ""}, I'm ${agent.name}. I've read what you told me and my computer is on. Ask me for anything, or just say hi.` }];
+  const threads: Record<string, Msg[]> = {
+    home: chat,
+    scout: [
+      { id: uid(), from: "scout", at: now - 3 * 864e5, text: "Scout here. I'm in seat 02. Send me anything that needs reading, comparing or checking." },
+      { id: uid(), from: "you", at: now - 3 * 864e5 + 6e4, text: "Compare three budgeting tools and keep it to one page" },
+      { id: uid(), from: "scout", at: now - 3 * 864e5 + 9e4, text: "Done. Read 3 feature pages and 14 plans. The one-page summary and a table are in Files, with links to every source." },
+    ],
+  };
+  return { ...s, agent, onboarded: true, plan: "pro", hired: ["scout"], memory, jobs, chat, threads, nextJob: jobs.length + 1 };
 }
 export function finishOnboarding(agent: Agent, knows: string[]) { set((s) => seeded(s, agent, knows)); }
 export function startDemo() {
@@ -145,22 +154,45 @@ export function routeJob(s: State, text: string) {
   return kw?.slug ?? "home";
 }
 
-export function sendChat(text: string) {
-  const s = get(); if (!s.agent) return;
-  const now = Date.now(); const id = s.nextJob; const assignee = routeJob(s, text);
-  const clean = text.replace(/@\w+\s*/g, "").trim() || text;
-  const job: Job = { ...scriptFor(clean, assignee, s.agent.name), id, status: "running", startedAt: now + 900 };
-  set((x) => ({ ...x, nextJob: id + 1, jobs: [...x.jobs, job], chat: [...x.chat, { id: uid(), from: "you", text, at: now }].slice(-60) }));
-  const sp = SPECIALISTS.find((p) => p.slug === assignee);
-  const reply = sp
-    ? `${sp.name} here. ${s.agent.name} passed this one to me because it's ${sp.job.toLowerCase()}. Starting job ${jobNo(id)} now.`
-    : ({ short: `On it. Job ${jobNo(id)} is open. Watch my screen.`, warm: `Love this one! I've opened job ${jobNo(id)}. You can watch me work on my computer.`, formal: `Understood. I have opened job ${jobNo(id)} and will report back when it is complete.`, playful: `Ooh, a job! ${jobNo(id)} is go. Eyes on my screen.` } as const)[s.agent.tone];
-  setTimeout(() => set((x) => ({ ...x, chat: [...x.chat, { id: uid(), from: assignee, text: reply, at: Date.now(), jobId: id }].slice(-60) })), 850);
+/* ---------- chats: one thread per agent, demo replies ---------- */
+const replying = new Set<string>();
+/** True while an agent is "typing" its demo reply. */
+export function useTyping(id: string) {
+  return useSyncExternalStore(subscribe, () => replying.has(id), () => false);
+}
+
+function scheduleReply(id: string, delay: number) {
+  if (replying.has(id)) return;
+  replying.add(id); subs.forEach((f) => f());
+  setTimeout(() => {
+    replying.delete(id);
+    const st = get(); const thread = st.threads[id] || []; const last = thread[thread.length - 1];
+    if (!st.agent || !last || last.from !== "you") { subs.forEach((f) => f()); return; }
+    let text = cannedReply({ id, text: last.text, n: thread.filter((m) => m.from !== "you").length, agentName: st.agent.name, you: st.agent.you, tone: st.agent.tone });
+    // "remember ..." really files a memory in the brain
+    const rem = id === "home" ? last.text.match(/^\s*(please\s+)?remember( that)?\s+(.{3,120})/i) : null;
+    if (rem) { const note = rem[3].replace(/[.!\s]+$/, ""); addNote(note.charAt(0).toUpperCase() + note.slice(1), "About you", "Chat"); text = `Filed in my brain under About you: "${note}". I'll use it from now on.`; }
+    set((x) => ({ ...x, threads: { ...x.threads, [id]: [...(x.threads[id] || []), { id: uid(), from: id, text, at: Date.now() }].slice(-80) } }));
+  }, delay);
+}
+
+/** Send a message to one agent. A demo reply follows after a short typing pause. */
+export function sendTo(id: string, text: string) {
+  const v = text.trim(); if (!v) return;
+  set((x) => ({ ...x, threads: { ...x.threads, [id]: [...(x.threads[id] || []), { id: uid(), from: "you", text: v, at: Date.now() }].slice(-80) } }));
+  scheduleReply(id, 900 + Math.min(1400, v.length * 18));
+}
+/** After a reload, answer any message that was still waiting for a reply. */
+export function ensureReplies() {
+  const st = get();
+  Object.entries(st.threads).forEach(([id, t]) => { if (t[t.length - 1]?.from === "you") scheduleReply(id, 700); });
 }
 
 export function resolveJob(id: number) { set((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: "done" } : j)) })); }
+/** Sends a past job's request to the same agent again. Returns the chat id. */
 export function rerunJob(id: number) {
-  const j = get().jobs.find((x) => x.id === id); if (j) sendChat(j.assignee === "home" ? j.prompt : `@${j.assignee} ${j.prompt}`);
+  const j = get().jobs.find((x) => x.id === id); if (!j) return "home";
+  sendTo(j.assignee, j.prompt); return j.assignee;
 }
 
 /** Called every second by the app shell. Finishes jobs whose time is up and files what they learned. */

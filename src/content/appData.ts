@@ -207,3 +207,36 @@ export const IDLE_LINES = [
   "  all files saved",
   "$ wait --for next job",
 ];
+
+/* ---------- demo chat replies ---------- */
+const TASKY = /\b(compare|find|write|draft|plan|make|build|research|summari[sz]e|check|list|clean|design|cut|review|fix|watch)\b/;
+const gist = (t: string) => t.replace(/[?.!]+$/, "").split(/\s+/).slice(0, 7).join(" ").toLowerCase();
+
+/** Canned example replies so the chat feels alive. Clearly demo: nothing is generated. */
+export function cannedReply(o: { id: string; text: string; n: number; agentName: string; you: string; tone: ToneId }) {
+  const t = o.text.toLowerCase();
+  const hi = /^(hi|hey|hello|yo|good (morning|afternoon|evening))\b/.test(t);
+  if (o.id === "home") {
+    if (hi) return { short: `Hi${o.you ? ` ${o.you}` : ""}. What should I work on?`, warm: `Hey${o.you ? ` ${o.you}` : ""}! Good to see you. What are we doing today?`, formal: `Hello${o.you ? ` ${o.you}` : ""}. How can I help today?`, playful: `Hiya${o.you ? ` ${o.you}` : ""}! Point me at something.` }[o.tone];
+    if (/what do you (know|remember)/.test(t)) return "Quite a bit already. Open my brain to see every memory, grouped by area. You can edit or forget any of them.";
+    const lines = [
+      `On it. I'll open my computer, work through "${gist(o.text)}" and post a short summary right here.`,
+      `Good one. Based on what I remember about you, I'll keep it to one page with the sources linked. Want a table too?`,
+      `Noted. If it needs a specialist I'll pass it to someone on your team and tell you who.`,
+      `Done with a first pass. The file is in my output folder. Tell me what to change and I'll redo it.`,
+    ];
+    if (TASKY.test(t)) return lines[0];
+    return lines[1 + (o.n % 3)];
+  }
+  const sp = specialistBySlug(o.id);
+  if (!sp) return "Got it.";
+  if (hi) return `Hi! ${sp.name} here, your ${sp.job.toLowerCase()} specialist. ${sp.quip}`;
+  const lines = [
+    `${sp.name} here. That's right in my lane. I'll handle "${gist(o.text)}" and post the result in this chat.`,
+    `On it. ${sp.back} I'll send it back here when it's ready.`,
+    `Quick check before I start: short and punchy, or thorough? I'll assume short unless you say otherwise.`,
+    `First draft is done and saved to Files. Want me to tighten anything?`,
+  ];
+  if (TASKY.test(t)) return lines[o.n % 2];
+  return lines[2 + (o.n % 2)];
+}
