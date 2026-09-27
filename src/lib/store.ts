@@ -7,11 +7,17 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
-  DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, cannedReply, scriptFor, shortAddr,
+  DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, cannedReply, groupReply, scriptFor, shortAddr,
   type Job, type MemoryTag, type PlanId, type ToneId, type WalletId,
 } from "@/content/appData";
 
-export type Msg = { id: string; from: string; text: string; at: number; jobId?: number };
+export type Msg = {
+  id: string; from: string; text: string; at: number; jobId?: number;
+  file?: { name: string; size: string }; // an attachment (demo: only the name and size are kept)
+  voice?: number; // a voice note, length in seconds
+  call?: number; // a call log line, length in seconds
+};
+export type Group = { id: string; name: string; members: string[]; at: number };
 export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number };
 export type Agent = { name: string; look: number | null; you: string; role: string; tone: ToneId };
 export type Auth = { method: "google" | "wallet"; label: string; sub: string; wallet?: WalletId };
@@ -19,18 +25,19 @@ export type State = {
   v: 1; auth: Auth | null; links: { google: boolean; wallet: boolean };
   agent: Agent | null; onboarded: boolean; plan: PlanId; hired: string[];
   memory: Note[]; jobs: Job[]; chat: Msg[]; nextJob: number;
-  threads: Record<string, Msg[]>; // one chat per agent: "home" or a specialist slug
+  threads: Record<string, Msg[]>; // one chat per agent ("home" or a specialist slug) or per group ("g-…")
+  groups: Group[]; active: string; // the conversation open on Home
 };
 
 const KEY = "lexari-app-v1";
-const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {} };
+const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home" };
 
 let state: State | null = null;
 const subs = new Set<() => void>();
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 function load(): State {
-  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; return st; } } } catch {}
+  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; if (!Array.isArray(st.groups)) st.groups = []; return st; } } } catch {}
   return EMPTY;
 }
 function snapshot() { if (state === null) state = load(); return state; }
@@ -111,7 +118,21 @@ function seeded(s: State, agent: Agent, knows: string[]): State {
       { id: uid(), from: "scout", at: now - 3 * 864e5 + 9e4, text: "Done. Read 3 feature pages and 14 plans. The one-page summary and a table are in Files, with links to every source." },
     ],
   };
-  return { ...s, agent, onboarded: true, plan: "pro", hired: ["scout"], memory, jobs, chat, threads, nextJob: jobs.length + 1 };
+  const d = (days: number, min = 0) => now - days * 864e5 + min * 6e4;
+  threads.quill = [
+    { id: uid(), from: "quill", at: d(2), text: "Quill here, seat 03. Send me a rough idea and I'll give it back sharp." },
+    { id: uid(), from: "you", at: d(2, 2), text: "Tighten the intro of my launch post" },
+    { id: uid(), from: "quill", at: d(2, 4), text: "Cut it from 90 words to 41 and led with the one line people will quote. Draft is in Files." },
+  ];
+  threads.tally = [{ id: uid(), from: "tally", at: d(1), text: "Tally here, seat 04. Messy sheet? Send it over and I'll tell you what changed." }];
+  const crew: Group = { id: "g-launch", name: "Launch crew", members: ["home", "scout", "quill"], at: d(1, 30) };
+  threads[crew.id] = [
+    { id: uid(), from: "you", at: d(0, -95), text: "Launch is Friday. What do we still need?" },
+    { id: uid(), from: "home", at: d(0, -94), text: `I'll keep the list. Scout, can you check what similar launches did? Quill, the post needs a final pass.` },
+    { id: uid(), from: "scout", at: d(0, -93), text: "On it. Reading five recent launches now. Short table by tonight." },
+    { id: uid(), from: "quill", at: d(0, -92), text: "Final pass on the post is done. Two headline options are in Files." },
+  ];
+  return { ...s, agent, onboarded: true, plan: "pro", hired: ["scout", "quill", "tally"], memory, jobs, chat, threads, groups: [crew], active: "home", nextJob: jobs.length + 1 };
 }
 export function finishOnboarding(agent: Agent, knows: string[]) { set((s) => seeded(s, agent, knows)); }
 export function startDemo() {
@@ -127,7 +148,7 @@ export function hire(slug: string): "ok" | "full" | "already" {
   set((x) => ({ ...x, hired: [...x.hired, slug] }));
   return "ok";
 }
-export function release(slug: string) { set((s) => ({ ...s, hired: s.hired.filter((h) => h !== slug) })); }
+export function release(slug: string) { set((s) => ({ ...s, hired: s.hired.filter((h) => h !== slug), groups: s.groups.map((g) => ({ ...g, members: g.members.filter((m) => m !== slug) })) })); }
 export function setPlan(id: PlanId) {
   set((s) => { const seats = PLANS.find((p) => p.id === id)!.seats; return { ...s, plan: id, hired: s.hired.slice(0, seats - 1) }; });
 }
@@ -154,47 +175,90 @@ export function routeJob(s: State, text: string) {
   return kw?.slug ?? "home";
 }
 
-/* ---------- chats: one thread per agent, demo replies ---------- */
-const replying = new Set<string>();
-/** True while an agent is "typing" its demo reply. */
+/* ---------- chats: one thread per agent or group, demo replies ---------- */
+export const isGroup = (id: string) => id.startsWith("g-");
+export const groupOf = (s: State, id: string) => s.groups.find((g) => g.id === id);
+/** Every conversation id that still exists: your agent, hired specialists and groups. */
+export const convoExists = (s: State, id: string | null | undefined) => !!id && (id === "home" || s.hired.includes(id) || s.groups.some((g) => g.id === id));
+
+const typingWho = new Map<string, string>(); // conversation → the agent typing in it
+const queued = new Set<string>();
+/** Which agent is typing its demo reply in a conversation, or null. */
 export function useTyping(id: string) {
-  return useSyncExternalStore(subscribe, () => replying.has(id), () => false);
+  return useSyncExternalStore(subscribe, () => typingWho.get(id) ?? null, () => null);
+}
+const ping = () => subs.forEach((f) => f());
+const push = (convo: string, m: Omit<Msg, "id" | "at">) =>
+  set((x) => ({ ...x, threads: { ...x.threads, [convo]: [...(x.threads[convo] || []), { ...m, id: uid(), at: Date.now() }].slice(-120) } }));
+
+const fmtSecs = (n: number) => `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, "0")}`;
+
+function replyText(convo: string, who: string, last: Msg, turn: number, others: string[]) {
+  const st = get(); const a = st.agent!;
+  const n = (st.threads[convo] || []).filter((m) => m.from === who).length;
+  if (last.voice) return who === "home" ? `Got your voice note (${fmtSecs(last.voice)}). I've written it down and I'm on it.` : `Heard your voice note. I'll take my part and post it here.`;
+  if (last.file && !last.text) return `Thanks, I have ${last.file.name}. What should I do with it?`;
+  if (isGroup(convo)) return groupReply({ who, text: last.text, turn, n, agentName: a.name, you: a.you, others });
+  return cannedReply({ id: who, text: last.text, n, agentName: a.name, you: a.you, tone: a.tone });
 }
 
-function scheduleReply(id: string, delay: number) {
-  if (replying.has(id)) return;
-  replying.add(id); subs.forEach((f) => f());
-  setTimeout(() => {
-    replying.delete(id);
-    const st = get(); const thread = st.threads[id] || []; const last = thread[thread.length - 1];
-    if (!st.agent || !last || last.from !== "you") { subs.forEach((f) => f()); return; }
-    let text = cannedReply({ id, text: last.text, n: thread.filter((m) => m.from !== "you").length, agentName: st.agent.name, you: st.agent.you, tone: st.agent.tone });
-    // "remember ..." really files a memory in the brain
-    const rem = id === "home" ? last.text.match(/^\s*(please\s+)?remember( that)?\s+(.{3,120})/i) : null;
-    if (rem) { const note = rem[3].replace(/[.!\s]+$/, ""); addNote(note.charAt(0).toUpperCase() + note.slice(1), "About you", "Chat"); text = `Filed in my brain under About you: "${note}". I'll use it from now on.`; }
-    set((x) => ({ ...x, threads: { ...x.threads, [id]: [...(x.threads[id] || []), { id: uid(), from: id, text, at: Date.now() }].slice(-80) } }));
-  }, delay);
+/** Queue demo replies. In a group, one or two members answer in turn, each after a typing pause. */
+function scheduleReplies(convo: string, delay: number) {
+  if (queued.has(convo)) return;
+  const st = get(); const thread = st.threads[convo] || []; const last = thread[thread.length - 1];
+  if (!st.agent || !last || last.from !== "you") return;
+  let who: string[] = [convo];
+  if (isGroup(convo)) {
+    const g = groupOf(st, convo); if (!g || !g.members.length) return;
+    const names = g.members.map((m) => ({ m, name: (m === "home" ? st.agent!.name : SPECIALISTS.find((p) => p.slug === m)?.name ?? m).toLowerCase() }));
+    const t = last.text.toLowerCase();
+    const named = names.filter((x) => t.includes(x.name) || t.includes(`@${x.name}`)).map((x) => x.m);
+    const k = thread.filter((m) => m.from === "you").length;
+    who = named.length ? named.slice(0, 3) : g.members.length === 1 ? g.members : [g.members[k % g.members.length], g.members[(k + 1) % g.members.length]];
+  }
+  queued.add(convo);
+  const step = (i: number, wait: number) => {
+    typingWho.set(convo, who[i]); ping();
+    setTimeout(() => {
+      const now = get(); const l = (now.threads[convo] || []).filter((m) => m.from === "you").pop();
+      if (!now.agent || !l || !convoExists(now, convo)) { typingWho.delete(convo); queued.delete(convo); ping(); return; }
+      let text = replyText(convo, who[i], l, i, who.filter((w) => w !== who[i]));
+      const rem = convo === "home" && !l.voice ? l.text.match(/^\s*(please\s+)?remember( that)?\s+(.{3,120})/i) : null; // "remember ..." really files a memory
+      if (rem) { const note = rem[3].replace(/[.!\s]+$/, ""); addNote(note.charAt(0).toUpperCase() + note.slice(1), "About you", "Chat"); text = `Filed in my brain under About you: "${note}". I'll use it from now on.`; }
+      typingWho.delete(convo);
+      push(convo, { from: who[i], text });
+      if (i + 1 < who.length) step(i + 1, 1100 + Math.random() * 700);
+      else { queued.delete(convo); ping(); }
+    }, wait);
+  };
+  step(0, delay);
 }
 
-/** Send a message to one agent. A demo reply follows after a short typing pause. */
-export function sendTo(id: string, text: string) {
-  const v = text.trim(); if (!v) return;
-  set((x) => ({ ...x, threads: { ...x.threads, [id]: [...(x.threads[id] || []), { id: uid(), from: "you", text: v, at: Date.now() }].slice(-80) } }));
-  scheduleReply(id, 900 + Math.min(1400, v.length * 18));
+/** Send a message (text, an attachment or a voice note) to an agent or a group. Demo replies follow. */
+export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voice"> = {}) {
+  const v = text.trim(); if (!v && !extra.file && !extra.voice) return;
+  push(id, { from: "you", text: v, ...extra });
+  scheduleReplies(id, 900 + Math.min(1400, v.length * 18));
 }
 /** After a reload, answer any message that was still waiting for a reply. */
 export function ensureReplies() {
   const st = get();
-  Object.entries(st.threads).forEach(([id, t]) => { if (t[t.length - 1]?.from === "you") scheduleReply(id, 700); });
+  Object.entries(st.threads).forEach(([id, t]) => { if (t[t.length - 1]?.from === "you" && convoExists(st, id)) scheduleReplies(id, 700); });
+}
+export function logCall(id: string, secs: number) { if (secs > 0) push(id, { from: "system", text: "Voice call", call: secs }); }
+export function setActive(id: string) { if (get().active !== id) set((x) => ({ ...x, active: id })); }
+
+export function createGroup(name: string, members: string[]) {
+  const g: Group = { id: `g-${uid()}`, name: name.trim() || "New group", members, at: Date.now() };
+  set((x) => ({ ...x, groups: [...x.groups, g], threads: { ...x.threads, [g.id]: [{ id: uid(), from: "system", at: Date.now(), text: `You made the group “${g.name}”` }] } }));
+  return g.id;
+}
+export function updateGroup(id: string, p: Partial<Pick<Group, "name" | "members">>) { set((x) => ({ ...x, groups: x.groups.map((g) => (g.id === id ? { ...g, ...p } : g)) })); }
+export function deleteGroup(id: string) {
+  set((x) => { const threads = { ...x.threads }; delete threads[id]; return { ...x, groups: x.groups.filter((g) => g.id !== id), threads, active: x.active === id ? "home" : x.active }; });
 }
 
 export function resolveJob(id: number) { set((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: "done" } : j)) })); }
-/** Sends a past job's request to the same agent again. Returns the chat id. */
-export function rerunJob(id: number) {
-  const j = get().jobs.find((x) => x.id === id); if (!j) return "home";
-  sendTo(j.assignee, j.prompt); return j.assignee;
-}
-
 /** Called every second by the app shell. Finishes jobs whose time is up and files what they learned. */
 export function tick(now = Date.now()) {
   const s = get();

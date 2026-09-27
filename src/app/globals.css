@@ -169,3 +169,14 @@ body { font-family: var(--font-sans); color: var(--ink); background: var(--bg); 
 .brain-stage { background: radial-gradient(ellipse 60% 55% at 50% 50%, #ffffff 0%, #f5f2ff 55%, #e9e2ff 100%); }
 [data-theme="dark"] .brain-stage { background: radial-gradient(ellipse 55% 50% at 50% 50%, #1b1236 0%, #0a0716 50%, #000 100%); }
 .brain-chip { position: absolute; left: 0; top: 0; will-change: transform, opacity; transition: opacity .35s ease, background-color .25s, color .25s, box-shadow .25s; }
+
+/* voice note bars */
+@keyframes wave { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+.wave { animation: wave .9s ease-in-out infinite; transform-origin: center; }
+/* call rings */
+@keyframes ring-out { from { transform: scale(1); opacity: .5; } to { transform: scale(1.9); opacity: 0; } }
+.ring-out { animation: ring-out 2.2s cubic-bezier(.2,.6,.3,1) infinite; }
+/* a pretend cursor moving on the agent's desktop */
+@keyframes cursor-path { 0% { left: 18%; top: 34%; } 25% { left: 64%; top: 24%; } 45% { left: 72%; top: 60%; } 70% { left: 30%; top: 72%; } 100% { left: 18%; top: 34%; } }
+.cursor-path { animation: cursor-path 9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .wave, .ring-out, .cursor-path { animation: none; } }

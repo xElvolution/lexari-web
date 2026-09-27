@@ -1,5 +1,3 @@
-import type { Metadata } from "next";
-import ChatLayout from "@/components/app/chat/ChatLayout";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Lexari · Chats" };
-export default function ChatsPage() { return <ChatLayout />; }
+export default function ChatsPage() { redirect("/app"); }

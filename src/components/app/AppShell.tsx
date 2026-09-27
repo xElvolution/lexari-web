@@ -2,117 +2,119 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { PLANS } from "@/content/appData";
-import { agentName, planOf, startDemo, tick, useApp, type State } from "@/lib/store";
+import { startDemo, tick, toast, useApp, type State } from "@/lib/store";
 import Logo from "../Logo";
 import ThemeToggle from "../ThemeToggle";
 import Face from "../Face";
 import Icon from "./Icon";
-import { AgentFace, SpecFace } from "./faces";
 import { DemoTag } from "./ui";
 import Toaster from "./Toaster";
 
 export const NAV = [
   { href: "/app", label: "Home", icon: "home" },
-  { href: "/app/chat", label: "Chats", icon: "chat" },
   { href: "/app/memory", label: "Brain", icon: "memory" },
   { href: "/app/marketplace", label: "Market", icon: "market" },
   { href: "/app/team", label: "Team", icon: "team" },
-  { href: "/app/jobs", label: "Jobs", icon: "jobs" },
+  { href: "/app/wallets", label: "Wallets", icon: "wallet" },
   { href: "/app/settings", label: "Settings", icon: "settings" },
 ];
 const isOn = (path: string, href: string) => (href === "/app" ? path === "/app" : path.startsWith(href));
+const initials = (s: State) => (s.auth?.method === "wallet" ? "0x" : (s.auth?.label || "You").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase());
 
-function SeatMeter({ s }: { s: State }) {
-  const p = planOf(s); const shown = Math.min(p.seats, 20);
+/** Slim rail on desktop: icons with small labels, theme and profile at the bottom. */
+function Rail({ s, path }: { s: State; path: string }) {
+  const onProfile = path.startsWith("/app/profile");
   return (
-    <Link href="/app/team" data-seat-target className="block rounded-[20px] bg-card p-3.5 ring-1 ring-line transition hover:ring-grape/50">
-      <div className="flex items-center justify-between"><span className="label text-[9.5px] text-ink/65">Seats · {p.name}</span><span className="label tab-num text-[10px] text-brand-ink">{1 + s.hired.length}/{p.seats}</span></div>
-      <div className="mt-2.5 grid grid-cols-10 gap-1">
-        {Array.from({ length: shown }).map((_, i) => (
-          <span key={i} className={`aspect-square rounded-[4px] ${i === 0 ? "bg-grape" : i <= s.hired.length ? "bg-lilac" : "border border-dashed border-ink/30"}`} />
-        ))}
-      </div>
-    </Link>
-  );
-}
-
-function Sidebar({ s, path }: { s: State; path: string }) {
-  const running = s.jobs.filter((j) => j.status === "running");
-  return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] flex-col border-r border-line bg-alt px-4 pb-4 pt-5 lg:flex">
-      <Link href="/" aria-label="Lexari home" className="px-2"><Logo /></Link>
-      <Link href="/app/settings" className="grain carpet-w relative mt-6 flex items-center gap-3 overflow-hidden rounded-[22px] bg-grape p-3 text-white shadow-[0_6px_0_#3514b0] transition hover:-translate-y-0.5">
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#0a0a0a]"><AgentFace look={s.agent?.look} size={46} track /></span>
-        <span className="relative min-w-0">
-          <span className="display block truncate text-[26px] leading-none">{agentName(s)}</span>
-          <span className="label mt-1.5 flex items-center gap-1.5 text-[9px] text-white/85"><i className={`h-1.5 w-1.5 rounded-full bg-white ${running.length ? "live-dot" : ""}`} />{running.length ? `working · ${running.length} job${running.length > 1 ? "s" : ""}` : "online"}</span>
-        </span>
-      </Link>
-      <nav className="mt-5 grid gap-1" aria-label="App">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[84px] flex-col items-center border-r border-line bg-alt pb-4 pt-5 lg:flex">
+      <Link href="/" aria-label="Lexari home" title="Lexari" className="grid h-10 w-10 place-items-center rounded-[12px] bg-ink transition hover:scale-105"><span className="h-3.5 w-3.5 rounded-full bg-base" /></Link>
+      <nav className="mt-6 grid w-full gap-1 px-2" aria-label="App">
         {NAV.map((n) => {
           const on = isOn(path, n.href);
           return (
-            <Link key={n.href} href={n.href} aria-current={on ? "page" : undefined} className={`group relative flex items-center gap-3 rounded-2xl px-3.5 py-3 text-[15px] font-semibold transition ${on ? "bg-card text-ink shadow-[0_0_0_1px_var(--line)]" : "text-ink/75 hover:bg-tint hover:text-ink"}`}>
-              {on && <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-grape" />}
-              <Icon name={n.icon} size={20} className={on ? "text-brand-ink" : "transition group-hover:scale-110"} />
+            <Link key={n.href} href={n.href} aria-current={on ? "page" : undefined} {...(n.href === "/app/team" ? { "data-seat-target": true } : {})} className={`group relative flex flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold transition ${on ? "text-ink" : "text-ink/60 hover:text-ink"}`}>
+              {on && <span className="absolute -left-2 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-grape" />}
+              <span className={`grid h-9 w-12 place-items-center rounded-full transition ${on ? "bg-grape text-white" : "group-hover:bg-tint"}`}><Icon name={n.icon} size={20} /></span>
               {n.label}
-              {n.href === "/app/jobs" && running.length > 0 && <span className="label ml-auto rounded-full bg-grape px-1.5 py-0.5 text-[9px] text-white">{running.length}</span>}
             </Link>
           );
         })}
       </nav>
-      {s.hired.length > 0 && (
-        <div className="mt-5 px-1">
-          <span className="label text-[9.5px] text-ink/60">Hired</span>
-          <div className="mt-2 flex -space-x-2">
-            {s.hired.slice(0, 7).map((h) => <Link key={h} href={`/app/chat/${h}`} title={`Chat with ${h}`} className="grid h-9 w-9 place-items-center rounded-full bg-tint ring-2 ring-alt transition hover:z-10 hover:-translate-y-1"><SpecFace slug={h} size={30} /></Link>)}
-          </div>
-        </div>
-      )}
-      <div className="mt-auto grid gap-3">
-        <SeatMeter s={s} />
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1 px-1">
-            <div className="truncate text-[13px] font-bold text-ink">{s.auth?.label}</div>
-            <div className="flex items-center gap-1 text-[12px] text-ink/65"><Icon name={s.auth?.method === "wallet" ? "wallet" : "google"} size={12} />{s.auth?.method === "wallet" ? s.auth.sub : "Google"}</div>
-          </div>
-          <ThemeToggle />
-        </div>
-        <DemoTag className="self-start" />
+      <div className="mt-auto flex flex-col items-center gap-3">
+        <ThemeToggle />
+        <Link href="/app/profile" aria-label="Profile" title={`${s.auth?.label ?? "Profile"}`} className={`grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] ring-2 ring-offset-2 ring-offset-[var(--alt)] transition hover:scale-105 ${onProfile ? "ring-grape" : "ring-transparent"}`}>{initials(s)}</Link>
       </div>
     </aside>
   );
 }
 
+type Item = { key: string; label: string; icon: string; href?: string; run?: () => void; soon?: boolean };
+const MORE_PATHS = ["/app/wallets", "/app/settings", "/app/profile"];
+
+/** Phone header and bottom nav. "More" lifts the main items away and brings up a second row. */
 function MobileBars({ s, path }: { s: State; path: string }) {
-  const items = NAV.slice(0, 6);
-  const idx = Math.max(0, items.findIndex((n) => isOn(path, n.href)));
-  const onSettings = path.startsWith("/app/settings");
+  const [more, setMore] = useState(() => MORE_PATHS.some((p) => path.startsWith(p)));
+  const rowA = useRef<HTMLDivElement>(null);
+  const rowB = useRef<HTMLDivElement>(null);
+  const first = useRef(true);
+  const primary: Item[] = [...NAV.slice(0, 4).map((n) => ({ key: n.href, label: n.label, icon: n.icon, href: n.href })), { key: "more", label: "More", icon: "more", run: () => setMore(true) }];
+  const secondary: Item[] = [
+    { key: "/app/wallets", label: "Wallets", icon: "wallet", href: "/app/wallets" },
+    { key: "/app/settings", label: "Settings", icon: "settings", href: "/app/settings" },
+    { key: "/app/profile", label: "Profile", icon: "user", href: "/app/profile" },
+    { key: "soon", label: "Soon", icon: "box", soon: true, run: () => toast({ text: "More is coming here soon" }) },
+    { key: "close", label: "Close", icon: "x", run: () => setMore(false) },
+  ];
+
+  useLayoutEffect(() => {
+    const a = rowA.current, b = rowB.current; if (!a || !b) return;
+    const ai = a.querySelectorAll("[data-nav-item]"), bi = b.querySelectorAll("[data-nav-item]");
+    const [show, hide, showItems, hideItems] = more ? [b, a, bi, ai] : [a, b, ai, bi];
+    if (first.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      first.current = false;
+      gsap.set(show, { autoAlpha: 1 }); gsap.set(hide, { autoAlpha: 0 }); gsap.set([...ai, ...bi], { y: 0, opacity: 1 });
+      return;
+    }
+    const tl = gsap.timeline();
+    // opening: the main row rises out, the new row slides up in. Closing: the new row falls away, the main row drops back in.
+    const out = more ? -46 : 46, inFrom = more ? 46 : -46;
+    tl.to(hideItems, { y: out, opacity: 0, duration: 0.26, stagger: 0.035, ease: "power2.in" })
+      .set(hide, { autoAlpha: 0 })
+      .set(show, { autoAlpha: 1 }, "<")
+      .fromTo(showItems, { y: inFrom, opacity: 0 }, { y: 0, opacity: 1, duration: 0.42, stagger: 0.045, ease: "back.out(1.6)" }, "-=0.12");
+    return () => { tl.kill(); };
+  }, [more]);
+
+  const cell = (it: Item) => {
+    const on = !!it.href && isOn(path, it.href);
+    const inner = (
+      <>
+        <span className={`grid h-8 w-12 place-items-center rounded-full transition ${on ? "bg-grape text-white" : it.soon ? "text-ink/40" : "text-ink/70"}`}><Icon name={it.icon} size={21} /></span>
+        <span className={`text-[11px] font-bold ${on ? "text-ink" : it.soon ? "text-ink/40" : "text-ink/65"}`}>{it.label}</span>
+      </>
+    );
+    const cls = "flex flex-col items-center justify-start gap-1 pt-2";
+    return it.href
+      ? <Link key={it.key} data-nav-item href={it.href} aria-current={on ? "page" : undefined} {...(it.href === "/app/team" ? { "data-seat-target": true } : {})} className={cls}>{inner}</Link>
+      : <button key={it.key} data-nav-item onClick={it.run} aria-expanded={it.key === "more" ? more : undefined} className={cls}>{inner}</button>;
+  };
+
   return (
     <>
-      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-line bg-base/85 px-4 backdrop-blur-md lg:hidden">
+      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-line bg-base/90 px-4 backdrop-blur-md lg:hidden">
         <Link href="/app" aria-label="Home"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
         <div className="flex items-center gap-2">
           <DemoTag className="hidden min-[400px]:inline-flex" />
           <ThemeToggle />
-          <Link href="/app/settings" aria-label="Settings and profile" className={`grid h-11 w-11 place-items-center rounded-full bg-grape ring-2 transition ${onSettings ? "ring-ink" : "ring-transparent"}`}><AgentFace look={s.agent?.look} size={34} /></Link>
+          <Link href="/app/profile" aria-label="Profile" className="grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)]">{initials(s)}</Link>
         </div>
       </header>
-      <nav aria-label="App" className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-base/92 backdrop-blur-md lg:hidden">
-        <div className="relative mx-auto grid h-[68px] max-w-[560px] grid-cols-6">
-          {!onSettings && <span aria-hidden className="absolute top-2 h-9 w-12 rounded-full bg-grape transition-transform duration-500 [transition-timing-function:cubic-bezier(.3,1.5,.5,1)]" style={{ left: `calc(100% / 12 - 24px)`, transform: `translateX(calc(${idx} * (min(100vw, 560px) / 6)))` }} />}
-          {items.map((n, i) => {
-            const on = !onSettings && i === idx;
-            return (
-              <Link key={n.href} href={n.href} aria-current={on ? "page" : undefined} {...(n.href === "/app/team" ? { "data-seat-target": true } : {})} className="relative flex flex-col items-center justify-start gap-1 pt-2.5">
-                <span className={`grid h-8 place-items-center transition ${on ? "text-white" : "text-ink/70"}`}><Icon name={n.icon} size={21} /></span>
-                <span className={`text-[11px] font-bold ${on ? "text-ink" : "text-ink/65"}`}>{n.label}</span>
-              </Link>
-            );
-          })}
+      <nav aria-label="App" className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-base/95 backdrop-blur-md lg:hidden">
+        <div className="relative mx-auto h-[66px] max-w-[560px] overflow-hidden">
+          <div ref={rowA} className="absolute inset-0 grid grid-cols-5" aria-hidden={more}>{primary.map(cell)}</div>
+          <div ref={rowB} className="invisible absolute inset-0 grid grid-cols-5" aria-hidden={!more}>{secondary.map(cell)}</div>
         </div>
       </nav>
     </>
@@ -121,10 +123,10 @@ function MobileBars({ s, path }: { s: State; path: string }) {
 
 function Loading() {
   return (
-    <div className="min-h-screen bg-base lg:pl-[264px]" aria-busy="true" aria-label="Loading">
-      <div className="fixed inset-y-0 left-0 hidden w-[264px] border-r border-line bg-alt p-5 lg:block">
-        <div className="skel h-7 w-28" /><div className="skel mt-6 h-20" />
-        {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="skel mt-3 h-11" />)}
+    <div className="min-h-screen bg-base lg:pl-[84px]" aria-busy="true" aria-label="Loading">
+      <div className="fixed inset-y-0 left-0 hidden w-[84px] border-r border-line bg-alt px-4 py-5 lg:block">
+        <div className="skel mx-auto h-10 w-10" />
+        {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="skel mx-auto mt-5 h-12 w-12" />)}
       </div>
       <div className="mx-auto max-w-[1180px] px-5 pt-8 sm:px-8">
         <div className="skel h-4 w-32" /><div className="skel mt-4 h-14 w-2/3 max-w-[520px]" />
@@ -164,20 +166,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useLayoutEffect(() => {
     if (!ready || !main.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = gsap.context(() => {
-      gsap.from("[data-rise]", { y: 28, opacity: 0, duration: 0.75, stagger: 0.06, ease: "back.out(1.5)", clearProps: "transform,opacity" });
+      gsap.from("[data-rise]", { y: 14, opacity: 0, duration: 0.5, stagger: 0.05, ease: "power2.out", clearProps: "transform,opacity" });
     }, main);
     return () => ctx.revert();
   }, [path, ready]);
 
   if (!s) return <Loading />;
   if (!ready) return <Gate s={s} />;
-  const inThread = /^\/app\/chat\/.+/.test(path);
-  const bleed = path === "/app/memory" || path.startsWith("/app/chat");
+  const bleed = path === "/app" || path === "/app/memory" || path.startsWith("/app/chat");
   return (
     <div className="min-h-screen bg-base text-ink">
-      <Sidebar s={s} path={path} />
-      {!inThread && <MobileBars s={s} path={path} />}
-      <div className="lg:pl-[264px]">
+      <Rail s={s} path={path} />
+      <MobileBars s={s} path={path} />
+      <div className="lg:pl-[84px]">
         {bleed ? <div key={path}>{children}</div> : <div ref={main} key={path} className="mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-8 sm:pt-9 lg:pb-16">{children}</div>}
       </div>
       <Toaster />

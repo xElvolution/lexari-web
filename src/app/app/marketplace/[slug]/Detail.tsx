@@ -31,7 +31,7 @@ export default function Detail({ slug }: { slug: string }) {
   const similar = SPECIALISTS.filter((x) => x.slug !== a.slug && (x.cat === a.cat || x.words.some((w) => a.words.includes(w)))).concat(SPECIALISTS.filter((x) => x.slug !== a.slug)).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 3);
   const tryJob = (ex: string) => {
     if (!hired) { const r = hireWithFx(a.slug, face.current, () => router.push("/app/team")); if (r !== "ok") return; }
-    sendTo(a.slug, ex); router.push(`/app/chat/${a.slug}`);
+    sendTo(a.slug, ex); router.push(`/app?c=${a.slug}`);
   };
 
   return (
@@ -62,7 +62,7 @@ export default function Detail({ slug }: { slug: string }) {
           <div className="mt-6 flex flex-col gap-3 sm:flex-row lg:mt-auto lg:pt-6">
             {hired ? (
               <>
-                <Link href={`/app/chat/${a.slug}`} className="btn btn-brand flex-1">Chat with {a.name} <Icon name="arrow" size={18} /></Link>
+                <Link href={`/app?c=${a.slug}`} className="btn btn-brand flex-1">Chat with {a.name} <Icon name="arrow" size={18} /></Link>
                 <button onClick={() => { release(a.slug); toast({ text: `${a.name} left the seat. It's open again.`, face: a.seed, color: a.color }); }} className="btn btn-line text-ink">Release seat</button>
               </>
             ) : (

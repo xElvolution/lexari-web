@@ -240,3 +240,59 @@ export function cannedReply(o: { id: string; text: string; n: number; agentName:
   if (TASKY.test(t)) return lines[o.n % 2];
   return lines[2 + (o.n % 2)];
 }
+
+/** Demo replies inside a group chat. The first to answer coordinates, the next one picks up a part. */
+export function groupReply(o: { who: string; text: string; turn: number; n: number; agentName: string; you: string; others: string[] }) {
+  const t = o.text.toLowerCase();
+  const hi = /^(hi|hey|hello|yo|good (morning|afternoon|evening))\b/.test(t);
+  const nameOf = (id: string) => (id === "home" ? o.agentName : specialistBySlug(id)?.name ?? "the team");
+  const other = o.others[0] ? nameOf(o.others[0]) : "";
+  if (hi) return o.who === "home" ? `Hi${o.you ? ` ${o.you}` : ""}! Everyone's here. What are we working on?` : `Hey! ${specialistBySlug(o.who)?.name ?? "I"} here, ready when you are.`;
+  if (o.who === "home") {
+    const lines = [
+      `Got it. I'll keep track of this${other ? ` and ask ${other} to take a part` : ""}. Summary here when it's done.`,
+      `Noted. I'll split it up and check back in this chat.`,
+      `On it. I'll pull together what everyone sends and keep it to one page.`,
+    ];
+    return lines[o.n % lines.length];
+  }
+  const sp = specialistBySlug(o.who);
+  if (!sp) return "On it.";
+  const lines = o.turn === 0
+    ? [`${sp.name} here. "${gist(o.text)}" is right in my lane. I'll take it.`, `On it. ${sp.back}`, `I can take this. Short version first, details after.`]
+    : [`I'll take the ${sp.job.toLowerCase()} part and post it here.`, `Adding my part: ${sp.back.charAt(0).toLowerCase()}${sp.back.slice(1)}`, `Sounds good. I'll back ${other || "that"} up on this.`];
+  return lines[o.n % lines.length];
+}
+
+/* ---------- each agent's computer (demo desktop pane) ---------- */
+export type DesktopScript = { url: string; title: string; kind: "browser" | "doc" | "sheet"; steps: string[]; terminal: string[]; files: { name: string; size: string }[] };
+export function desktopFor(id: string, agentName: string): DesktopScript {
+  const sp = specialistBySlug(id);
+  const tag = (sp?.slug ?? "home");
+  const byCat: Record<string, Omit<DesktopScript, "terminal">> = {
+    home: { url: "notes.example.com/this-week", title: "This week", kind: "doc", steps: ["Read your new messages", "Opened this week's notes", "Checked two deadlines", "Updated the plan", "Saved notes to Files"], files: [{ name: "week-plan.md", size: "2 KB" }, { name: "team-report.md", size: "3 KB" }] },
+    Research: { url: "compare.example.com/pricing", title: "Pricing pages", kind: "browser", steps: ["Opened 3 product sites", "Reading pricing page 1 of 3", "Reading pricing page 2 of 3", "Checking every source", "Building the table"], files: [{ name: "comparison.md", size: "4 KB" }, { name: "sources.txt", size: "1 KB" }] },
+    Writing: { url: "docs.example.com/launch-post", title: "Launch post", kind: "doc", steps: ["Opened the draft", "Reading it in your voice", "Cutting the intro", "Trying two headlines", "Saved draft v3"], files: [{ name: "launch-post-v3.md", size: "3 KB" }] },
+    Data: { url: "sheets.example.com/q3-numbers", title: "Q3 numbers", kind: "sheet", steps: ["Opened the sheet", "Found 14 duplicate rows", "Fixed date formats", "Added a totals row", "Wrote what changed"], files: [{ name: "q3-clean.csv", size: "12 KB" }, { name: "changes.md", size: "1 KB" }] },
+  };
+  const base = byCat[tag === "home" ? "home" : sp!.cat] ?? { url: `${tag}.example.com/workspace`, title: sp?.job ?? "Workspace", kind: "browser" as const, steps: ["Opened the brief", "Gathering what it needs", "Working through it", "Checking the result", "Saved to Files"], files: [{ name: `${tag}-output.md`, size: "2 KB" }] };
+  const host = (sp?.name ?? agentName).toLowerCase();
+  return { ...base, terminal: [`$ open ${base.url}`, "  page loaded", `$ notes add "${base.title.toLowerCase()}"`, "  saved", "$ files ls ~/output", ...base.files.map((f) => `  ${f.name}  ${f.size}`), `$ wait --for ${host === "you" ? "you" : "next message"}`] };
+}
+
+/* ---------- agent wallets (demo) ---------- */
+export type WalletLine = { label: string; amount: number; ago: string };
+/** A made-up address and balance per agent. Clearly demo: nothing here is on a real chain. */
+export function walletFor(id: string) {
+  let h = 2166136261; for (const ch of `lexari-${id}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const hex = (n: number) => { let out = "", x = n; for (let i = 0; i < 40; i++) { x = Math.imul(x ^ (x >>> 13), 1274126177) >>> 0; out += (x & 15).toString(16); } return out; };
+  const address = `0x${hex(h)}`;
+  const balance = Math.round(((h % 40000) / 100 + 25) * 100) / 100;
+  const lines: WalletLine[] = [
+    { label: "Added by you", amount: 50, ago: "3 days ago" },
+    { label: "Tools used", amount: -Math.round((h % 500) / 10) / 10 - 0.4, ago: "yesterday" },
+    { label: "File storage", amount: -0.4, ago: "today" },
+  ];
+  const spark = Array.from({ length: 12 }, (_, i) => 30 + (((h >>> (i % 24)) & 31) + i * 2));
+  return { address, balance, lines, spark };
+}

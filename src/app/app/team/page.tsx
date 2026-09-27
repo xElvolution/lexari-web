@@ -57,7 +57,7 @@ export default function TeamPage() {
               const cls = `pop relative grid aspect-square place-items-center rounded-[22%] transition ${state === "home" ? "bg-grape shadow-[0_4px_0_#3514b0]" : state === "hired" ? `bg-tint ring-2 ${pick === slug ? "ring-grape" : "ring-grape/40"} hover:-translate-y-1` : "border-2 border-dashed border-ink/25 bg-base/60 hover:border-grape hover:bg-tint"}`;
               const style = { animationDelay: `${Math.min(i, 40) * 14}ms` };
               const num = big && <span className={`label absolute bottom-[8%] right-[10%] text-[9px] ${state === "home" ? "text-white/85" : "text-ink/55"}`}>{String(i + 1).padStart(2, "0")}</span>;
-              if (state === "home") return <Link key={i} href="/app/chat/home" className={cls} style={style} title={`${agentName(s)} · seat 01`}><AgentFace look={s.agent?.look} size={120} track={big} className="!h-[72%] !w-[72%]" />{num}</Link>;
+              if (state === "home") return <Link key={i} href="/app?c=home" className={cls} style={style} title={`${agentName(s)} · seat 01`}><AgentFace look={s.agent?.look} size={120} track={big} className="!h-[72%] !w-[72%]" />{num}</Link>;
               if (state === "hired") return <button key={i} onClick={() => setPick(pick === slug ? null : slug!)} className={cls} style={style} title={`${sp?.name} · seat ${i + 1}`} aria-label={`${sp?.name}, seat ${i + 1}`}><SpecFace slug={slug!} size={90} className="!h-[72%] !w-[72%]" />{num}</button>;
               return <Link key={i} href="/app/marketplace" className={cls} style={style} aria-label={`Open seat ${i + 1}. Hire a specialist.`}>{big && <Icon name="plus" size={22} className="text-ink/40" />}{num}</Link>;
             })}
@@ -66,7 +66,7 @@ export default function TeamPage() {
             <div className="pop relative mt-5 flex flex-wrap items-center gap-3 rounded-[22px] bg-ink p-3 text-[var(--bg)]">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-[var(--bg)]/10"><SpecFace slug={pick} size={40} /></span>
               <span className="min-w-0 flex-1"><b className="display block text-[24px] leading-none">{sp.name}</b><span className="text-[13px] opacity-75">{sp.job} · seat {String(s.hired.indexOf(pick) + 2).padStart(2, "0")}</span></span>
-              <Link href={`/app/chat/${pick}`} className="rounded-full bg-grape px-4 py-2 text-[14px] font-bold text-white">Chat</Link>
+              <Link href={`/app?c=${pick}`} className="rounded-full bg-grape px-4 py-2 text-[14px] font-bold text-white">Chat</Link>
               <Link href={`/app/marketplace/${pick}`} className="rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">Profile</Link>
               <button onClick={() => { release(pick); setPick(null); toast({ text: `${sp.name} left the seat`, face: sp.seed, color: sp.color }); }} className="rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">Release</button>
             </div>
