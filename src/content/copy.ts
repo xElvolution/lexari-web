@@ -5,7 +5,9 @@
  * [placeholder] = OKX specifics that are not final yet. Swap them when the team confirms.
  */
 
-export const APP = (process.env.NEXT_PUBLIC_APP_URL || "https://app.lexari.ai").replace(/\/$/, "");
+/** The web app lives in this same Next app, so links are relative. */
+export const APP = "/app";
+export const SIGNIN = "/signin";
 
 export const copy = {
   meta: {
@@ -20,7 +22,7 @@ export const copy = {
       { label: "Memory", href: "#memory" },
       { label: "Roster", href: "#roster" },
       { label: "Seats", href: "#seats" },
-      { label: "Sign in", href: "#access" },
+      { label: "Sign in", href: "/signin" },
       { label: "Questions", href: "#questions" },
     ],
     cta: "Hire your agent",
@@ -84,7 +86,7 @@ export const copy = {
       {
         time: "09:04",
         head: "Opens the browser",
-        text: "It visits each tool's pricing page and reads them properly, tables included.",
+        text: "It visits each tool's feature page and reads them properly, tables included.",
         screen: "browser",
       },
       {
@@ -101,7 +103,7 @@ export const copy = {
       },
     ],
     terminal: [
-      "$ collect pricing --sites 3",
+      "$ collect features --sites 3",
       "  3 pages read, 14 plans found",
       "$ build table --out plans.csv",
       "  plans.csv saved",
@@ -222,9 +224,9 @@ export const copy = {
     line: "An AI agent with its own computer and memory, plus a roster of specialists to hire.",
     links: [
       { label: "Open the app", href: APP },
-      { label: "Marketplace", href: `${APP}/market` },
-      { label: "Terms", href: `${APP}/legal/terms` },
-      { label: "Privacy", href: `${APP}/legal/privacy` },
+      { label: "Marketplace", href: `${APP}/marketplace` },
+      { label: "Terms", href: "/legal/terms" },
+      { label: "Privacy", href: "/legal/privacy" },
     ],
     fine: "Sample data on this page is illustrative. The wallet list is a placeholder until confirmed.",
   },

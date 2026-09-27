@@ -1,4 +1,4 @@
-import { copy, APP } from "@/content/copy";
+import { copy, SIGNIN } from "@/content/copy";
 import Face from "./Face";
 import Logo from "./Logo";
 
@@ -13,7 +13,7 @@ export default function Finale() {
           </div>
           <h2 className="reveal display mt-8 max-w-[14ch] text-[clamp(3rem,8.5vw,7.5rem)]">{F.title}</h2>
           <p className="reveal mt-6 text-[18px] text-white/80 sm:text-[20px]">{F.body}</p>
-          <a href={APP} className="reveal btn btn-white mt-9 !h-16 !px-9 !text-[18px]">{F.cta} →</a>
+          <a href={SIGNIN} className="reveal btn btn-white mt-9 !h-16 !px-9 !text-[18px]">{F.cta} →</a>
         </div>
         <div aria-hidden className="display pointer-events-none -mb-[0.14em] mt-16 select-none text-center text-[31vw] leading-[0.72] text-white/[0.09]">{F.wordmark}</div>
       </section>

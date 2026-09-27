@@ -46,7 +46,7 @@ function Code({ text }: { text: string }) {
  * and springs back. A tap or a fast sideways flick turns it over to show the back.
  * Physics (pendulum plus flip spring) is written straight to the DOM every frame.
  */
-export default function Badge({ name, setName }: { name: string; setName: (v: string) => void }) {
+export default function Badge({ name, setName, look }: { name: string; setName: (v: string) => void; look?: number | null }) {
   const rig = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const flipTarget = useRef(0);
@@ -147,7 +147,7 @@ export default function Badge({ name, setName }: { name: string; setName: (v: st
             <div className="label mt-1 text-[9.5px] text-white/80">my name is</div>
           </div>
           <div className="carpet-w relative mt-3 grid h-[118px] place-items-center overflow-hidden rounded-[18px] bg-[#0a0a0a] sm:h-[170px]">
-            <Face size={112} track />
+            {look === null || look === undefined ? <Face size={112} track /> : <Face seed={look} size={112} track />}
             <span className="label absolute left-3 top-3 text-[9px] text-white/70">{B.company}</span>
             <span className="label absolute right-3 top-3 rounded-full bg-grape px-2 py-1 text-[9px] text-white">● online</span>
           </div>

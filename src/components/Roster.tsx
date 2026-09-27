@@ -67,7 +67,7 @@ export default function Roster() {
       <div className="relative mx-auto max-w-[1320px] px-5 sm:px-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <SectionIntro label={R.label} title={R.title} body={R.body} why={R.why} tone="grape" />
-          <a href={`${APP}/market`} className="reveal btn btn-white shrink-0 self-start lg:self-end">{R.cta} →</a>
+          <a href={`${APP}/marketplace`} className="reveal btn btn-white shrink-0 self-start lg:self-end">{R.cta} →</a>
         </div>
       </div>
       <div ref={wrap} className="relative mt-14 py-6">

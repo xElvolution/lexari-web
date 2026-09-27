@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { copy, APP } from "@/content/copy";
+import { copy, SIGNIN } from "@/content/copy";
 import SectionIntro from "./SectionIntro";
 import Face from "./Face";
 
@@ -71,7 +71,7 @@ export default function Seats() {
             <ul className="mt-5 grid gap-2.5 text-[15px]">
               {P.points.map((pt) => <li key={pt} className="flex gap-2.5"><span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-white" />{pt}</li>)}
             </ul>
-            <a href={APP} className="btn btn-white relative z-10 mt-8 lg:mt-auto">Start on {P.name}</a>
+            <a href={SIGNIN} className="btn btn-white relative z-10 mt-8 lg:mt-auto">Start on {P.name}</a>
           </div>
         </div>
       </div>

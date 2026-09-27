@@ -40,12 +40,12 @@ function Screen({ kind, active }: { kind: string; active: boolean }) {
   );
   if (kind === "browser") return (
     <div className={base}>
-      <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-mono text-[10px] text-white/70 sm:text-[12px]"><span className="h-2 w-2 rounded-full bg-lilac" />pricing.budgetapp.example</div>
+      <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 font-mono text-[10px] text-white/70 sm:text-[12px]"><span className="h-2 w-2 rounded-full bg-lilac" />features.budgetapp.example</div>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {["Basic", "Plus", "Team"].map((p, i) => (
           <div key={p} className={`rounded-xl p-2.5 sm:p-3 ${i === 1 ? "bg-grape" : "bg-white/8 ring-1 ring-white/10"}`}>
             <div className="text-[11px] font-bold text-white sm:text-[13px]">{p}</div>
-            <div className="display mt-1 text-[18px] text-white sm:text-[24px]">${[0, 6, 12][i]}</div>
+            <div className="display mt-1 text-[18px] text-white sm:text-[24px]">{["7.4", "8.9", "8.1"][i]}</div>
             {[0, 1, 2].map((k) => <div key={k} className="mt-1.5 h-1.5 rounded-full bg-white/20" style={{ width: `${90 - k * 18}%` }} />)}
           </div>
         ))}

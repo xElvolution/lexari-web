@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { copy, APP } from "@/content/copy";
+import { copy, SIGNIN } from "@/content/copy";
 import Badge from "./Badge";
 
 const H = copy.hero;
@@ -38,7 +38,7 @@ export default function Hero() {
         <div className="[grid-area:rest] lg:pb-12">
           <p className="mt-7 max-w-[36rem] text-[17px] leading-[1.6] text-ink/75 sm:text-[19px]">{H.body}</p>
           <div className="mt-9 flex flex-col gap-4 sm:flex-row">
-            <a href={`${APP}/?name=${encodeURIComponent(name)}`} className="btn btn-brand">{H.primary} {name || "your agent"} <span aria-hidden>→</span></a>
+            <a href={`${SIGNIN}?name=${encodeURIComponent(name)}`} className="btn btn-brand">{H.primary} {name || "your agent"} <span aria-hidden>→</span></a>
             <a href="#desk" className="btn btn-line text-ink">{H.secondary}</a>
           </div>
           <dl className="mt-12 grid max-w-[36rem] grid-cols-3 border-t-2 border-line pt-5">
