@@ -9,7 +9,6 @@ import Access from "@/components/Access";
 import Faq from "@/components/Faq";
 import Finale from "@/components/Finale";
 import Reveal from "@/components/Reveal";
-import Peekers from "@/components/Peekers";
 
 export default function Home() {
   return (
@@ -24,7 +23,6 @@ export default function Home() {
       <Access />
       <Faq />
       <Finale />
-      <Peekers />
       <Reveal />
     </main>
   );
