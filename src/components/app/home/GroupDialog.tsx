@@ -28,10 +28,10 @@ export default function GroupDialog({ s, editId, onClose, onDone }: { s: State; 
 
   return (
     <div className="fixed inset-0 z-[75] flex items-end justify-center bg-black/55 backdrop-blur-sm sm:items-center sm:p-5" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={card} role="dialog" aria-modal="true" aria-labelledby="group-title" className="pb-safe-dlg w-full max-w-[460px] rounded-t-[28px] bg-card p-5 ring-1 ring-line sm:rounded-[28px] sm:p-6">
+      <div ref={card} role="dialog" aria-modal="true" aria-labelledby="group-title" data-tour="group-dialog" className="pb-safe-dlg w-full max-w-[460px] rounded-t-[28px] bg-card p-5 ring-1 ring-line sm:rounded-[28px] sm:p-6">
         <div className="flex items-center justify-between">
           <h2 id="group-title" className="display text-[32px] text-ink">{g ? "Edit group" : "New group"}</h2>
-          <button onClick={onClose} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={19} /></button>
+          <button onClick={onClose} aria-label="Close" data-tour="group-close" className="grid h-10 w-10 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={19} /></button>
         </div>
         <label className="mt-4 block">
           <span className="label text-[9.5px] text-ink/60">Group name</span>
@@ -52,7 +52,7 @@ export default function GroupDialog({ s, editId, onClose, onDone }: { s: State; 
             );
           })}
         </ul>
-        {agents.length < 2 && <p className="mt-2 text-[13.5px] text-ink/60">Add another agent with the + on Home to start a group.</p>}
+        {agents.length < 2 && <p className="mt-2 text-[13.5px] text-ink/60">Add another agent with the + on the Agents page to start a group.</p>}
         <div className="mt-5 flex gap-2">
           {g && <button onClick={() => { deleteGroup(g.id); onDone(null); }} className="btn btn-sm btn-line text-ink">Delete</button>}
           <button onClick={save} disabled={!ok} className="btn btn-brand btn-sm flex-1 disabled:opacity-40 disabled:shadow-none">{g ? "Save" : "Create group"}</button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { openAdd } from "../overlays";
 import { useState } from "react";
 import { cardTxns, shortAddr, walletFor } from "@/content/appData";
 import { cancelCard, createWallet, toast, updateCard, useApp, type State } from "@/lib/store";
@@ -149,7 +150,7 @@ export default function WalletsView() {
         </div>
         <div className="inline-flex shrink-0 self-start rounded-full bg-tint p-1 sm:self-end" role="tablist" aria-label="Wallets or cards">
           {([["wallets", "wallet", "Wallets", withWallet], ["cards", "file", "Cards", withCard]] as const).map(([id, ic, l, n]) => (
-            <button key={id} role="tab" aria-selected={tab === id} onClick={() => go(id)} className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-[14px] font-bold transition ${tab === id ? "bg-card text-ink shadow-[0_2px_0_var(--color-grape)]" : "text-ink/65 hover:text-ink"}`}><Icon name={ic} size={16} />{l}<span className="tab-num rounded-full bg-ink/10 px-1.5 text-[11px]">{n}</span></button>
+            <button key={id} role="tab" data-tour={`${id}-tab`} aria-selected={tab === id} onClick={() => go(id)} className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-[14px] font-bold transition ${tab === id ? "bg-card text-ink shadow-[0_2px_0_var(--color-grape)]" : "text-ink/65 hover:text-ink"}`}><Icon name={ic} size={16} />{l}<span className="tab-num rounded-full bg-ink/10 px-1.5 text-[11px]">{n}</span></button>
           ))}
         </div>
       </div>
@@ -160,7 +161,7 @@ export default function WalletsView() {
           <section data-rise>
             <div className="flex items-baseline justify-between"><h2 className="text-[18px] font-bold text-ink">Other agents</h2><span className="text-[13px] text-ink/55">Hired agents start without a wallet</span></div>
             <ul className="mt-3 grid gap-2.5">{agents.slice(1).map((a) => <OtherWallet key={a.id} s={s} a={a} />)}</ul>
-            {agents.length === 1 && <p className="mt-3 text-[14px] text-ink/60">Hire an agent to give it a wallet.</p>}
+            {agents.length === 1 && <p className="mt-3 text-[14px] text-ink/60">Add an agent to give it a wallet. <button onClick={() => openAdd()} className="font-bold text-brand-ink">Add an agent</button></p>}
           </section>
         </div>
       ) : (

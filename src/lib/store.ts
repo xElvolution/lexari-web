@@ -7,8 +7,8 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
-  DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, cannedReply, groupReply, scriptFor, shortAddr, walletFor,
-  type Job, type MemoryTag, type PlanId, type ToneId, type WalletId,
+  DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, cannedReply, groupReply, registerCustom, scriptFor, shortAddr, walletFor,
+  type CustomAgent, type Job, type MemoryTag, type PlanId, type ToneId, type WalletId,
 } from "@/content/appData";
 
 export type Msg = {
@@ -16,7 +16,12 @@ export type Msg = {
   file?: { name: string; size: string }; // an attachment (demo: only the name and size are kept)
   voice?: number; // a voice note, length in seconds
   call?: number; // a call log line, length in seconds
+  re?: Record<string, string[]>; // reactions: emoji → who reacted ("you" or an agent id)
+  reply?: { id: string; from: string; text: string }; // the message this one answers
 };
+/** Your own notes on any agent. Hired agents only get nick, notes and memory; the maker controls the rest. */
+export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; about?: string; skills?: string[] };
+export type Tour = { on: boolean; step: number; done: boolean };
 export type Group = { id: string; name: string; members: string[]; at: number };
 export type Card = { number: string; exp: string; cvv: string; frozen: boolean; limit: number; at: number };
 export type Prefs = {
@@ -42,10 +47,14 @@ export type State = {
   wallets: Record<string, string>; // agent id → wallet address (demo). Only your own agent has one at first.
   cards: Record<string, Card>; // agent id → its virtual card (demo)
   prefs: Prefs; profile: Profile | null;
+  custom: CustomAgent[]; // agents you made (ids start with "c-")
+  born: Record<string, number>; // agent id → the day it joined you (printed on its ID card)
+  meta: Record<string, AgentMeta>;
+  tour: Tour;
 };
 
 const KEY = "lexari-app-v1";
-const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null };
+const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null, custom: [], born: {}, meta: {}, tour: { on: false, step: 0, done: false } };
 
 let state: State | null = null;
 const subs = new Set<() => void>();
@@ -55,7 +64,13 @@ function load(): State {
   try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; if (!Array.isArray(st.groups)) st.groups = [];
       if (!s.wallets) st.wallets = s.agent ? { home: walletFor("home").address } : {};
       st.prefs = { ...DEFAULT_PREFS, ...(s.prefs || {}), notif: { ...DEFAULT_PREFS.notif, ...(s.prefs?.notif || {}) } };
+      if (!Array.isArray(s.custom)) st.custom = [];
+      if (!s.meta) st.meta = {};
+      if (!s.born) { const t0 = s.profile?.since ?? Date.now(); st.born = { home: t0 }; (st.hired || []).forEach((h, i) => { st.born[h] = t0 + (i + 1) * 36e5; }); }
+      if (!s.tour) st.tour = { on: !!s.onboarded, step: 0, done: false }; // saved before the tour existed: show it once
+      registerCustom(st.custom);
       return st; } } } catch {}
+  registerCustom([]);
   return EMPTY;
 }
 function snapshot() { if (state === null) state = load(); return state; }
@@ -66,7 +81,9 @@ function subscribe(f: () => void) {
   return () => { subs.delete(f); window.removeEventListener("storage", onStorage); };
 }
 export function set(fn: (s: State) => State) {
+  const before = snapshot().custom;
   state = fn(snapshot());
+  if (state.custom !== before) registerCustom(state.custom);
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
   subs.forEach((f) => f());
 }
@@ -127,13 +144,15 @@ function seeded(s: State, agent: Agent, knows: string[]): State {
     ...(agent.you ? [{ id: uid(), tag: "About you" as MemoryTag, text: `Calls you ${agent.you}${agent.role ? `, ${agent.role.toLowerCase()}` : ""}`, source: "You, day one", at: now }] : []),
     ...SEED_MEMORY.map((m) => ({ id: uid(), tag: m.tag, text: m.text, source: m.source, at: now - m.ago })),
   ];
-  const chat: Msg[] = [{ id: uid(), from: "home", at: now, text: `Hi${agent.you ? ` ${agent.you}` : ""}, I'm ${agent.name}. I've read what you told me and my computer is on. Ask me for anything, or just say hi.` }];
+  const chat: Msg[] = [{ id: uid(), from: "home", at: now, re: { "👋": ["you"] }, text: `Hi${agent.you ? ` ${agent.you}` : ""}, I'm ${agent.name}. I've read what you told me and my computer is on. Ask me for anything, or just say hi.` }];
   const threads: Record<string, Msg[]> = {
     home: chat,
     scout: [
       { id: uid(), from: "scout", at: now - 3 * 864e5, text: "Scout here. I'm in seat 02. Send me anything that needs reading, comparing or checking." },
-      { id: uid(), from: "you", at: now - 3 * 864e5 + 6e4, text: "Compare three budgeting tools and keep it to one page" },
-      { id: uid(), from: "scout", at: now - 3 * 864e5 + 9e4, text: "Done. Read 3 feature pages and 14 plans. The one-page summary and a table are in Files, with links to every source." },
+      { id: uid(), from: "you", at: now - 3 * 864e5 + 6e4, text: "Compare three budgeting tools and keep it to one page", re: { "👍": ["scout"] } },
+      { id: uid(), from: "scout", at: now - 3 * 864e5 + 9e4, text: "Done. Read 3 feature pages and 14 plans. The one-page summary and a table are in Files, with links to every source.", re: { "🔥": ["you"] } },
+      { id: uid(), from: "you", at: now - 3 * 864e5 + 12e4, text: "Perfect, thank you!", re: { "❤️": ["scout"] } },
+      { id: uid(), from: "scout", at: now - 3 * 864e5 + 15e4, text: "Anytime. Want the same one-pager for note apps next?" },
     ],
   };
   const d = (days: number, min = 0) => now - days * 864e5 + min * 6e4;
@@ -145,15 +164,16 @@ function seeded(s: State, agent: Agent, knows: string[]): State {
   threads.tally = [{ id: uid(), from: "tally", at: d(1), text: "Tally here, seat 04. Messy sheet? Send it over and I'll tell you what changed." }];
   const crew: Group = { id: "g-launch", name: "Launch crew", members: ["home", "scout", "quill"], at: d(1, 30) };
   threads[crew.id] = [
-    { id: uid(), from: "you", at: d(0, -95), text: "Launch is Friday. What do we still need?" },
+    { id: uid(), from: "you", at: d(0, -95), text: "Launch is Friday. What do we still need?", re: { "👀": ["home"], "👍": ["scout"] } },
     { id: uid(), from: "home", at: d(0, -94), text: `I'll keep the list. Scout, can you check what similar launches did? Quill, the post needs a final pass.` },
     { id: uid(), from: "scout", at: d(0, -93), text: "On it. Reading five recent launches now. Short table by tonight." },
-    { id: uid(), from: "quill", at: d(0, -92), text: "Final pass on the post is done. Two headline options are in Files." },
+    { id: uid(), from: "quill", at: d(0, -92), text: "Final pass on the post is done. Two headline options are in Files.", re: { "🎉": ["you", "home"], "🔥": ["scout"] } },
   ];
   const who = s.auth?.method === "google" ? s.auth.label : agent.you || "You";
   const profile: Profile = { name: who, username: who.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 14) || "you", bio: agent.role ? `${agent.role}.` : "", since: now };
   return { ...s, agent, onboarded: true, plan: "pro", hired: ["scout", "quill", "tally"], memory, jobs, chat, threads, groups: [crew], active: "home", nextJob: jobs.length + 1,
-    wallets: { home: walletFor("home").address }, cards: {}, profile };
+    wallets: { home: walletFor("home").address }, cards: {}, profile,
+    custom: [], meta: {}, born: { home: now, scout: now - 3 * 864e5 - 36e5, quill: now - 2 * 864e5 - 36e5, tally: now - 864e5 - 36e5 }, tour: { on: true, step: 0, done: false } };
 }
 export function finishOnboarding(agent: Agent, knows: string[]) { set((s) => seeded(s, agent, knows)); }
 export function startDemo() {
@@ -166,7 +186,7 @@ export function hire(slug: string): "ok" | "full" | "already" {
   const s = get();
   if (s.hired.includes(slug)) return "already";
   if (seatsLeft(s) <= 0) return "full";
-  set((x) => ({ ...x, hired: [...x.hired, slug] }));
+  set((x) => ({ ...x, hired: [...x.hired, slug], born: { ...x.born, [slug]: Date.now() } }));
   return "ok";
 }
 export function release(slug: string) { set((s) => ({ ...s, hired: s.hired.filter((h) => h !== slug), groups: s.groups.map((g) => ({ ...g, members: g.members.filter((m) => m !== slug) })) })); }
@@ -200,7 +220,8 @@ export function routeJob(s: State, text: string) {
 export const isGroup = (id: string) => id.startsWith("g-");
 export const groupOf = (s: State, id: string) => s.groups.find((g) => g.id === id);
 /** Every conversation id that still exists: your agent, hired specialists and groups. */
-export const convoExists = (s: State, id: string | null | undefined) => !!id && (id === "home" || s.hired.includes(id) || s.groups.some((g) => g.id === id));
+export const convoExists = (s: State, id: string | null | undefined) => !!id && (id === "home" || s.hired.includes(id) || s.custom.some((c) => c.id === id) || s.groups.some((g) => g.id === id));
+export const isCustom = (id: string) => id.startsWith("c-");
 
 const typingWho = new Map<string, string>(); // conversation → the agent typing in it
 const queued = new Set<string>();
@@ -209,8 +230,11 @@ export function useTyping(id: string) {
   return useSyncExternalStore(subscribe, () => typingWho.get(id) ?? null, () => null);
 }
 const ping = () => subs.forEach((f) => f());
-const push = (convo: string, m: Omit<Msg, "id" | "at">) =>
-  set((x) => ({ ...x, threads: { ...x.threads, [convo]: [...(x.threads[convo] || []), { ...m, id: uid(), at: Date.now() }].slice(-120) } }));
+const push = (convo: string, m: Omit<Msg, "id" | "at">) => {
+  const id = uid();
+  set((x) => ({ ...x, threads: { ...x.threads, [convo]: [...(x.threads[convo] || []), { ...m, id, at: Date.now() }].slice(-120) } }));
+  return id;
+};
 
 const fmtSecs = (n: number) => `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, "0")}`;
 
@@ -220,7 +244,9 @@ function replyText(convo: string, who: string, last: Msg, turn: number, others: 
   if (last.voice) return who === "home" ? `Got your voice note (${fmtSecs(last.voice)}). I've written it down and I'm on it.` : `Heard your voice note. I'll take my part and post it here.`;
   if (last.file && !last.text) return `Thanks, I have ${last.file.name}. What should I do with it?`;
   if (isGroup(convo)) return groupReply({ who, text: last.text, turn, n, agentName: a.name, you: a.you, others });
-  return cannedReply({ id: who, text: last.text, n, agentName: a.name, you: a.you, tone: a.tone });
+  const c = st.custom.find((x) => x.id === who);
+  if (c && n <= 1 && !/^(hi|hey|hello)/i.test(last.text)) return `${c.name} here. ${c.about ? "Going by the brief you gave me, " : ""}I'll start on "${last.text.replace(/[?.!]+$/, "").split(/\s+/).slice(0, 7).join(" ")}" now.`;
+  return cannedReply({ id: who, text: last.text, n, agentName: a.name, you: a.you, tone: c?.tone ?? a.tone });
 }
 
 /** Queue demo replies. In a group, one or two members answer in turn, each after a typing pause. */
@@ -231,7 +257,7 @@ function scheduleReplies(convo: string, delay: number) {
   let who: string[] = [convo];
   if (isGroup(convo)) {
     const g = groupOf(st, convo); if (!g || !g.members.length) return;
-    const names = g.members.map((m) => ({ m, name: (m === "home" ? st.agent!.name : SPECIALISTS.find((p) => p.slug === m)?.name ?? m).toLowerCase() }));
+    const names = g.members.map((m) => ({ m, name: (m === "home" ? st.agent!.name : st.meta[m]?.nick || (st.custom.find((c) => c.id === m)?.name ?? SPECIALISTS.find((p) => p.slug === m)?.name ?? m)).toLowerCase() }));
     const t = last.text.toLowerCase();
     const named = names.filter((x) => t.includes(x.name) || t.includes(`@${x.name}`)).map((x) => x.m);
     const k = thread.filter((m) => m.from === "you").length;
@@ -256,10 +282,44 @@ function scheduleReplies(convo: string, delay: number) {
 }
 
 /** Send a message (text, an attachment or a voice note) to an agent or a group. Demo replies follow. */
-export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voice"> = {}) {
+export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voice" | "reply"> = {}) {
   const v = text.trim(); if (!v && !extra.file && !extra.voice) return;
-  push(id, { from: "you", text: v, ...extra });
+  const mid = push(id, { from: "you", text: v, ...extra });
   scheduleReplies(id, 900 + Math.min(1400, v.length * 18));
+  agentReacts(id, mid, v, !!extra.voice);
+}
+
+/* ---------- reactions ---------- */
+export const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎉", "👀", "🔥"];
+export const MORE_REACTIONS = ["😮", "😢", "🙏", "💯", "✅", "👏", "🤔", "🚀", "😍", "🤝", "💡", "👋"];
+/** Add or remove one person's reaction on a message. */
+export function toggleReaction(convo: string, msgId: string, emoji: string, who = "you") {
+  set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((m) => {
+    if (m.id !== msgId) return m;
+    const re = { ...(m.re || {}) }; const list = re[emoji] || [];
+    re[emoji] = list.includes(who) ? list.filter((w) => w !== who) : [...list, who];
+    if (!re[emoji].length) delete re[emoji];
+    return { ...m, re };
+  }) } }));
+}
+/** Demo: agents sometimes react to what you send. Thanks get a heart, good news a party, requests a thumbs up. */
+function agentReacts(convo: string, msgId: string, text: string, voice: boolean) {
+  const t = text.toLowerCase();
+  const pick = /\b(thanks|thank you|thx|ty|love|appreciate)\b/.test(t) ? "❤️"
+    : /\b(launched|shipped|done|won|finally|great news|good news|yay|we did it|live|passed|hired)\b|!{2,}/.test(t) ? "🎉"
+    : /\b(haha|lol|lmao|funny)\b|😂/.test(t) ? "😂"
+    : /\b(urgent|asap|now|deadline|tonight)\b/.test(t) ? "👀"
+    : voice || /\b(please|can you|could you|compare|find|write|draft|plan|make|build|check|fix|review|remember)\b|\?$/.test(t) ? "👍" : null;
+  if (!pick) return;
+  const strong = pick !== "👍";
+  if (!strong && Math.random() > 0.65) return;
+  const st = get();
+  const who: string[] = isGroup(convo) ? [...(groupOf(st, convo)?.members ?? [])].sort(() => Math.random() - 0.5).slice(0, strong ? 2 : 1) : [convo];
+  who.forEach((w, i) => setTimeout(() => {
+    const m = (get().threads[convo] || []).find((x) => x.id === msgId); if (!m) return;
+    const emoji = i === 0 ? pick : pick === "🎉" ? "🔥" : pick === "❤️" ? "🙏" : "👍";
+    if (!(m.re?.[emoji] || []).includes(w)) toggleReaction(convo, msgId, emoji, w);
+  }, 650 + i * 900 + Math.random() * 500));
 }
 /** After a reload, answer any message that was still waiting for a reply. */
 export function ensureReplies() {
@@ -325,3 +385,30 @@ export function exportData() {
   const a = document.createElement("a"); a.href = url; a.download = "lexari-export.json"; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/* ---------- agents you create, your notes on any agent ---------- */
+export function createAgent(a: Omit<CustomAgent, "id" | "at">) {
+  const c: CustomAgent = { ...a, id: `c-${uid()}`, at: Date.now() };
+  const you = get().agent?.you;
+  const hello = `Hi${you ? ` ${you}` : ""}, I'm ${c.name}. ${c.about ? `I've read the brief you gave me: “${c.about.replace(/\s+$/, "")}”` : "Tell me what you want me to do."} My computer is on and my memory is ${c.memory ? "on" : "off"}. What should I start with?`;
+  set((x) => ({ ...x, custom: [...x.custom, c], born: { ...x.born, [c.id]: c.at }, active: c.id,
+    threads: { ...x.threads, [c.id]: [{ id: uid(), from: c.id, at: Date.now(), text: hello }] } }));
+  return c.id;
+}
+export function updateCustom(id: string, p: Partial<CustomAgent>) { set((x) => ({ ...x, custom: x.custom.map((c) => (c.id === id ? { ...c, ...p } : c)) })); }
+export function deleteCustom(id: string) {
+  set((x) => {
+    const threads = { ...x.threads }; delete threads[id];
+    const wallets = { ...x.wallets }; delete wallets[id];
+    const cards = { ...x.cards }; delete cards[id];
+    const meta = { ...x.meta }; delete meta[id];
+    return { ...x, custom: x.custom.filter((c) => c.id !== id), threads, wallets, cards, meta, active: x.active === id ? "home" : x.active,
+      groups: x.groups.map((g) => ({ ...g, members: g.members.filter((m) => m !== id) })) };
+  });
+}
+export function setMeta(id: string, p: AgentMeta) { set((x) => ({ ...x, meta: { ...x.meta, [id]: { ...(x.meta[id] || {}), ...p } } })); }
+
+/* ---------- guided tour ---------- */
+export function startTour() { set((x) => ({ ...x, tour: { on: true, step: 0, done: x.tour?.done ?? false } })); }
+export function setTourStep(step: number) { set((x) => ({ ...x, tour: { ...x.tour, step } })); }
+export function endTour() { set((x) => ({ ...x, tour: { on: false, step: 0, done: true } })); }

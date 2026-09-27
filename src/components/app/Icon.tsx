@@ -1,5 +1,10 @@
 /** Small stroke icons for the app. One set, one weight. */
 const P: Record<string, React.ReactNode> = {
+  smile: <><circle cx="12" cy="12" r="8.5" /><path d="M8.5 14.2a4.2 4.2 0 0 0 7 0" /><path d="M9.2 9.6h.01M14.8 9.6h.01" strokeWidth="2.6" /></>,
+  reply: <><path d="M10 8 5 12.5l5 4.5" /><path d="M5.5 12.5H14a5 5 0 0 1 5 5V19" /></>,
+  info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.5M12 7.8h.01" strokeWidth="2.4" /></>,
+  idcard: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><circle cx="9" cy="11" r="2.2" /><path d="M5.8 16c.6-1.6 1.8-2.4 3.2-2.4s2.6.8 3.2 2.4M14.5 10h3.5M14.5 13.5h3.5" /></>,
+  hand: <><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11" /><path d="M12 10V4.5a1.5 1.5 0 0 1 3 0V11" /><path d="M15 10.5V6.5a1.5 1.5 0 0 1 3 0v7c0 4-2.5 7-6.5 7-2.6 0-4.1-1.3-5.5-3.3L4 13.9a1.5 1.5 0 0 1 2.4-1.8L9 15V9.5" /></>,
   home: <><path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5H9v5.5H5.5A1.5 1.5 0 0 1 4 19z" /></>,
   desk: <><rect x="3" y="4" width="18" height="12" rx="2.5" /><path d="M8 20h8M12 16v4" /></>,
   memory: <><path d="M7 3h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></>,

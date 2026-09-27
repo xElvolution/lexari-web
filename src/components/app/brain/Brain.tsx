@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { openAdd } from "../overlays";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { SPECIALISTS, type MemoryTag } from "@/content/appData";
@@ -108,7 +109,7 @@ function Panel({ s, cat, onClose }: { s: State; cat: number; onClose: () => void
                 <Icon name="arrow" size={16} className="mr-1 text-ink/60" />
               </Link></li>
             ))}
-          </ul>) : <p className="rounded-2xl border-2 border-dashed border-line p-5 text-center text-[14px] text-ink/70">No one hired yet. <Link href="/app/marketplace" className="font-bold text-brand-ink">Open the marketplace</Link></p>)}
+          </ul>) : <p className="rounded-2xl border-2 border-dashed border-line p-5 text-center text-[14px] text-ink/70">No one hired yet. <button onClick={() => openAdd("hire")} className="font-bold text-brand-ink">Add an agent</button></p>)}
       </div>
       {EDITABLE.has(id) && (
         <form onSubmit={(e) => { e.preventDefault(); teach(); }} className="flex gap-2 border-t border-line p-3">

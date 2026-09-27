@@ -51,7 +51,7 @@ export default function Home() {
           <ConvoList s={s} active={active} onPick={open} onNewGroup={() => setGroup({})} className="w-[300px] shrink-0 border-r border-line bg-alt" />
         )}
         <div className="flex min-w-0 flex-1 flex-col lg:h-full">
-          <AgentStrip s={s} active={active} onPick={open} />
+          <AgentStrip s={s} active={wide ? active : fromUrl ?? ""} onPick={open} />
           {wide ? (
             <div className="relative flex min-h-0 flex-1">
               <ChatPanel key={active} s={s} id={active} onCall={() => setCall(true)} onDesktop={() => setPane((p) => !p)} desktopOpen={pane} onEditGroup={() => setGroup({ edit: active })} />

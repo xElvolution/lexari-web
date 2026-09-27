@@ -13,7 +13,7 @@ export function AgentFace({ look, size = 48, track = false, className = "" }: { 
 export function SpecFace({ slug, size = 48, track = false, className = "" }: { slug: string; size?: number; track?: boolean; className?: string }) {
   const s = specialistBySlug(slug);
   if (!s) return null;
-  return <Face seed={s.seed} variant={{ color: s.color }} size={size} track={track} className={className} />;
+  return <Face seed={s.seed} variant={{ color: s.color, ...s.face }} size={size} track={track} className={className} />;
 }
 
 /** Either one, by assignee id ("home" or a slug). */

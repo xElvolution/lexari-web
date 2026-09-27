@@ -3,12 +3,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { CHAT_SUGGESTIONS, specialistBySlug } from "@/content/appData";
-import { ensureReplies, useNow, useTyping, type Msg, type State } from "@/lib/store";
+import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, toast, toggleReaction, useNow, useTyping, type Msg, type State } from "@/lib/store";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
 import { DemoTag } from "../ui";
 import { convoOf, dayLabel, fmtSecs, nameOf, shortTime } from "../agents";
 import Composer from "./Composer";
+import { openAgent } from "../overlays";
 
 function VoiceNote({ secs, mine }: { secs: number; mine: boolean }) {
   const [p, setP] = useState(-1);
@@ -30,9 +31,15 @@ function VoiceNote({ secs, mine }: { secs: number; mine: boolean }) {
   );
 }
 
-function Body({ m, mine }: { m: Msg; mine: boolean }) {
+function Body({ m, mine, s }: { m: Msg; mine: boolean; s: State }) {
   return (
     <>
+      {m.reply && (
+        <button type="button" onClick={() => document.getElementById(`m-${m.reply!.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })} className={`mb-1.5 block w-full rounded-xl border-l-[3px] px-2.5 py-1.5 text-left text-[13px] leading-snug ${mine ? "border-white/70 bg-white/15 text-white/90" : "border-grape bg-tint text-ink/75"}`}>
+          <span className="block text-[11.5px] font-bold">{m.reply.from === "you" ? "You" : nameOf(s, m.reply.from)}</span>
+          <span className="line-clamp-2">{m.reply.text || "Attachment"}</span>
+        </button>
+      )}
       {m.file && (
         <span className={`mb-1 flex items-center gap-2.5 rounded-2xl p-1.5 pr-3 ${mine ? "bg-white/15" : "bg-tint"}`}>
           <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${mine ? "bg-white text-grape" : "bg-grape text-white"}`}><Icon name="file" size={17} /></span>
@@ -41,6 +48,97 @@ function Body({ m, mine }: { m: Msg; mine: boolean }) {
       )}
       {m.voice ? <VoiceNote secs={m.voice} mine={mine} /> : m.text && <span className="block whitespace-pre-wrap break-words">{m.text}</span>}
     </>
+  );
+}
+
+const whoName = (s: State, w: string) => (w === "you" ? "You" : nameOf(s, w));
+
+/** Small reaction pills under a bubble. Tap one to add or remove yours. */
+function Pills({ m, s, convo, mine }: { m: Msg; s: State; convo: string; mine: boolean }) {
+  const list = Object.entries(m.re || {}).filter(([, w]) => w.length);
+  if (!list.length) return null;
+  return (
+    <div className={`-mt-1.5 flex flex-wrap gap-1 ${mine ? "justify-end pr-2" : "pl-2"}`}>
+      {list.map(([e, w]) => {
+        const me = w.includes("you");
+        return (
+          <button key={e} onClick={() => toggleReaction(convo, m.id, e)} title={`${w.map((x) => whoName(s, x)).join(", ")} reacted ${e}`} aria-label={`${e} ${w.length}. ${me ? "Remove your reaction" : "React"}`} aria-pressed={me}
+            className={`pop relative z-[1] flex h-[26px] items-center gap-1 rounded-full px-2 text-[13px] leading-none shadow-sm ring-2 ring-[var(--bg)] transition hover:scale-105 ${me ? "bg-grape text-white" : "bg-card text-ink"}`}>
+            <span className="text-[14px]">{e}</span>{w.length > 1 && <span className="tab-num text-[11.5px] font-bold">{w.length}</span>}
+            {!me && w.length === 1 && w[0] !== "you" && <span className="text-[10.5px] font-semibold text-ink/50">{whoName(s, w[0])}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Reaction bar plus Reply and Copy. Opens on hover (desktop) or a long press (touch). */
+function MsgMenu({ m, convo, mine, open, more, below, onOpen, onMore, onReply, onClose }: {
+  m: Msg; convo: string; mine: boolean; open: boolean; more: boolean; below: boolean; onOpen: () => void; onMore: () => void; onReply: () => void; onClose: () => void;
+}) {
+  const react = (e: string) => { toggleReaction(convo, m.id, e); onClose(); };
+  const copy = () => { navigator.clipboard?.writeText(m.text || m.file?.name || "").then(() => toast({ text: "Copied" }), () => toast({ text: "Couldn't copy" })); onClose(); };
+  const act = "grid h-8 w-8 place-items-center rounded-full text-ink/65 transition hover:bg-tint hover:text-brand-ink";
+  return (
+    <>
+      <div className={`absolute top-1/2 z-[3] flex -translate-y-1/2 items-center gap-0.5 rounded-full bg-card p-0.5 shadow-lg ring-1 ring-line transition ${mine ? "right-full mr-2" : "left-full ml-2"} ${open ? "pointer-events-none opacity-0" : "pointer-events-none opacity-0 [@media(hover:hover)]:group-hover/msg:pointer-events-auto [@media(hover:hover)]:group-hover/msg:opacity-100"}`}>
+        <button onClick={onOpen} aria-label="React" title="React" className={act}><Icon name="smile" size={17} /></button>
+        <button onClick={onReply} aria-label="Reply" title="Reply" className={act}><Icon name="reply" size={17} /></button>
+        {(m.text || m.file) && <button onClick={copy} aria-label="Copy" title="Copy" className={act}><Icon name="copy" size={16} /></button>}
+      </div>
+      {open && (
+        <div data-menu className={`pop absolute z-[4] w-max ${below ? "top-full mt-2" : "bottom-full mb-2"} max-w-[min(330px,86vw)] ${mine ? "right-0 origin-bottom-right" : "left-0 origin-bottom-left"}`} role="menu" aria-label="React to message">
+          <div className="flex flex-wrap items-center gap-0.5 rounded-[22px] bg-card p-1 shadow-[0_18px_40px_-16px_rgba(0,0,0,.45)] ring-1 ring-line">
+            {(more ? [...QUICK_REACTIONS, ...MORE_REACTIONS] : QUICK_REACTIONS).map((e) => {
+              const me = (m.re?.[e] || []).includes("you");
+              return <button key={e} role="menuitem" onClick={() => react(e)} aria-label={`React ${e}`} className={`grid h-10 w-10 place-items-center rounded-full text-[21px] transition hover:-translate-y-0.5 hover:scale-125 hover:bg-tint ${me ? "bg-tint ring-2 ring-grape" : ""}`}>{e}</button>;
+            })}
+            {!more && <button onClick={onMore} aria-label="More reactions" className="grid h-10 w-10 place-items-center rounded-full bg-tint text-ink/70 transition hover:bg-grape hover:text-white"><Icon name="plus" size={18} /></button>}
+          </div>
+          <div className={`mt-1.5 flex gap-1 ${mine ? "justify-end" : ""}`}>
+            <button role="menuitem" onClick={onReply} className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13.5px] font-bold text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="reply" size={15} />Reply</button>
+            {(m.text || m.file) && <button role="menuitem" onClick={copy} className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13.5px] font-bold text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="copy" size={15} />Copy</button>}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Long press on touch opens the menu. */
+function usePress(open: () => void) {
+  const t = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clear = () => { if (t.current) clearTimeout(t.current); t.current = null; };
+  return {
+    onPointerDown: (e: React.PointerEvent) => { if (e.pointerType === "mouse") return; clear(); t.current = setTimeout(() => { open(); navigator.vibrate?.(12); }, 430); },
+    onPointerUp: clear, onPointerLeave: clear, onPointerCancel: clear,
+    onContextMenu: (e: React.MouseEvent) => { if ((e.nativeEvent as PointerEvent).pointerType !== "mouse") e.preventDefault(); },
+  };
+}
+
+function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
+  m: Msg; s: State; convo: string; mine: boolean; lastOfRun: boolean; now: number;
+  menu: { id: string; more: boolean } | null; setMenu: (v: { id: string; more: boolean } | null) => void; onReply: (m: Msg) => void;
+}) {
+  const open = menu?.id === m.id;
+  const box = useRef<HTMLDivElement>(null);
+  const [below, setBelow] = useState(false);
+  useLayoutEffect(() => {
+    if (!open || !box.current) return;
+    const sc = box.current.closest(".overflow-y-auto"); const top = sc ? sc.getBoundingClientRect().top : 0;
+    setBelow(box.current.getBoundingClientRect().top - top < 140);
+  }, [open]);
+  const press = usePress(() => setMenu({ id: m.id, more: false }));
+  const cls = mine ? `bg-grape text-white ${lastOfRun ? "rounded-br-md" : ""}` : `bg-card text-ink ring-1 ring-line ${lastOfRun ? "rounded-bl-md" : ""}`;
+  return (
+    <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
+      <div ref={box} className="group/msg relative max-w-full">
+        <div {...press} title={shortTime(m.at, now)} className={`select-text rounded-[20px] px-4 py-2.5 text-[15.5px] leading-snug transition ${cls} ${open ? "ring-2 ring-grape" : ""} [-webkit-touch-callout:none]`}><Body m={m} mine={mine} s={s} /></div>
+        <MsgMenu m={m} convo={convo} mine={mine} open={open} more={!!menu?.more} below={below} onOpen={() => setMenu({ id: m.id, more: false })} onMore={() => setMenu({ id: m.id, more: true })} onReply={() => { setMenu(null); onReply(m); }} onClose={() => setMenu(null)} />
+      </div>
+      <Pills m={m} s={s} convo={convo} mine={mine} />
+    </div>
   );
 }
 
@@ -56,6 +154,16 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
   const seen = useRef(msgs.length);
   const look = s.agent?.look;
   const calm = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const [menu, setMenu] = useState<{ id: string; more: boolean } | null>(null);
+  const [reply, setReply] = useState<Msg | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const off = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest("[data-menu]")) setMenu(null); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setMenu(null); };
+    const t = setTimeout(() => window.addEventListener("pointerdown", off), 0);
+    window.addEventListener("keydown", esc);
+    return () => { clearTimeout(t); window.removeEventListener("pointerdown", off); window.removeEventListener("keydown", esc); };
+  }, [menu]);
 
   useEffect(() => { ensureReplies(); }, []);
   useLayoutEffect(() => {
@@ -81,12 +189,21 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-base">
       <header className="flex h-[64px] shrink-0 items-center gap-3 border-b border-line px-3 sm:px-5">
-        {onBack && <button onClick={onBack} aria-label="Back to chats" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink transition hover:bg-tint"><Icon name="back" size={20} /></button>}
-        {c.group ? <GroupTile members={c.members} look={look} size={40} /> : <AgentTile id={id} look={look} size={40} />}
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[16.5px] font-bold leading-tight text-ink">{c.name}</h2>
-          <p className={`truncate text-[12.5px] ${typing ? "font-semibold text-brand-ink" : "text-ink/60"}`}>{sub}</p>
-        </div>
+        {onBack && <button onClick={onBack} aria-label="Back to chats" data-tour="chat-back" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink transition hover:bg-tint"><Icon name="back" size={20} /></button>}
+        {c.group ? (
+          <button onClick={onEditGroup} className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl text-left">
+            <GroupTile members={c.members} look={look} size={40} />
+            <span className="min-w-0 flex-1"><h2 className="truncate text-[16.5px] font-bold leading-tight text-ink">{c.name}</h2><p className={`truncate text-[12.5px] ${typing ? "font-semibold text-brand-ink" : "text-ink/60"}`}>{sub}</p></span>
+          </button>
+        ) : (
+          <button onClick={() => openAgent(id)} data-tour="chat-head" title={`${c.name}'s profile and ID card`} className="group flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-1 pr-2 text-left">
+            <AgentTile id={id} look={look} size={40} className="transition group-hover:scale-105" />
+            <span className="min-w-0">
+              <h2 className="flex items-center gap-1.5 truncate text-[16.5px] font-bold leading-tight text-ink group-hover:text-brand-ink">{c.name}<Icon name="idcard" size={15} className="shrink-0 text-ink/40 transition group-hover:text-brand-ink" /></h2>
+              <p className={`truncate text-[12.5px] ${typing ? "font-semibold text-brand-ink" : "text-ink/60"}`}>{sub}</p>
+            </span>
+          </button>
+        )}
         <DemoTag className="hidden md:inline-flex" />
         {c.group && <button onClick={onEditGroup} aria-label="Edit group" title="Edit group" className="grid h-10 w-10 place-items-center rounded-full text-ink/75 transition hover:bg-tint hover:text-brand-ink"><Icon name="users" size={19} /></button>}
       </header>
@@ -113,18 +230,17 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
                 </div>
               );
               const mine = m.from === "you";
+              const bub = <Bubble m={m} s={s} convo={id} mine={mine} lastOfRun={lastOfRun} now={now} menu={menu} setMenu={setMenu} onReply={setReply} />;
               return (
-                <div key={m.id} data-msg>{day}
+                <div key={m.id} id={`m-${m.id}`} data-msg className={menu?.id === m.id ? "relative z-[5]" : ""}>{day}
                   {mine ? (
-                    <div className={`flex justify-end ${first ? "mt-4" : ""}`}>
-                      <div title={shortTime(m.at, now)} className={`max-w-[80%] rounded-[20px] bg-grape px-4 py-2.5 text-[15.5px] leading-snug text-white ${lastOfRun ? "rounded-br-md" : ""}`}><Body m={m} mine /></div>
-                    </div>
+                    <div className={`flex justify-end ${first ? "mt-4" : ""}`}><div className="min-w-0 max-w-[80%]">{bub}</div></div>
                   ) : (
                     <div className={`flex items-end gap-2.5 ${first ? "mt-4" : ""}`}>
-                      {lastOfRun ? <AgentTile id={m.from} look={look} size={30} radius={10} /> : <span className="w-[30px] shrink-0" />}
+                      {lastOfRun ? <button onClick={() => openAgent(m.from)} aria-label={`${nameOf(s, m.from)}'s profile`} className={`shrink-0 ${m.re && Object.keys(m.re).length ? "mb-[22px]" : ""}`}><AgentTile id={m.from} look={look} size={30} radius={10} /></button> : <span className="w-[30px] shrink-0" />}
                       <div className="min-w-0 max-w-[80%]">
                         {first && <span className="mb-1 block text-[12px] font-bold text-ink/60">{nameOf(s, m.from)}</span>}
-                        <div title={shortTime(m.at, now)} className={`rounded-[20px] bg-card px-4 py-2.5 text-[15.5px] leading-snug text-ink ring-1 ring-line ${lastOfRun ? "rounded-bl-md" : ""}`}><Body m={m} mine={false} /></div>
+                        {bub}
                       </div>
                     </div>
                   )}
@@ -144,7 +260,8 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
         </div>
       </div>
 
-      <Composer id={id} name={c.name} suggestions={suggestions} onCall={onCall} onDesktop={onDesktop} desktopOpen={desktopOpen} />
+      <Composer id={id} name={c.name} suggestions={suggestions} onCall={onCall} onDesktop={onDesktop} desktopOpen={desktopOpen}
+        reply={reply ? { id: reply.id, from: reply.from, text: reply.text || (reply.voice ? "Voice note" : reply.file?.name ?? "") } : null} replyName={reply ? whoName(s, reply.from) : ""} onClearReply={() => setReply(null)} />
     </section>
   );
 }

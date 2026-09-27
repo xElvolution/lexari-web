@@ -42,7 +42,7 @@ export default function ConvoList({ s, active, onPick, onNewGroup, className = "
       <ul className="no-bar min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2.5 pb-3">
         {list.map((c) => <Row key={c.id} c={c} s={s} on={c.id === active} now={now} onPick={onPick} />)}
         <li>
-          <button onClick={onNewGroup} className="mt-1 flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left text-ink/65 transition hover:bg-tint/70 hover:text-ink">
+          <button onClick={onNewGroup} data-tour="new-group" className="mt-1 flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left text-ink/65 transition hover:bg-tint/70 hover:text-ink">
             <span className="grid h-11 w-11 place-items-center rounded-[14px] border-2 border-dashed border-ink/25"><Icon name="plus" size={18} /></span>
             <span className="text-[14.5px] font-semibold">New group chat</span>
           </button>

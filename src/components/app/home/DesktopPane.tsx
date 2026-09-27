@@ -157,7 +157,7 @@ export default function DesktopPane({ s, id, onClose, full = false }: { s: State
   const cpu = 24 + ((step * 37 + v.seat * 11) % 38), ram = 44 + ((step * 13) % 9);
 
   return (
-    <aside ref={root} aria-label={`${name}'s remote desktop`} className={`flex h-full min-h-0 flex-col bg-alt ${full ? "" : "border-l border-line"}`}>
+    <aside ref={root} data-tour="pane" aria-label={`${name}'s remote desktop`} className={`flex h-full min-h-0 flex-col bg-alt ${full ? "" : "border-l border-line"}`}>
       <header className="flex h-[64px] shrink-0 items-center gap-3 border-b border-line px-4">
         <span className="grid h-10 w-10 place-items-center rounded-[13px] bg-grape text-white"><Icon name="monitor" size={20} /></span>
         <div className="min-w-0 flex-1">
@@ -165,7 +165,7 @@ export default function DesktopPane({ s, id, onClose, full = false }: { s: State
           <p className="truncate text-[12.5px] text-ink/60">Remote desktop · Ubuntu 24.04 · demo</p>
         </div>
         <span className="label hidden rounded-full border border-dashed border-ink/35 px-2 py-1 text-[8.5px] text-ink/70 sm:inline">Demo</span>
-        <button onClick={onClose} aria-label="Close desktop" className="grid h-10 w-10 place-items-center rounded-full text-ink/75 transition hover:bg-tint hover:text-ink"><Icon name={full ? "back" : "x"} size={19} /></button>
+        <button onClick={onClose} aria-label="Close desktop" data-tour="pane-close" className="grid h-10 w-10 place-items-center rounded-full text-ink/75 transition hover:bg-tint hover:text-ink"><Icon name={full ? "back" : "x"} size={19} /></button>
       </header>
       {members.length > 1 && (
         <div className="no-bar flex gap-1.5 overflow-x-auto border-b border-line px-4 py-2">

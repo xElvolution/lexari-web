@@ -4,7 +4,7 @@
  * product can be shown moving. Nothing talks to a server yet.
  * House rules: plain words, no em dashes, no prices or payment talk.
  */
-import type { ColorKey } from "@/components/avatar";
+import type { ColorKey, Eyes, Mouth, Shape, Variant } from "@/components/avatar";
 
 export const DEMO_LABEL = "Demo data";
 
@@ -58,6 +58,8 @@ export type Specialist = {
   skills: [string, number][]; tools: string[]; examples: string[];
   words: string[]; // chat keywords that route a job to this specialist
   review: { who: string; seed: number; text: string; stars: number }[];
+  face?: Partial<Variant>; // custom agents pick their own shape, eyes and mouth
+  custom?: boolean; // made by you in Create an agent
 };
 
 const ROSTER_COLORS: ColorKey[] = ["orange", "blue", "green", "yellow", "red", "teal", "pink", "sky"];
@@ -127,7 +129,52 @@ export const SPECIALISTS: Specialist[] = [
     words: ["news", "competitor", "brief", "trend", "market", "scan"],
     review: [{ who: "Uche", seed: 217, stars: 5, text: "My morning read, done for me." }] },
 ];
-export const specialistBySlug = (slug: string) => SPECIALISTS.find((s) => s.slug === slug);
+/* ---------- agents you create (demo: saved in this browser only) ---------- */
+export type CustomAgent = {
+  id: string; name: string; role: string; about: string; template: string | null;
+  shape: Shape; color: ColorKey; eyes: Eyes; mouth: Mouth; tone: ToneId; skills: string[]; memory: boolean; at: number;
+};
+export const AGENT_SKILLS = [
+  { id: "web", label: "Browse the web", desc: "Open pages, read and compare them." },
+  { id: "files", label: "Read and write files", desc: "Work with docs and save results to Files." },
+  { id: "code", label: "Run code", desc: "Use the terminal on its computer." },
+  { id: "sheets", label: "Spreadsheets", desc: "Clean, sum and chart tables." },
+  { id: "images", label: "Make images", desc: "Draft simple graphics and cards." },
+  { id: "email", label: "Draft emails", desc: "Write emails for you to send." },
+  { id: "calendar", label: "Plans and reminders", desc: "Keep dates, steps and check ins." },
+  { id: "wallet", label: "Use its wallet", desc: "Pay for tools inside a limit (demo)." },
+] as const;
+export type SkillId = (typeof AGENT_SKILLS)[number]["id"];
+export const AGENT_TEMPLATES: { id: string; label: string; icon: string; role: string; about: string; cat: Category; skills: SkillId[]; shape: Shape; color: ColorKey; examples: string[]; words: string[] }[] = [
+  { id: "research", label: "Researcher", icon: "search", role: "Research", about: "Reads the web for me, checks every source and sends back a short summary with links.", cat: "Research", skills: ["web", "files"], shape: "round", color: "orange", examples: ["Compare three note apps on one page", "Find the latest numbers on my market"], words: ["research", "find", "compare"] },
+  { id: "writer", label: "Writer", icon: "edit", role: "Writing", about: "Drafts posts, emails and briefs in my voice, then cuts them down to what matters.", cat: "Writing", skills: ["files", "email"], shape: "blob", color: "blue", examples: ["Draft a short update email", "Tighten this intro"], words: ["write", "draft", "edit"] },
+  { id: "analyst", label: "Analyst", icon: "jobs", role: "Numbers", about: "Cleans my sheets, builds summary tables and explains what changed in plain words.", cat: "Data", skills: ["sheets", "files"], shape: "square", color: "green", examples: ["Clean this contact list", "Explain last month's totals"], words: ["sheet", "numbers", "table"] },
+  { id: "designer", label: "Designer", icon: "spark", role: "Design", about: "Turns rough ideas into layouts, social cards and simple visuals.", cat: "Design", skills: ["images", "web"], shape: "hex", color: "pink", examples: ["Make three social cards", "Pick colors for a launch"], words: ["design", "card", "layout"] },
+  { id: "dev", label: "Developer", icon: "terminal", role: "Code", about: "Reads code, finds the bug and suggests the smallest fix, with tests.", cat: "Code", skills: ["code", "files"], shape: "robot", color: "teal", examples: ["Review this function", "Write a small script"], words: ["code", "bug", "fix"] },
+  { id: "marketer", label: "Marketer", icon: "chat", role: "Marketing", about: "Plans a week of posts, writes the hooks and keeps an eye on what gets replies.", cat: "Social", skills: ["web", "images"], shape: "tall", color: "yellow", examples: ["Draft a week of posts", "Find this week's talking points"], words: ["post", "social", "launch"] },
+  { id: "planner", label: "Planner", icon: "list", role: "Planning", about: "Breaks big goals into steps, owners and dates, then checks in every week.", cat: "Planning", skills: ["calendar", "files"], shape: "egg", color: "sky", examples: ["Plan my next two weeks", "Make a launch checklist"], words: ["plan", "steps", "schedule"] },
+];
+const hashId = (id: string) => { let h = 2166136261; for (const ch of id) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
+/** A friendly ID number for any agent, stable per id. Printed on its ID card. */
+export const agentIdNo = (id: string) => { const h = hashId(`id-${id}`); return `LX-${String(h % 10000).padStart(4, "0")}-${String((h >>> 14) % 1000).padStart(3, "0")}`; };
+/** Turns a custom agent into the same shape as a marketplace specialist, so chats, faces and desktops just work. */
+export function customToSpecialist(c: CustomAgent): Specialist {
+  const t = AGENT_TEMPLATES.find((x) => x.id === c.template);
+  const first = c.about.split(/(?<=[.!?])\s/)[0] || "Built by you.";
+  return {
+    slug: c.id, name: c.name, job: c.role || t?.role || "Custom agent", cat: t?.cat ?? "Planning", quip: first, back: c.about || "An agent you made. Tell it what to do.",
+    rating: 5, jobs: 0, reviews: 0, seed: hashId(c.id) % 997, color: c.color, speed: "Made by you",
+    skills: c.skills.map((id, i) => [AGENT_SKILLS.find((k) => k.id === id)?.label ?? id, 92 - i * 4] as [string, number]),
+    tools: ["Browser", "Files", "Terminal"].slice(0, Math.max(1, Math.min(3, c.skills.length))),
+    examples: t?.examples ?? ["Tell me what you can do", "Plan my week with me"], words: t?.words ?? [], review: [],
+    face: { shape: c.shape, color: c.color, eyes: c.eyes, mouth: c.mouth, extra: c.shape === "robot" ? "antenna" : "none", blush: c.tone === "warm" || c.tone === "playful" },
+    custom: true,
+  };
+}
+let CUSTOM: Specialist[] = [];
+/** Called by the store whenever your custom agents change. */
+export function registerCustom(list: CustomAgent[]) { CUSTOM = list.map(customToSpecialist); }
+export const specialistBySlug = (slug: string) => SPECIALISTS.find((s) => s.slug === slug) ?? CUSTOM.find((s) => s.slug === slug);
 
 /* ---------- memory ---------- */
 export const MEMORY_TAGS = ["About you", "Preferences", "People", "Tools", "Habits"] as const;

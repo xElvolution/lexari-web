@@ -9,7 +9,7 @@ const B = copy.hero.badge;
 const DARK_INK = { "--ink": "#0a0a0a", "--bg": "#ffffff" } as CSSProperties; // the card is always white
 
 /** Barcode generated from the agent's name, so every name prints a unique badge. */
-function Barcode({ text }: { text: string }) {
+export function Barcode({ text }: { text: string }) {
   const bars: number[] = [];
   for (const ch of (text || "lexari").padEnd(10, "x")) { const c = ch.charCodeAt(0); bars.push(1 + (c % 3), 1 + ((c >> 2) % 2)); }
   let x = 0;
@@ -21,7 +21,7 @@ function Barcode({ text }: { text: string }) {
 }
 
 /** A QR style code seeded by the name. Decorative, like the rest of the card. */
-function Code({ text }: { text: string }) {
+export function Code({ text }: { text: string }) {
   const n = 21, cells: [number, number][] = [];
   let h = 2166136261;
   for (const ch of text || "lexari") h = Math.imul(h ^ ch.charCodeAt(0), 16777619);

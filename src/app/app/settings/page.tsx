@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DEMO_ADDRESS, DEMO_GOOGLE, LOOKS, TONES, shortAddr } from "@/content/appData";
 import {
-  agentName, clearChats, exportData, setActive, linkMethod, planOf, release, resetAll, setNotif, setPrefs, signOut, toast, updateAgent, useApp, type State,
+  agentName, clearChats, exportData, setActive, linkMethod, planOf, resetAll, setNotif, setPrefs, signOut, startTour, toast, updateAgent, useApp, type State,
 } from "@/lib/store";
 import Icon from "@/components/app/Icon";
 import { AgentFace, AgentTile } from "@/components/app/faces";
 import { DemoTag } from "@/components/app/ui";
 import { myAgents } from "@/components/app/agents";
+import { openAdd, openAgent } from "@/components/app/overlays";
 
 const SECTIONS = [
   { id: "general", label: "General", icon: "settings" },
@@ -56,6 +57,7 @@ const dangerBtn = "inline-flex h-10 items-center gap-2 rounded-full px-4 text-[1
 
 /* ---------- sections ---------- */
 function General({ s }: { s: State }) {
+  const router = useRouter();
   const [theme, setTheme] = useState<Theme>("system");
   useEffect(() => { const t = localStorage.getItem("lexari-theme"); setTheme(t === "light" || t === "dark" ? t : "system"); }, []);
   const applyTheme = (t: Theme) => {
@@ -88,6 +90,9 @@ function General({ s }: { s: State }) {
       <Group title="Chats">
         <Row title="Default agent" desc="Who opens first on the Agents page."><Select label="Default agent" value={p.defaultAgent} options={myAgents(s).map((a) => [a.id, a.name] as [string, string])} onChange={(v) => { setPrefs({ defaultAgent: v }); setActive(v); }} /></Row>
         <Row title="Send with Enter" desc="Shift+Enter always adds a new line."><Toggle on onChange={() => toast({ text: "Enter to send is always on in the demo" })} label="Send with Enter" /></Row>
+      </Group>
+      <Group title="Help">
+        <Row title="Guided tour" desc={`${agentName(s)} walks you through the app again, step by step.${s.tour?.done ? " You finished it before." : ""}`}><button onClick={() => { startTour(); router.push("/app"); }} className={smallBtn}><Icon name="play" size={14} />Replay tour</button></Row>
       </Group>
     </>
   );
@@ -138,18 +143,18 @@ function Agents({ s }: { s: State }) {
   const p = planOf(s);
   return (
     <>
-      <Group title={`Your team · ${1 + s.hired.length} of ${p.seats} seats`}>
+      <Group title={`Your team · ${1 + s.hired.length} of ${p.seats} seats${s.custom.length ? ` · ${s.custom.length} made by you` : ""}`}>
         {myAgents(s).map((a) => (
           <div key={a.id} className="flex items-center gap-3 py-3.5">
             <AgentTile id={a.id} look={s.agent?.look} size={44} />
             <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="truncate text-[15px] font-semibold text-ink">{a.name}</span>{s.prefs.defaultAgent === a.id && <span className="label rounded-full bg-tint px-1.5 py-0.5 text-[8px] text-brand-ink">Default</span>}</div><div className="truncate text-[13px] text-ink/55">{a.role} · seat {String(a.seat).padStart(2, "0")}{s.wallets[a.id] ? " · wallet" : ""}{s.cards[a.id] ? " · card" : ""}</div></div>
             <Link href={`/app?c=${a.id}`} className={smallBtn}>Chat</Link>
-            {a.id !== "home" && <button onClick={() => { if (confirm(`Release ${a.name} from seat ${a.seat}?`)) { release(a.id); toast({ text: `${a.name} left the team` }); } }} className="hidden h-10 rounded-full px-3 text-[13.5px] font-semibold text-ink/55 hover:text-ink sm:inline-flex sm:items-center">Release</button>}
+            <button onClick={() => openAgent(a.id)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold text-ink/65 hover:bg-tint hover:text-ink"><Icon name="idcard" size={15} />Edit</button>
           </div>
         ))}
       </Group>
       <Group>
-        <Row title="Hire more agents" desc="Browse specialists in the marketplace."><Link href="/app/marketplace" className={smallBtn}>Marketplace</Link></Row>
+        <Row title="Add an agent" desc="Create your own, or hire a specialist from the marketplace."><button onClick={() => openAdd()} className={smallBtn}>Add agent</button></Row>
         <Row title="Seats and plan" desc="Seats decide how many agents you can have."><Link href="/app/team" className={smallBtn}>Team</Link></Row>
       </Group>
     </>

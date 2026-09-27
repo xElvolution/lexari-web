@@ -9,7 +9,8 @@ const kb = (n: number) => (n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(
 const BARS = 36;
 
 /** Message box: attach, text, voice note (demo recording), call and send. Enter sends, Shift+Enter adds a line. */
-export default function Composer({ id, name, suggestions, onCall, onDesktop, desktopOpen }: { id: string; name: string; suggestions: string[]; onCall: () => void; onDesktop: () => void; desktopOpen: boolean }) {
+type Reply = { id: string; from: string; text: string };
+export default function Composer({ id, name, suggestions, onCall, onDesktop, desktopOpen, reply = null, replyName = "", onClearReply }: { id: string; name: string; suggestions: string[]; onCall: () => void; onDesktop: () => void; desktopOpen: boolean; reply?: Reply | null; replyName?: string; onClearReply?: () => void }) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<{ name: string; size: string } | null>(null);
   const [rec, setRec] = useState<number | null>(null); // seconds recorded, null when not recording
@@ -28,9 +29,10 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
   const grow = () => { const t = input.current; if (!t) return; t.style.height = "auto"; t.style.height = `${Math.min(160, t.scrollHeight)}px`; };
   const send = (v = text) => {
     if (!v.trim() && !file) return;
-    sendTo(id, v, file ? { file } : {}); setText(""); setFile(null); requestAnimationFrame(grow); input.current?.focus();
+    sendTo(id, v, { ...(file ? { file } : {}), ...(reply ? { reply } : {}) }); setText(""); setFile(null); onClearReply?.(); requestAnimationFrame(grow); input.current?.focus();
   };
-  const sendVoice = () => { const secs = Math.max(1, Math.round(rec ?? 1)); setRec(null); sendTo(id, "", { voice: secs }); };
+  const sendVoice = () => { const secs = Math.max(1, Math.round(rec ?? 1)); setRec(null); sendTo(id, "", { voice: secs, ...(reply ? { reply } : {}) }); onClearReply?.(); };
+  useEffect(() => { if (reply) input.current?.focus(); }, [reply]);
   const ready = !!text.trim() || !!file;
   const iconBtn = "grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink/70 transition hover:bg-tint hover:text-brand-ink";
 
@@ -42,7 +44,14 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
             {suggestions.map((c) => <button key={c} onClick={() => send(c)} className="shrink-0 rounded-full bg-tint px-3.5 py-2 text-[13px] font-semibold text-ink/80 transition hover:bg-grape hover:text-white">{c}</button>)}
           </div>
         )}
-        <div className={`rounded-[26px] bg-card ring-1 transition ${rec !== null ? "ring-grape" : "ring-line focus-within:ring-2 focus-within:ring-grape"}`}>
+        <div data-tour="composer" className={`rounded-[26px] bg-card ring-1 transition ${rec !== null ? "ring-grape" : "ring-line focus-within:ring-2 focus-within:ring-grape"}`}>
+          {reply && rec === null && (
+            <div className="flex items-center gap-2.5 px-3 pt-3">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-tint text-brand-ink"><Icon name="reply" size={16} /></span>
+              <span className="min-w-0 flex-1 border-l-[3px] border-grape pl-2.5"><span className="block text-[12px] font-bold text-brand-ink">Replying to {replyName}</span><span className="block truncate text-[13px] text-ink/65">{reply.text || "Attachment"}</span></span>
+              <button type="button" onClick={onClearReply} aria-label="Cancel reply" className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink/60 hover:bg-line"><Icon name="x" size={14} /></button>
+            </div>
+          )}
           {file && rec === null && (
             <div className="flex px-3 pt-3">
               <span className="flex max-w-full items-center gap-2 rounded-2xl bg-tint py-1.5 pl-2 pr-1.5 text-[13px] text-ink">
@@ -55,9 +64,9 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
           {rec === null ? (
             <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex items-end gap-1 p-1.5">
               <input ref={picker} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile({ name: f.name, size: kb(f.size) }); e.target.value = ""; }} />
-              <button type="button" onClick={onDesktop} aria-pressed={desktopOpen} aria-label={`Open ${name}'s desktop`} title="Desktop" className={desktopOpen ? "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition" : iconBtn}><Icon name="monitor" size={19} /></button>
+              <button type="button" onClick={onDesktop} data-tour="desktop-btn" aria-pressed={desktopOpen} aria-label={`Open ${name}'s desktop`} title="Desktop" className={desktopOpen ? "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition" : iconBtn}><Icon name="monitor" size={19} /></button>
               <button type="button" onClick={() => picker.current?.click()} aria-label="Attach a file" title="Attach a file" className={iconBtn}><Icon name="clip" size={19} /></button>
-              <textarea ref={input} value={text} rows={1} onChange={(e) => { setText(e.target.value.slice(0, 2000)); grow(); }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }} placeholder={`Message ${name}`} aria-label={`Message ${name}`} className="max-h-40 min-h-[40px] min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-6 text-ink outline-none placeholder:text-ink/45" />
+              <textarea ref={input} value={text} rows={1} onChange={(e) => { setText(e.target.value.slice(0, 2000)); grow(); }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } else if (e.key === "Escape" && reply) onClearReply?.(); }} placeholder={`Message ${name}`} aria-label={`Message ${name}`} className="max-h-40 min-h-[40px] min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-6 text-ink outline-none placeholder:text-ink/45" />
               <button type="button" onClick={() => setRec(0)} aria-label="Record a voice message" title="Voice message" className={iconBtn}><Icon name="mic" size={19} /></button>
               <button type="button" onClick={onCall} aria-label={`Call ${name}`} title="Voice call" className={iconBtn}><Icon name="call" size={18} /></button>
               <button disabled={!ready} aria-label="Send" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:bg-grape-deep disabled:bg-ink/15 disabled:text-ink/40"><Icon name="send" size={18} stroke={2.4} /></button>

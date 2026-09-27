@@ -12,6 +12,9 @@ import Face from "../Face";
 import Icon from "./Icon";
 import { DemoTag } from "./ui";
 import Toaster from "./Toaster";
+import Tour from "./Tour";
+import AgentPanel from "./agent/AgentPanel";
+import AddAgentDialog from "./agent/AddAgentDialog";
 
 export const NAV = [
   { href: "/app", label: "Agents", icon: "home" },
@@ -34,7 +37,7 @@ function Rail({ s, path }: { s: State; path: string }) {
         {NAV.map((n) => {
           const on = isOn(path, n.href);
           return (
-            <Link key={n.href} href={n.href} aria-current={on ? "page" : undefined} {...(n.href === "/app/team" ? { "data-seat-target": true } : {})} className={`group relative flex flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold transition ${on ? "text-ink" : "text-ink/60 hover:text-ink"}`}>
+            <Link key={n.href} href={n.href} data-tour={`nav-${n.label.toLowerCase()}`} aria-current={on ? "page" : undefined} {...(n.href === "/app/team" ? { "data-seat-target": true } : {})} className={`group relative flex flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold transition ${on ? "text-ink" : "text-ink/60 hover:text-ink"}`}>
               {on && <span className="absolute -left-2 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-grape" />}
               <span className={`grid h-9 w-12 place-items-center rounded-full transition ${on ? "bg-grape text-white" : "group-hover:bg-tint"}`}><Icon name={n.icon} size={20} /></span>
               {n.label}
@@ -44,7 +47,7 @@ function Rail({ s, path }: { s: State; path: string }) {
       </nav>
       <div className="mt-auto flex flex-col items-center gap-3">
         <ThemeToggle />
-        <Link href="/app/profile" aria-label="Profile" title={`${s.auth?.label ?? "Profile"}`} className={`grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] ring-2 ring-offset-2 ring-offset-[var(--alt)] transition hover:scale-105 ${onProfile ? "ring-grape" : "ring-transparent"}`}>{initials(s)}</Link>
+        <Link href="/app/profile" data-tour="nav-profile" aria-label="Profile" title={`${s.auth?.label ?? "Profile"}`} className={`grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] ring-2 ring-offset-2 ring-offset-[var(--alt)] transition hover:scale-105 ${onProfile ? "ring-grape" : "ring-transparent"}`}>{initials(s)}</Link>
       </div>
     </aside>
   );
@@ -97,8 +100,8 @@ function MobileBars({ s, path }: { s: State; path: string }) {
     );
     const cls = "flex flex-col items-center justify-start gap-1 pt-2";
     return it.href
-      ? <Link key={it.key} data-nav-item href={it.href} aria-current={on ? "page" : undefined} {...(it.href === "/app/team" ? { "data-seat-target": true } : {})} className={cls}>{inner}</Link>
-      : <button key={it.key} data-nav-item onClick={it.run} aria-expanded={it.key === "more" ? more : undefined} className={cls}>{inner}</button>;
+      ? <Link key={it.key} data-nav-item data-tour={`nav-${it.label.toLowerCase()}`} href={it.href} aria-current={on ? "page" : undefined} {...(it.href === "/app/team" ? { "data-seat-target": true } : {})} className={cls}>{inner}</Link>
+      : <button key={it.key} data-nav-item data-tour={`nav-${it.label.toLowerCase()}`} onClick={it.run} aria-expanded={it.key === "more" ? more : undefined} className={cls}>{inner}</button>;
   };
 
   return (
@@ -114,7 +117,7 @@ function MobileBars({ s, path }: { s: State; path: string }) {
       <nav aria-label="App" className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-base/95 backdrop-blur-md lg:hidden">
         <div className="relative mx-auto h-[66px] max-w-[560px] overflow-hidden">
           <div ref={rowA} className="absolute inset-0 grid grid-cols-5" aria-hidden={more}>{primary.map(cell)}</div>
-          <div ref={rowB} className="invisible absolute inset-0 grid grid-cols-5" aria-hidden={!more}>{secondary.map(cell)}</div>
+          <div ref={rowB} data-tour="more-row" className="invisible absolute inset-0 grid grid-cols-5" aria-hidden={!more}>{secondary.map(cell)}</div>
         </div>
       </nav>
     </>
@@ -189,6 +192,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="lg:pl-[84px]">
         {bleed ? <div key={path}>{children}</div> : <div ref={main} key={path} className="mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-8 sm:pt-9 lg:pb-16">{children}</div>}
       </div>
+      <AgentPanel />
+      <AddAgentDialog />
+      {s.tour?.on && <Tour s={s} />}
       <Toaster />
     </div>
   );

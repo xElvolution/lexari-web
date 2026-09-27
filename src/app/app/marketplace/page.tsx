@@ -116,6 +116,7 @@ export default function Marketplace() {
   const s = useApp()!;
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<StoreCat | "All">("All");
+  useEffect(() => { const c = new URLSearchParams(window.location.search).get("cat"); const hit = STORE_CATS.find((x) => x.id.toLowerCase() === c?.toLowerCase()); if (hit) setCat(hit.id); }, []);
   const left = seatsLeft(s);
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();

@@ -7,14 +7,18 @@ export type Convo = { id: string; group: boolean; name: string; sub: string; mem
 
 const lastOf = (s: State, id: string) => { const t = (s.threads[id] || []).filter((m) => m.from !== "system" || m.call); return t.length ? t[t.length - 1] : undefined; };
 
-/** Everyone on your team: your own agent first, then hired specialists in seat order. */
+/** Everyone on your team: your own agent first, then agents you made, then hired specialists in seat order. */
 export function myAgents(s: State): MyAgent[] {
+  const made = s.custom.map((c, i) => ({ id: c.id, name: c.name, role: c.role || "Made by you", seat: i + 2, last: lastOf(s, c.id) }));
   return [
     { id: "home", name: agentName(s), role: "Your personal agent", seat: 1, last: lastOf(s, "home") },
-    ...s.hired.map((h, i) => { const sp = specialistBySlug(h)!; return { id: h, name: sp.name, role: sp.job, seat: i + 2, last: lastOf(s, h) }; }),
+    ...made,
+    ...s.hired.map((h, i) => { const sp = specialistBySlug(h)!; return { id: h, name: s.meta[h]?.nick || sp.name, role: sp.job, seat: made.length + i + 2, last: lastOf(s, h) }; }),
   ];
 }
-export const nameOf = (s: State, id: string) => (id === "home" ? agentName(s) : specialistBySlug(id)?.name ?? "Agent");
+export const nameOf = (s: State, id: string) => (id === "home" ? agentName(s) : s.meta?.[id]?.nick || (specialistBySlug(id)?.name ?? "Agent"));
+/** Who owns an agent's settings: you (your agent and the ones you made) or its maker. */
+export const kindOf = (id: string): "home" | "custom" | "hired" => (id === "home" ? "home" : id.startsWith("c-") ? "custom" : "hired");
 
 /** Direct chats and groups together, most recent first. */
 export function convos(s: State): Convo[] {

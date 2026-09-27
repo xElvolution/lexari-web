@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DEMO_ADDRESS, DEMO_GOOGLE, shortAddr } from "@/content/appData";
-import { agentName, planOf, signOut, toast, updateProfile, useApp, type State } from "@/lib/store";
+import { agentName, planOf, signOut, startTour, toast, updateProfile, useApp, type State } from "@/lib/store";
+import { openAgent } from "@/components/app/overlays";
 import Icon from "@/components/app/Icon";
 import { AgentTile } from "@/components/app/faces";
 import { DemoTag } from "@/components/app/ui";
@@ -67,6 +68,7 @@ export default function ProfilePage() {
             <span className="grid h-24 w-24 place-items-center rounded-full bg-ink text-[34px] font-bold text-[var(--bg)] ring-[6px] ring-[var(--card)] sm:h-28 sm:w-28">{initials(p.name)}</span>
             <div className="ml-auto flex gap-2 pb-1">
               <button onClick={() => setEdit(true)} className="btn btn-ghost btn-sm !h-10"><Icon name="edit" size={15} />Edit profile</button>
+              <button onClick={() => { startTour(); router.push("/app"); }} className="btn btn-ghost btn-sm !h-10"><Icon name="play" size={14} />Replay tour</button>
               <button onClick={() => { signOut(); router.push("/signin"); }} className="btn btn-line btn-sm !h-10 text-ink"><Icon name="out" size={15} />Sign out</button>
             </div>
           </div>
@@ -106,7 +108,7 @@ export default function ProfilePage() {
           <section data-rise className="rounded-[26px] bg-card p-5 ring-1 ring-line sm:p-6">
             <div className="flex items-center justify-between"><h2 className="text-[17px] font-bold text-ink">Your agents</h2><Link href="/app/team" className="text-[13.5px] font-bold text-brand-ink hover:underline">Team</Link></div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {team.map((t) => <Link key={t.id} href={`/app?c=${t.id}`} className="flex items-center gap-2 rounded-full bg-tint py-1 pl-1 pr-3.5 text-[13.5px] font-semibold text-ink transition hover:bg-grape hover:text-white"><AgentTile id={t.id} look={s.agent?.look} size={30} radius={15} />{t.name}</Link>)}
+              {team.map((t) => <button key={t.id} onClick={() => openAgent(t.id)} title={`${t.name}'s ID card`} className="flex items-center gap-2 rounded-full bg-tint py-1 pl-1 pr-3.5 text-[13.5px] font-semibold text-ink transition hover:bg-grape hover:text-white"><AgentTile id={t.id} look={s.agent?.look} size={30} radius={15} />{t.name}</button>)}
             </div>
           </section>
           <section data-rise className="rounded-[26px] bg-card p-5 ring-1 ring-line sm:p-6">
