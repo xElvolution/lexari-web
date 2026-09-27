@@ -4,7 +4,7 @@ import Icon from "./Icon";
 
 export function DemoTag({ className = "" }: { className?: string }) {
   return (
-    <span title="Sample data for the demo. Nothing here is live yet." className={`label ${/\bhidden\b/.test(className) ? "" : "inline-flex"} items-center gap-1.5 rounded-full border border-dashed border-ink/35 px-2 py-1 text-[9px] text-ink/70 ${className}`}>
+    <span title="Sample data for the demo. Nothing here is live yet." className={`demo-tag label ${/\bhidden\b/.test(className) ? "" : "inline-flex"} items-center gap-1.5 rounded-full border border-dashed border-ink/35 px-2 py-1 text-[9px] text-ink/70 ${className}`}>
       <i className="h-1.5 w-1.5 rounded-full bg-brand-ink" />{DEMO_LABEL}
     </span>
   );

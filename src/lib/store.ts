@@ -7,7 +7,7 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
-  DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, cannedReply, groupReply, scriptFor, shortAddr,
+  DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, cannedReply, groupReply, scriptFor, shortAddr, walletFor,
   type Job, type MemoryTag, type PlanId, type ToneId, type WalletId,
 } from "@/content/appData";
 
@@ -18,6 +18,18 @@ export type Msg = {
   call?: number; // a call log line, length in seconds
 };
 export type Group = { id: string; name: string; members: string[]; at: number };
+export type Card = { number: string; exp: string; cvv: string; frozen: boolean; limit: number; at: number };
+export type Prefs = {
+  language: string; voice: string; defaultAgent: string; memory: boolean; history: boolean; improve: boolean;
+  motion: boolean; demoLabels: boolean; instructions: string; twofa: boolean; signedOut: string[];
+  notif: Record<string, boolean>;
+};
+export type Profile = { name: string; username: string; bio: string; since: number };
+export const DEFAULT_PREFS: Prefs = {
+  language: "English", voice: "Iris", defaultAgent: "home", memory: true, history: true, improve: false,
+  motion: true, demoLabels: true, instructions: "", twofa: false, signedOut: [],
+  notif: { replies: true, groups: true, calls: true, wallet: true, cards: true, digest: false, product: false },
+};
 export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number };
 export type Agent = { name: string; look: number | null; you: string; role: string; tone: ToneId };
 export type Auth = { method: "google" | "wallet"; label: string; sub: string; wallet?: WalletId };
@@ -27,17 +39,23 @@ export type State = {
   memory: Note[]; jobs: Job[]; chat: Msg[]; nextJob: number;
   threads: Record<string, Msg[]>; // one chat per agent ("home" or a specialist slug) or per group ("g-…")
   groups: Group[]; active: string; // the conversation open on Home
+  wallets: Record<string, string>; // agent id → wallet address (demo). Only your own agent has one at first.
+  cards: Record<string, Card>; // agent id → its virtual card (demo)
+  prefs: Prefs; profile: Profile | null;
 };
 
 const KEY = "lexari-app-v1";
-const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home" };
+const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null };
 
 let state: State | null = null;
 const subs = new Set<() => void>();
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 function load(): State {
-  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; if (!Array.isArray(st.groups)) st.groups = []; return st; } } } catch {}
+  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; if (!Array.isArray(st.groups)) st.groups = [];
+      if (!s.wallets) st.wallets = s.agent ? { home: walletFor("home").address } : {};
+      st.prefs = { ...DEFAULT_PREFS, ...(s.prefs || {}), notif: { ...DEFAULT_PREFS.notif, ...(s.prefs?.notif || {}) } };
+      return st; } } } catch {}
   return EMPTY;
 }
 function snapshot() { if (state === null) state = load(); return state; }
@@ -132,7 +150,10 @@ function seeded(s: State, agent: Agent, knows: string[]): State {
     { id: uid(), from: "scout", at: d(0, -93), text: "On it. Reading five recent launches now. Short table by tonight." },
     { id: uid(), from: "quill", at: d(0, -92), text: "Final pass on the post is done. Two headline options are in Files." },
   ];
-  return { ...s, agent, onboarded: true, plan: "pro", hired: ["scout", "quill", "tally"], memory, jobs, chat, threads, groups: [crew], active: "home", nextJob: jobs.length + 1 };
+  const who = s.auth?.method === "google" ? s.auth.label : agent.you || "You";
+  const profile: Profile = { name: who, username: who.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 14) || "you", bio: agent.role ? `${agent.role}.` : "", since: now };
+  return { ...s, agent, onboarded: true, plan: "pro", hired: ["scout", "quill", "tally"], memory, jobs, chat, threads, groups: [crew], active: "home", nextJob: jobs.length + 1,
+    wallets: { home: walletFor("home").address }, cards: {}, profile };
 }
 export function finishOnboarding(agent: Agent, knows: string[]) { set((s) => seeded(s, agent, knows)); }
 export function startDemo() {
@@ -279,5 +300,28 @@ export function tick(now = Date.now()) {
 export function downloadFile(name: string, body: string) {
   const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
   const a = document.createElement("a"); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ---------- wallets, cards, preferences, profile (all demo) ---------- */
+export function createWallet(id: string) { set((x) => ({ ...x, wallets: { ...x.wallets, [id]: walletFor(id).address } })); }
+export function issueCard(id: string, limit: number) {
+  const d = () => Math.floor(Math.random() * 10);
+  const number = `4000${Array.from({ length: 12 }, d).join("")}`;
+  const now = new Date();
+  const card: Card = { number, exp: `${String(now.getMonth() + 1).padStart(2, "0")}/${String((now.getFullYear() + 3) % 100).padStart(2, "0")}`, cvv: `${d()}${d()}${d()}`, frozen: false, limit, at: Date.now() };
+  set((x) => ({ ...x, cards: { ...x.cards, [id]: card } }));
+  return card;
+}
+export function updateCard(id: string, p: Partial<Card>) { set((x) => (x.cards[id] ? { ...x, cards: { ...x.cards, [id]: { ...x.cards[id], ...p } } } : x)); }
+export function cancelCard(id: string) { set((x) => { const cards = { ...x.cards }; delete cards[id]; return { ...x, cards }; }); }
+export function setPrefs(p: Partial<Prefs>) { set((x) => ({ ...x, prefs: { ...x.prefs, ...p } })); }
+export function setNotif(k: string, v: boolean) { set((x) => ({ ...x, prefs: { ...x.prefs, notif: { ...x.prefs.notif, [k]: v } } })); }
+export function updateProfile(p: Partial<Profile>) { set((x) => ({ ...x, profile: { ...(x.profile ?? { name: "You", username: "you", bio: "", since: Date.now() }), ...p } })); }
+export function clearChats() { set((x) => ({ ...x, threads: {} })); }
+export function exportData() {
+  const st = get();
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ exported: new Date().toISOString(), note: "Lexari demo export", ...st }, null, 2)], { type: "application/json" }));
+  const a = document.createElement("a"); a.href = url; a.download = "lexari-export.json"; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

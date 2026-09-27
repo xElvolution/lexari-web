@@ -158,6 +158,8 @@ body { font-family: var(--font-sans); color: var(--ink); background: var(--bg); 
 .draw { stroke-dasharray: 60; stroke-dashoffset: 60; animation: draw .6s .15s cubic-bezier(.6,0,.2,1) forwards; }
 
 .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+.pb-safe-dlg { padding-bottom: max(env(safe-area-inset-bottom), 22px); }
+@media (min-width: 640px) { .pb-safe-dlg { padding-bottom: 24px; } }
 .tab-num { font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -180,3 +182,11 @@ body { font-family: var(--font-sans); color: var(--ink); background: var(--bg); 
 @keyframes cursor-path { 0% { left: 18%; top: 34%; } 25% { left: 64%; top: 24%; } 45% { left: 72%; top: 60%; } 70% { left: 30%; top: 72%; } 100% { left: 18%; top: 34%; } }
 .cursor-path { animation: cursor-path 9s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .wave, .ring-out, .cursor-path { animation: none; } }
+@keyframes expand-in { from { width: 54px; opacity: .4; } }
+.expand-in { animation: expand-in .28s cubic-bezier(.2,.8,.3,1); }
+@media (prefers-reduced-motion: reduce) { .expand-in { animation: none; } }
+@keyframes term-blink { 50% { opacity: 0; } }
+.term-caret { display: inline-block; width: .6em; height: 1.15em; margin-left: 1px; vertical-align: text-bottom; background: #c9b8ff; animation: term-blink 1s steps(1) infinite; }
+/* settings: hide demo tags, turn off motion */
+[data-demo="off"] .demo-tag { display: none !important; }
+[data-motion="off"] *, [data-motion="off"] *::before, [data-motion="off"] *::after { animation: none !important; transition: none !important; }

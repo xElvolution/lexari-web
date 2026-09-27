@@ -51,24 +51,44 @@ export default function AgentStrip({ s, active, onPick }: { s: State; active: st
 
   const nudge = (d: number) => row.current?.scrollBy({ left: d * Math.max(200, (row.current.clientWidth ?? 400) * 0.7), behavior: "smooth" });
 
+  const [open, setOpen] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+  const close = () => { setOpen(false); setQ(""); };
+  useEffect(() => { if (open) field.current?.focus(); }, [open]);
+  const sq = "grid h-[54px] w-[54px] place-items-center rounded-[17px] transition";
+
   return (
-    <div className="flex flex-col gap-2 border-b border-line px-3 py-2.5 sm:px-4 md:flex-row md:items-center md:gap-3">
-      <label className="relative flex h-11 shrink-0 items-center md:w-[210px]">
-        <Icon name="search" size={17} className="pointer-events-none absolute left-3.5 text-ink/50" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${all.length} agent${all.length === 1 ? "" : "s"}`} aria-label="Search your agents" className="h-full w-full rounded-full bg-tint pl-10 pr-9 text-[14.5px] text-ink outline-none ring-grape transition placeholder:text-ink/50 focus:ring-2" />
-        {q && <button onClick={() => setQ("")} aria-label="Clear search" className="absolute right-2 grid h-7 w-7 place-items-center rounded-full text-ink/60 hover:bg-line"><Icon name="x" size={14} /></button>}
-      </label>
+    <div className="flex items-center gap-2 border-b border-line px-3 py-2.5 sm:px-4">
       <div className="relative min-w-0 flex-1">
         <div ref={row} onScroll={measure} className="no-bar flex cursor-grab select-none items-start gap-1 overflow-x-auto scroll-smooth active:cursor-grabbing" role="list" aria-label="Your agents">
           {list.map((a) => <Tile key={a.id} a={a} s={s} on={a.id === active} onPick={onPick} />)}
-          {q && list.length === 0 && <p className="self-center whitespace-nowrap px-3 text-[14px] text-ink/60">No agent matches “{q}”.</p>}
-          <Link href="/app/marketplace" draggable={false} title="Add an agent" className="group flex w-[76px] shrink-0 flex-col items-center gap-1.5 pb-1 pt-1.5">
-            <span className="p-[3px]"><span className="grid h-[54px] w-[54px] place-items-center rounded-[17px] border-2 border-dashed border-ink/30 text-ink/70 transition group-hover:border-grape group-hover:bg-tint group-hover:text-brand-ink"><Icon name="plus" size={22} /></span></span>
-            <span className="text-[12.5px] font-semibold text-ink/60">Add</span>
-          </Link>
+          {q && list.length === 0 && <p className="self-center whitespace-nowrap px-3 py-5 text-[14px] text-ink/60">No agent matches “{q}”.</p>}
         </div>
         {edge.l && <button onClick={() => nudge(-1)} aria-label="Scroll left" className="absolute left-0 top-0 z-10 hidden h-full w-14 items-center justify-start bg-gradient-to-r from-base via-base/80 to-transparent md:flex"><span className="grid h-9 w-9 place-items-center rounded-full bg-card text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="left" size={18} /></span></button>}
         {edge.r && <button onClick={() => nudge(1)} aria-label="Scroll right" className="absolute right-0 top-0 z-10 hidden h-full w-14 items-center justify-end bg-gradient-to-l from-base via-base/80 to-transparent md:flex"><span className="grid h-9 w-9 place-items-center rounded-full bg-card text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="right" size={18} /></span></button>}
+      </div>
+      <div className="flex shrink-0 items-start gap-1 border-l border-line pl-2">
+        <Link href="/app/marketplace" draggable={false} title="Add an agent" className="group flex w-[64px] flex-col items-center gap-1.5 pb-1 pt-1.5">
+          <span className="p-[3px]"><span className={`${sq} border-2 border-dashed border-ink/30 text-ink/70 group-hover:border-grape group-hover:bg-tint group-hover:text-brand-ink`}><Icon name="plus" size={22} /></span></span>
+          <span className="text-[12.5px] font-semibold text-ink/60">Add</span>
+        </Link>
+        {open ? (
+          <div className="flex flex-col items-center gap-1.5 pb-1 pt-1.5">
+            <span className="p-[3px]">
+              <label className="expand-in flex h-[54px] w-[min(240px,52vw)] items-center gap-2 rounded-[17px] bg-tint px-3 ring-2 ring-grape">
+                <Icon name="search" size={17} className="shrink-0 text-brand-ink" />
+                <input ref={field} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") close(); }} placeholder="Find an agent" aria-label="Search your agents" className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink/45" />
+                <button onClick={close} aria-label="Close search" className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink/60 hover:bg-line hover:text-ink"><Icon name="x" size={14} /></button>
+              </label>
+            </span>
+            <span className="text-[12.5px] font-semibold text-ink/60">{q ? `${list.length} of ${all.length}` : `${all.length} agent${all.length === 1 ? "" : "s"}`}</span>
+          </div>
+        ) : (
+          <button onClick={() => setOpen(true)} title="Search agents" aria-label="Search agents" className="group flex w-[64px] flex-col items-center gap-1.5 pb-1 pt-1.5">
+            <span className="p-[3px]"><span className={`${sq} bg-tint text-ink/75 group-hover:bg-grape group-hover:text-white`}><Icon name="search" size={21} /></span></span>
+            <span className="text-[12.5px] font-semibold text-ink/60">Search</span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -46,7 +46,7 @@ function Body({ m, mine }: { m: Msg; mine: boolean }) {
 
 /** One conversation: header, thread and composer. Works for a single agent or a group. */
 export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpen, onEditGroup }: {
-  s: State; id: string; onBack?: () => void; onCall: () => void; onDesktop?: () => void; desktopOpen?: boolean; onEditGroup: () => void;
+  s: State; id: string; onBack?: () => void; onCall: () => void; onDesktop: () => void; desktopOpen: boolean; onEditGroup: () => void;
 }) {
   const c = convoOf(s, id)!;
   const msgs = s.threads[id] || [];
@@ -89,7 +89,6 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
         </div>
         <DemoTag className="hidden md:inline-flex" />
         {c.group && <button onClick={onEditGroup} aria-label="Edit group" title="Edit group" className="grid h-10 w-10 place-items-center rounded-full text-ink/75 transition hover:bg-tint hover:text-brand-ink"><Icon name="users" size={19} /></button>}
-        {onDesktop && <button onClick={onDesktop} aria-pressed={!!desktopOpen} aria-label="Open desktop" title="Desktop" className={`grid h-10 w-10 place-items-center rounded-full transition ${desktopOpen ? "bg-grape text-white" : "text-ink/75 hover:bg-tint hover:text-brand-ink"}`}><Icon name="monitor" size={19} /></button>}
       </header>
 
       <div ref={scroller} className="no-bar min-h-0 flex-1 overflow-y-auto" aria-live="polite">
@@ -145,7 +144,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
         </div>
       </div>
 
-      <Composer id={id} name={c.name} suggestions={suggestions} onCall={onCall} />
+      <Composer id={id} name={c.name} suggestions={suggestions} onCall={onCall} onDesktop={onDesktop} desktopOpen={desktopOpen} />
     </section>
   );
 }

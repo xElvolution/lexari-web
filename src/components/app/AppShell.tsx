@@ -14,7 +14,7 @@ import { DemoTag } from "./ui";
 import Toaster from "./Toaster";
 
 export const NAV = [
-  { href: "/app", label: "Home", icon: "home" },
+  { href: "/app", label: "Agents", icon: "home" },
   { href: "/app/memory", label: "Brain", icon: "memory" },
   { href: "/app/marketplace", label: "Market", icon: "market" },
   { href: "/app/team", label: "Team", icon: "team" },
@@ -104,7 +104,7 @@ function MobileBars({ s, path }: { s: State; path: string }) {
   return (
     <>
       <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-line bg-base/90 px-4 backdrop-blur-md lg:hidden">
-        <Link href="/app" aria-label="Home"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
+        <Link href="/app" aria-label="Agents"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
         <div className="flex items-center gap-2">
           <DemoTag className="hidden min-[400px]:inline-flex" />
           <ThemeToggle />
@@ -163,6 +163,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { if (!ready) return; tick(); const id = setInterval(() => tick(), 1000); return () => clearInterval(id); }, [ready]);
   useEffect(() => { window.scrollTo(0, 0); }, [path]);
+  // preferences that change the whole app
+  const demoOff = s?.prefs?.demoLabels === false, still = s?.prefs?.motion === false;
+  useEffect(() => {
+    const el = document.documentElement;
+    if (demoOff) el.dataset.demo = "off"; else delete el.dataset.demo;
+    if (still) el.dataset.motion = "off"; else delete el.dataset.motion;
+    gsap.globalTimeline.timeScale(still ? 1000 : 1);
+  }, [demoOff, still]);
   useLayoutEffect(() => {
     if (!ready || !main.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = gsap.context(() => {

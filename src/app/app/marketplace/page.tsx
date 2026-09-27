@@ -1,112 +1,180 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { gsap } from "gsap";
-import { Flip } from "gsap/Flip";
-import { CATEGORIES, SPECIALISTS, type Specialist } from "@/content/appData";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { PALETTE } from "@/components/avatar";
+import { SPECIALISTS, STORE_CATS, compact, storeMeta, type StoreCat } from "@/content/appData";
 import { planOf, seatsLeft, useApp } from "@/lib/store";
 import Icon from "@/components/app/Icon";
-import { SpecFace } from "@/components/app/faces";
-import { Empty, PageHead } from "@/components/app/ui";
-import { hireWithFx } from "@/components/app/hireAction";
+import { AgentTile } from "@/components/app/faces";
+import { DemoTag, Empty } from "@/components/app/ui";
+import { AppCard, HireBtn, ShelfRow } from "@/components/app/market/parts";
 
-gsap.registerPlugin(Flip);
-const SORTS = [{ id: "rating", label: "Top rated" }, { id: "jobs", label: "Most jobs" }, { id: "name", label: "A to Z" }] as const;
+const FEATURED = ["scout", "frame", "atlas"];
+const byHires = [...SPECIALISTS].sort((a, b) => storeMeta(b).hires - storeMeta(a).hires);
 
-function Card({ a, hired, i }: { a: Specialist; hired: boolean; i: number }) {
-  const [flipped, setFlipped] = useState(false);
-  const face = useRef<HTMLSpanElement>(null);
-  const router = useRouter();
+function Hero() {
+  const list = FEATURED.map((f) => SPECIALISTS.find((x) => x.slug === f)!);
+  const [i, setI] = useState(0);
+  const track = useRef<HTMLDivElement>(null);
+  const paused = useRef(false);
+  const go = (n: number) => { const k = (n + list.length) % list.length; setI(k); const el = track.current; if (el) el.scrollTo({ left: k * el.clientWidth, behavior: "smooth" }); };
+  useEffect(() => { const t = setInterval(() => { if (!paused.current && !document.hidden) go(i + 1); }, 6500); return () => clearInterval(t); }); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div data-flip-id={a.slug} className={`flip h-[420px] ${flipped ? "is-flipped" : ""}`}>
-      <div className="flip-inner">
-        <div role="button" tabIndex={0} onClick={() => setFlipped(true)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setFlipped(true))} aria-label={`${a.name}, ${a.job}. Flip for details.`} className="flip-face flex cursor-pointer flex-col overflow-hidden rounded-[28px] bg-card text-ink shadow-[0_8px_0_var(--tint)] ring-1 ring-line outline-none transition-shadow focus-visible:ring-4 focus-visible:ring-grape/60">
-          <div className="carpet relative grid h-[180px] place-items-center bg-tint">
-            <span ref={face} className="transition-transform duration-500 [transition-timing-function:cubic-bezier(.3,1.6,.5,1)] group-hover:scale-105"><SpecFace slug={a.slug} size={138} /></span>
-            <span className="display absolute left-4 top-3 text-[24px] text-ink/30">#{String(i + 1).padStart(2, "0")}</span>
-            <span className="label absolute right-4 top-4 flex items-center gap-1 rounded-full bg-ink px-2 py-1 text-[9.5px] text-[var(--bg)]"><Icon name="star" size={10} />{a.rating}</span>
-            {hired && <span className="label absolute bottom-3 left-4 rounded-full bg-grape px-2 py-1 text-[9px] text-white">on your team</span>}
-          </div>
-          <div className="flex flex-1 flex-col p-5">
-            <div className="flex items-baseline justify-between gap-2"><div className="display text-[40px] text-ink">{a.name}</div><span className="label text-[9px] text-ink/60">{a.cat}</span></div>
-            <div className="mt-1 text-[15px] font-semibold text-brand-ink">{a.job}</div>
-            <p className="mt-3 rounded-2xl rounded-tl-sm border border-line bg-alt px-3.5 py-2.5 text-[14px] font-semibold leading-snug text-ink">&ldquo;{a.quip}&rdquo;</p>
-            <div className="mt-auto flex items-center justify-between border-t-2 border-dashed border-line pt-3.5">
-              <span className="text-[13px] text-ink/70"><b className="text-ink">{a.jobs.toLocaleString("en-US")}</b> jobs done</span>
-              <span className="label flex items-center gap-1 rounded-full bg-grape px-2.5 py-1.5 text-[9px] text-white"><Icon name="flip" size={11} />flip</span>
-            </div>
-          </div>
-        </div>
-        <div className="flip-face flip-back flex flex-col rounded-[28px] bg-[#0a0a0a] p-5 text-white shadow-[0_8px_0_#3514b0] ring-1 ring-white/10">
-          <div className="flex items-center justify-between"><span className="label text-[10px] text-lilac">what {a.name} does</span><button onClick={() => setFlipped(false)} aria-label="Flip back" className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition hover:rotate-180 hover:bg-white/20"><Icon name="flip" size={14} /></button></div>
-          <p className="display mt-3 text-[24px] leading-[1.05]">{a.back}</p>
-          <ul className="mt-4 grid gap-2">
-            {a.skills.slice(0, 3).map(([k, v]) => <li key={k}><div className="flex justify-between text-[12px] text-white/80"><span>{k}</span><span>{v}</span></div><div className="mt-1 h-1.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-lilac" style={{ width: `${v}%` }} /></div></li>)}
-          </ul>
-          <div className="mt-auto grid gap-2 pt-4">
-            {hired ? <span className="btn !h-12 bg-white/10 !text-[15px] text-white">On your team</span>
-              : <button onClick={() => hireWithFx(a.slug, face.current, () => router.push("/app/team"))} className="btn btn-brand !h-12 !text-[15px]">Hire into a seat</button>}
-            <Link href={`/app/marketplace/${a.slug}`} className="text-center text-[14px] font-bold text-white/85 hover:text-white">View profile →</Link>
-          </div>
+    <section data-rise className="relative mt-6" onMouseEnter={() => (paused.current = true)} onMouseLeave={() => (paused.current = false)} aria-roledescription="carousel" aria-label="Agent of the week">
+      <div ref={track} onScroll={(e) => { const el = e.currentTarget; const k = Math.round(el.scrollLeft / el.clientWidth); if (k !== i) setI(k); }} className="no-bar flex snap-x snap-mandatory overflow-x-auto rounded-[30px]">
+        {list.map((a, k) => {
+          const m = storeMeta(a); const col = PALETTE[a.color].fill;
+          return (
+            <article key={a.slug} aria-roledescription="slide" aria-label={`${k + 1} of ${list.length}`} className="relative flex min-h-[300px] w-full shrink-0 snap-start overflow-hidden text-white sm:min-h-[340px]" style={{ background: `radial-gradient(90% 120% at 85% 30%, color-mix(in oklab, ${col} 70%, transparent) 0%, transparent 60%), linear-gradient(120deg, #0a0a0a 0%, #1d0f5c 55%, #5b2bff 100%)` }}>
+              <div className="grain pointer-events-none absolute inset-0" />
+              <div className="relative z-10 flex max-w-[560px] flex-col justify-end p-6 sm:p-9">
+                <span className="label w-fit rounded-full bg-white/15 px-2.5 py-1 text-[9px] backdrop-blur">{k === 0 ? "Agent of the week" : k === 1 ? "Editors' choice" : "Staff favourite"}</span>
+                <h2 className="display mt-4 text-[56px] leading-[.9] sm:text-[80px]">{a.name}</h2>
+                <p className="mt-2 text-[17px] font-semibold text-white/90 sm:text-[19px]">{a.quip}</p>
+                <p className="mt-2 max-w-[440px] text-[14.5px] text-white/70">{a.back}</p>
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <HireBtn a={a} size="lg" />
+                  <Link href={`/app/marketplace/${a.slug}`} className="inline-flex h-12 items-center rounded-full bg-white/15 px-6 text-[15px] font-bold backdrop-blur transition hover:bg-white/25">View listing</Link>
+                  <span className="flex items-center gap-2 text-[13.5px] text-white/80"><span className="flex items-center gap-1 font-bold text-white">{a.rating}<Icon name="star" size={13} /></span>· {compact(m.hires)} hires · {m.cat}</span>
+                </div>
+              </div>
+              <div className="pointer-events-none absolute -right-6 bottom-[-30px] hidden sm:block md:right-8 md:bottom-[-10px]"><AgentTile id={a.slug} look={null} size={300} radius={80} face={250} className="rotate-[-6deg] shadow-[0_40px_80px_-30px_rgba(0,0,0,.8)]" /></div>
+              <div className="pointer-events-none absolute -right-8 -top-8 sm:hidden"><AgentTile id={a.slug} look={null} size={150} radius={44} className="rotate-[-8deg] opacity-90" /></div>
+            </article>
+          );
+        })}
+      </div>
+      <div className="absolute bottom-5 right-6 z-10 flex items-center gap-2">
+        <button onClick={() => go(i - 1)} aria-label="Previous" className="grid h-9 w-9 place-items-center rounded-full bg-black/40 text-white backdrop-blur hover:bg-black/60"><Icon name="left" size={17} /></button>
+        <div className="flex gap-1.5">{list.map((_, k) => <button key={k} onClick={() => go(k)} aria-label={`Slide ${k + 1}`} aria-current={k === i} className={`h-2 rounded-full transition-all ${k === i ? "w-6 bg-white" : "w-2 bg-white/45"}`} />)}</div>
+        <button onClick={() => go(i + 1)} aria-label="Next" className="grid h-9 w-9 place-items-center rounded-full bg-black/40 text-white backdrop-blur hover:bg-black/60"><Icon name="right" size={17} /></button>
+      </div>
+    </section>
+  );
+}
+
+const CHART_TABS = [{ id: "free", label: "Free" }, { id: "hired", label: "Top hired" }, { id: "rising", label: "Rising" }] as const;
+function TopCharts() {
+  const [tab, setTab] = useState<(typeof CHART_TABS)[number]["id"]>("hired");
+  const list = useMemo(() => {
+    const all = [...SPECIALISTS];
+    if (tab === "free") return all.filter((a) => storeMeta(a).free).sort((a, b) => b.rating - a.rating || storeMeta(b).hires - storeMeta(a).hires);
+    if (tab === "rising") return all.sort((a, b) => storeMeta(b).rising - storeMeta(a).rising);
+    return byHires;
+  }, [tab]).slice(0, 10);
+  return (
+    <section data-rise className="mt-12">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div><h2 className="text-[22px] font-bold tracking-tight text-ink sm:text-[24px]">Top charts</h2><p className="mt-0.5 text-[14px] text-ink/55">Updated daily · demo rankings</p></div>
+        <div className="inline-flex rounded-full bg-tint p-1" role="tablist" aria-label="Chart">
+          {CHART_TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`rounded-full px-4 py-2 text-[13.5px] font-bold transition ${tab === t.id ? "bg-card text-ink shadow-sm" : "text-ink/60 hover:text-ink"}`}>{t.label}</button>)}
         </div>
       </div>
-    </div>
+      <ol key={tab} className="mt-4 grid gap-x-8 sm:grid-cols-2 xl:grid-cols-3 xl:grid-flow-col xl:grid-rows-4">
+        {list.map((a, k) => { const m = storeMeta(a); return (
+          <li key={a.slug} className="pop" style={{ animationDelay: `${k * 30}ms` }}>
+            <Link href={`/app/marketplace/${a.slug}`} className="group flex items-center gap-3.5 border-b border-line py-3">
+              <span className="display tab-num w-7 shrink-0 text-center text-[26px] text-ink/35 group-hover:text-brand-ink">{k + 1}</span>
+              <AgentTile id={a.slug} look={null} size={56} radius={16} />
+              <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-bold text-ink">{a.name}</span><span className="block truncate text-[12.5px] text-ink/55">{m.cat} · {m.maker}</span><span className="flex items-center gap-1.5 text-[12px] text-ink/65"><span className="flex items-center gap-0.5 font-semibold">{a.rating}<Icon name="star" size={10} className="text-brand-ink" /></span>· {compact(m.hires)}{tab === "free" && <span className="label ml-1 rounded bg-tint px-1 text-[8px] text-brand-ink">Free</span>}{tab === "rising" && <span className="ml-1 text-brand-ink">▲ {3 + ((k * 5) % 9)}</span>}</span></span>
+              <HireBtn a={a} />
+            </Link>
+          </li>
+        ); })}
+      </ol>
+    </section>
+  );
+}
+
+function Picks() {
+  const picks = [
+    { title: "A research desk in two hires", body: "Scout reads everything, Sonar watches the market. Together they turn a week of reading into a page.", who: ["scout", "sonar"], tag: "Editors' pick" },
+    { title: "Ship your launch week", body: "Quill writes the post, Frame makes the cards, Pulse schedules it all. You just say go.", who: ["quill", "frame", "pulse"], tag: "Collection" },
+  ];
+  return (
+    <section data-rise className="mt-12">
+      <h2 className="text-[22px] font-bold tracking-tight text-ink sm:text-[24px]">Editors&apos; picks</h2>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        {picks.map((p) => (
+          <article key={p.title} className="group relative overflow-hidden rounded-[26px] bg-card p-6 ring-1 ring-line">
+            <span className="label text-[9px] text-brand-ink">{p.tag}</span>
+            <h3 className="display mt-2 text-[32px] leading-[.95] text-ink">{p.title}</h3>
+            <p className="mt-2 max-w-[28rem] text-[14.5px] text-ink/65">{p.body}</p>
+            <div className="mt-5 flex items-center gap-3">
+              <div className="flex -space-x-3">{p.who.map((w) => <Link key={w} href={`/app/marketplace/${w}`} className="transition hover:z-10 hover:-translate-y-1"><AgentTile id={w} look={null} size={52} className="ring-4 ring-[var(--card)]" /></Link>)}</div>
+              <span className="text-[13.5px] font-semibold text-ink/65">{p.who.map((w) => SPECIALISTS.find((x) => x.slug === w)!.name).join(", ")}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
 export default function Marketplace() {
   const s = useApp()!;
-  const [cat, setCat] = useState<(typeof CATEGORIES)[number]>("All");
   const [q, setQ] = useState("");
-  const [sort, setSort] = useState<(typeof SORTS)[number]["id"]>("rating");
-  const grid = useRef<HTMLDivElement>(null);
-  const flipState = useRef<Flip.FlipState | null>(null);
-
-  const list = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    return SPECIALISTS.filter((a) => (cat === "All" || a.cat === cat) && (!t || `${a.name} ${a.job} ${a.cat} ${a.back}`.toLowerCase().includes(t)))
-      .sort((a, b) => (sort === "rating" ? b.rating - a.rating || b.jobs - a.jobs : sort === "jobs" ? b.jobs - a.jobs : a.name.localeCompare(b.name)));
-  }, [cat, q, sort]);
-
-  const capture = () => { if (grid.current) flipState.current = Flip.getState(grid.current.querySelectorAll("[data-flip-id]")); };
-  useLayoutEffect(() => {
-    if (!flipState.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { flipState.current = null; return; }
-    Flip.from(flipState.current, { duration: 0.6, ease: "power3.inOut", absolute: true, stagger: 0.02, onEnter: (els) => gsap.fromTo(els, { opacity: 0, scale: 0.85 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.6)" }), onLeave: (els) => gsap.to(els, { opacity: 0, scale: 0.85, duration: 0.3 }) });
-    flipState.current = null;
-  }, [list]);
-
+  const [cat, setCat] = useState<StoreCat | "All">("All");
   const left = seatsLeft(s);
+  const filtered = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return SPECIALISTS.filter((a) => (cat === "All" || storeMeta(a).cat === cat) && (!t || `${a.name} ${a.job} ${a.cat} ${a.back} ${storeMeta(a).maker}`.toLowerCase().includes(t)));
+  }, [q, cat]);
+  const browsing = !!q.trim() || cat !== "All";
+  const trending = [...SPECIALISTS].sort((a, b) => b.reviews / b.jobs - a.reviews / a.jobs);
+  const fresh = SPECIALISTS.filter((a) => storeMeta(a).isNew).concat(SPECIALISTS.slice(4, 6));
+
   return (
     <>
-      <PageHead kicker="Marketplace" demo title="Hire a specialist." body="Each agent is good at one kind of work. Flip a card to see what it does, then hire it into an open seat next to your agent."
-        right={<Link href="/app/team" data-rise className={`label flex items-center gap-2 rounded-full px-3.5 py-2.5 text-[10px] ${left > 0 ? "bg-tint text-ink" : "bg-ink text-[var(--bg)]"}`}><Icon name="team" size={14} />{left > 0 ? `${left} open seat${left > 1 ? "s" : ""} on ${planOf(s).name}` : "No open seats"}</Link>} />
-
-      <div data-rise className="sticky top-16 z-20 -mx-4 mt-7 border-b border-line bg-base/90 px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-[22px] sm:border sm:px-3 lg:top-3">
-        <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:gap-3">
-          <div className="flex gap-2 md:contents">
-            <label className="relative flex-1 md:order-1 md:max-w-[340px]">
-              <Icon name="search" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/55" />
-              <input value={q} onChange={(e) => { capture(); setQ(e.target.value); }} placeholder="Search agents or skills" aria-label="Search agents" className="field !h-11 !rounded-full !pl-11 !text-[15px]" />
-            </label>
-            <select value={sort} onChange={(e) => { capture(); setSort(e.target.value as typeof sort); }} aria-label="Sort" className="field !h-11 !w-[132px] shrink-0 !rounded-full !py-0 !text-[14px] md:order-3 md:!w-auto">
-              {SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-            </select>
-          </div>
-          <div className="no-bar -mx-1 flex flex-1 gap-1.5 overflow-x-auto px-1 md:order-2">
-            {CATEGORIES.map((c) => <button key={c} onClick={() => { capture(); setCat(c); }} aria-pressed={cat === c} className="chip !h-10 shrink-0 !px-3.5 !text-[13px]">{c}</button>)}
-          </div>
+      <div data-rise className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="flex items-center gap-2.5"><span className="label text-brand-ink">Marketplace</span><DemoTag /></div>
+          <h1 className="display mt-3 text-[44px] text-ink sm:text-[60px]">Find your next hire.</h1>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="relative sm:w-[320px]">
+            <Icon name="search" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/50" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search agents, makers, skills" aria-label="Search the marketplace" className="h-12 w-full rounded-full bg-tint pl-11 pr-4 text-[15px] text-ink outline-none ring-grape placeholder:text-ink/45 focus:ring-2" />
+          </label>
+          <Link href="/app/team" className={`label flex h-12 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-[9.5px] ${left > 0 ? "bg-card text-ink ring-1 ring-line" : "bg-ink text-[var(--bg)]"}`}><Icon name="team" size={14} />{left > 0 ? `${left} open seat${left > 1 ? "s" : ""} · ${planOf(s).name}` : "No open seats"}</Link>
         </div>
       </div>
 
-      <p data-rise className="label mt-5 text-[10px] text-ink/60">{list.length} agent{list.length === 1 ? "" : "s"}{cat !== "All" ? ` in ${cat}` : ""}{q ? ` matching "${q}"` : ""}</p>
-      {list.length ? (
-        <div ref={grid} data-rise className="mt-3 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {list.map((a) => <Card key={a.slug} a={a} i={SPECIALISTS.indexOf(a)} hired={s.hired.includes(a.slug)} />)}
-        </div>
+      <div data-rise className="no-bar -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 sm:-mx-8 sm:px-8" role="tablist" aria-label="Categories">
+        {(["All", ...STORE_CATS.map((c) => c.id)] as const).map((c) => (
+          <button key={c} role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={`flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-[14px] font-bold transition ${cat === c ? "bg-ink text-[var(--bg)]" : "bg-card text-ink/75 ring-1 ring-line hover:text-ink hover:ring-grape/50"}`}>
+            {c !== "All" && <Icon name={STORE_CATS.find((x) => x.id === c)!.icon} size={15} />}{c}
+          </button>
+        ))}
+      </div>
+
+      {browsing ? (
+        <section className="mt-8">
+          <h2 className="text-[22px] font-bold text-ink">{q ? `Results for “${q}”` : `${cat} agents`}<span className="ml-2 text-[15px] font-semibold text-ink/45">{filtered.length}</span></h2>
+          {filtered.length ? <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">{filtered.map((a) => <AppCard key={a.slug} a={a} />)}</div>
+            : <div className="mt-5"><Empty icon="search" title="No agents match." body="Try a different word or category." cta={{ label: "Clear", onClick: () => { setQ(""); setCat("All"); } }} /></div>}
+        </section>
       ) : (
-        <div className="mt-3"><Empty icon="search" title="No one matches that." body="Try a different word, or clear the filters to see the whole roster." cta={{ label: "Clear filters", onClick: () => { setQ(""); setCat("All"); } }} /></div>
+        <>
+          <Hero />
+          <ShelfRow title="Trending now" sub="What people are hiring this week">{trending.map((a) => <AppCard key={a.slug} a={a} />)}</ShelfRow>
+          <TopCharts />
+          <ShelfRow title="New & notable" sub="Fresh on the marketplace">{fresh.map((a) => <AppCard key={a.slug} a={a} wide />)}</ShelfRow>
+          <Picks />
+          <section data-rise className="mt-12">
+            <h2 className="text-[22px] font-bold tracking-tight text-ink sm:text-[24px]">Browse categories</h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {STORE_CATS.map((c) => { const n = SPECIALISTS.filter((a) => storeMeta(a).cat === c.id).length; return (
+                <button key={c.id} onClick={() => { setCat(c.id); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="group flex items-center gap-3 rounded-[20px] bg-card p-4 text-left ring-1 ring-line transition hover:ring-grape/60">
+                  <span className="grid h-11 w-11 place-items-center rounded-2xl bg-tint text-brand-ink transition group-hover:bg-grape group-hover:text-white"><Icon name={c.icon} size={20} /></span>
+                  <span><span className="block text-[15px] font-bold text-ink">{c.id}</span><span className="text-[12.5px] text-ink/55">{n} agent{n === 1 ? "" : "s"}</span></span>
+                </button>
+              ); })}
+            </div>
+          </section>
+          <p className="mt-10 text-center text-[12.5px] text-ink/45">Ratings, hires and rankings are demo data.</p>
+        </>
       )}
     </>
   );

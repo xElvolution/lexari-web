@@ -9,7 +9,6 @@ import ChatPanel from "./ChatPanel";
 import CallOverlay from "./CallOverlay";
 import DesktopPane from "./DesktopPane";
 import GroupDialog from "./GroupDialog";
-import { convoOf, nameOf } from "../agents";
 
 function useWide() {
   const [wide, setWide] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches);
@@ -44,20 +43,18 @@ export default function Home() {
   };
   const back = () => { if (pushed) { pushed = false; window.history.back(); } else window.history.replaceState(null, "", "/app"); };
   const mobileChat = !wide && !!fromUrl;
-  const cur = convoOf(s, active);
-  const deskLabel = cur?.group ? `${cur.members.length} computers · live` : `${nameOf(s, active)}'s computer · live`;
 
   return (
     <>
       <div className="lg:flex lg:h-[100dvh]">
         {wide && (
-          <ConvoList s={s} active={active} onPick={open} onNewGroup={() => setGroup({})} desktop={{ open: pane, label: deskLabel, toggle: () => setPane((p) => !p) }} className="w-[300px] shrink-0 border-r border-line bg-alt" />
+          <ConvoList s={s} active={active} onPick={open} onNewGroup={() => setGroup({})} className="w-[300px] shrink-0 border-r border-line bg-alt" />
         )}
         <div className="flex min-w-0 flex-1 flex-col lg:h-full">
           <AgentStrip s={s} active={active} onPick={open} />
           {wide ? (
             <div className="relative flex min-h-0 flex-1">
-              <ChatPanel key={active} s={s} id={active} onCall={() => setCall(true)} onEditGroup={() => setGroup({ edit: active })} />
+              <ChatPanel key={active} s={s} id={active} onCall={() => setCall(true)} onDesktop={() => setPane((p) => !p)} desktopOpen={pane} onEditGroup={() => setGroup({ edit: active })} />
               {pane && <div className="absolute inset-y-0 right-0 z-20 w-[min(560px,100%)] shadow-[-30px_0_60px_-30px_rgba(0,0,0,.35)] xl:static xl:w-[min(46%,620px)] xl:shrink-0 xl:shadow-none"><DesktopPane s={s} id={active} onClose={() => setPane(false)} /></div>}
             </div>
           ) : (
@@ -67,7 +64,7 @@ export default function Home() {
       </div>
       {mobileChat && (
         <div className="fixed inset-0 z-50 bg-base">
-          <ChatPanel key={fromUrl} s={s} id={fromUrl!} onBack={back} onCall={() => setCall(true)} onDesktop={() => setPane(true)} desktopOpen={pane} onEditGroup={() => setGroup({ edit: fromUrl! })} />
+          <ChatPanel key={fromUrl} s={s} id={fromUrl!} onBack={back} onCall={() => setCall(true)} onDesktop={() => setPane((p) => !p)} desktopOpen={pane} onEditGroup={() => setGroup({ edit: fromUrl! })} />
         </div>
       )}
       {!wide && pane && fromUrl && <div className="fixed inset-0 z-[60] bg-alt"><DesktopPane s={s} id={fromUrl} onClose={() => setPane(false)} full /></div>}

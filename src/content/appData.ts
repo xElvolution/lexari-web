@@ -296,3 +296,48 @@ export function walletFor(id: string) {
   const spark = Array.from({ length: 12 }, (_, i) => 30 + (((h >>> (i % 24)) & 31) + i * 2));
   return { address, balance, lines, spark };
 }
+
+/* ---------- agent cards (demo) ---------- */
+/** Placeholder card fee. No real payment: the confirm step only pretends. Units are left neutral on purpose. */
+export const CARD_FEE = "5.00";
+export const CARD_LIMITS = [100, 250, 500, 1000];
+export function cardTxns(id: string) {
+  const who = specialistBySlug(id);
+  return who ? [
+    { label: `${who.tools[0] ?? "Tool"} add-on`, amount: 4.99, ago: "today" },
+    { label: "Cloud compute", amount: 12.4, ago: "yesterday" },
+    { label: "API credits", amount: 20, ago: "3 days ago" },
+  ] : [
+    { label: "Domain renewal", amount: 11.99, ago: "today" },
+    { label: "Cloud compute", amount: 8.2, ago: "yesterday" },
+    { label: "Notes app, monthly", amount: 4, ago: "4 days ago" },
+  ];
+}
+
+/* ---------- marketplace store listing (demo) ---------- */
+export const STORE_CATS = [
+  { id: "Research", icon: "search", from: ["Research"] },
+  { id: "Writing", icon: "edit", from: ["Writing"] },
+  { id: "Finance", icon: "wallet", from: ["Data", "Onchain"] },
+  { id: "Design", icon: "spark", from: ["Design"] },
+  { id: "Dev", icon: "terminal", from: ["Code"] },
+  { id: "Marketing", icon: "chat", from: ["Social", "Community"] },
+  { id: "Video", icon: "play", from: ["Video"] },
+  { id: "Planning", icon: "list", from: ["Planning"] },
+] as const;
+export type StoreCat = (typeof STORE_CATS)[number]["id"];
+const MAKERS = ["Lexari Labs", "Northwind AI", "Kite & Co", "Mosaic Studio", "Basalt Works", "Oyo Digital"];
+export const compact = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n));
+export function storeMeta(sp: Specialist) {
+  const i = SPECIALISTS.indexOf(sp);
+  const cat = (STORE_CATS.find((c) => (c.from as readonly string[]).includes(sp.cat))?.id ?? "Research") as StoreCat;
+  const hires = sp.jobs * 7 + 400 + i * 131;
+  const r = sp.rating;
+  const five = Math.round(40 + (r - 4.5) * 90), four = Math.round((100 - five) * 0.62), three = Math.round((100 - five - four) * 0.55), two = Math.round((100 - five - four - three) * 0.6);
+  return {
+    maker: i < 4 ? "Lexari Labs" : MAKERS[i % MAKERS.length], cat, hires, free: i % 3 !== 1, isNew: i >= 8,
+    age: sp.cat === "Onchain" || sp.cat === "Social" ? "12+" : "4+", rising: ((i * 7) % 12) + (sp.reviews / sp.jobs) * 10,
+    dist: [five, four, three, two, Math.max(0, 100 - five - four - three - two)],
+    updated: i % 6 ? `${1 + (i % 6)} days ago` : "yesterday", version: `2.${i + 1}.${(i * 3) % 10}`, languages: i % 2 ? "English, French" : "English",
+  };
+}

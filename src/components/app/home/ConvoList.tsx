@@ -26,10 +26,9 @@ function Row({ c, s, on, now, onPick }: { c: Convo; s: State; on: boolean; now: 
   );
 }
 
-/** Conversation list: direct chats and groups, most recent first. On desktop it also holds the Desktop switch. */
-export default function ConvoList({ s, active, onPick, onNewGroup, desktop, className = "" }: {
-  s: State; active: string | null; onPick: (id: string) => void; onNewGroup: () => void;
-  desktop?: { open: boolean; label: string; toggle: () => void }; className?: string;
+/** Conversation list: direct chats and groups, most recent first. */
+export default function ConvoList({ s, active, onPick, onNewGroup, className = "" }: {
+  s: State; active: string | null; onPick: (id: string) => void; onNewGroup: () => void; className?: string;
 }) {
   const now = useNow(30000);
   const list = convos(s);
@@ -39,18 +38,6 @@ export default function ConvoList({ s, active, onPick, onNewGroup, desktop, clas
         <h1 className="display text-[30px] leading-none text-ink">Chats</h1>
         <button onClick={onNewGroup} title="New group" aria-label="New group" className="grid h-10 w-10 place-items-center rounded-full text-ink/75 transition hover:bg-tint hover:text-brand-ink"><Icon name="groupadd" size={20} /></button>
       </div>
-      {desktop && (
-        <div className="px-3 pb-2">
-          <button onClick={desktop.toggle} aria-pressed={desktop.open} className={`group flex w-full items-center gap-3 rounded-2xl p-2.5 text-left ring-1 transition ${desktop.open ? "bg-grape text-white ring-grape" : "bg-card text-ink ring-line hover:ring-grape/60"}`}>
-            <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[14px] ${desktop.open ? "bg-white/15" : "bg-tint text-brand-ink"}`}><Icon name="monitor" size={22} /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-bold">Desktop</span>
-              <span className={`flex items-center gap-1.5 truncate text-[12.5px] ${desktop.open ? "text-white/80" : "text-ink/60"}`}><i className={`h-1.5 w-1.5 shrink-0 rounded-full ${desktop.open ? "bg-white" : "bg-grape"} live-dot`} /><span className="truncate">{desktop.label}</span></span>
-            </span>
-            <Icon name={desktop.open ? "x" : "right"} size={17} className={desktop.open ? "text-white/85" : "text-ink/40 transition group-hover:translate-x-0.5"} />
-          </button>
-        </div>
-      )}
       <div className="label px-5 pb-1.5 pt-2 text-[9px] text-ink/50">Messages</div>
       <ul className="no-bar min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2.5 pb-3">
         {list.map((c) => <Row key={c.id} c={c} s={s} on={c.id === active} now={now} onPick={onPick} />)}
