@@ -93,8 +93,8 @@ body { font-family: var(--font-sans); color: var(--ink); background: var(--bg); 
 .marquee { animation: marquee 32s linear infinite; }
 @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.08); } }
 .blink { animation: blink 4.2s infinite; transform-origin: center; transform-box: fill-box; }
-@keyframes look { 0%, 12% { transform: translateX(0); } 28%, 44% { transform: translateX(-6px); } 60%, 78% { transform: translateX(6px); } 92%, 100% { transform: translateX(0); } }
-.look { animation: look 2.6s ease-in-out both; }
+@keyframes look { 0%, 12% { transform: translateX(0); } 28%, 44% { transform: translateX(-7px); } 60%, 78% { transform: translateX(7px); } 92%, 100% { transform: translateX(0); } }
+.look { animation: look 2.8s ease-in-out .7s both; }
 @keyframes caret { 50% { opacity: 0; } }
 .caret::after { content: ""; display: inline-block; width: 0.55em; height: 1.05em; margin-left: 2px; vertical-align: -0.18em; background: var(--color-lilac); animation: caret 1s steps(1) infinite; }
 @keyframes pop { 0% { transform: scale(0.2); opacity: 0; } 70% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }

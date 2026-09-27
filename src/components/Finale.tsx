@@ -8,8 +8,8 @@ export default function Finale() {
     <>
       <section className="sheet grain overflow-hidden bg-grape pt-24 text-white sm:pt-32">
         <div className="relative mx-auto flex max-w-[1320px] flex-col items-center px-5 text-center sm:px-8">
-          <div className="reveal flex -space-x-4">
-            {([["#ffffff", 101], ["#0a0a0a", 7], ["#c9b8ff", 45], ["#8f6bff", 23]] as const).map(([body, seed], i) => <div key={seed} className="rounded-full bg-grape p-1" style={{ transform: `rotate(${(i - 1.5) * 8}deg)` }}><Face seed={seed} variant={{ body }} size={76} /></div>)}
+          <div className="reveal flex -space-x-2">
+            {([["orange", 101], ["yellow", 7], ["teal", 45], ["pink", 23], ["sky", 88]] as const).map(([color, seed], i) => <div key={seed} style={{ transform: `rotate(${(i - 2) * 7}deg)` }}><Face seed={seed} variant={{ color }} size={84} /></div>)}
           </div>
           <h2 className="reveal display mt-8 max-w-[14ch] text-[clamp(3rem,8.5vw,7.5rem)]">{F.title}</h2>
           <p className="reveal mt-6 text-[18px] text-white/80 sm:text-[20px]">{F.body}</p>

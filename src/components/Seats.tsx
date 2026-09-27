@@ -49,7 +49,7 @@ export default function Seats() {
                     {state === "home" && <Face size={120} track={big} className="!h-[74%] !w-[74%]" />}
                     {state === "hired" && <Face seed={seatSeed(i)} size={80} className="!h-[74%] !w-[74%]" />}
                     {big && state === "open" && <span className="text-[22px] text-ink/25">+</span>}
-                    {big && <span className={`label absolute bottom-1 right-2 hidden text-[8px] sm:block ${state === "home" ? "text-white/80" : "text-ink/50"}`}>{String(i + 1).padStart(2, "0")}</span>}
+                    {big && <span className={`label absolute leading-none ${plan === 0 ? "block" : "hidden sm:block"} ${state === "home" ? "text-white/80" : "text-ink/50"}`} style={{ right: "12%", bottom: "10%", fontSize: plan === 0 ? 12 : 9 }}>{String(i + 1).padStart(2, "0")}</span>}
                   </div>
                 );
               })}
