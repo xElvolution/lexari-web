@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Face from "./Face";
-import { PALETTE, type ColorKey } from "./avatar";
+import { type ColorKey } from "./avatar";
 
 type Side = "left" | "right";
 type Peek = { id: number; seed: number; color: ColorKey; side: Side; top: number; size: number; depth: number };
@@ -49,7 +49,6 @@ function findSpot(size: number, depth: number) {
 export default function Peekers() {
   const [peek, setPeek] = useState<Peek | null>(null);
   const head = useRef<HTMLDivElement>(null);
-  const hands = useRef<HTMLDivElement>(null);
   const n = useRef(0);
 
   useEffect(() => {
@@ -74,7 +73,7 @@ export default function Peekers() {
   }, []);
 
   useEffect(() => {
-    if (!peek || !head.current || !hands.current) return;
+    if (!peek || !head.current) return;
     const s = peek.side === "left" ? 1 : -1;
     const hidden = `translateX(${-s * 115}%)`;
     const shown = (-(1 - peek.depth) * 100) * s;
@@ -95,39 +94,18 @@ export default function Peekers() {
       ],
       opts
     );
-    const k = hands.current.animate(
-      [
-        { transform: `translateX(${-s * 100}%)`, offset: 0 },
-        { transform: "translateX(0%)", offset: 0.06 },
-        { transform: "translateX(0%)", offset: 0.86 },
-        { transform: `translateX(${-s * 100}%)`, offset: 1 },
-      ],
-      opts
-    );
     h.onfinish = () => setPeek(null);
-    return () => { h.cancel(); k.cancel(); };
+    return () => { h.cancel(); };
   }, [peek]);
 
   if (!peek) return null;
-  const c = PALETTE[peek.color];
   const left = peek.side === "left";
-  const hand = (y: number) => (
-    <svg key={y} width={peek.size * 0.24} height={peek.size * 0.2} viewBox="0 0 24 20" style={{ position: "absolute", top: y, [left ? "left" : "right"]: 0, transform: left ? undefined : "scaleX(-1)" }}>
-      <path d="M0 3 H14 a6 6 0 0 1 0 14 H0 Z" fill={c.fill} stroke={c.shade} strokeWidth="2" />
-      <path d="M11 7.5 H17 M11 12.5 H17" stroke={c.shade} strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-[20] overflow-hidden">
       <div className="absolute" style={{ top: peek.top, [left ? "left" : "right"]: 0, width: peek.size, height: peek.size }}>
         {/* head */}
         <div ref={head} className="absolute inset-0 drop-shadow-[0_10px_18px_rgba(0,0,0,.35)]" style={{ transformOrigin: left ? "0% 85%" : "100% 85%", transform: `translateX(${left ? -115 : 115}%)` }}>
           <Face key={peek.id} seed={peek.seed} variant={{ color: peek.color }} size={peek.size} look className="block" />
-        </div>
-        {/* hands gripping the edge of the screen */}
-        <div ref={hands} className="absolute inset-0" style={{ transform: `translateX(${left ? -100 : 100}%)` }}>
-          {hand(peek.size * 0.18)}
-          {hand(peek.size * 0.7)}
         </div>
       </div>
     </div>
