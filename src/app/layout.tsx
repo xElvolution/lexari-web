@@ -7,12 +7,27 @@ const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-br
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree" });
 const martian = Martian_Mono({ subsets: ["latin"], variable: "--font-martian" });
 
-export const metadata: Metadata = { title: copy.meta.title, description: copy.meta.description };
-export const viewport: Viewport = { themeColor: "#5b2bff" };
+export const metadata: Metadata = {
+  title: copy.meta.title,
+  description: copy.meta.description,
+  openGraph: { title: copy.meta.title, description: copy.meta.description },
+};
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+  ],
+};
+
+/* Runs before first paint: saved choice wins, otherwise follow the system. No flash. */
+const themeScript = `(function(){try{var t=localStorage.getItem('lexari-theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','light')}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${figtree.variable} ${martian.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${bricolage.variable} ${figtree.variable} ${martian.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>{children}</body>
     </html>
   );

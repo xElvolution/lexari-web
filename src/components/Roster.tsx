@@ -16,30 +16,30 @@ function Card({ a, i }: { a: Agent; i: number }) {
   return (
     <button type="button" onClick={() => setFlipped((v) => !v)} className={`flip h-[430px] w-[282px] shrink-0 snap-center text-left sm:w-[310px] ${flipped ? "is-flipped" : ""}`} aria-label={`${a.name}, ${a.job}. Tap to read more.`}>
       <div className="flip-inner">
-        <div className="flip-face flex flex-col overflow-hidden rounded-[28px] bg-frost shadow-[0_10px_0_#3514b0]">
-          <div className="carpet relative grid h-[190px] place-items-center" style={{ background: `hsl(${a.hue} 90% 86%)` }}>
-            <Face hue={a.hue} shape={a.shape as "round"} size={130} />
-            <span className="display absolute left-4 top-3 text-[26px] text-plum/30">#{String(i + 1).padStart(2, "0")}</span>
-            <span className="label absolute right-4 top-4 rounded-full bg-plum px-2 py-1 text-[9px] text-white">★ {a.rating}</span>
+        <div className="flip-face flex flex-col overflow-hidden rounded-[28px] bg-card text-ink shadow-[0_10px_0_#3514b0]">
+          <div className="carpet relative grid h-[190px] place-items-center bg-tint">
+            <Face seed={i * 11 + 5} variant={{ shape: a.shape as "round" }} size={130} />
+            <span className="display absolute left-4 top-3 text-[26px] text-ink/30">#{String(i + 1).padStart(2, "0")}</span>
+            <span className="label absolute right-4 top-4 rounded-full bg-ink px-2 py-1 text-[9px] text-base">★ {a.rating}</span>
           </div>
           <div className="flex flex-1 flex-col p-5">
-            <div className="display text-[46px] text-plum">{a.name}</div>
-            <div className="mt-1 text-[16px] font-semibold text-grape">{a.job}</div>
-            <p className="relative mt-4 rounded-2xl rounded-tl-sm bg-frost-2 px-3.5 py-2.5 text-[14.5px] font-semibold leading-snug text-plum">&ldquo;{a.quip}&rdquo;</p>
-            <div className="mt-auto flex items-center justify-between border-t-2 border-dashed border-plum/15 pt-4">
-              <span className="text-[13px] text-plum/65"><b className="text-plum">{a.jobs.toLocaleString("en-US")}</b> jobs done</span>
-              <span className="label rounded-full bg-candy px-2.5 py-1.5 text-[9px] text-plum">flip ↻</span>
+            <div className="display text-[46px] text-ink">{a.name}</div>
+            <div className="mt-1 text-[16px] font-semibold text-brand-ink">{a.job}</div>
+            <p className="relative mt-4 rounded-2xl rounded-tl-sm border border-line bg-alt px-3.5 py-2.5 text-[14.5px] font-semibold leading-snug text-ink">&ldquo;{a.quip}&rdquo;</p>
+            <div className="mt-auto flex items-center justify-between border-t-2 border-dashed border-line pt-4">
+              <span className="text-[13px] text-ink/65"><b className="text-ink">{a.jobs.toLocaleString("en-US")}</b> jobs done</span>
+              <span className="label rounded-full bg-grape px-2.5 py-1.5 text-[9px] text-white">flip ↻</span>
             </div>
           </div>
         </div>
-        <div className="flip-face flip-back flex flex-col rounded-[28px] bg-plum p-6 text-white shadow-[0_10px_0_#3514b0]">
-          <span className="label text-[10px] text-candy">what {a.name} does</span>
+        <div className="flip-face flip-back flex flex-col rounded-[28px] bg-[#0a0a0a] p-6 text-white shadow-[0_10px_0_#3514b0] ring-1 ring-white/10">
+          <span className="label text-[10px] text-lilac">what {a.name} does</span>
           <p className="display mt-4 text-[27px] leading-[1.05]">{a.back}</p>
           <dl className="mt-auto grid grid-cols-2 gap-3 border-t border-white/15 pt-4 text-[13px]">
             <div><dt className="text-white/55">Rating</dt><dd className="display text-[26px]">{a.rating}</dd></div>
             <div><dt className="text-white/55">Jobs</dt><dd className="display text-[26px]">{a.jobs.toLocaleString("en-US")}</dd></div>
           </dl>
-          <span className="btn btn-candy mt-4 !h-12 !text-[15px]">Hire into a seat</span>
+          <span className="btn btn-brand mt-4 !h-12 !text-[15px]">Hire into a seat</span>
         </div>
       </div>
     </button>
@@ -64,7 +64,7 @@ export default function Roster() {
       <div className="relative mx-auto max-w-[1320px] px-5 sm:px-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <SectionIntro label={R.label} title={R.title} body={R.body} why={R.why} tone="grape" />
-          <a href={`${APP}/market`} className="reveal btn btn-candy shrink-0 self-start lg:self-end">{R.cta} →</a>
+          <a href={`${APP}/market`} className="reveal btn btn-white shrink-0 self-start lg:self-end">{R.cta} →</a>
         </div>
       </div>
       <div ref={wrap} className="relative mt-14 py-6">

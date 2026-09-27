@@ -1,16 +1,15 @@
-/** Wordmark: a punched ID badge glyph with two eyes, then "lexari". */
-export default function Logo({ tone = "light" }: { tone?: "light" | "dark" }) {
-  const ink = tone === "light" ? "#fff" : "#170a38";
+/**
+ * PLACEHOLDER LOGO. The final mark is being designed separately.
+ * Swap the <span> mark below (or the whole component) for the real logo.
+ * It inherits the theme ink color, so it works on light and dark.
+ */
+export default function Logo() {
   return (
-    <span className="flex items-center gap-2">
-      <svg width="30" height="34" viewBox="0 0 30 34" aria-hidden>
-        <rect x="1" y="3" width="28" height="30" rx="8" fill="#ffa8ea" />
-        <rect x="10" y="0" width="10" height="7" rx="3.5" fill={ink} />
-        <circle cx="10.5" cy="18" r="2.6" fill="#170a38" />
-        <circle cx="19.5" cy="18" r="2.6" fill="#170a38" />
-        <path d="M10 25 Q15 28.5 20 25" stroke="#170a38" strokeWidth="2.2" fill="none" strokeLinecap="round" />
-      </svg>
-      <span className="display text-[26px] leading-none" style={{ color: ink }}>lexari</span>
+    <span className="flex items-center gap-2 text-ink">
+      <span aria-hidden className="grid h-7 w-7 place-items-center rounded-[9px] bg-ink">
+        <span className="h-2.5 w-2.5 rounded-full bg-base" />
+      </span>
+      <span className="display text-[26px] leading-none">lexari</span>
     </span>
   );
 }

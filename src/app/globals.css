@@ -1,47 +1,75 @@
 @import "tailwindcss";
 
-/* Lexari identity: electric grape field, midnight plum ink, frost white, candy pink accent. */
+/* Lexari identity: black, purple and white. Two themes share one set of semantic tokens. */
+:root, [data-theme="light"] {
+  --bg: #ffffff;
+  --alt: #f5f2ff;
+  --card: #ffffff;
+  --tint: #ece6ff;
+  --ink: #0a0a0a;
+  --line: rgba(10, 10, 10, 0.11);
+  --brand-ink: #5b2bff;
+  --glow: rgba(91, 43, 255, 0.2);
+  --frame: #0d0a17;
+  --dots: rgba(10, 10, 10, 0.1);
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --bg: #000000;
+  --alt: #0b0915;
+  --card: #13101f;
+  --tint: #1d1731;
+  --ink: #ffffff;
+  --line: rgba(255, 255, 255, 0.13);
+  --brand-ink: #a58bff;
+  --glow: rgba(91, 43, 255, 0.5);
+  --frame: #1c1730;
+  --dots: rgba(255, 255, 255, 0.12);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-base: var(--bg);
+  --color-alt: var(--alt);
+  --color-card: var(--card);
+  --color-tint: var(--tint);
+  --color-ink: var(--ink);
+  --color-line: var(--line);
+  --color-brand-ink: var(--brand-ink);
+  --color-frame: var(--frame);
+}
 @theme {
   --color-grape: #5b2bff;
-  --color-grape-deep: #4a1fe0;
+  --color-grape-deep: #3514b0;
   --color-grape-soft: #8f6bff;
-  --color-plum: #170a38;
-  --color-plum-2: #221149;
-  --color-frost: #f3efff;
-  --color-frost-2: #e6ddff;
-  --color-candy: #ffa8ea;
-  --color-orchid: #c8b3ff;
-  --color-flare: #ff8a3d;
+  --color-lilac: #c9b8ff;
   --font-display: var(--font-bricolage), system-ui, sans-serif;
   --font-sans: var(--font-figtree), system-ui, sans-serif;
   --font-mono: var(--font-martian), ui-monospace, monospace;
 }
 
-html { background: var(--color-plum); overflow-x: clip; scroll-behavior: smooth; }
-body { font-family: var(--font-sans); color: var(--color-plum); -webkit-font-smoothing: antialiased; }
-::selection { background: var(--color-candy); color: var(--color-plum); }
+html { background: var(--bg); overflow-x: clip; scroll-behavior: smooth; }
+body { font-family: var(--font-sans); color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; transition: background-color .3s ease; }
+::selection { background: var(--color-grape); color: #fff; }
 
 .display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.045em; line-height: 0.9; font-variation-settings: "wdth" 88; }
 .label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
 
-/* film grain so the flat grape field feels printed on fabric */
+/* film grain for the flat purple fields */
 .grain::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.16; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
-/* carpet: the office floor pattern behind the hero */
-.carpet {
-  background-image:
-    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.18) 1px, transparent 1.5px);
-  background-size: 22px 22px;
-}
+/* carpet: office floor dots. .carpet follows the theme, .carpet-w is white for purple fields */
+.carpet { background-image: radial-gradient(circle at 1px 1px, var(--dots) 1px, transparent 1.5px); background-size: 22px 22px; }
+.carpet-w { background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.2) 1px, transparent 1.5px); background-size: 22px 22px; }
 
-/* the lanyard strap, a woven ribbon with the wordmark printed on it */
+/* the lanyard strap */
 .strap {
   background:
-    repeating-linear-gradient(0deg, transparent 0 6px, rgba(0, 0, 0, 0.08) 6px 7px),
-    linear-gradient(90deg, #ff9be4, #ffc6f1 50%, #ff9be4);
+    repeating-linear-gradient(0deg, transparent 0 6px, rgba(0, 0, 0, 0.12) 6px 7px),
+    linear-gradient(90deg, #4a1fe0, #7a52ff 50%, #4a1fe0);
 }
 
 /* sections overlap like sheets dealt onto a desk */
@@ -54,19 +82,21 @@ body { font-family: var(--font-sans); color: var(--color-plum); -webkit-font-smo
   transition: transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1), box-shadow 0.25s ease, background 0.25s ease;
 }
 .btn:active { transform: scale(0.97); }
-.btn-candy { background: var(--color-candy); color: var(--color-plum); box-shadow: 0 6px 0 #d45fb6; }
-.btn-candy:hover { transform: translateY(-3px); box-shadow: 0 9px 0 #d45fb6; }
+.btn-brand { background: var(--color-grape); color: #fff; box-shadow: 0 6px 0 var(--color-grape-deep); }
+.btn-brand:hover { transform: translateY(-3px); box-shadow: 0 9px 0 var(--color-grape-deep); }
+.btn-white { background: #fff; color: #0a0a0a; box-shadow: 0 6px 0 var(--color-grape-deep); }
+.btn-white:hover { transform: translateY(-3px); box-shadow: 0 9px 0 var(--color-grape-deep); }
 .btn-line { border: 2px solid currentColor; }
 .btn-line:hover { transform: translateY(-3px); }
-.btn-grape { background: var(--color-grape); color: #fff; box-shadow: 0 6px 0 #3514b0; }
-.btn-grape:hover { transform: translateY(-3px); box-shadow: 0 9px 0 #3514b0; }
 
 @keyframes marquee { to { transform: translateX(-50%); } }
 .marquee { animation: marquee 32s linear infinite; }
 @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.08); } }
 .blink { animation: blink 4.2s infinite; transform-origin: center; transform-box: fill-box; }
+@keyframes look { 0%, 12% { transform: translateX(0); } 28%, 44% { transform: translateX(-6px); } 60%, 78% { transform: translateX(6px); } 92%, 100% { transform: translateX(0); } }
+.look { animation: look 2.6s ease-in-out both; }
 @keyframes caret { 50% { opacity: 0; } }
-.caret::after { content: ""; display: inline-block; width: 0.55em; height: 1.05em; margin-left: 2px; vertical-align: -0.18em; background: var(--color-candy); animation: caret 1s steps(1) infinite; }
+.caret::after { content: ""; display: inline-block; width: 0.55em; height: 1.05em; margin-left: 2px; vertical-align: -0.18em; background: var(--color-lilac); animation: caret 1s steps(1) infinite; }
 @keyframes pop { 0% { transform: scale(0.2); opacity: 0; } 70% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
 .pop { animation: pop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
 
@@ -77,9 +107,14 @@ body { font-family: var(--font-sans); color: var(--color-plum); -webkit-font-smo
 .flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .flip-back { transform: rotateY(180deg); }
 
+/* theme toggle icons, switched by CSS so the server render never mismatches */
+.i-sun, .i-moon { display: none; }
+[data-theme="dark"] .i-sun { display: block; }
+[data-theme="light"] .i-moon { display: block; }
+
 .no-bar { scrollbar-width: none; } .no-bar::-webkit-scrollbar { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .marquee, .blink, .caret::after, .pop { animation: none; }
+  .marquee, .blink, .caret::after, .pop, .look { animation: none; }
   html { scroll-behavior: auto; }
 }

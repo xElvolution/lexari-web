@@ -9,9 +9,9 @@ export const APP = (process.env.NEXT_PUBLIC_APP_URL || "https://app.lexari.ai").
 
 export const copy = {
   meta: {
-    title: "Lexari · Meet your first AI hire",
+    title: "Lexari · Meet your first personalized AI agent",
     description:
-      "Lexari gives you a named AI agent with its own computer and a memory that lasts. Hire specialist agents into open seats as your work grows.",
+      "Lexari gives you a personalized AI agent with its own computer and a memory that lasts. Sign in with Google or a crypto wallet, meet your agent, and hire more as your work grows.",
   },
 
   nav: {
@@ -20,17 +20,18 @@ export const copy = {
       { label: "Memory", href: "#memory" },
       { label: "Roster", href: "#roster" },
       { label: "Seats", href: "#seats" },
-      { label: "OKX", href: "#okx" },
+      { label: "Sign in", href: "#access" },
       { label: "Questions", href: "#questions" },
     ],
     cta: "Hire your agent",
   },
 
   hero: {
-    kicker: "Now hiring · one AI agent, yours to name",
-    title: ["Meet your", "first hire."],
+    kicker: "Now hiring · one personalized AI agent, yours to name",
+    title: ["Meet your first", "personalized AI agent."],
+    subtitle: "And hire more.",
     body:
-      "Lexari gives you an AI agent with a name, its own computer and a memory that lasts. It shows up every day, remembers how you like things done, and brings in specialists when the job gets bigger than one desk.",
+      "Lexari gives you a personalized AI agent with a name, its own computer and a memory that lasts. It shows up every day, remembers how you like things done, and brings in specialists when the job gets bigger than one desk.",
     primary: "Hire",
     secondary: "See it at work",
     badge: {
@@ -50,7 +51,7 @@ export const copy = {
     ],
   },
 
-  marquee: ["Now hiring", "Own computer", "Lasting memory", "Specialists on call", "Seats from 1 to 100", "Built around OKX"],
+  marquee: ["Now hiring", "Own computer", "Lasting memory", "Specialists on call", "Seats from 1 to 100", "Sign in with Google or a wallet"],
 
   desk: {
     label: "01 · Its own desk",
@@ -110,7 +111,7 @@ export const copy = {
     counter: 212,
     cards: [
       { tag: "Style", text: "Keeps summaries to one page" },
-      { tag: "Tools", text: "Uses OKX Wallet for payments" },
+      { tag: "Tools", text: "Prefers tables over long text" },
       { tag: "Team", text: "Maya signs off on design" },
       { tag: "Style", text: "No jargon, short sentences" },
       { tag: "Habit", text: "Weekly report goes out on Friday" },
@@ -127,17 +128,17 @@ export const copy = {
       "The marketplace is a roster of specialist agents, each good at one kind of work. Every card shows what the agent does, how it has been rated and how many jobs it has finished. Hire one and it joins your team, next to your own agent.",
     why: "Why you should care: your team grows by the job, not by the headcount.",
     hint: "Hover or tap a card to read the back.",
-    note: "Sample roster. Live listings and prices are in the app.",
+    note: "Sample roster. Live listings are in the app.",
     cta: "Open the marketplace",
     agents: [
-      { name: "Scout", quip: "I read so you do not have to.", job: "Web research", back: "Reads dozens of pages and returns the three facts that matter, with links.", rating: 4.9, jobs: 1840, hue: 262, shape: "round" },
-      { name: "Quill", quip: "Give me a rough idea. I will give it back sharp.", job: "Writing and edits", back: "Drafts posts, emails and briefs in your voice, then tightens them.", rating: 4.8, jobs: 1322, hue: 318, shape: "tall" },
-      { name: "Tally", quip: "Messy sheet? Send it over.", job: "Numbers and sheets", back: "Cleans spreadsheets, builds tables and explains what changed.", rating: 4.8, jobs: 976, hue: 150, shape: "square" },
-      { name: "Frame", quip: "Tell me the vibe, I will draw it.", job: "Design", back: "Turns a rough idea into layouts, social cards and simple brand kits.", rating: 4.7, jobs: 811, hue: 28, shape: "round" },
-      { name: "Echo", quip: "Your channels, answered while you sleep.", job: "Community", back: "Answers questions in your channels and flags the ones that need you.", rating: 4.6, jobs: 604, hue: 195, shape: "tall" },
-      { name: "Relay", quip: "I watch the chain so you can look away.", job: "Onchain watch", back: "Keeps an eye on wallets and tokens you care about and sends plain alerts.", rating: 4.7, jobs: 533, hue: 280, shape: "square" },
-      { name: "Cut", quip: "Two hours of footage, ten great seconds.", job: "Video", back: "Finds the best moments in long footage and cuts them into shorts.", rating: 4.6, jobs: 402, hue: 350, shape: "round" },
-      { name: "Atlas", quip: "Big goal in, clear plan out.", job: "Planning", back: "Breaks a big goal into steps, owners and dates, then tracks them.", rating: 4.8, jobs: 367, hue: 220, shape: "tall" },
+      { name: "Scout", quip: "I read so you do not have to.", job: "Web research", back: "Reads dozens of pages and returns the three facts that matter, with links.", rating: 4.9, jobs: 1840, shape: "round" },
+      { name: "Quill", quip: "Give me a rough idea. I will give it back sharp.", job: "Writing and edits", back: "Drafts posts, emails and briefs in your voice, then tightens them.", rating: 4.8, jobs: 1322, shape: "tall" },
+      { name: "Tally", quip: "Messy sheet? Send it over.", job: "Numbers and sheets", back: "Cleans spreadsheets, builds tables and explains what changed.", rating: 4.8, jobs: 976, shape: "square" },
+      { name: "Frame", quip: "Tell me the vibe, I will draw it.", job: "Design", back: "Turns a rough idea into layouts, social cards and simple brand kits.", rating: 4.7, jobs: 811, shape: "round" },
+      { name: "Echo", quip: "Your channels, answered while you sleep.", job: "Community", back: "Answers questions in your channels and flags the ones that need you.", rating: 4.6, jobs: 604, shape: "tall" },
+      { name: "Relay", quip: "I watch the chain so you can look away.", job: "Onchain watch", back: "Keeps an eye on wallets and tokens you care about and sends plain alerts.", rating: 4.7, jobs: 533, shape: "square" },
+      { name: "Cut", quip: "Two hours of footage, ten great seconds.", job: "Video", back: "Finds the best moments in long footage and cuts them into shorts.", rating: 4.6, jobs: 402, shape: "round" },
+      { name: "Atlas", quip: "Big goal in, clear plan out.", job: "Planning", back: "Breaks a big goal into steps, owners and dates, then tracks them.", rating: 4.8, jobs: 367, shape: "tall" },
     ],
   },
 
@@ -158,27 +159,27 @@ export const copy = {
     ],
   },
 
-  okx: {
-    label: "05 · The OKX story",
-    title: "Your wallet is your signature.",
+  access: {
+    label: "05 · Getting in",
+    title: "Sign in. Meet your agent. Hire more.",
     body:
-      "Lexari is being built around the OKX ecosystem. The idea is simple: the wallet you already trust becomes how you sign in, how you pay a specialist and how you prove a hire happened.",
-    placeholder: "Placeholder: OKX details below are not final and will be confirmed by the team.",
+      "Getting started takes about a minute. Sign in with your Google account or a crypto wallet, name your agent and it clocks in on its own computer. When the work grows, hire more agents from the roster.",
+    placeholder: "Placeholder: OKX Wallet is one wallet option. The full list of supported wallets is still being confirmed.",
     letter: {
-      head: "Offer of seat",
+      head: "Welcome letter",
       lines: [
-        ["Agent", "Scout · Web research"],
-        ["Seat", "Desk 02"],
-        ["Rate", "Shown before you sign"],
-        ["Paid with", "OKX Wallet [placeholder]"],
+        ["Signed in with", "Google or a crypto wallet"],
+        ["Wallet options", "OKX Wallet and others [placeholder]"],
+        ["Your agent", "Juniper · Desk 01"],
+        ["Next step", "Hire more when you are ready"],
       ],
-      sign: "Signed with OKX Wallet",
-      signed: "Hired. Receipt saved.",
+      sign: "Signed, the Lexari team",
+      signed: "Welcome aboard. Your agent is ready.",
     },
     chapters: [
-      { n: "i", head: "Sign in with OKX Wallet", text: "Open your team with the wallet you already use. No new password to remember. [placeholder]" },
-      { n: "ii", head: "Pay a specialist in a tap", text: "Rates are shown before you hire, and you approve the payment in your wallet. [placeholder]" },
-      { n: "iii", head: "Keep proof of every hire", text: "Each hire leaves a receipt you can check later, so your team history is never a guess. [placeholder]" },
+      { n: "i", head: "Sign in with Google", text: "Use the Google account you already have. No new password to remember." },
+      { n: "ii", head: "Or use a crypto wallet", text: "Prefer a wallet? Connect one instead. OKX Wallet is one of the options. [placeholder]" },
+      { n: "iii", head: "Meet your agent, then hire more", text: "Name your personalized agent on day one. Add specialists from the roster whenever the work asks for it." },
     ],
   },
 
@@ -191,13 +192,13 @@ export const copy = {
       ["What does its computer do?", "It is a persistent machine with a terminal, a browser and files. Your agent uses it to research, run tools and save real outputs you can download."],
       ["What does it remember?", "Useful things from finished jobs, like your preferences, your tools and your team. It reads those notes before starting new work."],
       ["What is a specialist?", "An agent from the roster that is good at one kind of work, like research, writing or design. You hire it into an open seat on your team."],
-      ["How does OKX fit in?", "The plan is to sign in and pay with OKX Wallet and keep a receipt for each hire. Exact details are still being confirmed."],
+      ["How do I sign in?", "With your Google account or a crypto wallet. OKX Wallet is one of the wallet options. That is all you need to get started."],
       ["Can I start for free?", "Yes. The Free plan gives you your own agent with its computer and memory. Move to a bigger plan when you want more seats."],
     ] as [string, string][],
   },
 
   finale: {
-    title: "Your first hire is waiting for a name.",
+    title: "Your personalized agent is waiting for a name.",
     body: "Name it, give it a job and watch it clock in.",
     cta: "Hire your agent",
     wordmark: "lexari",
@@ -211,6 +212,6 @@ export const copy = {
       { label: "Terms", href: `${APP}/legal/terms` },
       { label: "Privacy", href: `${APP}/legal/privacy` },
     ],
-    fine: "Sample data on this page is illustrative. OKX details are placeholders until confirmed.",
+    fine: "Sample data on this page is illustrative. The wallet list is a placeholder until confirmed.",
   },
 };

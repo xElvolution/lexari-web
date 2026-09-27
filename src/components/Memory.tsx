@@ -8,7 +8,7 @@ import SectionIntro from "./SectionIntro";
 
 gsap.registerPlugin(ScrollTrigger);
 const M = copy.memory;
-const TAG: Record<string, string> = { Style: "#5b2bff", Tools: "#ffa8ea", Team: "#ff8a3d", Habit: "#c8b3ff" };
+const TAG: Record<string, string> = { Style: "#5b2bff", Tools: "#c9b8ff", Team: "var(--ink)", Habit: "#8f6bff" };
 const TILT = [-3, 2, -1.5, 3, 1.5, -2.5, 2.5, -1];
 
 export default function Memory() {
@@ -32,23 +32,23 @@ export default function Memory() {
   }, []);
 
   return (
-    <section id="memory" className="sheet scroll-mt-16 overflow-hidden bg-plum pb-28 pt-24 sm:pb-40 sm:pt-32">
-      <div className="pointer-events-none absolute right-[-10%] top-10 h-[480px] w-[480px] rounded-full bg-grape/40 blur-[140px]" />
+    <section id="memory" className="sheet scroll-mt-16 overflow-hidden bg-alt pb-28 pt-24 sm:pb-40 sm:pt-32">
+      <div className="pointer-events-none absolute right-[-10%] top-10 h-[480px] w-[480px] rounded-full bg-[var(--glow)] blur-[140px]" />
       <div className="relative mx-auto grid max-w-[1320px] gap-14 px-5 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
         <div>
-          <SectionIntro label={M.label} title={M.title} body={M.body} why={M.why} tone="dark" />
+          <SectionIntro label={M.label} title={M.title} body={M.body} why={M.why} tone="base" />
           <div className="reveal mt-10 flex items-end gap-4">
-            <span ref={num} className="display text-[clamp(5rem,12vw,9rem)] tabular-nums text-candy">0</span>
-            <span className="pb-4 text-[15px] leading-snug text-white/70">{M.counterLabel}</span>
+            <span ref={num} className="display text-[clamp(5rem,12vw,9rem)] tabular-nums text-brand-ink">0</span>
+            <span className="pb-4 text-[15px] leading-snug text-ink/70">{M.counterLabel}</span>
           </div>
         </div>
         <div ref={box} className="grid grid-cols-2 gap-3 sm:gap-4">
           {M.cards.map((c, i) => (
-            <div key={c.text} data-card className="relative rounded-2xl bg-frost p-4 pt-5 shadow-[0_18px_30px_-18px_rgba(0,0,0,.8)] sm:p-5 sm:pt-6" style={{ transform: `rotate(${TILT[i]}deg)` }}>
+            <div key={c.text} data-card className="relative rounded-2xl bg-card p-4 pt-5 text-ink shadow-[0_18px_30px_-18px_rgba(20,0,80,.45)] ring-1 ring-line sm:p-5 sm:pt-6" style={{ transform: `rotate(${TILT[i]}deg)` }}>
               <span className="absolute inset-x-0 top-0 h-2 rounded-t-2xl" style={{ background: TAG[c.tag] }} />
-              <span className="absolute right-4 top-4 h-3 w-3 rounded-full bg-plum/15" />
-              <span className="label text-[9.5px] text-plum/55">note {String(i + 1).padStart(3, "0")} · {c.tag}</span>
-              <p className="display mt-2 text-[19px] leading-[1.02] text-plum sm:text-[25px]">{c.text}</p>
+              <span className="absolute right-4 top-4 h-3 w-3 rounded-full bg-ink/15" />
+              <span className="label text-[9.5px] text-ink/55">note {String(i + 1).padStart(3, "0")} · {c.tag}</span>
+              <p className="display mt-2 text-[19px] leading-[1.02] text-ink sm:text-[25px]">{c.text}</p>
             </div>
           ))}
         </div>
