@@ -40,7 +40,8 @@ export function variantFor(seed: number): Variant {
   const shape = pick(SHAPES);
   let extra = pick(EXTRAS);
   if (shape === "robot") extra = "antenna";
-  if (shape === "tri" && extra !== "none") extra = "party";
+  if (shape === "tri") extra = "none";
+  if (extra === "beanie" || extra === "cap" || extra === "party") extra = "none"; // no hats
   return { shape, color: pick(COLORS), eyes: pick(EYES), mouth: pick(MOUTHS), extra, blush: r() < 0.4 };
 }
 
