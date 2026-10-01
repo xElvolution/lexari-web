@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { KNOW_SUGGESTIONS, LOOKS, ROLES, TONES, type ToneId } from "@/content/appData";
-import { finishOnboarding, startDemo, useApp } from "@/lib/store";
+import { KNOW_SUGGESTIONS, ROLES, TONES, type ToneId } from "@/content/appData";
+import { finishOnboarding, startDemo, useApp, type AgentLook } from "@/lib/store";
+import GlyphCreator from "@/components/glyph/GlyphCreator";
+import { defaultFace, isFace } from "@/lib/glyph/face";
 import Badge from "@/components/Badge";
 import Logo from "@/components/Logo";
 import ThemeToggle from "@/components/ThemeToggle";
 import Icon from "@/components/app/Icon";
-import { AgentFace } from "@/components/app/faces";
 import { burst } from "@/components/app/fly";
 
 const STEPS = ["Name", "Look", "About you", "Meet"];
@@ -21,7 +22,7 @@ export default function Onboarding() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
-  const [look, setLook] = useState<number | null>(null);
+  const [look, setLook] = useState<AgentLook>(null);
   const [you, setYou] = useState("");
   const [role, setRole] = useState("");
   const [tone, setTone] = useState<ToneId>("short");
@@ -50,6 +51,9 @@ export default function Onboarding() {
     const ctx = gsap.context(() => gsap.from("[data-step] > *", { x: 40, opacity: 0, stagger: 0.05, duration: 0.6, ease: "back.out(1.4)", clearProps: "all" }), panel);
     return () => ctx.revert();
   }, [step]);
+
+  // the Look step starts from a full Glyph face seeded by the name
+  useEffect(() => { if (step === 1 && !isFace(look)) setLook(defaultFace(`home:${name.trim().toLowerCase() || "agent"}`, tone)); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shown = name.trim() || "your agent";
   const can = step === 0 ? !!name.trim() : true;
@@ -117,17 +121,9 @@ export default function Onboarding() {
             <div data-step>
               <p className="label text-brand-ink">Step 2 of 4 · look</p>
               <h1 className="display mt-3 text-[48px] sm:text-[76px]">Pick a face for {shown}.</h1>
-              <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Every face is generated. The badge updates as you pick.</p>
-              <div className="mt-7 grid max-w-[560px] grid-cols-4 gap-2.5 sm:grid-cols-6">
-                {LOOKS.map((l) => {
-                  const on = look === l;
-                  return (
-                    <button key={String(l)} onClick={() => setLook(l)} aria-pressed={on} aria-label={l === null ? "House face" : `Face ${l}`} className={`group relative grid aspect-square place-items-center rounded-[22px] transition-all duration-300 [transition-timing-function:cubic-bezier(.3,1.6,.5,1)] ${on ? "scale-105 bg-grape shadow-[0_6px_0_#3514b0]" : "bg-tint hover:-translate-y-1 hover:bg-grape/25"}`}>
-                      <span className="transition group-hover:scale-110"><AgentFace look={l} size={64} /></span>
-                      {on && <span className="pop absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-ink text-[var(--bg)]"><Icon name="check" size={13} stroke={3} /></span>}
-                    </button>
-                  );
-                })}
+              <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Build it part by part, pick any colour, or hit Randomize. The badge updates as you go.</p>
+              <div className="mt-7 max-w-[560px]">
+                {isFace(look) && <GlyphCreator value={look} onChange={setLook} name={shown} previewSize={140} wide />}
               </div>
             </div>
           )}

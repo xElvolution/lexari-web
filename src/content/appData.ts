@@ -4,6 +4,7 @@
  * product can be shown moving. Nothing talks to a server yet.
  * House rules: plain words, no em dashes, no prices or payment talk.
  */
+import type { FaceDNA } from "@/lib/glyph/face";
 import type { ColorKey, Eyes, Mouth, Shape, Variant } from "@/components/avatar";
 
 export const DEMO_LABEL = "Demo data";
@@ -57,6 +58,7 @@ export type Specialist = {
   rating: number; jobs: number; reviews: number; seed: number; color: ColorKey; speed: string;
   skills: [string, number][]; tools: string[]; examples: string[];
   words: string[]; // chat keywords that route a job to this specialist
+  glyph?: FaceDNA; // agents you made with the Glyph creator
   review: { who: string; seed: number; text: string; stars: number }[];
   face?: Partial<Variant>; // custom agents pick their own shape, eyes and mouth
   custom?: boolean; // made by you in Create an agent
@@ -133,6 +135,8 @@ export const SPECIALISTS: Specialist[] = [
 export type CustomAgent = {
   id: string; name: string; role: string; about: string; template: string | null;
   shape: Shape; color: ColorKey; eyes: Eyes; mouth: Mouth; tone: ToneId; skills: string[]; memory: boolean; at: number;
+  /** Glyph face DNA from the character creator (older agents only have shape/colour/eyes/mouth) */
+  face?: FaceDNA;
 };
 export const AGENT_SKILLS = [
   { id: "web", label: "Browse the web", desc: "Open pages, read and compare them." },
@@ -163,7 +167,7 @@ export function customToSpecialist(c: CustomAgent): Specialist {
   const first = c.about.split(/(?<=[.!?])\s/)[0] || "Built by you.";
   return {
     slug: c.id, name: c.name, job: c.role || t?.role || "Custom agent", cat: t?.cat ?? "Planning", quip: first, back: c.about || "An agent you made. Tell it what to do.",
-    rating: 5, jobs: 0, reviews: 0, seed: hashId(c.id) % 997, color: c.color, speed: "Made by you",
+    rating: 5, jobs: 0, reviews: 0, seed: hashId(c.id) % 997, color: c.color, speed: "Made by you", glyph: c.face,
     skills: c.skills.map((id, i) => [AGENT_SKILLS.find((k) => k.id === id)?.label ?? id, 92 - i * 4] as [string, number]),
     tools: ["Browser", "Files", "Terminal"].slice(0, Math.max(1, Math.min(3, c.skills.length))),
     examples: t?.examples ?? ["Tell me what you can do", "Plan my week with me"], words: t?.words ?? [], review: [],

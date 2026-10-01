@@ -4,9 +4,10 @@ import { useState, type CSSProperties } from "react";
 import { Barcode, Code } from "../../Badge";
 import Logo from "../../Logo";
 import { WhoFace } from "../faces";
+import type { AgentLook } from "@/lib/store";
 
 const DARK_INK = { "--ink": "#0a0a0a", "--bg": "#ffffff" } as CSSProperties; // the card is always white
-export type IdInfo = { id: string; name: string; role: string; idNo: string; desk: number; born: number; maker: string; kind: string; chips: string[]; memory: boolean; look: number | null | undefined };
+export type IdInfo = { id: string; name: string; role: string; idNo: string; desk: number; born: number; maker: string; kind: string; chips: string[]; memory: boolean; look: AgentLook | undefined };
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 /** An agent's ID badge on a short lanyard, in the landing page style. Tap, Enter or the flip button turns it over. */
@@ -35,7 +36,7 @@ export default function AgentIdCard({ info, flipped: controlled, onFlip, faceEl 
             <div className="label mt-1 text-[8.5px] text-white/80">my name is</div>
           </div>
           <div className="carpet-w relative mt-2.5 grid h-[128px] place-items-center overflow-hidden rounded-[16px] bg-[#0a0a0a]">
-            <span key={info.id + String(info.look)} className="pop">{faceEl ?? <WhoFace who={info.id} look={info.look} size={96} />}</span>
+            <span key={info.id + (typeof info.look === "object" && info.look ? "g" : String(info.look))} className="pop">{faceEl ?? <WhoFace who={info.id} look={info.look} size={96} />}</span>
             <span className="label absolute left-3 top-3 text-[8.5px] text-white/70">LEXARI</span>
             <span className="label absolute right-3 top-3 rounded-full bg-grape px-2 py-0.5 text-[8.5px] text-white">● online</span>
             <span className="label absolute bottom-2.5 left-3 text-[8px] text-white/55">{info.idNo}</span>

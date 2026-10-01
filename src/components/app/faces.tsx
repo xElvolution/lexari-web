@@ -1,11 +1,16 @@
 "use client";
 
 import Face from "../Face";
+import GlyphFace from "../glyph/GlyphFace";
+import { isFace } from "@/lib/glyph/face";
+import type { AvatarState } from "@/lib/glyph";
+import type { AgentLook } from "@/lib/store";
 import { specialistBySlug } from "@/content/appData";
 import { tileBg } from "./agents";
 
 /** Your agent's face. look null is the house face from the landing badge. */
-export function AgentFace({ look, size = 48, track = false, className = "" }: { look: number | null | undefined; size?: number; track?: boolean; className?: string }) {
+export function AgentFace({ look, size = 48, track = false, className = "", animated = false, state }: { look: AgentLook | undefined; size?: number; track?: boolean; className?: string; animated?: boolean; state?: AvatarState }) {
+  if (isFace(look)) return <GlyphFace dna={look} size={size} animated={animated || track} state={state} className={className} />;
   return look === null || look === undefined ? <Face size={size} track={track} className={className} /> : <Face seed={look} size={size} track={track} className={className} />;
 }
 
@@ -13,16 +18,17 @@ export function AgentFace({ look, size = 48, track = false, className = "" }: { 
 export function SpecFace({ slug, size = 48, track = false, className = "" }: { slug: string; size?: number; track?: boolean; className?: string }) {
   const s = specialistBySlug(slug);
   if (!s) return null;
+  if (s.glyph) return <GlyphFace dna={s.glyph} size={size} animated={track} className={className} />;
   return <Face seed={s.seed} variant={{ color: s.color, ...s.face }} size={size} track={track} className={className} />;
 }
 
 /** Either one, by assignee id ("home" or a slug). */
-export function WhoFace({ who, look, size = 40, className = "" }: { who: string; look: number | null | undefined; size?: number; className?: string }) {
+export function WhoFace({ who, look, size = 40, className = "" }: { who: string; look: AgentLook | undefined; size?: number; className?: string }) {
   return who === "home" || who === "you" ? <AgentFace look={look} size={size} className={className} /> : <SpecFace slug={who} size={size} className={className} />;
 }
 
 /** An agent's face on its soft colour tile. Rounded square, sized in px. */
-export function AgentTile({ id, look, size = 48, face, className = "", radius }: { id: string; look: number | null | undefined; size?: number; face?: number; className?: string; radius?: number }) {
+export function AgentTile({ id, look, size = 48, face, className = "", radius }: { id: string; look: AgentLook | undefined; size?: number; face?: number; className?: string; radius?: number }) {
   return (
     <span className={`grid shrink-0 place-items-center ${className}`} style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.32), background: tileBg(id) }}>
       <WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} />
@@ -31,7 +37,7 @@ export function AgentTile({ id, look, size = 48, face, className = "", radius }:
 }
 
 /** A group: two members overlapped on a diagonal, plus a count when there are more. */
-export function GroupTile({ members, look, size = 48, className = "" }: { members: string[]; look: number | null | undefined; size?: number; className?: string }) {
+export function GroupTile({ members, look, size = 48, className = "" }: { members: string[]; look: AgentLook | undefined; size?: number; className?: string }) {
   const m = members.slice(0, 2); const sub = Math.round(size * 0.66); const extra = members.length - 2;
   return (
     <span className={`relative block shrink-0 ${className}`} style={{ width: size, height: size }}>

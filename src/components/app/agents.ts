@@ -1,5 +1,6 @@
 import { specialistBySlug } from "@/content/appData";
 import { PALETTE } from "@/components/avatar";
+import { VIVID } from "@/lib/glyph";
 import { agentName, isGroup, type Msg, type State } from "@/lib/store";
 
 export type MyAgent = { id: string; name: string; role: string; seat: number; last?: Msg };
@@ -36,6 +37,7 @@ export function convoOf(s: State, id: string): Convo | undefined {
 export function tileBg(id: string) {
   if (id === "home") return "var(--color-grape)";
   const sp = specialistBySlug(id);
+  if (sp?.glyph) return `color-mix(in oklab, ${VIVID[sp.glyph.color.body]?.fill ?? PALETTE[sp.color].fill} 24%, var(--card))`;
   return sp ? `color-mix(in oklab, ${PALETTE[sp.color].fill} 24%, var(--card))` : "var(--tint)";
 }
 

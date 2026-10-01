@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { copy } from "@/content/copy";
 import Face from "./Face";
+import GlyphFace from "./glyph/GlyphFace";
+import { isFace } from "@/lib/glyph/face";
+import type { AgentLook } from "@/lib/store";
 import Logo from "./Logo";
 
 const B = copy.hero.badge;
@@ -46,7 +49,7 @@ export function Code({ text }: { text: string }) {
  * and springs back. A tap or a fast sideways flick turns it over to show the back.
  * Physics (pendulum plus flip spring) is written straight to the DOM every frame.
  */
-export default function Badge({ name, setName, look }: { name: string; setName: (v: string) => void; look?: number | null }) {
+export default function Badge({ name, setName, look }: { name: string; setName: (v: string) => void; look?: AgentLook }) {
   const rig = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const flipTarget = useRef(0);
@@ -147,7 +150,7 @@ export default function Badge({ name, setName, look }: { name: string; setName: 
             <div className="label mt-1 text-[9.5px] text-white/80">my name is</div>
           </div>
           <div className="carpet-w relative mt-3 grid h-[118px] place-items-center overflow-hidden rounded-[18px] bg-[#0a0a0a] sm:h-[170px]">
-            {look === null || look === undefined ? <Face size={112} track /> : <Face seed={look} size={112} track />}
+            {isFace(look) ? <span key="glyph" className="grid h-[104px] w-[104px] place-items-center sm:h-[140px] sm:w-[140px]"><GlyphFace dna={look} size={140} animated className="h-full w-full" /></span> : look === null || look === undefined ? <Face size={112} track /> : <Face seed={look} size={112} track />}
             <span className="label absolute left-3 top-3 text-[9px] text-white/70">{B.company}</span>
             <span className="label absolute right-3 top-3 rounded-full bg-grape px-2 py-1 text-[9px] text-white">● online</span>
           </div>
