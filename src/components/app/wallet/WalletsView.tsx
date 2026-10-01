@@ -77,7 +77,7 @@ function OtherWallet({ s, a }: { s: State; a: MyAgent }) {
       ) : (
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <span className="label rounded-full border border-dashed border-ink/30 px-2.5 py-1.5 text-[8.5px] text-ink/60">No wallet</span>
-          <button onClick={make} disabled={busy} className="btn btn-ghost btn-sm ml-auto !h-10 disabled:opacity-70">{busy ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-ink/20 border-t-grape" />Generating…</> : <><Icon name="plus" size={15} />Create wallet address</>}</button>
+          <button onClick={make} disabled={busy} className="btn btn-ghost btn-sm ml-auto !h-10 disabled:opacity-70">{busy ? <><span className="typing text-grape" aria-hidden><i /> <i /> <i /></span>Generating…</> : <><Icon name="plus" size={15} />Create wallet address</>}</button>
         </div>
       )}
     </li>

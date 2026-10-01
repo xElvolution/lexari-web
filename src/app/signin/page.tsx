@@ -51,7 +51,7 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
             </span>
           ) : (
             <>
-              <span className="absolute inset-0 animate-spin rounded-full border-4 border-tint border-t-grape [animation-duration:1.1s]" />
+              <span className="absolute inset-0 rounded-full bg-tint" /><span className="ring-out absolute inset-0 rounded-full border-2 border-grape" /><span className="ring-out absolute inset-0 rounded-full border-2 border-grape [animation-delay:1.1s]" />
               {flow.method === "google" ? <span className="grid h-14 w-14 place-items-center rounded-2xl bg-ink text-[var(--bg)]"><Icon name="google" size={28} /></span> : <WalletGlyph id={flow.wallet} />}
             </>
           )}

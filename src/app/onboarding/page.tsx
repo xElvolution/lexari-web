@@ -14,6 +14,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Icon from "@/components/app/Icon";
 import { AgentFace } from "@/components/app/faces";
 import { burst } from "@/components/app/fly";
+import SetupSequence from "@/components/app/agent/SetupSequence";
+import MintFinish from "@/components/app/agent/MintFinish";
 
 const STEPS = ["Name", "Look", "About you", "Meet"];
 const NAMES = ["Juniper", "Nova", "Pip", "Otto", "Mika", "Sol"];
@@ -33,6 +35,7 @@ export default function Onboarding() {
   const printer = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const cta = useRef<HTMLButtonElement>(null);
+  const [finale, setFinale] = useState<"none" | "setup" | "done">("none");
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("name");
@@ -62,8 +65,24 @@ export default function Onboarding() {
   const meet = () => {
     burst(cta.current, 22);
     finishOnboarding({ name: name.trim() || "Juniper", look, you: you.trim(), role, tone }, knows);
-    setTimeout(() => router.push("/app"), 650);
+    setTimeout(() => setFinale("setup"), 380);
   };
+  const v = lookVariant(look); const bg = look && typeof look === "object" ? look.bg : undefined;
+  const agentName = name.trim() || "Juniper";
+
+  if (finale !== "none" && s?.agent) return (
+    <main className="relative grid min-h-[100svh] place-items-center overflow-x-clip bg-base px-5 py-10 text-ink">
+      <div className="carpet pointer-events-none absolute inset-0 [mask-image:radial-gradient(circle_at_50%_40%,#000,transparent_75%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-1/3 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[var(--glow)] blur-[130px]" />
+      <div className="relative w-full max-w-[760px]">
+        {finale === "setup"
+          ? <SetupSequence name={agentName} v={v} bg={bg} onDone={() => setFinale("done")} tone="page" />
+          : <div className="rounded-[30px] bg-card p-5 ring-1 ring-line sm:p-7"><MintFinish s={s} id="home" v={v} title={`Meet ${agentName}.`}
+              sub={`Its badge is printed, its computer is on and it already knows ${knows.length + (you ? 1 : 0)} things about you. Mint its ID card on chain, or do it later from its profile.`}
+              later={() => router.push("/app")} laterLabel={s.meta.home?.nft ? `Start chatting with ${agentName}` : "Later, start chatting"} /></div>}
+      </div>
+    </main>
+  );
 
   if (s && !s.auth) return (
     <main className="carpet grid min-h-[100svh] place-items-center bg-base px-5 text-center text-ink">

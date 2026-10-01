@@ -64,9 +64,13 @@ export default function GetCardDialog({ s, id, onClose }: { s: State; id: string
         )}
 
         {step === 3 && (
-          <div className="grid place-items-center py-12 text-center">
-            <span className="h-12 w-12 animate-spin rounded-full border-4 border-tint border-t-grape" />
-            <p className="mt-4 text-[15px] font-semibold text-ink">Issuing {name}&apos;s card…</p>
+          <div className="grid place-items-center py-8 text-center" role="status">
+            <div className="skel relative aspect-[1.586] w-full max-w-[300px] !rounded-[22px]" aria-hidden>
+              <span className="absolute left-5 top-5 h-7 w-10 rounded-md bg-card/70" />
+              <span className="absolute bottom-12 left-5 h-3 w-3/5 rounded-full bg-card/70" />
+              <span className="absolute bottom-6 left-5 h-2.5 w-1/3 rounded-full bg-card/60" />
+            </div>
+            <p className="mt-5 flex items-center gap-2 text-[15px] font-semibold text-ink"><span className="typing text-grape" aria-hidden><i /> <i /> <i /></span>Issuing {name}&apos;s card…</p>
             <p className="mt-1 text-[13px] text-ink/55">Demo only. Nothing is being charged.</p>
           </div>
         )}

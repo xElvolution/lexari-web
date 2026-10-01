@@ -12,6 +12,8 @@ import Icon from "../Icon";
 import { AgentTile } from "../faces";
 import { HireBtn, StarRow } from "../market/parts";
 import { closeAdd, useOverlays } from "../overlays";
+import SetupSequence from "./SetupSequence";
+import MintFinish from "./MintFinish";
 import { AvatarPicker, Field, SkillPicker, TonePicker, areaCls, inputCls, variant, type Look } from "./fields";
 
 const STEPS = ["Basics", "Look", "Personality"];
@@ -87,7 +89,8 @@ function Create() {
   const [tone, setTone] = useState<ToneId>("warm");
   const [skills, setSkills] = useState<string[]>(["web", "files"]);
   const [memory, setMemory] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<"form" | "setup" | "done">("form");
+  const [made, setMade] = useState<string | null>(null);
   const nameOk = name.trim().length > 0;
 
   const applyTpl = (id: string | null) => {
@@ -96,25 +99,18 @@ function Create() {
     if (!t) { setRole(""); setAbout(""); setSkills([]); return; }
     setRole(t.role); setAbout(t.about); setSkills([...t.skills]); setLook((l) => ({ ...l, shape: t.shape, color: t.color }));
   };
-  const make = () => {
-    if (!nameOk || busy) return;
-    setBusy(true);
-    setTimeout(() => {
-      const id = createAgent({ name: name.trim(), role: role.trim() || "Custom agent", about: about.trim(), template: tpl, ...look, tone, skills, memory });
-      closeAdd();
-      router.push(`/app?c=${id}`);
-    }, 1300);
+  const make = () => { if (nameOk && phase === "form") setPhase("setup"); };
+  const ready = () => {
+    const id = createAgent({ name: name.trim(), role: role.trim() || "Custom agent", about: about.trim(), template: tpl, ...look, tone, skills, memory });
+    setMade(id); setPhase("done");
   };
+  const open = () => { closeAdd(); if (made) router.push(`/app?c=${made}`); };
 
-  if (busy) return (
-    <div className="grid place-items-center py-14 text-center">
-      <span className="relative grid h-[120px] w-[120px] place-items-center rounded-[34px]" style={{ background: "var(--face-tile)" }}>
-        <span><Face variant={variant(look)} size={96} state="thinking" animated /></span>
-        <span className="absolute -inset-2 animate-spin rounded-[40px] border-4 border-transparent border-t-grape" />
-      </span>
-      <p className="mt-6 text-[18px] font-bold text-ink">Setting up {name.trim()}&apos;s desk…</p>
-      <p className="mt-1 text-[14px] text-ink/55">Turning on its computer and memory. Demo only.</p>
-    </div>
+  if (phase === "setup") return <SetupSequence name={name.trim()} v={variant(look)} bg={look.bg} onDone={ready} />;
+  if (phase === "done" && made && s.custom.some((c) => c.id === made)) return (
+    <MintFinish s={s} id={made} v={variant(look)} title={`Say hi to ${name.trim()}.`}
+      sub="Its computer is on and its memory is ready. Mint its ID card on chain now, or do it later from its profile."
+      later={open} laterLabel={s.meta[made]?.nft ? `Open chat with ${name.trim()}` : "Later, open chat"} />
   );
 
   return (

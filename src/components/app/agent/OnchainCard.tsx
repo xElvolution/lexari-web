@@ -14,7 +14,7 @@ const eth = () => (typeof window !== "undefined" ? (window as unknown as { ether
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 /** Mint this agent's ID card as an NFT on Arbitrum Sepolia, and push face/name edits to it later. */
-export default function OnchainCard({ s, id, name, role, v, bg }: { s: State; id: string; name: string; role: string; v: Variant; bg?: string }) {
+export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID card as NFT", prominent = false, onMinted }: { s: State; id: string; name: string; role: string; v: Variant; bg?: string; cta?: string; prominent?: boolean; onMinted?: () => void }) {
   const rec = s.meta[id]?.nft;
   const holder = useRef<HTMLSpanElement>(null);
   const [addr, setAddr] = useState<`0x${string}` | null>(null);
@@ -88,7 +88,7 @@ export default function OnchainCard({ s, id, name, role, v, bg }: { s: State; id
         }
       }
       const next: NftRecord = { tokenId, tx: hashes[hashes.length - 1], dna, name: nm, role: rl, owner: account, at: Date.now() };
-      setMeta(id, { nft: next }); setPhase("idle");
+      setMeta(id, { nft: next }); setPhase("idle"); if (kind === "mint") onMinted?.();
       toast({ text: kind === "mint" ? `${nm}'s ID card is onchain. Token #${tokenId}.` : `Card #${tokenId} updated onchain.`, face: "home" });
     } catch (e) { fail(e); }
   };
@@ -106,7 +106,7 @@ export default function OnchainCard({ s, id, name, role, v, bg }: { s: State; id
   else if (rec) status = { tone: "ok", text: `Minted as token #${rec.tokenId}. Up to date.` };
   else status = { tone: "muted", text: `Connected ${short(account)}. Minting is free apart from gas.` };
 
-  const btn = "flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full text-[13.5px] font-bold transition disabled:cursor-not-allowed disabled:opacity-45";
+  const btn = (prominent ? "h-12 text-[15.5px] shadow-[0_5px_0_#3514b0] " : "h-10 text-[13.5px] ") + "flex flex-1 items-center justify-center gap-1.5 rounded-full font-bold transition disabled:cursor-not-allowed disabled:opacity-45";
   return (
     <section data-tour="onchain-card" className="rounded-[22px] bg-card p-4 ring-1 ring-line">
       <span ref={holder} className="hidden" aria-hidden><Face variant={{ ...v, plain: false }} size={100} /></span>
@@ -114,17 +114,17 @@ export default function OnchainCard({ s, id, name, role, v, bg }: { s: State; id
         <h3 className="label text-[9.5px] text-ink/55">Onchain ID card</h3>
         <span className="label rounded-full bg-tint px-2 py-0.5 text-[8.5px] text-ink/60">{NFT_CHAIN.name}</span>
       </div>
-      <p className="mt-1.5 text-[13.5px] leading-snug text-ink/75">Mint this card as an NFT. The face, background, name and role are stored and drawn fully onchain, and you can update them later.</p>
+      <p className={`mt-1.5 leading-snug text-ink/75 ${prominent ? "text-[13px]" : "text-[13.5px]"}`}>Mint this card as an NFT. The face, background, name and role are stored and drawn fully onchain, and you can update them later.</p>
       <p role="status" className={`mt-3 flex gap-2 rounded-2xl p-3 text-[13px] leading-snug ${status.tone === "ok" ? "bg-[#1f9d55]/12 text-ink" : status.tone === "warn" ? "bg-[#f5a524]/15 text-ink" : "bg-tint text-ink/70"}`}>
         <Icon name={status.tone === "ok" ? "check" : "info"} size={16} className="mt-0.5 shrink-0" />{status.text}
       </p>
       {phase === "error" && err && <p className="mt-2 rounded-2xl bg-[#e5484d]/12 p-3 text-[13px] leading-snug text-[#e5484d]">{err}</p>}
       <div className="mt-3 flex gap-2">
-        {!addr ? <button disabled className={`${btn} bg-tint text-ink`}><Icon name="idcard" size={15} />Mint ID card as NFT</button>
+        {!addr ? <button disabled className={`${btn} !shadow-none bg-tint text-ink`}><Icon name="idcard" size={15} />{cta}</button>
           : !hasWallet ? <a href="https://metamask.io/download/" target="_blank" rel="noreferrer" className={`${btn} bg-tint text-ink hover:bg-grape hover:text-white`}><Icon name="wallet" size={15} />Get a wallet</a>
           : !account ? <button onClick={connect} disabled={busy} className={`${btn} bg-grape text-white hover:bg-grape-deep`}><Icon name="wallet" size={15} />{phase === "connecting" ? "Connecting…" : "Connect wallet"}</button>
           : wrongNet ? <button onClick={switchNet} disabled={busy} className={`${btn} bg-grape text-white hover:bg-grape-deep`}>{phase === "switching" ? "Switching…" : `Switch to ${NFT_CHAIN.name}`}</button>
-          : !rec ? <button onClick={() => send("mint")} disabled={busy} className={`${btn} bg-grape text-white hover:bg-grape-deep`}><Icon name="idcard" size={15} />{phase === "signing" ? "Confirm in wallet…" : phase === "pending" ? "Minting…" : "Mint ID card as NFT"}</button>
+          : !rec ? <button onClick={() => send("mint")} disabled={busy} className={`${btn} bg-grape text-white hover:bg-grape-deep`}><Icon name="idcard" size={15} />{phase === "signing" ? "Confirm in wallet…" : phase === "pending" ? "Minting…" : cta}</button>
           : <button onClick={() => send("update")} disabled={busy || !(faceChanged || cardChanged)} className={`${btn} bg-grape text-white hover:bg-grape-deep`}><Icon name="undo" size={15} />{phase === "signing" ? "Confirm in wallet…" : phase === "pending" ? "Updating…" : "Update NFT"}</button>}
       </div>
       {(rec || tx) && addr && (
