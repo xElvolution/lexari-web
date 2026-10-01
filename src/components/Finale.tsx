@@ -1,6 +1,5 @@
 import { copy, SIGNIN } from "@/content/copy";
-import LiveGlyph from "./glyph/LiveGlyph";
-import { CAST, HOUSE, castFace } from "@/lib/glyph/cast";
+import Face from "./Face";
 import Logo from "./Logo";
 
 export default function Finale() {
@@ -10,7 +9,7 @@ export default function Finale() {
       <section className="sheet grain overflow-hidden bg-grape pt-24 text-white sm:pt-32">
         <div className="relative mx-auto flex max-w-[1320px] flex-col items-center px-5 text-center sm:px-8">
           <div className="reveal flex -space-x-2">
-            {[0, 3, 5, 6, 10].map((c, i) => <div key={c} style={{ transform: `rotate(${(i - 2) * 7}deg)` }}><LiveGlyph dna={CAST[c]} size={84} beat={i} /></div>)}
+            {([["orange", 101], ["yellow", 7], ["teal", 45], ["pink", 23], ["sky", 88]] as const).map(([color, seed], i) => <div key={seed} style={{ transform: `rotate(${(i - 2) * 7}deg)` }}><Face seed={seed} variant={{ color }} size={84} /></div>)}
           </div>
           <h2 className="reveal display mt-8 max-w-[14ch] text-[clamp(3rem,8.5vw,7.5rem)]">{F.title}</h2>
           <p className="reveal mt-6 text-[18px] text-white/80 sm:text-[20px]">{F.body}</p>

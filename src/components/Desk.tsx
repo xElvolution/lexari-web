@@ -1,10 +1,9 @@
 "use client";
 
-import LiveGlyph from "./glyph/LiveGlyph";
-import { CAST, HOUSE, castFace } from "@/lib/glyph/cast";
 import { useEffect, useRef, useState } from "react";
 import { copy } from "@/content/copy";
 import SectionIntro from "./SectionIntro";
+import Face from "./Face";
 
 const D = copy.desk;
 
@@ -35,7 +34,7 @@ function Screen({ kind, active }: { kind: string; active: boolean }) {
   if (kind === "brief") return (
     <div className={base}>
       <div className="ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-grape p-3 text-[13px] font-semibold text-white sm:text-[15px]">Compare three budgeting tools. Keep it to one page.</div>
-      <div className="mt-3 flex items-end gap-2"><LiveGlyph dna={HOUSE} size={40} still /><div className="max-w-[75%] rounded-2xl rounded-bl-md bg-white/10 p-3 text-[13px] text-white sm:text-[15px]">On it. Opening my browser now.</div></div>
+      <div className="mt-3 flex items-end gap-2"><Face size={40} /><div className="max-w-[75%] rounded-2xl rounded-bl-md bg-white/10 p-3 text-[13px] text-white sm:text-[15px]">On it. Opening my browser now.</div></div>
       <div className="label mt-4 text-[9px] text-white/40">job received · 09:00</div>
     </div>
   );

@@ -1,7 +1,5 @@
 "use client";
 
-import LiveGlyph from "../glyph/LiveGlyph";
-import { HOUSE } from "@/lib/glyph/cast";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -10,6 +8,7 @@ import { PLANS } from "@/content/appData";
 import { startDemo, tick, toast, useApp, type State } from "@/lib/store";
 import Logo from "../Logo";
 import ThemeToggle from "../ThemeToggle";
+import Face from "../Face";
 import Icon from "./Icon";
 import { DemoTag } from "./ui";
 import Toaster from "./Toaster";
@@ -146,7 +145,7 @@ function Gate({ s }: { s: State }) {
     <main className="carpet relative grid min-h-screen place-items-center overflow-hidden bg-base px-5 py-16">
       <div className="pointer-events-none absolute left-1/2 top-1/3 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-[var(--glow)] blur-[130px]" />
       <div className="relative w-full max-w-[460px] rounded-[32px] bg-card p-7 text-center shadow-[0_14px_0_#5b2bff] ring-1 ring-line sm:p-9">
-        <div className="bob mx-auto grid h-24 w-24 place-items-center rounded-[26px] bg-[#0a0a0a]"><LiveGlyph dna={HOUSE} size={80} /></div>
+        <div className="bob mx-auto grid h-24 w-24 place-items-center rounded-[26px] bg-[#0a0a0a]"><Face size={80} track /></div>
         <h1 className="display mt-6 text-[40px] text-ink sm:text-[48px]">{signedIn ? "Almost there." : "Your agent is waiting."}</h1>
         <p className="mt-3 text-[16px] text-ink/75">{signedIn ? "You are signed in. Name your agent and it clocks in." : "Sign in with Google or a crypto wallet to meet your agent. Or look around a demo first."}</p>
         <div className="mt-7 grid gap-3">

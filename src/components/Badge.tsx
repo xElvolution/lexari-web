@@ -1,7 +1,5 @@
 "use client";
 
-import LiveGlyph from "./glyph/LiveGlyph";
-import { CAST, HOUSE, castFace } from "@/lib/glyph/cast";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { copy } from "@/content/copy";
 import Face from "./Face";
@@ -152,7 +150,7 @@ export default function Badge({ name, setName, look }: { name: string; setName: 
             <div className="label mt-1 text-[9.5px] text-white/80">my name is</div>
           </div>
           <div className="carpet-w relative mt-3 grid h-[118px] place-items-center overflow-hidden rounded-[18px] bg-[#0a0a0a] sm:h-[170px]">
-            {isFace(look) ? <span key="glyph" className="grid h-[104px] w-[104px] place-items-center sm:h-[140px] sm:w-[140px]"><GlyphFace dna={look} size={140} animated className="h-full w-full" /></span> : look === null || look === undefined ? <span key="house" className="grid h-[104px] w-[104px] place-items-center sm:h-[140px] sm:w-[140px]"><LiveGlyph dna={HOUSE} size={140} className="h-full w-full" /></span> : <Face seed={look} size={112} track />}
+            {isFace(look) ? <span key="glyph" className="grid h-[104px] w-[104px] place-items-center sm:h-[140px] sm:w-[140px]"><GlyphFace dna={look} size={140} animated className="h-full w-full" /></span> : look === null || look === undefined ? <Face size={112} track /> : <Face seed={look} size={112} track />}
             <span className="label absolute left-3 top-3 text-[9px] text-white/70">{B.company}</span>
             <span className="label absolute right-3 top-3 rounded-full bg-grape px-2 py-1 text-[9px] text-white">● online</span>
           </div>

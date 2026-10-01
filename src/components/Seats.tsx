@@ -1,15 +1,15 @@
 "use client";
 
-import LiveGlyph from "./glyph/LiveGlyph";
-import { CAST, HOUSE, castFace } from "@/lib/glyph/cast";
 import { useState } from "react";
 import { copy, SIGNIN } from "@/content/copy";
 import SectionIntro from "./SectionIntro";
+import Face from "./Face";
 
 const S = copy.seats;
 const START = [0, 1, 6, 37]; // sample: specialists already hired on each plan
 const COLS = ["grid-cols-1", "grid-cols-5", "grid-cols-5 sm:grid-cols-10", "grid-cols-10 sm:grid-cols-20"];
 // every desk keeps the same generated face across plans, so avatars never flicker
+const seatSeed = (i: number) => i * 7 + 3;
 
 export default function Seats() {
   const [plan, setPlan] = useState(1);
@@ -46,8 +46,8 @@ export default function Seats() {
                 const state = i === 0 ? "home" : i < taken ? "hired" : "open";
                 return (
                   <div key={i} className={`pop relative grid aspect-square place-items-center rounded-[22%] transition-colors ${state === "home" ? "bg-grape" : state === "hired" ? "bg-tint ring-2 ring-grape/45" : "border-2 border-dashed border-ink/20 bg-base/60"}`} style={{ animationDelay: `${Math.min(i, 40) * 12}ms` }}>
-                    {state === "home" && <LiveGlyph dna={HOUSE} size={120} still={!big} className="!h-[78%] !w-[78%]" />}
-                    {state === "hired" && <LiveGlyph dna={castFace(i - 1)} size={80} beat={i} still={!big} className="!h-[78%] !w-[78%]" />}
+                    {state === "home" && <Face size={120} track={big} className="!h-[74%] !w-[74%]" />}
+                    {state === "hired" && <Face seed={seatSeed(i)} size={80} className="!h-[74%] !w-[74%]" />}
                     {big && state === "open" && <span className="text-[22px] text-ink/25">+</span>}
                     {big && <span className={`label absolute leading-none ${plan === 0 ? "block" : "hidden sm:block"} ${state === "home" ? "text-white/80" : "text-ink/50"}`} style={{ right: "12%", bottom: "10%", fontSize: plan === 0 ? 12 : 9 }}>{String(i + 1).padStart(2, "0")}</span>}
                   </div>
