@@ -59,6 +59,7 @@ export function AppCard({ a, wide = false }: { a: Specialist; wide?: boolean }) 
             <span className="label mt-2 text-[8px] text-lilac">Skills</span>
             <ul className="mt-1 space-y-0.5 text-[12px] leading-tight text-white/85">{a.skills.slice(0, wide ? 2 : 3).map(([k]) => <li key={k} className="truncate">· {k}</li>)}</ul>
             <span className="mt-auto flex items-center justify-between gap-1 text-[11px]"><span className="rounded-full bg-white/15 px-2 py-0.5 font-bold">{m.free ? "Free" : "Paid add-ons"}</span><span className="truncate text-white/55">{a.speed}</span></span>
+            <Link href={href} tabIndex={flipped ? 0 : -1} aria-label={`Open ${a.name}'s listing`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="mt-2 flex h-7 items-center justify-center rounded-full bg-white text-[12px] font-bold text-[#0a0a0a] transition hover:bg-lilac">Open listing →</Link>
           </div>
         </div>
       </div>
@@ -69,7 +70,7 @@ export function AppCard({ a, wide = false }: { a: Specialist; wide?: boolean }) 
         </Link>
         <span className="pt-0.5"><HireBtn a={a} faceEl={() => face.current} /></span>
       </span>
-      <span className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-ink/70"><span className="flex items-center gap-0.5 font-semibold">{a.rating}<Icon name="star" size={11} className="text-brand-ink" /></span><span className="text-ink/35">·</span>{compact(m.hires)} hires<Link href={href} className="ml-auto font-bold text-brand-ink hover:underline">Open</Link></span>
+      <span className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-ink/70"><span className="flex items-center gap-0.5 font-semibold">{a.rating}<Icon name="star" size={11} className="text-brand-ink" /></span><span className="text-ink/35">·</span>{compact(m.hires)} hires<Link href={href} aria-label={`Open ${a.name}'s listing`} className="ml-auto font-bold text-brand-ink hover:underline">Open</Link></span>
     </div>
   );
 }

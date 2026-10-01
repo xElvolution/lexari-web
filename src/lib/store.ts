@@ -21,7 +21,7 @@ export type Msg = {
   reply?: { id: string; from: string; text: string }; // the message this one answers
 };
 /** Your own notes on any agent. Hired agents only get nick, notes and memory; the maker controls the rest. */
-export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; about?: string; skills?: string[] };
+export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; about?: string; skills?: string[]; /** onchain ID card, once minted */ nft?: import("@/lib/nft").NftRecord };
 export type Tour = { on: boolean; step: number; done: boolean };
 export type Group = { id: string; name: string; members: string[]; at: number };
 export type Card = { number: string; exp: string; cvv: string; frozen: boolean; limit: number; at: number };
