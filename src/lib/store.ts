@@ -5,6 +5,7 @@
  * your agent's name sticks, hiring fills a seat, jobs keep running across pages.
  * There is no server. Everything here is mocked on purpose.
  */
+import type { FaceLook } from "@/components/avatar";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, cannedReply, groupReply, registerCustom, scriptFor, shortAddr, walletFor,
@@ -36,7 +37,9 @@ export const DEFAULT_PREFS: Prefs = {
   notif: { replies: true, groups: true, calls: true, wallet: true, cards: true, digest: false, product: false },
 };
 export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number };
-export type Agent = { name: string; look: number | null; you: string; role: string; tone: ToneId };
+/** look: a seed number (null = the house face) or a face built in the creator */
+export type AgentLook = number | null | FaceLook;
+export type Agent = { name: string; look: AgentLook; you: string; role: string; tone: ToneId };
 export type Auth = { method: "google" | "wallet"; label: string; sub: string; wallet?: WalletId };
 export type State = {
   v: 1; auth: Auth | null; links: { google: boolean; wallet: boolean };

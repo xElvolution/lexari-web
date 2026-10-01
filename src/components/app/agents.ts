@@ -1,5 +1,4 @@
 import { specialistBySlug } from "@/content/appData";
-import { PALETTE } from "@/components/avatar";
 import { agentName, isGroup, type Msg, type State } from "@/lib/store";
 
 export type MyAgent = { id: string; name: string; role: string; seat: number; last?: Msg };
@@ -32,11 +31,9 @@ export function convoOf(s: State, id: string): Convo | undefined {
   return myAgents(s).map((a) => ({ id: a.id, group: false, name: a.name, sub: a.role, members: [a.id], last: a.last })).find((c) => c.id === id);
 }
 
-/** Soft tile colour behind an agent's face, from the face's own colour. Your agent sits on purple. */
-export function tileBg(id: string) {
-  if (id === "home") return "var(--color-grape)";
-  const sp = specialistBySlug(id);
-  return sp ? `color-mix(in oklab, ${PALETTE[sp.color].fill} 24%, var(--card))` : "var(--tint)";
+/** Tile behind an agent's face: plain near-black in dark theme, plain white in light, no colour tint. */
+export function tileBg(_id?: string) { // eslint-disable-line @typescript-eslint/no-unused-vars
+  return "var(--face-tile)";
 }
 
 export function preview(m: Msg | undefined, s: State, group: boolean) {

@@ -143,7 +143,7 @@ export const copy = {
     body:
       "The marketplace is a roster of specialist agents, each good at one kind of work. Every card shows what the agent does, how it has been rated and how many jobs it has finished. Hire one and it joins your team, next to your own agent.",
     why: "Why you should care: your team grows by the job, not by the headcount.",
-    hint: "Hover or tap a card to read the back.",
+    hint: "Tap a card to flip it. Tap again to flip back.",
     note: "Sample roster. Live listings are in the app.",
     cta: "Open the marketplace",
     agents: [

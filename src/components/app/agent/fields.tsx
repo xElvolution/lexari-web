@@ -1,7 +1,8 @@
 "use client";
 
 import Face from "../../Face";
-import { COLORS, PALETTE, type ColorKey, type Eyes, type Mouth, type Shape } from "../../avatar";
+import { COLORS, PALETTE, type ColorKey, type Eyes, type FaceLook, type Mouth, type Shape } from "../../avatar";
+import FaceCreator from "./FaceCreator";
 import { AGENT_SKILLS, LOOKS, TONES, type ToneId } from "@/content/appData";
 import Icon from "../Icon";
 import { AgentFace } from "../faces";
@@ -9,8 +10,9 @@ import { AgentFace } from "../faces";
 export const SHAPES: Shape[] = ["round", "square", "blob", "hex", "tri", "robot", "egg", "tall", "wide"];
 export const EYES: Eyes[] = ["oval", "dot", "happy", "wink", "big", "sleepy", "glasses", "visor"];
 export const MOUTHS: Mouth[] = ["smile", "grin", "o", "flat", "cat", "tongue", "teeth", "none"];
-export type Look = { shape: Shape; color: ColorKey; eyes: Eyes; mouth: Mouth };
-const variant = (l: Look) => ({ ...l, extra: l.shape === "robot" ? ("antenna" as const) : ("none" as const), blush: false }); // never a hat
+export type Look = { shape: Shape; color: ColorKey; eyes: Eyes; mouth: Mouth } & Partial<Pick<FaceLook, "extra" | "blush" | "brows" | "orbit" | "dots" | "bg">>;
+/** a Look as a full face variant (older looks get the robot antenna, as before) */
+export const variant = (l: Look): FaceLook => ({ ...l, extra: l.extra ?? (l.shape === "robot" ? "antenna" : "none"), blush: l.blush ?? false });
 
 export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} className={`relative h-7 w-12 shrink-0 rounded-full transition ${on ? "bg-grape" : "bg-ink/20"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-6" : "left-1"}`} /></button>;
@@ -32,7 +34,11 @@ function Opt({ on, onClick, label, children }: { on: boolean; onClick: () => voi
 }
 
 /** Face builder for agents you make: shape, colour, eyes and mouth, with a big live preview. */
-export function AvatarPicker({ v, onChange, compact = false }: { v: Look; onChange: (l: Look) => void; compact?: boolean }) {
+export function AvatarPicker({ v, onChange, compact = false, name }: { v: Look; onChange: (l: Look) => void; compact?: boolean; name?: string }) {
+  return <FaceCreator value={variant(v)} onChange={(f) => onChange(f as Look)} name={name} wide={!compact} preview={!compact} />;
+}
+/** the original simple picker (kept for reference; the creator above replaces it) */
+export function ClassicPicker({ v, onChange, compact = false }: { v: Look; onChange: (l: Look) => void; compact?: boolean }) {
   const set = (p: Partial<Look>) => onChange({ ...v, ...p });
   const shuffle = () => { const r = (a: readonly string[]) => a[Math.floor(Math.random() * a.length)]; onChange({ shape: r(SHAPES) as Shape, color: r(COLORS) as ColorKey, eyes: r(EYES) as Eyes, mouth: r(MOUTHS) as Mouth }); };
   return (

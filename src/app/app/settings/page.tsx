@@ -108,7 +108,7 @@ function Personal({ s }: { s: State }) {
     <>
       <Group title="Your agent">
         <div className="flex flex-col gap-5 py-5 sm:flex-row sm:items-center">
-          <span className="grid h-24 w-24 shrink-0 place-items-center rounded-[26px] bg-grape"><AgentFace look={a.look} size={78} /></span>
+          <span className="grid h-24 w-24 shrink-0 place-items-center rounded-[26px] bg-[var(--face-tile)] ring-1 ring-line"><AgentFace look={a.look} size={78} /></span>
           <div className="grid flex-1 gap-3 sm:grid-cols-2">
             <label><span className="label text-[9.5px] text-ink/60">Agent name</span><input value={name} onChange={(e) => setName(e.target.value.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 12))} className="field mt-1.5 !py-2.5" /></label>
             <label><span className="label text-[9.5px] text-ink/60">It calls you</span><input value={you} onChange={(e) => setYou(e.target.value.slice(0, 20))} className="field mt-1.5 !py-2.5" placeholder="Ada" /></label>

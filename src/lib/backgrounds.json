@@ -1,0 +1,92 @@
+[
+{
+"id": "black",
+"label": "Black",
+"svg": "<rect width='100' height='100' fill='#0a0a0a'/>",
+"ink": "#ffffff"
+},
+{
+"id": "white",
+"label": "White",
+"svg": "<rect width='100' height='100' fill='#ffffff'/>",
+"ink": "#0a0a0a"
+},
+{
+"id": "grape",
+"label": "Grape",
+"svg": "<defs><linearGradient id='{U}a' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#8b5cf6'/><stop offset='1' stop-color='#3514b0'/></linearGradient></defs><rect width='100' height='100' fill='url(#{U}a)'/>",
+"ink": "#ffffff"
+},
+{
+"id": "sunset",
+"label": "Sunset",
+"svg": "<defs><linearGradient id='{U}a' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#ff8a3d'/><stop offset='.55' stop-color='#f45b7a'/><stop offset='1' stop-color='#8b5cf6'/></linearGradient></defs><rect width='100' height='100' fill='url(#{U}a)'/><circle cx='50' cy='78' r='26' fill='#fcd34d' opacity='.55'/>",
+"ink": "#ffffff"
+},
+{
+"id": "ocean",
+"label": "Ocean",
+"svg": "<defs><linearGradient id='{U}a' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#7dd3fc'/><stop offset='.5' stop-color='#3b82f6'/><stop offset='1' stop-color='#1e1b6b'/></linearGradient></defs><rect width='100' height='100' fill='url(#{U}a)'/>",
+"ink": "#ffffff"
+},
+{
+"id": "lime",
+"label": "Lime",
+"svg": "<defs><linearGradient id='{U}a' x1='0' y1='1' x2='1' y2='0'><stop offset='0' stop-color='#34d399'/><stop offset='1' stop-color='#fcd34d'/></linearGradient></defs><rect width='100' height='100' fill='url(#{U}a)'/>",
+"ink": "#0a0a0a"
+},
+{
+"id": "candy",
+"label": "Candy",
+"svg": "<defs><linearGradient id='{U}a' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#f9a8d4'/><stop offset='1' stop-color='#c9b8ff'/></linearGradient></defs><rect width='100' height='100' fill='url(#{U}a)'/>",
+"ink": "#0a0a0a"
+},
+{
+"id": "aurora",
+"label": "Aurora",
+"svg": "<defs><radialGradient id='{U}a' cx='.2' cy='.25' r='.6'><stop offset='0' stop-color='#2dd4bf'/><stop offset='1' stop-color='#2dd4bf' stop-opacity='0'/></radialGradient><radialGradient id='{U}b' cx='.85' cy='.3' r='.6'><stop offset='0' stop-color='#8b5cf6'/><stop offset='1' stop-color='#8b5cf6' stop-opacity='0'/></radialGradient><radialGradient id='{U}c' cx='.55' cy='.95' r='.6'><stop offset='0' stop-color='#f45b7a'/><stop offset='1' stop-color='#f45b7a' stop-opacity='0'/></radialGradient></defs><rect width='100' height='100' fill='#0b0915'/><rect width='100' height='100' fill='url(#{U}a)'/><rect width='100' height='100' fill='url(#{U}b)'/><rect width='100' height='100' fill='url(#{U}c)'/>",
+"ink": "#ffffff"
+},
+{
+"id": "grid",
+"label": "Grid",
+"svg": "<defs><pattern id='{U}a' width='10' height='10' patternUnits='userSpaceOnUse'><path d='M10 0H0V10' fill='none' stroke='#8b5cf6' stroke-width='.6' opacity='.7'/></pattern></defs><rect width='100' height='100' fill='#0a0a0a'/><rect width='100' height='100' fill='url(#{U}a)'/>",
+"ink": "#ffffff"
+},
+{
+"id": "dots",
+"label": "Dots",
+"svg": "<defs><pattern id='{U}a' width='8' height='8' patternUnits='userSpaceOnUse'><circle cx='4' cy='4' r='1.1' fill='#ffffff' opacity='.35'/></pattern></defs><rect width='100' height='100' fill='#13101f'/><rect width='100' height='100' fill='url(#{U}a)'/>",
+"ink": "#ffffff"
+},
+{
+"id": "rays",
+"label": "Rays",
+"svg": "<rect width='100' height='100' fill='#fcd34d'/><path d='M50 50L130.0 50.0L127.3 70.6Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L119.3 90.0L106.7 106.5Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L90.0 119.3L70.8 127.2Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L50.0 130.0L29.4 127.3Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L10.0 119.3L-6.5 106.7Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L-19.3 90.0L-27.2 70.8Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L-30.0 50.0L-27.3 29.4Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L-19.3 10.0L-6.7 -6.5Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L10.0 -19.3L29.2 -27.2Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L50.0 -30.0L70.6 -27.3Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L90.0 -19.3L106.5 -6.7Z' fill='#ff8a3d' opacity='.55'/><path d='M50 50L119.3 10.0L127.2 29.2Z' fill='#ff8a3d' opacity='.55'/>",
+"ink": "#0a0a0a"
+},
+{
+"id": "stars",
+"label": "Stars",
+"svg": "<defs><radialGradient id='{U}a' cx='.5' cy='.4' r='.8'><stop offset='0' stop-color='#1d0f5c'/><stop offset='1' stop-color='#05030c'/></radialGradient></defs><rect width='100' height='100' fill='url(#{U}a)'/><circle cx='33.1' cy='16.5' r='0.4' fill='#ffffff' opacity='0.5'/><circle cx='80.8' cy='11.0' r='0.4' fill='#ffffff' opacity='0.9'/><circle cx='22.6' cy='10.3' r='1.1' fill='#ffffff' opacity='0.5'/><circle cx='25.1' cy='54.9' r='0.4' fill='#ffffff' opacity='0.9'/><circle cx='13.9' cy='23.4' r='0.4' fill='#ffffff' opacity='0.9'/><circle cx='58.2' cy='6.8' r='0.6' fill='#ffffff' opacity='0.5'/><circle cx='55.4' cy='14.8' r='1.1' fill='#ffffff' opacity='0.5'/><circle cx='53.9' cy='56.8' r='0.6' fill='#ffffff' opacity='0.5'/><circle cx='57.8' cy='63.3' r='0.8' fill='#ffffff' opacity='0.5'/><circle cx='54.6' cy='8.0' r='0.4' fill='#ffffff' opacity='0.9'/><circle cx='21.8' cy='67.3' r='1.1' fill='#ffffff' opacity='0.7'/><circle cx='46.7' cy='90.7' r='0.8' fill='#ffffff' opacity='0.7'/><circle cx='25.8' cy='19.3' r='0.6' fill='#ffffff' opacity='0.5'/><circle cx='57.1' cy='52.4' r='0.8' fill='#ffffff' opacity='0.9'/><circle cx='45.1' cy='60.5' r='0.4' fill='#ffffff' opacity='0.5'/><circle cx='51.1' cy='17.8' r='0.8' fill='#ffffff' opacity='0.5'/><circle cx='91.6' cy='42.5' r='0.4' fill='#ffffff' opacity='0.9'/><circle cx='57.0' cy='86.0' r='0.8' fill='#ffffff' opacity='0.7'/><circle cx='68.7' cy='59.1' r='1.1' fill='#ffffff' opacity='0.5'/><circle cx='82.6' cy='92.7' r='1.1' fill='#ffffff' opacity='0.9'/><circle cx='65.8' cy='7.8' r='0.8' fill='#ffffff' opacity='0.9'/><circle cx='57.5' cy='67.4' r='1.1' fill='#ffffff' opacity='0.7'/><circle cx='70.8' cy='87.2' r='0.8' fill='#ffffff' opacity='0.5'/><circle cx='92.3' cy='36.1' r='0.4' fill='#ffffff' opacity='0.7'/><circle cx='7.7' cy='75.8' r='0.6' fill='#ffffff' opacity='0.9'/><circle cx='25.8' cy='39.5' r='1.1' fill='#ffffff' opacity='0.5'/><circle cx='18.0' cy='40.6' r='0.8' fill='#ffffff' opacity='0.5'/><circle cx='80.7' cy='84.9' r='0.8' fill='#ffffff' opacity='0.9'/><circle cx='41.9' cy='36.4' r='1.1' fill='#ffffff' opacity='0.5'/><circle cx='16.5' cy='18.9' r='0.6' fill='#ffffff' opacity='0.9'/><circle cx='24.4' cy='48.6' r='0.6' fill='#ffffff' opacity='0.7'/><circle cx='29.1' cy='16.0' r='0.8' fill='#ffffff' opacity='0.9'/><circle cx='56.4' cy='93.5' r='0.4' fill='#ffffff' opacity='0.7'/><circle cx='88.4' cy='76.9' r='1.1' fill='#ffffff' opacity='0.7'/><circle cx='40.3' cy='11.9' r='1.1' fill='#ffffff' opacity='0.5'/><circle cx='20.3' cy='96.5' r='1.1' fill='#ffffff' opacity='0.5'/><circle cx='12.6' cy='59.7' r='0.4' fill='#ffffff' opacity='0.5'/><circle cx='56.4' cy='53.5' r='0.8' fill='#ffffff' opacity='0.9'/><path d='M80 18Q81 22 85 23Q81 24 80 28Q79 24 75 23Q79 22 80 18Z' fill='#fcd34d'/>",
+"ink": "#ffffff"
+},
+{
+"id": "halftone",
+"label": "Halftone",
+"svg": "<defs><pattern id='{U}p0' width='7' height='7' patternUnits='userSpaceOnUse'><circle cx='3.5' cy='3.5' r='0.6' fill='#0a0a0a'/></pattern><pattern id='{U}p1' width='7' height='7' patternUnits='userSpaceOnUse'><circle cx='3.5' cy='3.5' r='1.2' fill='#0a0a0a'/></pattern><pattern id='{U}p2' width='7' height='7' patternUnits='userSpaceOnUse'><circle cx='3.5' cy='3.5' r='1.8' fill='#0a0a0a'/></pattern><pattern id='{U}p3' width='7' height='7' patternUnits='userSpaceOnUse'><circle cx='3.5' cy='3.5' r='2.4' fill='#0a0a0a'/></pattern><pattern id='{U}p4' width='7' height='7' patternUnits='userSpaceOnUse'><circle cx='3.5' cy='3.5' r='3.0' fill='#0a0a0a'/></pattern></defs><rect width='100' height='100' fill='#f45b5b'/><rect y='0' width='100' height='20' fill='url(#{U}p0)' opacity='.85'/><rect y='20' width='100' height='20' fill='url(#{U}p1)' opacity='.85'/><rect y='40' width='100' height='20' fill='url(#{U}p2)' opacity='.85'/><rect y='60' width='100' height='20' fill='url(#{U}p3)' opacity='.85'/><rect y='80' width='100' height='20' fill='url(#{U}p4)' opacity='.85'/>",
+"ink": "#ffffff"
+},
+{
+"id": "holo",
+"label": "Holographic",
+"svg": "<defs><linearGradient id='{U}a' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#7dd3fc'/><stop offset='.25' stop-color='#c9b8ff'/><stop offset='.5' stop-color='#f9a8d4'/><stop offset='.75' stop-color='#fcd34d'/><stop offset='1' stop-color='#34d399'/></linearGradient><linearGradient id='{U}b' x1='0' y1='0' x2='1' y2='0'><stop offset='0' stop-color='#ffffff' stop-opacity='0'/><stop offset='.5' stop-color='#ffffff' stop-opacity='.55'/><stop offset='1' stop-color='#ffffff' stop-opacity='0'/></linearGradient></defs><rect width='100' height='100' fill='url(#{U}a)'/><rect x='-30' y='35' width='160' height='16' fill='url(#{U}b)' transform='rotate(-30 50 50)'/>",
+"ink": "#0a0a0a"
+},
+{
+"id": "confetti",
+"label": "Confetti",
+"svg": "<rect width='100' height='100' fill='#13101f'/><rect x='2.4' y='83.1' width='4' height='2' rx='1' fill='#f9a8d4' transform='rotate(96 50 50)'/><rect x='14.1' y='24.0' width='4' height='2' rx='1' fill='#34d399' transform='rotate(154 50 50)'/><rect x='34.6' y='11.7' width='4' height='2' rx='1' fill='#2dd4bf' transform='rotate(124 50 50)'/><rect x='94.3' y='44.3' width='4' height='2' rx='1' fill='#3b82f6' transform='rotate(79 50 50)'/><rect x='8.2' y='9.7' width='4' height='2' rx='1' fill='#34d399' transform='rotate(67 50 50)'/><rect x='45.5' y='65.7' width='4' height='2' rx='1' fill='#f9a8d4' transform='rotate(5 50 50)'/><rect x='19.5' y='90.4' width='4' height='2' rx='1' fill='#34d399' transform='rotate(37 50 50)'/><rect x='65.6' y='86.8' width='4' height='2' rx='1' fill='#2dd4bf' transform='rotate(135 50 50)'/><rect x='28.3' y='61.1' width='4' height='2' rx='1' fill='#ff8a3d' transform='rotate(178 50 50)'/><rect x='80.3' y='49.2' width='4' height='2' rx='1' fill='#fcd34d' transform='rotate(91 50 50)'/><rect x='73.3' y='50.6' width='4' height='2' rx='1' fill='#2dd4bf' transform='rotate(128 50 50)'/><rect x='31.3' y='21.2' width='4' height='2' rx='1' fill='#2dd4bf' transform='rotate(49 50 50)'/><rect x='76.6' y='77.7' width='4' height='2' rx='1' fill='#8b5cf6' transform='rotate(58 50 50)'/><rect x='19.0' y='46.8' width='4' height='2' rx='1' fill='#8b5cf6' transform='rotate(7 50 50)'/><rect x='94.0' y='75.1' width='4' height='2' rx='1' fill='#3b82f6' transform='rotate(66 50 50)'/><rect x='18.4' y='57.5' width='4' height='2' rx='1' fill='#34d399' transform='rotate(114 50 50)'/><rect x='76.8' y='68.7' width='4' height='2' rx='1' fill='#34d399' transform='rotate(93 50 50)'/><rect x='7.7' y='9.7' width='4' height='2' rx='1' fill='#3b82f6' transform='rotate(50 50 50)'/><rect x='32.1' y='45.9' width='4' height='2' rx='1' fill='#f9a8d4' transform='rotate(0 50 50)'/><rect x='45.5' y='62.0' width='4' height='2' rx='1' fill='#2dd4bf' transform='rotate(164 50 50)'/><rect x='8.1' y='62.8' width='4' height='2' rx='1' fill='#3b82f6' transform='rotate(51 50 50)'/><rect x='45.4' y='17.0' width='4' height='2' rx='1' fill='#2dd4bf' transform='rotate(162 50 50)'/><rect x='31.6' y='76.1' width='4' height='2' rx='1' fill='#8b5cf6' transform='rotate(101 50 50)'/><rect x='44.0' y='70.6' width='4' height='2' rx='1' fill='#ff8a3d' transform='rotate(40 50 50)'/><rect x='16.2' y='12.1' width='4' height='2' rx='1' fill='#fcd34d' transform='rotate(151 50 50)'/><rect x='86.0' y='76.6' width='4' height='2' rx='1' fill='#fcd34d' transform='rotate(156 50 50)'/>",
+"ink": "#ffffff"
+}
+]

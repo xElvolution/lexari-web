@@ -1,37 +1,40 @@
 "use client";
 
+import { lookVariant, type FaceState } from "../avatar";
+import type { AgentLook } from "@/lib/store";
 import Face from "../Face";
 import { specialistBySlug } from "@/content/appData";
 import { tileBg } from "./agents";
 
 /** Your agent's face. look null is the house face from the landing badge. */
-export function AgentFace({ look, size = 48, track = false, className = "" }: { look: number | null | undefined; size?: number; track?: boolean; className?: string }) {
+export function AgentFace({ look, size = 48, track = false, className = "", animated = false, state }: { look: AgentLook | undefined; size?: number; track?: boolean; className?: string; animated?: boolean; state?: FaceState }) {
+  if (look && typeof look === "object") return <Face variant={lookVariant(look)} size={size} track={track} className={className} animated={animated} state={state} />;
   return look === null || look === undefined ? <Face size={size} track={track} className={className} /> : <Face seed={look} size={size} track={track} className={className} />;
 }
 
 /** A marketplace specialist's face, same seed and color as the landing roster. */
-export function SpecFace({ slug, size = 48, track = false, className = "" }: { slug: string; size?: number; track?: boolean; className?: string }) {
+export function SpecFace({ slug, size = 48, track = false, className = "", animated = false }: { slug: string; size?: number; track?: boolean; className?: string; animated?: boolean }) {
   const s = specialistBySlug(slug);
   if (!s) return null;
-  return <Face seed={s.seed} variant={{ color: s.color, ...s.face }} size={size} track={track} className={className} />;
+  return <Face seed={s.seed} variant={{ color: s.color, ...s.face }} size={size} track={track} className={className} animated={animated} />;
 }
 
 /** Either one, by assignee id ("home" or a slug). */
-export function WhoFace({ who, look, size = 40, className = "" }: { who: string; look: number | null | undefined; size?: number; className?: string }) {
-  return who === "home" || who === "you" ? <AgentFace look={look} size={size} className={className} /> : <SpecFace slug={who} size={size} className={className} />;
+export function WhoFace({ who, look, size = 40, className = "", animated = false }: { who: string; look: AgentLook | undefined; size?: number; className?: string; animated?: boolean }) {
+  return who === "home" || who === "you" ? <AgentFace look={look} size={size} className={className} animated={animated} /> : <SpecFace slug={who} size={size} className={className} animated={animated} />;
 }
 
 /** An agent's face on its soft colour tile. Rounded square, sized in px. */
-export function AgentTile({ id, look, size = 48, face, className = "", radius }: { id: string; look: number | null | undefined; size?: number; face?: number; className?: string; radius?: number }) {
+export function AgentTile({ id, look, size = 48, face, className = "", radius }: { id: string; look: AgentLook | undefined; size?: number; face?: number; className?: string; radius?: number }) {
   return (
-    <span className={`grid shrink-0 place-items-center ${className}`} style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.32), background: tileBg(id) }}>
+    <span className={`grid shrink-0 place-items-center ${className}`} style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.32), background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)" }}>
       <WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} />
     </span>
   );
 }
 
 /** A group: two members overlapped on a diagonal, plus a count when there are more. */
-export function GroupTile({ members, look, size = 48, className = "" }: { members: string[]; look: number | null | undefined; size?: number; className?: string }) {
+export function GroupTile({ members, look, size = 48, className = "" }: { members: string[]; look: AgentLook | undefined; size?: number; className?: string }) {
   const m = members.slice(0, 2); const sub = Math.round(size * 0.66); const extra = members.length - 2;
   return (
     <span className={`relative block shrink-0 ${className}`} style={{ width: size, height: size }}>

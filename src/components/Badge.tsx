@@ -1,5 +1,8 @@
 "use client";
 
+import BgArt from "./BgArt";
+import { lookVariant } from "./avatar";
+import type { AgentLook } from "@/lib/store";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { copy } from "@/content/copy";
 import Face from "./Face";
@@ -46,7 +49,7 @@ export function Code({ text }: { text: string }) {
  * and springs back. A tap or a fast sideways flick turns it over to show the back.
  * Physics (pendulum plus flip spring) is written straight to the DOM every frame.
  */
-export default function Badge({ name, setName, look }: { name: string; setName: (v: string) => void; look?: number | null }) {
+export default function Badge({ name, setName, look }: { name: string; setName: (v: string) => void; look?: AgentLook }) {
   const rig = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const flipTarget = useRef(0);
@@ -72,7 +75,7 @@ export default function Badge({ name, setName, look }: { name: string; setName: 
       tilt = (e.clientX / window.innerWidth - 0.5) * 18;
       if (press) {
         trail.push({ x: e.clientX, t: performance.now() }); trail = trail.slice(-6);
-        if (!drag && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 7) { drag = true; card.current!.style.cursor = "grabbing"; }
+        if (!drag && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 12) { drag = true; card.current!.style.cursor = "grabbing"; }
       }
       if (drag) { const p = pivot(); target = Math.max(-40, Math.min(40, (-Math.atan2(e.clientX - p.x, e.clientY - p.y) * 180) / Math.PI)); }
       else if (!reduce) v += dx * 0.012; // a breeze from the cursor
@@ -88,7 +91,7 @@ export default function Badge({ name, setName, look }: { name: string; setName: 
       const dt = performance.now() - press.t, dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
       const first = trail[0], last = trail[trail.length - 1];
       const speed = last && first && last.t > first.t ? (last.x - first.x) / (last.t - first.t) : 0; // px per ms
-      if (!drag && dist < 7 && dt < 450) flip(1); // a tap
+      if (!drag && dist < 12 && dt < 800) flip(1); // a tap (also slow taps and small jitters)
       else if (Math.abs(speed) > 1.3 && dt < 380 && Math.abs(e.clientX - press.x) > 40) flip(Math.sign(speed)); // a sideways flick
       press = null; drag = false;
       if (card.current) card.current.style.cursor = "grab";
@@ -147,7 +150,7 @@ export default function Badge({ name, setName, look }: { name: string; setName: 
             <div className="label mt-1 text-[9.5px] text-white/80">my name is</div>
           </div>
           <div className="carpet-w relative mt-3 grid h-[118px] place-items-center overflow-hidden rounded-[18px] bg-[#0a0a0a] sm:h-[170px]">
-            {look === null || look === undefined ? <Face size={112} track /> : <Face seed={look} size={112} track />}
+            {look && typeof look === "object" ? <span className="contents"><BgArt id={look.bg} className="opacity-100" /><span className="relative"><Face variant={lookVariant(look)} size={112} track animated /></span></span> : look === null || look === undefined ? <Face size={112} track /> : <Face seed={look} size={112} track />}
             <span className="label absolute left-3 top-3 text-[9px] text-white/70">{B.company}</span>
             <span className="label absolute right-3 top-3 rounded-full bg-grape px-2 py-1 text-[9px] text-white">● online</span>
           </div>

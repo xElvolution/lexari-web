@@ -12,7 +12,7 @@ import Icon from "../Icon";
 import { AgentTile } from "../faces";
 import { HireBtn, StarRow } from "../market/parts";
 import { closeAdd, useOverlays } from "../overlays";
-import { AvatarPicker, Field, SkillPicker, TonePicker, areaCls, inputCls, type Look } from "./fields";
+import { AvatarPicker, Field, SkillPicker, TonePicker, areaCls, inputCls, variant, type Look } from "./fields";
 
 const STEPS = ["Basics", "Look", "Personality"];
 
@@ -108,8 +108,8 @@ function Create() {
 
   if (busy) return (
     <div className="grid place-items-center py-14 text-center">
-      <span className="relative grid h-[120px] w-[120px] place-items-center rounded-[34px]" style={{ background: `color-mix(in oklab, ${PALETTE[look.color].fill} 26%, var(--card))` }}>
-        <span className="bob"><Face variant={{ ...look, extra: look.shape === "robot" ? "antenna" : "none", blush: false }} size={96} /></span>
+      <span className="relative grid h-[120px] w-[120px] place-items-center rounded-[34px]" style={{ background: "var(--face-tile)" }}>
+        <span><Face variant={variant(look)} size={96} state="thinking" animated /></span>
         <span className="absolute -inset-2 animate-spin rounded-[40px] border-4 border-transparent border-t-grape" />
       </span>
       <p className="mt-6 text-[18px] font-bold text-ink">Setting up {name.trim()}&apos;s desk…</p>
@@ -147,7 +147,7 @@ function Create() {
           <Field label="What should it do?" hint="Instructions it always follows"><textarea value={about} onChange={(e) => setAbout(e.target.value.slice(0, 400))} placeholder="Every Monday, read my inbox and tell me the three things that need me. Keep it short." className={areaCls} /></Field>
         </div>
       )}
-      {step === 1 && <AvatarPicker v={look} onChange={setLook} />}
+      {step === 1 && <AvatarPicker v={look} onChange={setLook} name={name.trim() || undefined} />}
       {step === 2 && (
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-5">
@@ -178,7 +178,7 @@ function Create() {
 function AgentPreview({ name, role, look }: { name: string; role: string; look: Look }) {
   return (
     <>
-      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl" style={{ background: `color-mix(in oklab, ${PALETTE[look.color].fill} 24%, var(--card))` }}><Face variant={{ ...look, extra: look.shape === "robot" ? "antenna" : "none", blush: false }} size={40} /></span>
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl" style={{ background: "var(--face-tile)" }}><Face variant={variant(look)} size={40} /></span>
       <span className="min-w-0"><span className="block truncate text-[15px] font-bold text-ink">{name.trim() || "Your new agent"}</span><span className="block truncate text-[12.5px] text-ink/55">{role.trim() || "Custom agent"} · joins your strip</span></span>
     </>
   );

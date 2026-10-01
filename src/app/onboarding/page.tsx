@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { KNOW_SUGGESTIONS, LOOKS, ROLES, TONES, type ToneId } from "@/content/appData";
-import { finishOnboarding, startDemo, useApp } from "@/lib/store";
+import { finishOnboarding, startDemo, useApp, type AgentLook } from "@/lib/store";
+import FaceCreator from "@/components/app/agent/FaceCreator";
+import { lookVariant } from "@/components/avatar";
 import Badge from "@/components/Badge";
 import Logo from "@/components/Logo";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -21,7 +23,8 @@ export default function Onboarding() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
-  const [look, setLook] = useState<number | null>(null);
+  const [look, setLook] = useState<AgentLook>(null);
+  const [base, setBase] = useState<number | null>(null); // which starter face you picked
   const [you, setYou] = useState("");
   const [role, setRole] = useState("");
   const [tone, setTone] = useState<ToneId>("short");
@@ -120,14 +123,18 @@ export default function Onboarding() {
               <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Every face is generated. The badge updates as you pick.</p>
               <div className="mt-7 grid max-w-[560px] grid-cols-4 gap-2.5 sm:grid-cols-6">
                 {LOOKS.map((l) => {
-                  const on = look === l;
+                  const on = base === l;
                   return (
-                    <button key={String(l)} onClick={() => setLook(l)} aria-pressed={on} aria-label={l === null ? "House face" : `Face ${l}`} className={`group relative grid aspect-square place-items-center rounded-[22px] transition-all duration-300 [transition-timing-function:cubic-bezier(.3,1.6,.5,1)] ${on ? "scale-105 bg-grape shadow-[0_6px_0_#3514b0]" : "bg-tint hover:-translate-y-1 hover:bg-grape/25"}`}>
+                    <button key={String(l)} onClick={() => { setBase(l); setLook(l); }} aria-pressed={on} aria-label={l === null ? "House face" : `Face ${l}`} className={`group relative grid aspect-square place-items-center rounded-[22px] transition-all duration-300 [transition-timing-function:cubic-bezier(.3,1.6,.5,1)] ${on ? "scale-105 bg-grape shadow-[0_6px_0_#3514b0]" : "bg-tint hover:-translate-y-1 hover:bg-grape/25"}`}>
                       <span className="transition group-hover:scale-110"><AgentFace look={l} size={64} /></span>
                       {on && <span className="pop absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-ink text-[var(--bg)]"><Icon name="check" size={13} stroke={3} /></span>}
                     </button>
                   );
                 })}
+              </div>
+              <div className="mt-8 max-w-[560px]">
+                <p className="label text-[10px] text-ink/70">Make it yours · states, brows, extras, memory dots and a card background</p>
+                <div className="mt-3"><FaceCreator value={lookVariant(look)} onChange={setLook} name={shown} wide /></div>
               </div>
             </div>
           )}

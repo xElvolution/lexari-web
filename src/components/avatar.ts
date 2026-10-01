@@ -19,10 +19,19 @@ export type ColorKey = keyof typeof PALETTE;
 export const COLORS = Object.keys(PALETTE) as ColorKey[];
 
 export type Shape = "round" | "square" | "tall" | "blob" | "hex" | "tri" | "robot" | "egg" | "wide";
-export type Eyes = "oval" | "dot" | "happy" | "wink" | "visor" | "big" | "sleepy" | "glasses";
-export type Mouth = "smile" | "flat" | "o" | "grin" | "none" | "tongue" | "cat" | "teeth";
+export type Eyes = "oval" | "dot" | "happy" | "wink" | "visor" | "big" | "sleepy" | "glasses" | "star" | "pixel" | "cyclops";
+export type Mouth = "smile" | "flat" | "o" | "grin" | "none" | "tongue" | "cat" | "teeth" | "wave" | "fang" | "smirk";
 export type Extra = "none" | "antenna" | "ears" | "catEars" | "tuft" | "beanie" | "cap" | "horns" | "headphones" | "party";
-export type Variant = { shape: Shape; color: ColorKey; eyes: Eyes; mouth: Mouth; extra: Extra; blush: boolean; plain?: boolean };
+export type Brows = "none" | "flat" | "raised" | "angry" | "soft" | "uni";
+export type Orbit = "none" | "dots" | "ring" | "comet" | "sparkle";
+export type FaceState = "idle" | "thinking" | "speaking" | "happy";
+export type Variant = {
+  shape: Shape; color: ColorKey; eyes: Eyes; mouth: Mouth; extra: Extra; blush: boolean; plain?: boolean;
+  /** added with the face creator; all optional so every older face renders exactly as before */
+  brows?: Brows; orbit?: Orbit; dots?: number; bg?: string;
+};
+/** A face you built in the creator. Saved as the agent's look and printed on its ID card / NFT. */
+export type FaceLook = Variant;
 
 const SHAPES: Shape[] = ["round", "square", "tall", "blob", "hex", "tri", "robot", "egg", "wide"];
 const EYES: Eyes[] = ["oval", "dot", "happy", "wink", "visor", "big", "sleepy", "glasses"];
@@ -47,3 +56,24 @@ export function variantFor(seed: number): Variant {
 
 /** The house face on the hero badge. Kept exactly as designed: flat lilac, no outline. */
 export const HOME: Variant = { shape: "round", color: "lilac", eyes: "oval", mouth: "smile", extra: "none", blush: false, plain: true };
+
+/* ---------- creator option lists (the random lists above stay as they were so seeded faces never change) ---------- */
+export const ALL_SHAPES: Shape[] = ["round", "square", "blob", "hex", "tri", "robot", "egg", "tall", "wide"];
+export const ALL_EYES: Eyes[] = ["oval", "dot", "happy", "wink", "big", "sleepy", "glasses", "visor", "star", "pixel", "cyclops"];
+export const ALL_MOUTHS: Mouth[] = ["smile", "grin", "o", "flat", "cat", "tongue", "teeth", "none", "wave", "fang", "smirk"];
+export const ALL_BROWS: Brows[] = ["none", "flat", "soft", "raised", "angry", "uni"];
+export const ALL_EXTRAS: Extra[] = ["none", "antenna", "ears", "catEars", "tuft", "horns", "headphones", "beanie", "cap", "party"];
+export const ALL_ORBITS: Orbit[] = ["none", "dots", "ring", "comet", "sparkle"];
+export const LABEL: Record<string, string> = {
+  round: "Round", square: "Square", blob: "Blob", hex: "Hex", tri: "Triangle", robot: "Robot", egg: "Egg", tall: "Tall", wide: "Wide",
+  oval: "Oval", dot: "Dot", happy: "Happy", wink: "Wink", big: "Big", sleepy: "Sleepy", glasses: "Glasses", visor: "Visor", star: "Star", pixel: "Pixel", cyclops: "Cyclops",
+  smile: "Smile", grin: "Grin", o: "O", flat: "Flat", cat: "Cat", tongue: "Tongue", teeth: "Teeth", none: "None", wave: "Wave", fang: "Fang", smirk: "Smirk",
+  soft: "Soft", raised: "Raised", angry: "Angry", uni: "Uni",
+  antenna: "Antenna", ears: "Ears", catEars: "Cat ears", tuft: "Tuft", horns: "Horns", headphones: "Headphones", beanie: "Beanie", cap: "Cap", party: "Party hat",
+  dots: "Memory dots", ring: "Ring", comet: "Comet", sparkle: "Sparkles",
+};
+/** The full look for any saved value: a seed number, null (house face) or a FaceLook object. */
+export function lookVariant(look: number | null | undefined | Partial<Variant>): Variant {
+  if (look && typeof look === "object") return { ...HOME, plain: false, ...look } as Variant;
+  return look === null || look === undefined ? { ...HOME } : variantFor(look);
+}

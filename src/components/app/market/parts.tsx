@@ -28,30 +28,49 @@ export function StarRow({ v, size = 12 }: { v: number; size?: number }) {
   return <span className="inline-flex items-center gap-0.5 text-brand-ink" aria-label={`${v} out of 5`}>{[1, 2, 3, 4, 5].map((i) => <Icon key={i} name="star" size={size} className={i <= Math.round(v) ? "" : "opacity-25"} />)}</span>;
 }
 
-/** Store tile: square avatar, name, maker, category and rating. */
+/** Store tile: tap the picture to flip it (back: rating, hires, skills, price); the name and Open go to the listing. */
 export function AppCard({ a, wide = false }: { a: Specialist; wide?: boolean }) {
   const m = storeMeta(a);
   const face = useRef<HTMLSpanElement>(null);
+  const [flipped, setFlipped] = useState(false);
+  const href = `/app/marketplace/${a.slug}`;
+  const h = wide ? "h-[150px]" : "h-[156px] sm:h-[168px]";
+  const toggle = () => setFlipped((v) => !v);
   return (
-    <Link href={`/app/marketplace/${a.slug}`} className={`group flex shrink-0 snap-start flex-col ${wide ? "w-[272px]" : "w-[156px] sm:w-[168px]"}`}>
-      {wide ? (
-        <span className="relative block h-[150px] overflow-hidden rounded-[22px] ring-1 ring-line" style={{ background: `linear-gradient(135deg, color-mix(in oklab, var(--color-grape) 30%, var(--card)), var(--card))` }}>
-          <span ref={face} className="absolute bottom-3 left-3 transition duration-300 group-hover:scale-105"><AgentTile id={a.slug} look={null} size={72} radius={22} /></span>
-          <span className="label absolute right-3 top-3 rounded-full bg-ink px-2 py-1 text-[8.5px] text-[var(--bg)]">New</span>
-          <span className="absolute bottom-4 right-4 max-w-[55%] text-right text-[13px] font-semibold leading-snug text-ink/75">&ldquo;{a.quip}&rdquo;</span>
-        </span>
-      ) : (
-        <span ref={face} className="block transition duration-300 group-hover:-translate-y-1"><AgentTile id={a.slug} look={null} size={156} radius={36} className="!h-[156px] !w-full sm:!h-[168px]" face={120} /></span>
-      )}
+    <div className={`group flex shrink-0 snap-start flex-col ${wide ? "w-[272px]" : "w-[156px] sm:w-[168px]"}`}>
+      <div role="button" tabIndex={0} data-flip aria-pressed={flipped} aria-label={flipped ? `${a.name} details. Tap to flip back.` : `${a.name}. Tap to flip for details.`}
+        onClick={toggle} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } }}
+        className={`flip relative block w-full cursor-pointer select-none rounded-[22px] outline-none focus-visible:ring-4 focus-visible:ring-grape/50 ${h} ${flipped ? "is-flipped" : ""}`}>
+        <div className="flip-inner">
+          <div className="flip-face overflow-hidden rounded-[22px]">
+            {wide ? (
+              <span className="relative block h-full overflow-hidden rounded-[22px] ring-1 ring-line" style={{ background: `linear-gradient(135deg, color-mix(in oklab, var(--color-grape) 30%, var(--card)), var(--card))` }}>
+                <span ref={face} className="absolute bottom-3 left-3 transition duration-300 group-hover:scale-105"><AgentTile id={a.slug} look={null} size={72} radius={22} /></span>
+                <span className="label absolute right-3 top-3 rounded-full bg-ink px-2 py-1 text-[8.5px] text-[var(--bg)]">New</span>
+                <span className="absolute bottom-4 right-4 max-w-[55%] text-right text-[13px] font-semibold leading-snug text-ink/75">&ldquo;{a.quip}&rdquo;</span>
+              </span>
+            ) : (
+              <span ref={face} className="block h-full"><AgentTile id={a.slug} look={null} size={156} radius={22} className="!h-full !w-full" face={120} /></span>
+            )}
+            <span className="label pointer-events-none absolute bottom-2 right-2 rounded-full bg-black/55 px-1.5 py-0.5 text-[8px] text-white/85">flip ↻</span>
+          </div>
+          <div className="flip-face flip-back flex flex-col overflow-hidden rounded-[22px] bg-[#0a0a0a] p-3 text-white ring-1 ring-white/10">
+            <span className="flex items-center justify-between text-[12px]"><span className="flex items-center gap-1 font-bold">{a.rating}<Icon name="star" size={11} className="text-lilac" /></span><span className="text-white/65">{compact(m.hires)} hires</span></span>
+            <span className="label mt-2 text-[8px] text-lilac">Skills</span>
+            <ul className="mt-1 space-y-0.5 text-[12px] leading-tight text-white/85">{a.skills.slice(0, wide ? 2 : 3).map(([k]) => <li key={k} className="truncate">· {k}</li>)}</ul>
+            <span className="mt-auto flex items-center justify-between gap-1 text-[11px]"><span className="rounded-full bg-white/15 px-2 py-0.5 font-bold">{m.free ? "Free" : "Paid add-ons"}</span><span className="truncate text-white/55">{a.speed}</span></span>
+          </div>
+        </div>
+      </div>
       <span className="mt-2.5 flex items-start gap-2">
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-bold text-ink">{a.name}</span>
+        <Link href={href} className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-bold text-ink hover:text-brand-ink">{a.name}</span>
           <span className="block truncate text-[12.5px] text-ink/55">{m.maker} · {m.cat}</span>
-        </span>
+        </Link>
         <span className="pt-0.5"><HireBtn a={a} faceEl={() => face.current} /></span>
       </span>
-      <span className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-ink/70"><span className="flex items-center gap-0.5 font-semibold">{a.rating}<Icon name="star" size={11} className="text-brand-ink" /></span><span className="text-ink/35">·</span>{compact(m.hires)} hires</span>
-    </Link>
+      <span className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-ink/70"><span className="flex items-center gap-0.5 font-semibold">{a.rating}<Icon name="star" size={11} className="text-brand-ink" /></span><span className="text-ink/35">·</span>{compact(m.hires)} hires<Link href={href} className="ml-auto font-bold text-brand-ink hover:underline">Open</Link></span>
+    </div>
   );
 }
 

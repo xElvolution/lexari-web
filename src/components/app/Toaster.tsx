@@ -14,7 +14,7 @@ function Item({ t }: { t: Toast }) {
   useEffect(() => { if (el.current) gsap.fromTo(el.current, { y: 30, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.55, ease: "back.out(1.8)" }); }, []);
   return (
     <div ref={el} role="status" className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-ink py-2.5 pl-2.5 pr-3 text-[var(--bg)] shadow-[0_18px_40px_-12px_rgba(20,0,80,.6)]">
-      {t.face !== undefined && <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-grape">{t.face === "home" ? <AgentFace look={s?.agent?.look} size={30} /> : t.face === null ? <Face size={30} /> : <Face seed={t.face} variant={t.color ? { color: t.color as ColorKey } : undefined} size={30} />}</span>}
+      {t.face !== undefined && <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0a0a0a]">{t.face === "home" ? <AgentFace look={s?.agent?.look} size={30} /> : t.face === null ? <Face size={30} /> : <Face seed={t.face} variant={t.color ? { color: t.color as ColorKey } : undefined} size={30} />}</span>}
       <span className="text-[14px] font-semibold leading-snug">{t.text}</span>
       {t.action && <button onClick={() => { t.action!.run(); dismiss(t.id); }} className="ml-1 rounded-full bg-grape px-3 py-1.5 text-[13px] font-bold text-white transition hover:scale-105">{t.action.label}</button>}
       <button onClick={() => dismiss(t.id)} aria-label="Dismiss" className="ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--bg)]/60 hover:text-base"><Icon name="x" size={14} /></button>

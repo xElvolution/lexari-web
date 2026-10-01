@@ -11,7 +11,10 @@ import { AgentTile } from "../faces";
 import { kindOf, myAgents, nameOf } from "../agents";
 import { closeAgent, useOverlays } from "../overlays";
 import AgentIdCard, { type IdInfo } from "./AgentIdCard";
-import { AvatarPicker, Field, LookPicker, SkillPicker, Toggle, TonePicker, areaCls, inputCls, type Look } from "./fields";
+import { Field, SkillPicker, Toggle, TonePicker, areaCls, inputCls, variant, type Look } from "./fields";
+import FaceCreator from "./FaceCreator";
+import { lookVariant } from "../../avatar";
+import type { AgentLook } from "@/lib/store";
 
 const skillLabel = (id: string) => AGENT_SKILLS.find((k) => k.id === id)?.label ?? id;
 
@@ -20,9 +23,9 @@ export function idInfo(s: State, id: string): IdInfo {
   const desk = Math.max(1, myAgents(s).findIndex((a) => a.id === id) + 1);
   const me = s.profile?.name || s.auth?.label || "You";
   const born = s.born[id] ?? c?.at ?? s.profile?.since ?? Date.now();
-  if (k === "home") return { id, name: nameOf(s, id), role: "Personal agent", idNo: agentIdNo(id), desk, born, maker: me, kind: "Personal", look: s.agent?.look, memory: s.prefs.memory,
+  if (k === "home") return { id, name: nameOf(s, id), role: "Personal agent", idNo: agentIdNo(id), desk, born, maker: me, kind: "Personal", look: s.agent?.look, bg: s.agent?.look && typeof s.agent.look === "object" ? s.agent.look.bg : undefined, memory: s.prefs.memory,
     chips: s.meta.home?.skills?.length ? s.meta.home.skills.map(skillLabel) : ["Own computer", "Lasting memory", "Can hire help"] };
-  if (k === "custom") return { id, name: c?.name ?? "Agent", role: c?.role || "Custom agent", idNo: agentIdNo(id), desk, born, maker: me, kind: "Custom", look: null, memory: c?.memory ?? true,
+  if (k === "custom") return { id, name: c?.name ?? "Agent", role: c?.role || "Custom agent", idNo: agentIdNo(id), desk, born, maker: me, kind: "Custom", look: null, bg: c?.bg, memory: c?.memory ?? true,
     chips: c?.skills.length ? c.skills.map(skillLabel) : ["Made by you"] };
   return { id, name: nameOf(s, id), role: sp?.job ?? "Specialist", idNo: agentIdNo(id), desk, born, maker: sp ? storeMeta(sp).maker : "Maker", kind: "Hired", look: null, memory: s.meta[id]?.memory ?? true, chips: sp?.tools ?? [] };
 }
@@ -61,8 +64,8 @@ function Panel({ s, id }: { s: State; id: string }) {
   const [tone, setTone] = useState<ToneId>(k === "home" ? s.agent?.tone ?? "short" : c?.tone ?? "warm");
   const [skills, setSkills] = useState<string[]>(k === "home" ? s.meta.home?.skills ?? ["web", "files", "code", "calendar"] : c?.skills ?? []);
   const [memory, setMemory] = useState(info.memory);
-  const [lookHome, setLookHome] = useState<number | null>(s.agent?.look ?? null);
-  const [look, setLook] = useState<Look>(c ? { shape: c.shape, color: c.color, eyes: c.eyes, mouth: c.mouth } : { shape: "round", color: "purple", eyes: "oval", mouth: "smile" });
+  const [lookHome, setLookHome] = useState<AgentLook>(s.agent?.look ?? null);
+  const [look, setLook] = useState<Look>(c ? { shape: c.shape, color: c.color, eyes: c.eyes, mouth: c.mouth, extra: c.extra, blush: c.blush ?? (c.tone === "warm" || c.tone === "playful"), brows: c.brows, orbit: c.orbit, dots: c.dots, bg: c.bg } : { shape: "round", color: "purple", eyes: "oval", mouth: "smile" });
   const [nick, setNick] = useState(s.meta[id]?.nick ?? "");
   const [notes, setNotes] = useState(s.meta[id]?.notes ?? "");
   const [confirm, setConfirm] = useState(false);
@@ -86,9 +89,9 @@ function Panel({ s, id }: { s: State; id: string }) {
   const chat = () => { closeAgent(); router.push(`/app?c=${id}`); };
 
   // what the card shows while you edit
-  const preview: IdInfo = tab === "edit" && k !== "hired" ? { ...info, name: name.trim() || info.name, role: k === "custom" ? role.trim() || "Custom agent" : info.role, look: k === "home" ? lookHome : info.look, memory, chips: skills.length ? skills.map(skillLabel) : info.chips }
+  const preview: IdInfo = tab === "edit" && k !== "hired" ? { ...info, name: name.trim() || info.name, role: k === "custom" ? role.trim() || "Custom agent" : info.role, look: k === "home" ? lookHome : info.look, bg: k === "home" ? (lookHome && typeof lookHome === "object" ? lookHome.bg : undefined) : look.bg, memory, chips: skills.length ? skills.map(skillLabel) : info.chips }
     : tab === "edit" && k === "hired" ? { ...info, name: nick.trim() || sp?.name || info.name, memory } : info;
-  const faceEl = tab === "edit" && k === "custom" ? <Face variant={{ ...look, extra: look.shape === "robot" ? "antenna" : "none", blush: tone === "warm" || tone === "playful" }} size={96} /> : undefined;
+  const faceEl = tab === "edit" && k === "custom" ? <Face variant={variant(look)} size={96} animated /> : undefined;
 
   const tabBtn = (t: "about" | "edit", label: string) => <button role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`h-9 flex-1 rounded-full text-[14px] font-bold transition ${tab === t ? "bg-card text-ink shadow-[0_1px_0_var(--line),0_0_0_1px_var(--line)]" : "text-ink/60 hover:text-ink"}`}>{label}</button>;
 
@@ -146,7 +149,7 @@ function Panel({ s, id }: { s: State; id: string }) {
                       <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 16))} className={inputCls} /></Field>
                       {k === "custom" && <Field label="Role"><input value={role} onChange={(e) => setRole(e.target.value.slice(0, 28))} placeholder="Custom agent" className={inputCls} /></Field>}
                     </div>
-                    <Field label="Avatar">{k === "home" ? <LookPicker look={lookHome} onChange={setLookHome} /> : <AvatarPicker v={look} onChange={setLook} compact />}</Field>
+                    <div><span className="label text-[9.5px] text-ink/60">Face</span><div className="mt-1.5">{k === "home" ? <FaceCreator value={lookVariant(lookHome)} onChange={setLookHome} name={name.trim() || info.name} /> : <FaceCreator value={variant(look)} onChange={(f) => setLook(f as Look)} name={name.trim() || info.name} />}</div></div>
                     <Field label="Instructions" hint="What it should always do"><textarea value={about} onChange={(e) => setAbout(e.target.value.slice(0, 400))} placeholder="Keep answers short. Always link sources." className={areaCls} /></Field>
                     <Field label="Personality"><TonePicker tone={tone} onChange={setTone} /></Field>
                     <div><span className="label text-[9.5px] text-ink/60">Skills</span><div className="mt-1.5"><SkillPicker skills={skills} onChange={setSkills} /></div></div>

@@ -4,7 +4,7 @@
  * product can be shown moving. Nothing talks to a server yet.
  * House rules: plain words, no em dashes, no prices or payment talk.
  */
-import type { ColorKey, Eyes, Mouth, Shape, Variant } from "@/components/avatar";
+import type { Brows, ColorKey, Extra, Eyes, Mouth, Orbit, Shape, Variant } from "@/components/avatar";
 
 export const DEMO_LABEL = "Demo data";
 
@@ -133,6 +133,8 @@ export const SPECIALISTS: Specialist[] = [
 export type CustomAgent = {
   id: string; name: string; role: string; about: string; template: string | null;
   shape: Shape; color: ColorKey; eyes: Eyes; mouth: Mouth; tone: ToneId; skills: string[]; memory: boolean; at: number;
+  /** from the face creator (optional; older agents render as before) */
+  extra?: Extra; blush?: boolean; brows?: Brows; orbit?: Orbit; dots?: number; bg?: string;
 };
 export const AGENT_SKILLS = [
   { id: "web", label: "Browse the web", desc: "Open pages, read and compare them." },
@@ -167,7 +169,7 @@ export function customToSpecialist(c: CustomAgent): Specialist {
     skills: c.skills.map((id, i) => [AGENT_SKILLS.find((k) => k.id === id)?.label ?? id, 92 - i * 4] as [string, number]),
     tools: ["Browser", "Files", "Terminal"].slice(0, Math.max(1, Math.min(3, c.skills.length))),
     examples: t?.examples ?? ["Tell me what you can do", "Plan my week with me"], words: t?.words ?? [], review: [],
-    face: { shape: c.shape, color: c.color, eyes: c.eyes, mouth: c.mouth, extra: c.shape === "robot" ? "antenna" : "none", blush: c.tone === "warm" || c.tone === "playful" },
+    face: { shape: c.shape, color: c.color, eyes: c.eyes, mouth: c.mouth, extra: c.extra ?? (c.shape === "robot" ? "antenna" : "none"), blush: c.blush ?? (c.tone === "warm" || c.tone === "playful"), brows: c.brows, orbit: c.orbit, dots: c.dots, bg: c.bg },
     custom: true,
   };
 }

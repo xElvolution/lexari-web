@@ -6,6 +6,7 @@
   --alt: #f5f2ff;
   --card: #ffffff;
   --tint: #ece6ff;
+  --face-tile: #ffffff; /* plain tile behind agent faces */
   --ink: #0a0a0a;
   --line: rgba(10, 10, 10, 0.11);
   --brand-ink: #5b2bff;
@@ -19,6 +20,7 @@
   --alt: #0b0915;
   --card: #13101f;
   --tint: #1d1731;
+  --face-tile: #0a0a0a;
   --ink: #ffffff;
   --line: rgba(255, 255, 255, 0.13);
   --brand-ink: #a58bff;
@@ -103,7 +105,7 @@ body { font-family: var(--font-sans); color: var(--ink); background: var(--bg); 
 /* roster card flip */
 .flip { perspective: 1200px; }
 .flip-inner { position: relative; height: 100%; transition: transform 0.7s cubic-bezier(0.3, 1.3, 0.4, 1); transform-style: preserve-3d; }
-.flip:hover .flip-inner, .flip.is-flipped .flip-inner { transform: rotateY(180deg); }
+.flip.is-flipped .flip-inner { transform: rotateY(180deg); } /* tap toggles; no hover flip so a second tap always flips back */
 .flip-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .flip-back { transform: rotateY(180deg); }
 
