@@ -5,14 +5,14 @@
  */
 export const PALETTE = {
   orange: { fill: "#ff8a3d", shade: "#d65f16", fc: "#0a0a0a" },
-  blue: { fill: "#3b82f6", shade: "#1e4fd6", fc: "#ffffff" },
+  blue: { fill: "#3b82f6", shade: "#1e4fd6", fc: "#0a0a0a" },
   green: { fill: "#34d399", shade: "#079669", fc: "#0a0a0a" },
   yellow: { fill: "#fcd34d", shade: "#d19b04", fc: "#0a0a0a" },
-  red: { fill: "#f45b5b", shade: "#c42a2a", fc: "#ffffff" },
+  red: { fill: "#f45b5b", shade: "#c42a2a", fc: "#0a0a0a" },
   teal: { fill: "#2dd4bf", shade: "#0d8f84", fc: "#0a0a0a" },
   pink: { fill: "#f9a8d4", shade: "#d9579e", fc: "#0a0a0a" },
   lilac: { fill: "#c9b8ff", shade: "#8f6bff", fc: "#0a0a0a" },
-  purple: { fill: "#8b5cf6", shade: "#5b2bff", fc: "#ffffff" },
+  purple: { fill: "#8b5cf6", shade: "#5b2bff", fc: "#0a0a0a" },
   sky: { fill: "#7dd3fc", shade: "#0b84c4", fc: "#0a0a0a" },
 } as const;
 export type ColorKey = keyof typeof PALETTE;

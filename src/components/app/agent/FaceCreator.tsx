@@ -52,16 +52,17 @@ export default function FaceCreator({ value, onChange, name, wide = false, previ
   return (
     <div className="space-y-4">
       {preview && (
-        <div className="relative overflow-hidden rounded-[26px] bg-[#0a0a0a] p-3 text-white ring-1 ring-white/10">
-          <div className="flex items-start justify-between gap-2">
-            <span className="label pt-1.5 text-[9px] text-white/55">Live preview{name ? ` · ${name}` : ""}</span>
+        <div data-face-preview data-bg={v.bg ?? "black"} className="relative overflow-hidden rounded-[26px] bg-[#0a0a0a] p-3 text-white ring-1 ring-white/10">
+          <BgArt id={v.bg ?? "black"} />
+          <div className="relative flex items-start justify-between gap-2">
+            <span className="label mt-1 rounded-full bg-black/45 px-2 py-1 text-[9px] text-white/80 backdrop-blur-sm">Live preview{name ? ` · ${name}` : ""}</span>
             <div className="flex gap-1.5">
-              <button type="button" onClick={undo} disabled={!hist.current.length} aria-label="Undo" title="Undo" className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 transition hover:bg-white/20 disabled:opacity-35"><Icon name="undo" size={16} /></button>
+              <button type="button" onClick={undo} disabled={!hist.current.length} aria-label="Undo" title="Undo" className="grid h-9 w-9 place-items-center rounded-xl bg-black/45 backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-35"><Icon name="undo" size={16} /></button>
               <button type="button" onClick={shuffle} className="flex h-9 items-center gap-1.5 rounded-xl bg-grape px-3 text-[13px] font-bold shadow-[0_3px_0_#3514b0] transition hover:-translate-y-0.5"><Dice />Randomize</button>
             </div>
           </div>
-          <div className="grid place-items-center py-1"><Face variant={v} size={150} state={state} animated /></div>
-          <div className="grid grid-cols-4 gap-1 rounded-2xl bg-white/10 p-1" role="radiogroup" aria-label="Preview state">
+          <div className="relative grid place-items-center py-1"><Face variant={v} size={150} state={state} animated /></div>
+          <div className="relative grid grid-cols-4 gap-1 rounded-2xl bg-black/45 p-1 backdrop-blur-sm" role="radiogroup" aria-label="Preview state">
             {STATES.map(([s, l]) => <button type="button" key={s} role="radio" aria-checked={state === s} onClick={() => setState(s)} className={`h-8 rounded-xl text-[13px] font-bold transition ${state === s ? "bg-white text-[#0a0a0a]" : "text-white/70 hover:text-white"}`}>{l}</button>)}
           </div>
         </div>
