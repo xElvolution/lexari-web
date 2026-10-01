@@ -1,11 +1,10 @@
 "use client";
 
+import { CAST } from "@/lib/glyph/cast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import Face from "../../Face";
-import { PALETTE } from "../../avatar";
 import { AGENT_TEMPLATES, SPECIALISTS, STORE_CATS, compact, storeMeta, type StoreCat, type ToneId } from "@/content/appData";
 import { createAgent, planOf, seatsLeft, useApp } from "@/lib/store";
 import Icon from "../Icon";
@@ -56,19 +55,19 @@ function Dialog({ mode: start, cat: startCat }: { mode: "choose" | "create" | "h
 }
 
 function Choose({ onPick }: { onPick: (m: "create" | "hire") => void }) {
-  const faces = [{ seed: 16, color: "blue" }, { seed: 27, color: "yellow" }, { seed: 49, color: "pink" }] as const;
+  const faces = [CAST[1], CAST[3], CAST[6]];
   return (
     <div className="grid gap-3 pb-4 sm:grid-cols-2">
       <button onClick={() => onPick("create")} className="group relative overflow-hidden rounded-[26px] bg-grape p-5 text-left text-white shadow-[0_18px_40px_-20px_rgba(91,43,255,.9)] transition hover:-translate-y-0.5">
         <span className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full border border-white/15" />
-        <span className="relative grid h-[88px] w-[88px] place-items-center rounded-[26px] bg-white/15 transition duration-300 group-hover:rotate-[-4deg] group-hover:scale-105"><Face variant={{ shape: "blob", color: "lilac", eyes: "happy", mouth: "grin", extra: "none", blush: true }} size={70} /></span>
+        <span className="relative grid h-[88px] w-[88px] place-items-center rounded-[26px] bg-white/15 transition duration-300 group-hover:rotate-[-4deg] group-hover:scale-105"><GlyphFace dna={CAST[9]} size={70} /></span>
         <span className="relative mt-4 block text-[20px] font-bold">Create an agent</span>
         <span className="relative mt-1 block text-[14px] leading-snug text-white/80">Name it, tell it what to do, pick its face and personality.</span>
         <span className="relative mt-4 inline-flex items-center gap-1.5 text-[14px] font-bold">Start building <Icon name="arrow" size={16} className="transition group-hover:translate-x-1" /></span>
       </button>
       <button onClick={() => onPick("hire")} className="group relative overflow-hidden rounded-[26px] bg-tint p-5 text-left ring-1 ring-line transition hover:-translate-y-0.5 hover:ring-grape/50">
         <span className="relative flex h-[88px] items-center">
-          {faces.map((f, i) => <span key={i} className="-ml-3 grid h-[64px] w-[64px] place-items-center rounded-[20px] ring-4 ring-[var(--tint)] transition duration-300 first:ml-0 group-hover:-translate-y-1" style={{ background: `color-mix(in oklab, ${PALETTE[f.color].fill} 30%, var(--card))`, transitionDelay: `${i * 50}ms` }}><Face seed={f.seed} variant={{ color: f.color }} size={50} /></span>)}
+          {faces.map((f, i) => <span key={i} className="-ml-3 grid h-[64px] w-[64px] place-items-center rounded-[20px] ring-4 ring-[var(--tint)] transition duration-300 first:ml-0 group-hover:-translate-y-1" style={{ background: faceTint(f, 30), transitionDelay: `${i * 50}ms` }}><GlyphFace dna={f} size={50} /></span>)}
         </span>
         <span className="mt-4 block text-[20px] font-bold text-ink">Hire an agent</span>
         <span className="mt-1 block text-[14px] leading-snug text-ink/65">Tell us what you need and get three picks from the marketplace.</span>

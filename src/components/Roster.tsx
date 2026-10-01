@@ -1,17 +1,15 @@
 "use client";
 
+import LiveGlyph from "./glyph/LiveGlyph";
+import { CAST, HOUSE, castFace } from "@/lib/glyph/cast";
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { copy, APP } from "@/content/copy";
 import SectionIntro from "./SectionIntro";
-import Face from "./Face";
-import type { ColorKey } from "./avatar";
 
 gsap.registerPlugin(ScrollTrigger);
 const R = copy.roster;
-// one distinct color per card so the roster reads as a varied team
-const ROSTER_COLORS: ColorKey[] = ["orange", "blue", "green", "yellow", "red", "teal", "pink", "sky"];
 type Agent = (typeof R.agents)[number];
 
 function Card({ a, i }: { a: Agent; i: number }) {
@@ -21,7 +19,7 @@ function Card({ a, i }: { a: Agent; i: number }) {
       <div className="flip-inner">
         <div className="flip-face flex flex-col overflow-hidden rounded-[28px] bg-card text-ink shadow-[0_10px_0_#3514b0]">
           <div className="carpet relative grid h-[190px] place-items-center bg-tint">
-            <Face seed={i * 11 + 5} variant={{ color: ROSTER_COLORS[i % ROSTER_COLORS.length] }} size={150} />
+            <LiveGlyph dna={castFace(i)} size={150} beat={i} />
             <span className="display absolute left-4 top-3 text-[26px] text-ink/30">#{String(i + 1).padStart(2, "0")}</span>
             <span className="label absolute right-4 top-4 rounded-full bg-ink px-2 py-1 text-[9px] text-base">★ {a.rating}</span>
           </div>

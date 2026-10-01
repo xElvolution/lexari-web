@@ -1,5 +1,7 @@
 "use client";
 
+import LiveGlyph from "@/components/glyph/LiveGlyph";
+import { HOUSE } from "@/lib/glyph/cast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -104,7 +106,7 @@ export default function SignIn() {
         </div>
         {/* a little welcome committee */}
         <div className="pointer-events-none absolute right-[-30px] top-[64px] hidden sm:block lg:right-10 lg:top-[14%]">
-          <div data-float className="bob grid h-36 w-36 place-items-center rounded-[34px] bg-[#0a0a0a] shadow-[0_20px_40px_-12px_rgba(0,0,0,.5)] lg:h-44 lg:w-44"><Face size={130} track /></div>
+          <div data-float className="bob grid h-36 w-36 place-items-center rounded-[34px] bg-[#0a0a0a] shadow-[0_20px_40px_-12px_rgba(0,0,0,.5)] lg:h-44 lg:w-44"><LiveGlyph dna={HOUSE} size={130} /></div>
         </div>
         <div className="pointer-events-none relative z-10 mt-8 flex gap-2 lg:mt-10">
           {["scout", "quill", "tally", "frame", "patch"].map((s, i) => <span key={s} data-float className="grid h-12 w-12 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/25 backdrop-blur-sm" style={{ animationDelay: `${i * 0.3}s` }}><SpecFace slug={s} size={40} /></span>)}

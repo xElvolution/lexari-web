@@ -4,6 +4,7 @@
  * product can be shown moving. Nothing talks to a server yet.
  * House rules: plain words, no em dashes, no prices or payment talk.
  */
+import { castFace } from "@/lib/glyph/cast";
 import type { FaceDNA } from "@/lib/glyph/face";
 import type { ColorKey, Eyes, Mouth, Shape, Variant } from "@/components/avatar";
 
@@ -67,7 +68,7 @@ export type Specialist = {
 const ROSTER_COLORS: ColorKey[] = ["orange", "blue", "green", "yellow", "red", "teal", "pink", "sky"];
 /** Same seeds and colors as the landing roster, so an agent looks the same everywhere. */
 const EXTRA_COLORS: ColorKey[] = ["purple", "lilac", "red", "green"];
-const face = (i: number) => ({ seed: i * 11 + 5, color: i < 8 ? ROSTER_COLORS[i] : EXTRA_COLORS[(i - 8) % 4] });
+const face = (i: number) => ({ seed: i * 11 + 5, color: i < 8 ? ROSTER_COLORS[i] : EXTRA_COLORS[(i - 8) % 4], glyph: castFace(i) });
 
 export const SPECIALISTS: Specialist[] = [
   { slug: "scout", name: "Scout", job: "Web research", cat: "Research", quip: "I read so you do not have to.", back: "Reads dozens of pages and returns the three facts that matter, with links.", rating: 4.9, jobs: 1840, reviews: 312, ...face(0), speed: "Usually done in 10 min",

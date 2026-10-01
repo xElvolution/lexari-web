@@ -1,5 +1,6 @@
 "use client";
 
+import { HOUSE } from "@/lib/glyph/cast";
 import Face from "../Face";
 import GlyphFace from "../glyph/GlyphFace";
 import { isFace } from "@/lib/glyph/face";
@@ -10,6 +11,7 @@ import { tileBg } from "./agents";
 
 /** Your agent's face. look null is the house face from the landing badge. */
 export function AgentFace({ look, size = 48, track = false, className = "", animated = false, state }: { look: AgentLook | undefined; size?: number; track?: boolean; className?: string; animated?: boolean; state?: AvatarState }) {
+  if (look === null || look === undefined) return <GlyphFace dna={HOUSE} size={size} animated={animated || track} state={state} className={className} />;
   if (isFace(look)) return <GlyphFace dna={look} size={size} animated={animated || track} state={state} className={className} />;
   return look === null || look === undefined ? <Face size={size} track={track} className={className} /> : <Face seed={look} size={size} track={track} className={className} />;
 }
