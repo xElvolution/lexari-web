@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
+import Face from "../../Face";
 import { AGENT_SKILLS, TONES, agentIdNo, specialistBySlug, storeMeta, type ToneId } from "@/content/appData";
 import { deleteCustom, release, setMeta, setPrefs, toast, updateAgent, updateCustom, useApp, type State } from "@/lib/store";
 import Icon from "../Icon";
@@ -10,11 +11,7 @@ import { AgentTile } from "../faces";
 import { kindOf, myAgents, nameOf } from "../agents";
 import { closeAgent, useOverlays } from "../overlays";
 import AgentIdCard, { type IdInfo } from "./AgentIdCard";
-import { Field, SkillPicker, Toggle, TonePicker, areaCls, inputCls } from "./fields";
-import GlyphCreator from "../../glyph/GlyphCreator";
-import GlyphFace from "../../glyph/GlyphFace";
-import { defaultFace, isFace, legacyColor, type FaceDNA } from "@/lib/glyph/face";
-import type { AgentLook } from "@/lib/store";
+import { AvatarPicker, Field, LookPicker, SkillPicker, Toggle, TonePicker, areaCls, inputCls, type Look } from "./fields";
 
 const skillLabel = (id: string) => AGENT_SKILLS.find((k) => k.id === id)?.label ?? id;
 
@@ -64,12 +61,8 @@ function Panel({ s, id }: { s: State; id: string }) {
   const [tone, setTone] = useState<ToneId>(k === "home" ? s.agent?.tone ?? "short" : c?.tone ?? "warm");
   const [skills, setSkills] = useState<string[]>(k === "home" ? s.meta.home?.skills ?? ["web", "files", "code", "calendar"] : c?.skills ?? []);
   const [memory, setMemory] = useState(info.memory);
-  const [lookHome, setLookHome] = useState<AgentLook>(s.agent?.look ?? null);
-  const [faceC, setFaceC] = useState<FaceDNA | null>(c?.face ?? null);
-  // agents with an older face start the creator from a seeded Glyph face; nothing changes until you edit it
-  const startFace = useMemo(() => defaultFace(k === "home" ? `home:${(s.agent?.name ?? "agent").toLowerCase()}` : id, k === "home" ? s.agent?.tone : c?.tone), [k, id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const homeFace = isFace(lookHome) ? lookHome : startFace;
-  const customFace = faceC ?? startFace;
+  const [lookHome, setLookHome] = useState<number | null>(s.agent?.look ?? null);
+  const [look, setLook] = useState<Look>(c ? { shape: c.shape, color: c.color, eyes: c.eyes, mouth: c.mouth } : { shape: "round", color: "purple", eyes: "oval", mouth: "smile" });
   const [nick, setNick] = useState(s.meta[id]?.nick ?? "");
   const [notes, setNotes] = useState(s.meta[id]?.notes ?? "");
   const [confirm, setConfirm] = useState(false);
@@ -80,9 +73,9 @@ function Panel({ s, id }: { s: State; id: string }) {
       setMeta("home", { about: about.trim(), skills });
       setPrefs({ memory });
     } else if (k === "custom") {
-      updateCustom(id, { name: name.trim() || c!.name, role: role.trim(), about: about.trim(), tone, skills, memory, ...(faceC ? { face: faceC, color: legacyColor(faceC.color.body) } : {}) });
+      updateCustom(id, { name: name.trim() || c!.name, role: role.trim(), about: about.trim(), tone, skills, memory, ...look });
     } else setMeta(id, { nick: nick.trim(), notes: notes.trim(), memory });
-    toast({ text: `Saved. ${k === "hired" ? nick.trim() || sp?.name : name.trim() || info.name} is up to date.`, face: k === "home" ? "home" : sp?.seed, color: sp?.color, who: k === "custom" ? id : undefined });
+    toast({ text: `Saved. ${k === "hired" ? nick.trim() || sp?.name : name.trim() || info.name} is up to date.`, face: k === "home" ? "home" : sp?.seed, color: sp?.color });
   };
   const remove = () => {
     if (k === "custom") deleteCustom(id); else release(id);
@@ -95,7 +88,7 @@ function Panel({ s, id }: { s: State; id: string }) {
   // what the card shows while you edit
   const preview: IdInfo = tab === "edit" && k !== "hired" ? { ...info, name: name.trim() || info.name, role: k === "custom" ? role.trim() || "Custom agent" : info.role, look: k === "home" ? lookHome : info.look, memory, chips: skills.length ? skills.map(skillLabel) : info.chips }
     : tab === "edit" && k === "hired" ? { ...info, name: nick.trim() || sp?.name || info.name, memory } : info;
-  const faceEl = tab === "edit" && k === "custom" && faceC ? <GlyphFace dna={faceC} size={96} animated /> : tab === "edit" && k === "home" && isFace(lookHome) ? <GlyphFace dna={lookHome} size={96} animated /> : undefined;
+  const faceEl = tab === "edit" && k === "custom" ? <Face variant={{ ...look, extra: look.shape === "robot" ? "antenna" : "none", blush: tone === "warm" || tone === "playful" }} size={96} /> : undefined;
 
   const tabBtn = (t: "about" | "edit", label: string) => <button role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`h-9 flex-1 rounded-full text-[14px] font-bold transition ${tab === t ? "bg-card text-ink shadow-[0_1px_0_var(--line),0_0_0_1px_var(--line)]" : "text-ink/60 hover:text-ink"}`}>{label}</button>;
 
@@ -153,7 +146,7 @@ function Panel({ s, id }: { s: State; id: string }) {
                       <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 16))} className={inputCls} /></Field>
                       {k === "custom" && <Field label="Role"><input value={role} onChange={(e) => setRole(e.target.value.slice(0, 28))} placeholder="Custom agent" className={inputCls} /></Field>}
                     </div>
-                    <div><span className="label text-[9.5px] text-ink/60">Face</span><div className="mt-1.5">{k === "home" ? <GlyphCreator value={homeFace} onChange={setLookHome} name={name.trim() || info.name} preview={false} /> : <GlyphCreator value={customFace} onChange={setFaceC} name={name.trim() || info.name} preview={false} />}</div></div>
+                    <Field label="Avatar">{k === "home" ? <LookPicker look={lookHome} onChange={setLookHome} /> : <AvatarPicker v={look} onChange={setLook} compact />}</Field>
                     <Field label="Instructions" hint="What it should always do"><textarea value={about} onChange={(e) => setAbout(e.target.value.slice(0, 400))} placeholder="Keep answers short. Always link sources." className={areaCls} /></Field>
                     <Field label="Personality"><TonePicker tone={tone} onChange={setTone} /></Field>
                     <div><span className="label text-[9.5px] text-ink/60">Skills</span><div className="mt-1.5"><SkillPicker skills={skills} onChange={setSkills} /></div></div>

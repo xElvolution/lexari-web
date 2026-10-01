@@ -12,10 +12,7 @@ import Icon from "../Icon";
 import { AgentTile } from "../faces";
 import { HireBtn, StarRow } from "../market/parts";
 import { closeAdd, useOverlays } from "../overlays";
-import { Field, SkillPicker, TonePicker, areaCls, inputCls } from "./fields";
-import GlyphCreator, { faceTint } from "../../glyph/GlyphCreator";
-import GlyphFace from "../../glyph/GlyphFace";
-import { defaultFace, legacyColor, type FaceDNA } from "@/lib/glyph/face";
+import { AvatarPicker, Field, SkillPicker, TonePicker, areaCls, inputCls, type Look } from "./fields";
 
 const STEPS = ["Basics", "Look", "Personality"];
 
@@ -86,7 +83,7 @@ function Create() {
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [about, setAbout] = useState("");
-  const [face, setFace] = useState<FaceDNA>(() => defaultFace(`c-draft-${Math.random().toString(36).slice(2, 9)}`, "warm"));
+  const [look, setLook] = useState<Look>({ shape: "blob", color: "purple", eyes: "happy", mouth: "smile" });
   const [tone, setTone] = useState<ToneId>("warm");
   const [skills, setSkills] = useState<string[]>(["web", "files"]);
   const [memory, setMemory] = useState(true);
@@ -97,13 +94,13 @@ function Create() {
     setTpl(id);
     const t = AGENT_TEMPLATES.find((x) => x.id === id);
     if (!t) { setRole(""); setAbout(""); setSkills([]); return; }
-    setRole(t.role); setAbout(t.about); setSkills([...t.skills]); setFace((f) => ({ ...f, color: { ...f.color, body: t.color } }));
+    setRole(t.role); setAbout(t.about); setSkills([...t.skills]); setLook((l) => ({ ...l, shape: t.shape, color: t.color }));
   };
   const make = () => {
     if (!nameOk || busy) return;
     setBusy(true);
     setTimeout(() => {
-      const id = createAgent({ name: name.trim(), role: role.trim() || "Custom agent", about: about.trim(), template: tpl, shape: "round", color: legacyColor(face.color.body), eyes: "oval", mouth: "smile", face: { ...face, personality: tone }, tone, skills, memory });
+      const id = createAgent({ name: name.trim(), role: role.trim() || "Custom agent", about: about.trim(), template: tpl, ...look, tone, skills, memory });
       closeAdd();
       router.push(`/app?c=${id}`);
     }, 1300);
@@ -111,8 +108,8 @@ function Create() {
 
   if (busy) return (
     <div className="grid place-items-center py-14 text-center">
-      <span className="relative grid h-[120px] w-[120px] place-items-center rounded-[34px]" style={{ background: faceTint(face, 26) }}>
-        <span><GlyphFace dna={face} state="thinking" size={96} animated /></span>
+      <span className="relative grid h-[120px] w-[120px] place-items-center rounded-[34px]" style={{ background: `color-mix(in oklab, ${PALETTE[look.color].fill} 26%, var(--card))` }}>
+        <span className="bob"><Face variant={{ ...look, extra: look.shape === "robot" ? "antenna" : "none", blush: false }} size={96} /></span>
         <span className="absolute -inset-2 animate-spin rounded-[40px] border-4 border-transparent border-t-grape" />
       </span>
       <p className="mt-6 text-[18px] font-bold text-ink">Setting up {name.trim()}&apos;s desk…</p>
@@ -150,7 +147,7 @@ function Create() {
           <Field label="What should it do?" hint="Instructions it always follows"><textarea value={about} onChange={(e) => setAbout(e.target.value.slice(0, 400))} placeholder="Every Monday, read my inbox and tell me the three things that need me. Keep it short." className={areaCls} /></Field>
         </div>
       )}
-      {step === 1 && <GlyphCreator value={face} onChange={setFace} name={name.trim() || undefined} previewSize={130} wide />}
+      {step === 1 && <AvatarPicker v={look} onChange={setLook} />}
       {step === 2 && (
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-5">
@@ -160,7 +157,7 @@ function Create() {
               <button type="button" role="switch" aria-checked={memory} aria-label="Memory" onClick={() => setMemory(!memory)} className={`relative h-7 w-12 shrink-0 rounded-full transition ${memory ? "bg-grape" : "bg-ink/20"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${memory ? "left-6" : "left-1"}`} /></button>
             </div>
             <div className="flex items-center gap-3 rounded-2xl p-3.5 ring-1 ring-line">
-              <AgentPreview name={name} role={role} face={face} />
+              <AgentPreview name={name} role={role} look={look} />
             </div>
           </div>
           <div><span className="label text-[9.5px] text-ink/60">Skills · optional</span><div className="mt-1.5"><SkillPicker skills={skills} onChange={setSkills} /></div></div>
@@ -178,10 +175,10 @@ function Create() {
   );
 }
 
-function AgentPreview({ name, role, face }: { name: string; role: string; face: FaceDNA }) {
+function AgentPreview({ name, role, look }: { name: string; role: string; look: Look }) {
   return (
     <>
-      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl" style={{ background: faceTint(face) }}><GlyphFace dna={face} size={40} /></span>
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl" style={{ background: `color-mix(in oklab, ${PALETTE[look.color].fill} 24%, var(--card))` }}><Face variant={{ ...look, extra: look.shape === "robot" ? "antenna" : "none", blush: false }} size={40} /></span>
       <span className="min-w-0"><span className="block truncate text-[15px] font-bold text-ink">{name.trim() || "Your new agent"}</span><span className="block truncate text-[12.5px] text-ink/55">{role.trim() || "Custom agent"} · joins your strip</span></span>
     </>
   );

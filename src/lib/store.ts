@@ -5,7 +5,6 @@
  * your agent's name sticks, hiring fills a seat, jobs keep running across pages.
  * There is no server. Everything here is mocked on purpose.
  */
-import type { FaceDNA } from "@/lib/glyph/face";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   DEMO_ADDRESS, DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, cannedReply, groupReply, registerCustom, scriptFor, shortAddr, walletFor,
@@ -37,9 +36,7 @@ export const DEFAULT_PREFS: Prefs = {
   notif: { replies: true, groups: true, calls: true, wallet: true, cards: true, digest: false, product: false },
 };
 export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number };
-/** look: a number is one of the original generated faces (null = house face); an object is a Glyph face DNA. */
-export type AgentLook = number | null | FaceDNA;
-export type Agent = { name: string; look: AgentLook; you: string; role: string; tone: ToneId };
+export type Agent = { name: string; look: number | null; you: string; role: string; tone: ToneId };
 export type Auth = { method: "google" | "wallet"; label: string; sub: string; wallet?: WalletId };
 export type State = {
   v: 1; auth: Auth | null; links: { google: boolean; wallet: boolean };
@@ -103,7 +100,7 @@ export function useNow(ms = 500) {
 }
 
 /* ---------- toasts (not saved) ---------- */
-export type Toast = { id: string; text: string; face?: number | null | "home"; color?: string; who?: string; action?: { label: string; run: () => void } };
+export type Toast = { id: string; text: string; face?: number | null | "home"; color?: string; action?: { label: string; run: () => void } };
 let toasts: Toast[] = [];
 const tsubs = new Set<() => void>();
 export function toast(t: Omit<Toast, "id">) {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { DEMO_ADDRESS, DEMO_GOOGLE, TONES, shortAddr } from "@/content/appData";
+import { DEMO_ADDRESS, DEMO_GOOGLE, LOOKS, TONES, shortAddr } from "@/content/appData";
 import {
   agentName, clearChats, exportData, setActive, linkMethod, planOf, resetAll, setNotif, setPrefs, signOut, startTour, toast, updateAgent, useApp, type State,
 } from "@/lib/store";
@@ -115,9 +115,10 @@ function Personal({ s }: { s: State }) {
             <div className="sm:col-span-2"><button disabled={!dirty || !name.trim()} onClick={() => { updateAgent({ name: name.trim(), you: you.trim() }); toast({ text: "Saved", face: "home" }); }} className="btn btn-brand btn-sm !h-10 disabled:opacity-40 disabled:shadow-none">Save</button></div>
           </div>
         </div>
-        <Row title="Face" desc="Body, eyes, mouth, accents and colours, in the face creator. It changes everywhere.">
-          <button onClick={() => openAgent("home")} className="btn btn-line btn-sm !h-10 shrink-0 text-ink"><Icon name="edit" size={15} />Edit face</button>
-        </Row>
+        <Row title="Face" desc="Pick a different generated face. It changes everywhere." />
+        <div className="grid grid-cols-6 gap-2 pb-5 sm:grid-cols-12">
+          {LOOKS.map((l) => { const on = a.look === l; return <button key={String(l)} onClick={() => updateAgent({ look: l })} aria-pressed={on} aria-label={l === null ? "House face" : `Face ${l}`} className={`grid aspect-square place-items-center rounded-2xl transition ${on ? "bg-grape ring-2 ring-grape ring-offset-2 ring-offset-[var(--card)]" : "bg-tint hover:bg-lilac/40"}`}><AgentFace look={l} size={36} /></button>; })}
+        </div>
         <Row title="Tone" desc={`How ${agentName(s)} talks to you.`}>
           <Select label="Tone" value={a.tone} options={TONES.map((t) => [t.id, t.label] as [string, string])} onChange={(v) => updateAgent({ tone: v as typeof a.tone })} />
         </Row>
