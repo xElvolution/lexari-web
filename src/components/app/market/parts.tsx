@@ -28,38 +28,62 @@ export function StarRow({ v, size = 12 }: { v: number; size?: number }) {
   return <span className="inline-flex items-center gap-0.5 text-brand-ink" aria-label={`${v} out of 5`}>{[1, 2, 3, 4, 5].map((i) => <Icon key={i} name="star" size={size} className={i <= Math.round(v) ? "" : "opacity-25"} />)}</span>;
 }
 
-/** Store tile: tap the picture to flip it (back: rating, hires, skills, price); the name and Open go to the listing. */
-export function AppCard({ a, wide = false }: { a: Specialist; wide?: boolean }) {
+/** Small decorative flip chip in the card's top-right corner; the whole picture is the button. */
+const FlipChip = () => <span aria-hidden data-flip-chip className="pointer-events-none absolute right-2.5 top-2.5 z-10 grid h-7 w-7 place-items-center rounded-full bg-black/55 text-white/90 ring-1 ring-white/15 backdrop-blur-sm"><Icon name="flip" size={13} /></span>;
+
+/**
+ * Store tile: tap the picture to flip it (back: rating, hires, skills, price, speed, Open listing).
+ * The name and Open link go to the listing. Trending tiles are ~2 per screen on phones.
+ * `fill` = take the grid cell's width instead of a fixed shelf width.
+ */
+export function AppCard({ a, wide = false, fill = false }: { a: Specialist; wide?: boolean; fill?: boolean }) {
   const m = storeMeta(a);
   const face = useRef<HTMLSpanElement>(null);
   const [flipped, setFlipped] = useState(false);
   const href = `/app/marketplace/${a.slug}`;
-  const h = wide ? "h-[150px]" : "h-[156px] sm:h-[168px]";
+  const size = wide ? "w-[300px] sm:w-[320px]" : fill ? "w-full" : "w-[44vw] min-w-[176px] max-w-[290px] sm:w-[272px] lg:w-[248px]";
+  const h = wide ? "h-[236px]" : "aspect-[4/5.3]";
   const toggle = () => setFlipped((v) => !v);
+  const skills = a.skills.slice(0, wide ? 2 : 3);
+  const more = a.skills.length - skills.length;
   return (
-    <div className={`group flex shrink-0 snap-start flex-col ${wide ? "w-[272px]" : "w-[156px] sm:w-[168px]"}`}>
+    <div data-app-card className={`group flex shrink-0 snap-start flex-col ${size}`}>
       <div role="button" tabIndex={0} data-flip aria-pressed={flipped} aria-label={flipped ? `${a.name} details. Tap to flip back.` : `${a.name}. Tap to flip for details.`}
         onClick={toggle} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } }}
         className={`flip relative block w-full cursor-pointer select-none rounded-[22px] outline-none focus-visible:ring-4 focus-visible:ring-grape/50 ${h} ${flipped ? "is-flipped" : ""}`}>
         <div className="flip-inner">
           <div className="flip-face overflow-hidden rounded-[22px]">
             {wide ? (
-              <span className="relative block h-full overflow-hidden rounded-[22px] ring-1 ring-line" style={{ background: `linear-gradient(135deg, color-mix(in oklab, var(--color-grape) 30%, var(--card)), var(--card))` }}>
-                <span ref={face} className="absolute bottom-3 left-3 transition duration-300 group-hover:scale-105"><AgentTile id={a.slug} look={null} size={72} radius={22} /></span>
-                <span className="label absolute right-3 top-3 rounded-full bg-ink px-2 py-1 text-[8.5px] text-[var(--bg)]">New</span>
-                <span className="absolute bottom-4 right-4 max-w-[55%] text-right text-[13px] font-semibold leading-snug text-ink/75">&ldquo;{a.quip}&rdquo;</span>
+              <span className="relative flex h-full flex-col justify-between overflow-hidden rounded-[22px] p-4 ring-1 ring-line" style={{ background: `linear-gradient(135deg, color-mix(in oklab, var(--color-grape) 30%, var(--card)), var(--card))` }}>
+                <span className="label self-start rounded-full bg-ink px-2 py-1 text-[8.5px] text-[var(--bg)]">New</span>
+                <span className="flex items-end gap-3">
+                  <span ref={face} className="shrink-0 transition duration-300 group-hover:scale-105"><AgentTile id={a.slug} look={null} size={84} radius={24} /></span>
+                  <span data-quote className="min-w-0 flex-1 pb-1 text-right text-[14px] font-semibold leading-snug text-ink/80">&ldquo;{a.quip}&rdquo;</span>
+                </span>
               </span>
             ) : (
-              <span ref={face} className="block h-full"><AgentTile id={a.slug} look={null} size={156} radius={22} className="!h-full !w-full" face={120} /></span>
+              <span ref={face} className="block h-full"><AgentTile id={a.slug} look={null} size={176} radius={22} className="!h-full !w-full" face={136} /></span>
             )}
-            <span className="label pointer-events-none absolute bottom-2 right-2 rounded-full bg-black/55 px-1.5 py-0.5 text-[8px] text-white/85">flip ↻</span>
+            <FlipChip />
           </div>
-          <div className="flip-face flip-back flex flex-col overflow-hidden rounded-[22px] bg-[#0a0a0a] p-3 text-white ring-1 ring-white/10">
-            <span className="flex items-center justify-between text-[12px]"><span className="flex items-center gap-1 font-bold">{a.rating}<Icon name="star" size={11} className="text-lilac" /></span><span className="text-white/65">{compact(m.hires)} hires</span></span>
-            <span className="label mt-2 text-[8px] text-lilac">Skills</span>
-            <ul className="mt-1 space-y-0.5 text-[12px] leading-tight text-white/85">{a.skills.slice(0, wide ? 2 : 3).map(([k]) => <li key={k} className="truncate">· {k}</li>)}</ul>
-            <span className="mt-auto flex items-center justify-between gap-1 text-[11px]"><span className="rounded-full bg-white/15 px-2 py-0.5 font-bold">{m.free ? "Free" : "Paid add-ons"}</span><span className="truncate text-white/55">{a.speed}</span></span>
-            <Link href={href} tabIndex={flipped ? 0 : -1} aria-label={`Open ${a.name}'s listing`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="mt-2 flex h-7 items-center justify-center rounded-full bg-white text-[12px] font-bold text-[#0a0a0a] transition hover:bg-lilac">Open listing →</Link>
+          <div data-back className={`flip-face flip-back flex flex-col overflow-hidden rounded-[22px] bg-[#0a0a0a] text-white ring-1 ring-white/10 ${wide ? "p-4" : "p-3.5"}`}>
+            <span className="flex items-center justify-between gap-2 text-[13px]">
+              <span className="flex items-center gap-1 font-bold">{a.rating}<Icon name="star" size={12} className="text-lilac" /></span>
+              <span className="whitespace-nowrap text-white/65">{compact(m.hires)} hires</span>
+            </span>
+            <span className="label mt-2.5 text-[8.5px] text-lilac">Skills</span>
+            <ul className="mt-1 space-y-1 text-[12px] leading-[1.3] text-white/85">
+              {skills.map(([k]) => <li key={k} className="line-clamp-2">· {k}</li>)}
+              {more > 0 && <li className="text-white/45">+{more} more</li>}
+            </ul>
+            {!wide && <p className="mt-3 line-clamp-3 border-l-2 border-lilac/60 pl-2 text-[12px] italic leading-[1.35] text-white/70 max-[420px]:hidden">&ldquo;{a.quip}&rdquo;</p>}
+            <span className="mt-auto flex flex-col gap-1 pt-2 text-[11.5px]">
+              <span className="flex items-center gap-2">
+                <span className="shrink-0 whitespace-nowrap rounded-full bg-white/15 px-2.5 py-0.5 font-bold">{m.free ? "Free" : "Paid add-ons"}</span>
+              </span>
+              <span className="text-white/60">{a.speed}</span>
+            </span>
+            <Link href={href} tabIndex={flipped ? 0 : -1} aria-label={`Open ${a.name}'s listing`} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="mt-2.5 flex h-8 shrink-0 items-center justify-center rounded-full bg-white text-[12.5px] font-bold text-[#0a0a0a] transition hover:bg-lilac">Open listing →</Link>
           </div>
         </div>
       </div>

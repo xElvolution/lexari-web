@@ -153,7 +153,7 @@ export default function Marketplace() {
       {browsing ? (
         <section className="mt-8">
           <h2 className="text-[22px] font-bold text-ink">{q ? `Results for “${q}”` : `${cat} agents`}<span className="ml-2 text-[15px] font-semibold text-ink/45">{filtered.length}</span></h2>
-          {filtered.length ? <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">{filtered.map((a) => <AppCard key={a.slug} a={a} />)}</div>
+          {filtered.length ? <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">{filtered.map((a) => <AppCard key={a.slug} a={a} fill />)}</div>
             : <div className="mt-5"><Empty icon="search" title="No agents match." body="Try a different word or category." cta={{ label: "Clear", onClick: () => { setQ(""); setCat("All"); } }} /></div>}
         </section>
       ) : (
