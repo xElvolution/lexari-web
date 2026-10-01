@@ -33,6 +33,9 @@ export type Variant = {
 /** A face you built in the creator. Saved as the agent's look and printed on its ID card / NFT. */
 export type FaceLook = Variant;
 
+/** Headwear was removed from the creator; any face that still has it (saved or seeded) shows no extra. */
+export const HEADWEAR: Extra[] = ["beanie", "cap", "headphones", "party"];
+export const safeExtra = (e: Extra | undefined): Extra => (!e || HEADWEAR.includes(e) ? "none" : e);
 const SHAPES: Shape[] = ["round", "square", "tall", "blob", "hex", "tri", "robot", "egg", "wide"];
 const EYES: Eyes[] = ["oval", "dot", "happy", "wink", "visor", "big", "sleepy", "glasses"];
 const MOUTHS: Mouth[] = ["smile", "flat", "o", "grin", "none", "tongue", "cat", "teeth"];
@@ -50,7 +53,7 @@ export function variantFor(seed: number): Variant {
   let extra = pick(EXTRAS);
   if (shape === "robot") extra = "antenna";
   if (shape === "tri") extra = "none";
-  if (extra === "beanie" || extra === "cap" || extra === "party") extra = "none"; // no hats
+  if (HEADWEAR.includes(extra)) extra = "none"; // no hats or headwear
   return { shape, color: pick(COLORS), eyes: pick(EYES), mouth: pick(MOUTHS), extra, blush: r() < 0.4 };
 }
 
@@ -62,7 +65,7 @@ export const ALL_SHAPES: Shape[] = ["round", "square", "blob", "hex", "tri", "ro
 export const ALL_EYES: Eyes[] = ["oval", "dot", "happy", "wink", "big", "sleepy", "glasses", "visor", "star", "pixel", "cyclops"];
 export const ALL_MOUTHS: Mouth[] = ["smile", "grin", "o", "flat", "cat", "tongue", "teeth", "none", "wave", "fang", "smirk"];
 export const ALL_BROWS: Brows[] = ["none", "flat", "soft", "raised", "angry", "uni"];
-export const ALL_EXTRAS: Extra[] = ["none", "antenna", "ears", "catEars", "tuft", "horns", "headphones", "beanie", "cap", "party"];
+export const ALL_EXTRAS: Extra[] = ["none", "antenna", "ears", "catEars", "tuft", "horns"];
 export const ALL_ORBITS: Orbit[] = ["none", "dots", "ring", "comet", "sparkle"];
 export const LABEL: Record<string, string> = {
   round: "Round", square: "Square", blob: "Blob", hex: "Hex", tri: "Triangle", robot: "Robot", egg: "Egg", tall: "Tall", wide: "Wide",
@@ -74,6 +77,6 @@ export const LABEL: Record<string, string> = {
 };
 /** The full look for any saved value: a seed number, null (house face) or a FaceLook object. */
 export function lookVariant(look: number | null | undefined | Partial<Variant>): Variant {
-  if (look && typeof look === "object") return { ...HOME, plain: false, ...look } as Variant;
+  if (look && typeof look === "object") { const v = { ...HOME, plain: false, ...look } as Variant; return { ...v, extra: safeExtra(v.extra) }; }
   return look === null || look === undefined ? { ...HOME } : variantFor(look);
 }

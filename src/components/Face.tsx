@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { HOME, PALETTE, variantFor, type FaceState, type Shape, type Variant } from "./avatar";
+import { HOME, PALETTE, safeExtra, variantFor, type FaceState, type Shape, type Variant } from "./avatar";
 
 type Props = { seed?: number; variant?: Partial<Variant>; size?: number; track?: boolean; look?: boolean; className?: string; state?: FaceState; animated?: boolean };
 
@@ -51,7 +51,8 @@ export default function Face({ seed, variant, size = 96, track = false, look = f
   const tRaw = useClock(animated);
   const live = animated && tRaw > 0;
   const t = live ? tRaw : 0.6; // still faces use a pleasant frame
-  const v: Variant = { ...(seed === undefined ? HOME : variantFor(seed)), ...variant };
+  const v0: Variant = { ...(seed === undefined ? HOME : variantFor(seed)), ...variant };
+  const v: Variant = { ...v0, extra: safeExtra(v0.extra) }; // headwear retired
   const c = PALETTE[v.color];
   const fc = c.fc, L = LAYOUT[v.shape], ey0 = L.eye, my = L.mouth;
   const bp = v.plain ? { fill: c.fill } : { fill: c.fill, stroke: c.shade, strokeWidth: 3, strokeLinejoin: "round" as const };

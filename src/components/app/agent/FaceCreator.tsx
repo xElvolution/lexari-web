@@ -31,7 +31,7 @@ const Tile = memo(function Tile({ v, on, label, onPick, children }: { v: Variant
 /** A random look from the classic parts (no hats unless you pick one). */
 export function randomLook(keep?: Partial<FaceLook>): FaceLook {
   const shape = pick(ALL_SHAPES);
-  return { shape, color: pick(COLORS), eyes: pick(ALL_EYES), mouth: pick(ALL_MOUTHS), extra: shape === "robot" ? "antenna" : pick(["none", "none", "antenna", "ears", "catEars", "tuft", "horns", "headphones"] as const), brows: pick(ALL_BROWS), orbit: pick(["none", "dots", "dots", "ring", "comet", "sparkle"] as const), dots: 3, blush: Math.random() < 0.4, bg: keep?.bg ?? "black" };
+  return { shape, color: pick(COLORS), eyes: pick(ALL_EYES), mouth: pick(ALL_MOUTHS), extra: shape === "robot" ? "antenna" : pick(["none", "none", "antenna", "ears", "catEars", "tuft", "horns"] as const), brows: pick(ALL_BROWS), orbit: pick(["none", "dots", "dots", "ring", "comet", "sparkle"] as const), dots: 3, blush: Math.random() < 0.4, bg: keep?.bg ?? "black" };
 }
 
 /**
