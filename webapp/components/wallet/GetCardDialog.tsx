@@ -26,8 +26,8 @@ export default function GetCardDialog({ s, id, onClose }: { s: State; id: string
         </div>
         <CardVisual id={id} name={name} className="mx-auto mt-4" />
         <p className="mt-4 text-[14px] leading-snug text-ink/70">{name} can pay for tools, compute and subscriptions with its own card, up to the monthly limit you set. Every card is bought separately for each agent.</p>
-        <div className="mt-3 grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Monthly limit">
-          {CARD_LIMITS.map((l) => <button key={l} role="radio" aria-checked={limit === l} onClick={() => setLimit(l)} className={`rounded-xl px-1 py-2 text-center ring-1 transition ${limit === l ? "bg-tint ring-2 ring-grape" : "ring-line hover:ring-grape/50"}`}><span className="label block text-[7.5px] text-ink/55">Limit / mo</span><span className="tab-num mt-0.5 block text-[15px] font-bold text-ink">${l}</span></button>)}
+        <div className="mt-3 grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Monthly spending limit">
+          {CARD_LIMITS.map((l) => <button key={l} role="radio" aria-checked={limit === l} onClick={() => setLimit(l)} className={`rounded-xl px-1 py-2 text-center ring-1 transition ${limit === l ? "bg-tint ring-2 ring-grape" : "ring-line hover:ring-grape/50"}`}><span className="tab-num block text-[15px] font-bold text-ink">${l}</span><span className="block text-[11px] text-ink/55">a month</span></button>)}
         </div>
         <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-tint px-3.5 py-2.5 text-[13.5px]"><span className="text-ink/70">Card price</span><span className="text-right font-semibold text-ink">Shown before you pay</span></div>
         {!CARDS_LIVE && <p className="mt-3 flex gap-2 rounded-2xl bg-tint p-3 text-[13px] leading-snug text-ink/75" role="status"><Icon name="info" size={16} className="mt-0.5 shrink-0 text-brand-ink" />{CARDS_SOON}</p>}

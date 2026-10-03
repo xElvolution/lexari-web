@@ -48,3 +48,4 @@ contracts/solana/node_modules/
 *.tsbuildinfo
 next-env.d.ts
 /tsconfig.staging.json
+.qa-*
