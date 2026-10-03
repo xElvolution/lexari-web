@@ -1,6 +1,8 @@
 #!/bin/bash
-# Anchor 0.30's default platform tools (v1.41) cannot read current crates.
-# The on-chain build uses platform tools v1.52.
+# Builds SBPF v0 (--arch v0), the bytecode every cluster accepts today.
+#
+# Tests mint and transfer real Metaplex Core assets, so the validator clones
+# the mpl-core program from devnet (needs network).
 #
 # `anchor test` loads the program with --bpf-program, which sets the upgrade
 # authority to the zero pubkey. init_config requires the real upgrade
@@ -14,7 +16,7 @@ ledger="$(mktemp -d)"
 cat > "${wrap}/cargo-build-sbf" << EOF
 #!/bin/bash
 if [ "\${1:-}" = "build-sbf" ]; then shift; fi
-exec "${real}" --tools-version v1.52 "\$@"
+exec "${real}" --arch v0 "\$@"
 EOF
 chmod +x "${wrap}/cargo-build-sbf"
 export PATH="${wrap}:${solana_bin}:${HOME}/.cargo/bin:${PATH}"
@@ -43,6 +45,8 @@ solana-test-validator \
   --ledger "${ledger}" \
   --mint "${mint}" \
   --upgradeable-program "${program_id}" "${so}" "${wallet}" \
+  --url "${CLONE_RPC:-https://api.devnet.solana.com}" \
+  --clone-upgradeable-program CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d \
   >"${ledger}/validator.log" 2>&1 &
 validator_pid=$!
 

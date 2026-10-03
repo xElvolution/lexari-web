@@ -107,6 +107,14 @@ impl BoxClaim {
     pub const SIZE: usize = 32 + 4 + 8 + 1;
 }
 
+/// Upper bounds on attested rewards, so a leaked attestor key cannot mint unlimited coins per claim.
+pub const MAX_QUEST_COINS: u64 = 1_000;
+pub const MAX_BOX_COINS: u64 = 500;
+
+/// Metaplex Core program. An AssetV1 account starts with Key::AssetV1 (1) then the 32-byte owner.
+pub const MPL_CORE_ID: Pubkey = pubkey!("CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d");
+pub const CORE_KEY_ASSET_V1: u8 = 1;
+
 pub const STREAK_PAY: [u64; 7] = [10, 15, 20, 25, 30, 40, 75];
 pub const TIER_FRIENDS: [u8; 4] = [1, 3, 5, 10];
 pub const TIER_REWARD: [u64; 4] = [100, 300, 600, 1500];
@@ -115,6 +123,6 @@ pub fn utc_day(ts: i64) -> i64 {
     ts.div_euclid(86_400)
 }
 
-pub fn xp_for(level: u8) -> u32 {
-    60 + u32::from(level.saturating_sub(1)) * 40
+pub fn xp_for(level: u8) -> u64 {
+    60 + u64::from(level.saturating_sub(1)) * 40
 }

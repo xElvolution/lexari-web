@@ -2,12 +2,6 @@
 members = ["programs/*"]
 resolver = "2"
 
-# Anchor 0.30 calls Span::source_file(), which proc-macro2 1.0.107 removed.
-# Vendored anchor-syn 0.30.1 keeps span-locations (Span::start/end) and uses
-# Span::local_file() for that one call.
-[patch.crates-io]
-anchor-syn = { path = "vendor/anchor-syn" }
-
 [profile.release]
 overflow-checks = true
 lto = "fat"

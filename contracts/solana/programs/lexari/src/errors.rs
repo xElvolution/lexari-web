@@ -32,6 +32,16 @@ pub enum LexariError {
     ZeroSpend,
     #[msg("Config already initialized")]
     ConfigExists,
-    #[msg("Only the program upgrade authority can initialize config")]
+    #[msg("Only the program upgrade authority can change config")]
     NotUpgradeAuthority,
+    #[msg("Asset is not a Metaplex Core asset")]
+    NotCoreAsset,
+    #[msg("Signer does not own this Core asset")]
+    NotAssetOwner,
+    #[msg("Asset account does not match the agent")]
+    AssetMismatch,
+    #[msg("Agent owner is already up to date")]
+    OwnerUnchanged,
+    #[msg("Reward is above the per-claim cap")]
+    RewardTooLarge,
 }

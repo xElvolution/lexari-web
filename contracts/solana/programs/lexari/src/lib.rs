@@ -24,19 +24,16 @@ impl Id for LexariId {
 pub mod lexari {
     use super::*;
 
-    pub fn register_agent(
-        ctx: Context<RegisterAgent>,
-        asset: Pubkey,
-        name: String,
-        role: String,
-        dna: String,
-    ) -> Result<()> {
+    /// Registers the agent record for a Metaplex Core asset. The signer must own the asset.
+    pub fn register_agent(ctx: Context<RegisterAgent>, name: String, role: String, dna: String) -> Result<()> {
         check_name(&name)?;
         check_role(&role)?;
         check_dna(&dna)?;
+        let owner = ctx.accounts.owner.key();
+        require_keys_eq!(core_owner(&ctx.accounts.asset)?, owner, LexariError::NotAssetOwner);
         let agent = &mut ctx.accounts.agent;
-        agent.owner = ctx.accounts.owner.key();
-        agent.asset = asset;
+        agent.owner = owner;
+        agent.asset = ctx.accounts.asset.key();
         agent.name = name;
         agent.role = role;
         agent.dna = dna;
@@ -48,6 +45,7 @@ pub mod lexari {
         check_name(&name)?;
         check_role(&role)?;
         check_dna(&dna)?;
+        require_keys_eq!(core_owner(&ctx.accounts.asset)?, ctx.accounts.owner.key(), LexariError::NotAssetOwner);
         let agent = &mut ctx.accounts.agent;
         agent.name = name;
         agent.role = role;
@@ -55,8 +53,19 @@ pub mod lexari {
         Ok(())
     }
 
+    /// After the ID card (Core asset) changes hands, its new owner takes over the agent record.
+    pub fn sync_agent_owner(ctx: Context<SyncAgentOwner>) -> Result<()> {
+        let new_owner = ctx.accounts.new_owner.key();
+        require_keys_eq!(core_owner(&ctx.accounts.asset)?, new_owner, LexariError::NotAssetOwner);
+        let agent = &mut ctx.accounts.agent;
+        require_keys_neq!(agent.owner, new_owner, LexariError::OwnerUnchanged);
+        agent.owner = new_owner;
+        Ok(())
+    }
+
     pub fn write_memory(ctx: Context<WriteMemory>, content_hash: [u8; 32], uri: String) -> Result<()> {
         check_uri(&uri)?;
+        require_keys_eq!(core_owner(&ctx.accounts.asset)?, ctx.accounts.owner.key(), LexariError::NotAssetOwner);
         let memory = &mut ctx.accounts.memory;
         memory.owner = ctx.accounts.owner.key();
         memory.agent = ctx.accounts.agent.key();
@@ -82,6 +91,12 @@ pub mod lexari {
         let config = &mut ctx.accounts.config;
         config.authority = authority;
         config.bump = ctx.bumps.config;
+        Ok(())
+    }
+
+    /// Rotates the attestor. Only the program upgrade authority can call it.
+    pub fn update_config(ctx: Context<UpdateConfig>, authority: Pubkey) -> Result<()> {
+        ctx.accounts.config.authority = authority;
         Ok(())
     }
 
@@ -126,6 +141,7 @@ pub mod lexari {
             ctx.accounts.attestor.key() == ctx.accounts.config.authority,
             LexariError::BadAttestor
         );
+        require!(coins <= MAX_QUEST_COINS, LexariError::RewardTooLarge);
         let claim = &mut ctx.accounts.claim;
         claim.player = ctx.accounts.player.key();
         claim.quest_id = quest_id;
@@ -143,6 +159,7 @@ pub mod lexari {
             ctx.accounts.attestor.key() == ctx.accounts.config.authority,
             LexariError::BadAttestor
         );
+        require!(coins <= MAX_BOX_COINS, LexariError::RewardTooLarge);
         let claim = &mut ctx.accounts.claim;
         claim.player = ctx.accounts.player.key();
         claim.day = day;
@@ -154,22 +171,31 @@ pub mod lexari {
         Ok(())
     }
 
+    /// Spends coins as XP on an agent. Never spends more than it takes to reach the max level.
     pub fn level_up(ctx: Context<LevelUp>, coins: u64) -> Result<()> {
         require!(coins > 0, LexariError::ZeroSpend);
+        require_keys_eq!(core_owner(&ctx.accounts.asset)?, ctx.accounts.owner.key(), LexariError::NotAssetOwner);
         let player = &mut ctx.accounts.player;
-        require!(player.coins >= coins, LexariError::InsufficientCoins);
         let level = &mut ctx.accounts.level;
         if level.level == 0 {
             level.agent = ctx.accounts.agent.key();
-            level.owner = player.owner;
             level.level = 1;
             level.xp = 0;
             level.bump = ctx.bumps.level;
         }
+        level.owner = player.owner;
         require!(level.level < AgentLevel::MAX_LEVEL, LexariError::MaxLevel);
-        player.coins = player.coins.saturating_sub(coins);
-        let mut xp = level.xp.saturating_add(coins as u32);
         let mut lv = level.level;
+        let mut xp = u64::from(level.xp);
+        let mut need: u64 = 0;
+        for l in lv..AgentLevel::MAX_LEVEL {
+            need = need.saturating_add(xp_for(l));
+        }
+        need = need.saturating_sub(xp);
+        let spend = coins.min(need);
+        require!(player.coins >= spend, LexariError::InsufficientCoins);
+        player.coins -= spend;
+        xp = xp.saturating_add(spend);
         while lv < AgentLevel::MAX_LEVEL && xp >= xp_for(lv) {
             xp -= xp_for(lv);
             lv += 1;
@@ -178,7 +204,7 @@ pub mod lexari {
             xp = 0;
         }
         level.level = lv;
-        level.xp = xp;
+        level.xp = u32::try_from(xp).map_err(|_| error!(LexariError::ZeroSpend))?;
         Ok(())
     }
 
@@ -200,6 +226,14 @@ pub mod lexari {
     }
 }
 
+/// Owner of a Metaplex Core AssetV1 account.
+fn core_owner(asset: &AccountInfo) -> Result<Pubkey> {
+    require_keys_eq!(*asset.owner, MPL_CORE_ID, LexariError::NotCoreAsset);
+    let data = asset.try_borrow_data()?;
+    require!(data.len() >= 33 && data[0] == CORE_KEY_ASSET_V1, LexariError::NotCoreAsset);
+    Ok(Pubkey::new_from_array(data[1..33].try_into().unwrap()))
+}
+
 fn check_name(name: &str) -> Result<()> {
     require!(!name.is_empty() && name.len() <= Agent::MAX_NAME, LexariError::BadName);
     Ok(())
@@ -218,15 +252,16 @@ fn check_uri(uri: &str) -> Result<()> {
 }
 
 #[derive(Accounts)]
-#[instruction(asset: Pubkey)]
 pub struct RegisterAgent<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
+    /// CHECK: checked in core_owner(): a Metaplex Core AssetV1 owned by `owner`.
+    pub asset: UncheckedAccount<'info>,
     #[account(
         init,
         payer = owner,
         space = 8 + Agent::SIZE,
-        seeds = [b"agent", owner.key().as_ref(), asset.as_ref()],
+        seeds = [b"agent", asset.key().as_ref()],
         bump
     )]
     pub agent: Account<'info, Agent>,
@@ -236,8 +271,19 @@ pub struct RegisterAgent<'info> {
 #[derive(Accounts)]
 pub struct UpdateAgent<'info> {
     pub owner: Signer<'info>,
-    #[account(mut, has_one = owner)]
+    #[account(mut, has_one = owner, has_one = asset @ LexariError::AssetMismatch, seeds = [b"agent", asset.key().as_ref()], bump = agent.bump)]
     pub agent: Account<'info, Agent>,
+    /// CHECK: must be agent.asset; ownership checked in core_owner().
+    pub asset: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SyncAgentOwner<'info> {
+    pub new_owner: Signer<'info>,
+    #[account(mut, has_one = asset @ LexariError::AssetMismatch, seeds = [b"agent", asset.key().as_ref()], bump = agent.bump)]
+    pub agent: Account<'info, Agent>,
+    /// CHECK: must be agent.asset; ownership checked in core_owner().
+    pub asset: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -245,8 +291,10 @@ pub struct UpdateAgent<'info> {
 pub struct WriteMemory<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    #[account(has_one = owner)]
+    #[account(has_one = owner, has_one = asset @ LexariError::AssetMismatch)]
     pub agent: Account<'info, Agent>,
+    /// CHECK: must be agent.asset; ownership checked in core_owner().
+    pub asset: UncheckedAccount<'info>,
     #[account(
         init,
         payer = owner,
@@ -298,6 +346,19 @@ pub struct InitConfig<'info> {
     )]
     pub program_data: Account<'info, ProgramData>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateConfig<'info> {
+    pub authority: Signer<'info>,
+    #[account(mut, seeds = [b"config"], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, LexariId>,
+    #[account(
+        constraint = program_data.upgrade_authority_address == Some(authority.key()) @ LexariError::NotUpgradeAuthority
+    )]
+    pub program_data: Account<'info, ProgramData>,
 }
 
 #[derive(Accounts)]
@@ -371,8 +432,10 @@ pub struct LevelUp<'info> {
     pub owner: Signer<'info>,
     #[account(mut, has_one = owner, seeds = [b"player", owner.key().as_ref()], bump = player.bump)]
     pub player: Account<'info, Player>,
-    #[account(has_one = owner)]
+    #[account(has_one = owner, has_one = asset @ LexariError::AssetMismatch)]
     pub agent: Account<'info, Agent>,
+    /// CHECK: must be agent.asset; ownership checked in core_owner().
+    pub asset: UncheckedAccount<'info>,
     #[account(
         init_if_needed,
         payer = owner,
