@@ -7,21 +7,25 @@
  * (no shell), the system prompt replaces Grok's own.
  *
  * Env: GROK_CLI_BIN (default "grok"), GROK_CLI_HOME (HOME holding the CLI login, default the process HOME),
- *      GROK_CLI_MODEL (optional), GROK_CLI_TIMEOUT_MS (default 120000), GROK_CLI_CONCURRENCY (default 2).
+ *      GROK_CLI_MODEL (optional), GROK_CLI_TIMEOUT_MS (default 120000), GROK_CLI_CONCURRENCY (default 2),
+ *      GROK_CLI_SOCKET (optional: unix socket of deploy/grok-relay.mjs, which runs the same locked-down command).
  */
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createConnection } from "node:net";
 import { ModelError, type ChatMessage } from "./cortex";
 
 export function grokCliConfig() {
   const bin = process.env.GROK_CLI_BIN || "grok";
   const home = process.env.GROK_CLI_HOME || process.env.HOME || "";
   const model = process.env.GROK_CLI_MODEL || "";
-  const ready = !!home && existsSync(join(home, ".grok", "auth.json"));
+  // GROK_CLI_SOCKET: talk to deploy/grok-relay.mjs instead of running the CLI (the login stays with the relay's user)
+  const socket = process.env.GROK_CLI_SOCKET || "";
+  const ready = socket ? existsSync(socket) : !!home && existsSync(join(home, ".grok", "auth.json"));
   return {
-    bin, home, model, ready,
+    bin, home, model, ready, socket,
     timeoutMs: Number(process.env.GROK_CLI_TIMEOUT_MS || 120_000),
     concurrency: Math.max(1, Number(process.env.GROK_CLI_CONCURRENCY || 2)),
   };
@@ -81,49 +85,77 @@ export function grokArgs(system: string, prompt: string, cwd: string, model: str
   return args;
 }
 
-export async function* streamGrokCli(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
-  const cfg = grokCliConfig();
-  if (!cfg.ready) throw new ModelError("The agent is not connected to a model yet.", `grok-cli: no login under ${cfg.home || "(no HOME)"}/.grok`);
-  await slot(cfg.concurrency);
+type Run = { out: AsyncIterable<unknown>; exited: Promise<number | null>; kill: () => void; stderr: () => string; killed: () => boolean; cleanup: () => void; onLine?: (line: string) => boolean };
+
+function runLocal(cfg: ReturnType<typeof grokCliConfig>, system: string, prompt: string): Run {
   const cwd = mkdtempSync(join(tmpdir(), "lexari-grok-"));
-  const { system, prompt } = flatten(messages);
   const child = spawn(cfg.bin, grokArgs(system, prompt, cwd, cfg.model), {
     cwd,
     env: { PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin", HOME: cfg.home, LANG: "C.UTF-8", NO_COLOR: "1" } as unknown as NodeJS.ProcessEnv,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const kill = () => { if (!child.killed) child.kill("SIGKILL"); };
-  const timer = setTimeout(kill, cfg.timeoutMs);
-  signal?.addEventListener("abort", kill, { once: true });
   let stderr = "";
   child.stderr.on("data", (d) => { if (stderr.length < 2000) stderr += String(d); });
   const exited = new Promise<number | null>((resolve) => child.on("close", (code) => resolve(code)));
+  return {
+    out: child.stdout, exited, stderr: () => stderr, killed: () => child.killed,
+    kill: () => { if (!child.killed) child.kill("SIGKILL"); },
+    cleanup: () => {
+      rmSync(cwd, { recursive: true, force: true });
+      // The CLI keeps a transcript per working dir under its HOME; drop ours so chats are not stored there.
+      if (cfg.home) rmSync(join(cfg.home, ".grok", "sessions", encodeURIComponent(cwd)), { recursive: true, force: true });
+    },
+  };
+}
+
+/** Same run through the relay socket. The relay ends with {"relayExit": code, "stderr": "..."}. */
+function runRelay(cfg: ReturnType<typeof grokCliConfig>, system: string, prompt: string): Run {
+  const sock = createConnection(cfg.socket);
+  sock.setEncoding("utf8");
+  sock.on("connect", () => sock.write(JSON.stringify({ system, prompt, model: cfg.model || undefined }) + "\n"));
+  let stderr = ""; let code: number | null = null; let killed = false;
+  const exited = new Promise<number | null>((resolve) => { sock.on("close", () => resolve(code)); sock.on("error", (e) => { stderr = stderr || `relay: ${e.message}`; }); });
+  const onLine = (line: string) => {
+    if (!line.startsWith('{"relayExit"')) return false;
+    try { const j = JSON.parse(line) as { relayExit: number; stderr?: string }; code = j.relayExit; stderr = j.stderr || ""; } catch {}
+    return true;
+  };
+  return { out: sock, exited, stderr: () => stderr, killed: () => killed, kill: () => { killed = true; sock.destroy(); }, cleanup: () => {}, onLine };
+}
+
+export async function* streamGrokCli(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
+  const cfg = grokCliConfig();
+  if (!cfg.ready) throw new ModelError("The agent is not connected to a model yet.", cfg.socket ? `grok-cli: relay socket ${cfg.socket} missing` : `grok-cli: no login under ${cfg.home || "(no HOME)"}/.grok`);
+  await slot(cfg.concurrency);
+  const { system, prompt } = flatten(messages);
+  const run = cfg.socket ? runRelay(cfg, system, prompt) : runLocal(cfg, system, prompt);
+  const timer = setTimeout(run.kill, cfg.timeoutMs);
+  signal?.addEventListener("abort", run.kill, { once: true });
   let buf = "";
   let any = false;
   let failure = "";
   try {
-    for await (const chunk of child.stdout) {
+    for await (const chunk of run.out) {
       buf += String(chunk);
       const lines = buf.split("\n");
       buf = lines.pop() || "";
       for (const line of lines) {
+        if (run.onLine?.(line)) continue;
         const r = textFromLine(line);
         if (r.text) { any = true; yield r.text; }
         if (r.error) failure = r.error;
       }
     }
-    const code = await exited;
+    const code = await run.exited;
     if (failure || (!any && code !== 0)) {
-      const timedOut = child.killed && !signal?.aborted;
-      throw new ModelError(timedOut ? "The model did not answer in time. Try again." : "The model could not answer. Try again.", `grok-cli exit ${code}: ${(failure || stderr).slice(0, 300)}`);
+      const timedOut = run.killed() && !signal?.aborted;
+      throw new ModelError(timedOut ? "The model did not answer in time. Try again." : "The model could not answer. Try again.", `grok-cli exit ${code}: ${(failure || run.stderr()).slice(0, 300)}`);
     }
   } finally {
     clearTimeout(timer);
-    kill();
-    await exited;
-    rmSync(cwd, { recursive: true, force: true });
-    // The CLI keeps a transcript per working dir under its HOME; drop ours so chats are not stored there.
-    if (cfg.home) rmSync(join(cfg.home, ".grok", "sessions", encodeURIComponent(cwd)), { recursive: true, force: true });
+    run.kill();
+    await run.exited;
+    run.cleanup();
     release();
   }
 }
