@@ -23,6 +23,9 @@
   .btn-ink { box-shadow: 0 4px 0 var(--color-grape); }
   .field { padding: .65rem .9rem; border-radius: 14px; }
 
+  /* fixed control heights (pairs stay square) */
+  .h-14 { height: 3.125rem; } .w-14 { width: 3.125rem; } .h-12 { height: 2.75rem; } .w-12 { width: 2.75rem; } .h-11 { height: 2.625rem; } .w-11 { width: 2.625rem; }
+
   /* padding, gaps and spacing */
   .p-9, .p-8 { padding: 1.25rem; } .p-7 { padding: 1.125rem; } .p-6 { padding: 1rem; } .p-5 { padding: .875rem; } .p-4 { padding: .8rem; }
   .px-8, .px-7 { padding-left: 1.125rem; padding-right: 1.125rem; } .px-6 { padding-left: 1rem; padding-right: 1rem; }
@@ -31,6 +34,9 @@
   .mt-12 { margin-top: 2rem; } .mt-10 { margin-top: 1.75rem; } .mt-8 { margin-top: 1.5rem; } .mt-7 { margin-top: 1.25rem; } .mt-6 { margin-top: 1.125rem; } .mt-5 { margin-top: 1rem; }
   .p-7.pt-9 { padding-top: 1.75rem; } .p-5.pb-4 { padding-bottom: .75rem; } .px-6.py-14 { padding-top: 2.5rem; padding-bottom: 2.5rem; }
   .pt-8 { padding-top: 1.5rem; } .pt-6 { padding-top: 1rem; }
+
+  /* onboarding: the badge rig is smaller on phones (zoom keeps the layout in step) */
+  .onb-badge { zoom: .82; }
 
   /* card radii */
   .rounded-\[34px\], .rounded-\[32px\], .rounded-\[30px\] { border-radius: 22px; }
