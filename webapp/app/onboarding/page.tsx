@@ -116,11 +116,11 @@ export default function Onboarding() {
         </ol>
         <ThemeToggle />
       </header>
-      <div className="relative z-10 mx-auto h-1.5 max-w-[1320px] px-5 sm:px-8 md:hidden"><div className="h-full overflow-hidden rounded-full bg-tint"><div className="h-full rounded-full bg-grape transition-all duration-700" style={{ width: `${((step + 1) / 4) * 100}%` }} /></div></div>
+      <div className="relative z-0 mx-auto h-1.5 max-w-[1320px] px-4 sm:px-8 md:hidden"><div className="h-full overflow-hidden rounded-full bg-tint"><div className="h-full rounded-full bg-grape transition-all duration-700" style={{ width: `${((step + 1) / 4) * 100}%` }} /></div></div>
 
-      <div className="relative z-10 mx-auto grid max-w-[1320px] gap-8 px-5 pb-16 pt-4 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:gap-14 lg:pt-6">
+      <div className="relative z-10 mx-auto grid max-w-[1320px] grid-cols-[minmax(0,1fr)] gap-8 overflow-x-clip px-4 pb-16 pt-9 sm:px-8 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)] lg:gap-14 lg:pt-6">
         {/* the badge */}
-        <div className="flex flex-col items-center lg:sticky lg:top-6 lg:self-start">
+        <div className="relative z-20 flex min-w-0 flex-col items-center lg:sticky lg:top-6 lg:self-start">
           <div className="relative z-10 flex h-5 w-[270px] items-center justify-center rounded-full bg-frame shadow-[0_8px_20px_-8px_rgba(0,0,0,.5)] sm:w-[330px]">
             <span className="h-1.5 w-[80%] rounded-full bg-black/60" />
             <span className="label absolute -top-5 text-[8.5px] text-ink/55">badge printer · desk 01</span>
@@ -132,11 +132,11 @@ export default function Onboarding() {
         </div>
 
         {/* the step panel */}
-        <div ref={panel} className="lg:pt-10">
+        <div ref={panel} className="min-w-0 lg:pt-10">
           {step === 0 && (
             <div data-step>
               <p className="label text-brand-ink">Step 1 of 4 · name</p>
-              <h1 className="display mt-3 text-[48px] sm:text-[76px]">What should we call your agent?</h1>
+              <h1 className="display mt-3 text-[clamp(34px,10.5vw,48px)] sm:text-[76px]">What should we call your agent?</h1>
               <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Type a name on its badge, or here. It sits at desk one on your team and keeps this name.</p>
               <input value={name} onChange={(e) => setName(e.target.value.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 12))} placeholder="Name your agent" aria-label="Agent name" className="field mt-7 !h-16 max-w-md !rounded-2xl !text-[22px] display !font-extrabold" />
               <div className="mt-4 flex flex-wrap gap-2">{NAMES.map((n) => <button key={n} onClick={() => setName(n)} aria-pressed={name === n} className="chip">{n}</button>)}</div>
@@ -145,9 +145,9 @@ export default function Onboarding() {
           {step === 1 && (
             <div data-step>
               <p className="label text-brand-ink">Step 2 of 4 · look</p>
-              <h1 className="display mt-3 text-[48px] sm:text-[76px]">Pick a face for {shown}.</h1>
+              <h1 className="display mt-3 text-[clamp(34px,10.5vw,48px)] sm:text-[76px]">Pick a face for {shown}.</h1>
               <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Every face is generated. The badge updates as you pick.</p>
-              <div className="mt-7 grid max-w-[560px] grid-cols-4 gap-2.5 sm:grid-cols-6">
+              <div className="mt-7 grid max-w-[560px] grid-cols-4 gap-2 sm:grid-cols-6 sm:gap-2.5">
                 {LOOKS.map((l) => {
                   const on = base === l;
                   return (
@@ -167,7 +167,7 @@ export default function Onboarding() {
           {step === 2 && (
             <div data-step>
               <p className="label text-brand-ink">Step 3 of 4 · about you</p>
-              <h1 className="display mt-3 text-[48px] sm:text-[72px]">What should {shown} know?</h1>
+              <h1 className="display mt-3 text-[clamp(34px,10.5vw,48px)] sm:text-[72px]">What should {shown} know?</h1>
               <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">These become its first memories. You can edit or forget any of them later in its brain.</p>
               <div className="mt-7 grid max-w-[560px] gap-6">
                 <label className="block"><span className="label text-[10px] text-ink/70">Your first name</span><input value={you} onChange={(e) => setYou(e.target.value.slice(0, 20))} placeholder="Ada" className="field mt-2" /></label>
@@ -184,7 +184,7 @@ export default function Onboarding() {
           {step === 3 && (
             <div data-step>
               <p className="label text-brand-ink">Step 4 of 4 · first day</p>
-              <h1 className="display mt-3 text-[56px] sm:text-[96px]">Meet {shown}.</h1>
+              <h1 className="display mt-3 text-[clamp(40px,12vw,56px)] sm:text-[96px]">Meet {shown}.</h1>
               <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Its badge is printed, its computer is on and it already knows {knows.length + (you ? 1 : 0)} things about you. Say hi and start chatting.</p>
               <ul className="mt-7 grid max-w-[520px] gap-2.5">
                 {[["desk", "Its own computer", "A terminal, a browser and a folder of files"], ["memory", "A brain that keeps", `${knows.length + (you ? 1 : 0)} memories filed on day one`], ["team", "Seats for specialists", "Hire from the marketplace when the work grows"]].map(([i, h, t]) => (
@@ -194,12 +194,12 @@ export default function Onboarding() {
             </div>
           )}
 
-          <div className="mt-10 flex items-center gap-3">
+          <div className="sticky bottom-0 z-30 -mx-4 mt-10 flex items-center gap-3 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)] to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:static sm:mx-0 sm:bg-none sm:p-0">
             {step > 0 && <button onClick={() => setStep((v) => v - 1)} className="btn btn-line text-ink" aria-label="Back"><Icon name="back" size={18} /></button>}
             {step < 3 ? (
-              <button onClick={next} disabled={!can} className="btn btn-brand disabled:opacity-40">{step === 0 ? `Continue with ${shown}` : "Continue"} <Icon name="arrow" size={18} /></button>
+              <button onClick={next} disabled={!can} className="btn btn-brand min-w-0 flex-1 disabled:opacity-40 sm:flex-none"><span className="truncate">{step === 0 ? `Continue with ${shown}` : "Continue"}</span> <Icon name="arrow" size={18} /></button>
             ) : (
-              <button ref={cta} onClick={meet} disabled={saving} className="btn btn-brand !h-16 !px-9 !text-[18px] disabled:opacity-60">{saving ? "Saving…" : <>Meet {shown} <Icon name="arrow" size={20} /></>}</button>
+              <button ref={cta} onClick={meet} disabled={saving} className="btn btn-brand !h-16 min-w-0 flex-1 !px-6 !text-[18px] disabled:opacity-60 sm:flex-none sm:!px-9">{saving ? "Saving…" : <>Meet {shown} <Icon name="arrow" size={20} /></>}</button>
             )}
           </div>
         </div>
