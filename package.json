@@ -11,6 +11,7 @@
     "dev:landing": "npm run dev -w landing",
     "dev:webapp": "npm run dev -w webapp",
     "build": "npm run build -w landing && npm run build -w webapp",
-    "start": "node scripts/dev.mjs start"
+    "start": "node scripts/dev.mjs start",
+    "gen:type": "node scripts/gen-mobile-type.mjs"
   }
 }

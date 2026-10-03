@@ -2,6 +2,7 @@
 @source "..";
 @source "../../shared";
 @import "../../shared/styles/theme.css";
+@import "../../shared/styles/mobile-type.css";
 
 /* ---------- Hub ---------- */
 @keyframes hub-flame { 0%, 100% { transform: scale(1, 1) rotate(-1.5deg); } 25% { transform: scale(.96, 1.06) rotate(1.5deg); } 50% { transform: scale(1.03, .97) rotate(-.5deg); } 75% { transform: scale(.98, 1.04) rotate(1deg); } }

@@ -2,3 +2,4 @@
 @source "..";
 @source "../../shared";
 @import "../../shared/styles/theme.css";
+@import "../../shared/styles/mobile-type.css";
