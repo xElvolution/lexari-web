@@ -7,7 +7,7 @@ import { gsap } from "gsap";
 import Face from "@shared/components/Face";
 import { PALETTE } from "@shared/components/avatar";
 import { AGENT_TEMPLATES, SPECIALISTS, STORE_CATS, compact, storeMeta, type StoreCat, type ToneId } from "@/content/appData";
-import { createAgent, planOf, seatsLeft, useApp } from "@/lib/store";
+import { createAgent, planOf, useApp } from "@/lib/store";
 import Icon from "../Icon";
 import { AgentTile } from "../faces";
 import { HireBtn, StarRow } from "../market/parts";
@@ -198,8 +198,6 @@ function Hire({ startCat }: { startCat?: string }) {
     }).sort((x, y) => y.score - x.score).slice(0, 3);
   }, [cat, text]);
   const asked = !!cat || text.trim().length > 2;
-  const left = seatsLeft(s);
-
   return (
     <div className="pb-4">
       <p className="text-[17px] font-bold text-ink">What do you need help with?</p>
@@ -210,7 +208,6 @@ function Hire({ startCat }: { startCat?: string }) {
 
       <div className="mt-5 flex items-baseline justify-between">
         <span className="label text-[9.5px] text-ink/60">{asked ? "Recommended for you" : "Popular right now"}</span>
-        <span className="text-[12.5px] text-ink/50">{left > 0 ? `${left} open seat${left === 1 ? "" : "s"}` : "No open seats"}</span>
       </div>
       <ul className="mt-2 space-y-2">
         {picks.map(({ a, m }, i) => (

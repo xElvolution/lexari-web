@@ -9,7 +9,7 @@ import { SPECIALISTS, cannedReply, compact, specialistBySlug, storeMeta } from "
 import { release, sendTo, toast, useApp } from "@/lib/store";
 import Face from "@shared/components/Face";
 import Icon from "@/components/Icon";
-import { AgentTile } from "@/components/faces";
+import { AgentTile, WhoFace } from "@/components/faces";
 import { Empty } from "@/components/ui";
 import { hireWithFx } from "@/components/hireAction";
 import { AppCard, HireBtn, ShelfRow, StarRow } from "@/components/market/parts";
@@ -60,9 +60,16 @@ export default function Detail({ slug }: { slug: string }) {
       </div>
 
       {/* header */}
-      <section data-rise className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start">
-        <div ref={face} className="shrink-0"><AgentTile id={a.slug} look={null} size={132} radius={36} face={110} className="shadow-[0_20px_40px_-20px_var(--glow)]" /></div>
-        <div className="min-w-0 flex-1">
+      <section data-rise className="mt-4 sm:mt-6">
+        {/* banner, like a collection page: the face sits on its bottom edge */}
+        <div className="relative h-32 overflow-hidden rounded-[24px] sm:h-56 sm:rounded-[30px]" style={{ background: `radial-gradient(110% 150% at 88% 0%, ${col} 0%, transparent 62%), linear-gradient(135deg, color-mix(in oklab, ${col} 55%, #1b1240) 0%, #120d26 100%)` }} aria-hidden>
+          <div className="absolute inset-0 opacity-40 [background-image:radial-gradient(rgba(255,255,255,.28)_1px,transparent_1.2px)] [background-size:16px_16px]" />
+          <div className="absolute -bottom-12 right-3 rotate-[-8deg] opacity-30 sm:-bottom-16 sm:right-12"><WhoFace who={a.slug} look={null} size={190} /></div>
+          <div className="absolute -left-10 -top-16 h-48 w-48 rounded-full border border-white/15" />
+          <span className="label absolute right-3 top-3 rounded-full bg-black/30 px-2.5 py-1 text-[8.5px] text-white/85 backdrop-blur sm:right-5 sm:top-5">{m.cat}</span>
+        </div>
+        <div ref={face} className="relative z-10 -mt-11 ml-3 w-max rounded-[30px] bg-base p-1 sm:-mt-16 sm:ml-7"><AgentTile id={a.slug} look={null} size={104} radius={28} face={86} className="shadow-[0_20px_40px_-20px_var(--glow)]" /></div>
+        <div className="mt-3 min-w-0 sm:px-7">
           <h1 className="display text-[52px] leading-none text-ink sm:text-[68px]">{a.name}</h1>
           <p className="mt-2 text-[16px] font-semibold text-brand-ink">{m.maker}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px]">

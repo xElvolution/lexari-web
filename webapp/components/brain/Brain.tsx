@@ -191,7 +191,7 @@ export default function Brain() {
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") close(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); });
 
   return (
-    <section className="brain-stage relative h-[calc(100svh-132px)] min-h-[520px] overflow-hidden lg:h-[100svh]" style={Object.fromEntries(CATS.map((c, i) => [`--cat-${i}`, `var(--cat-${i}-v)`])) as React.CSSProperties}>
+    <section className="brain-stage relative h-[calc(100svh-132px-env(safe-area-inset-bottom))] min-h-[480px] overflow-hidden lg:h-[100svh]" style={Object.fromEntries(CATS.map((c, i) => [`--cat-${i}`, `var(--cat-${i}-v)`])) as React.CSSProperties}>
       <style>{`:root,[data-theme="light"]{${CATS.map((c, i) => `--cat-${i}-v:${c.light}`).join(";")}}[data-theme="dark"]{${CATS.map((c, i) => `--cat-${i}-v:${c.dark}`).join(";")}}`}</style>
       <div ref={host} className="absolute inset-0" aria-label={`${agentName(s)}'s brain. Drag to turn it.`} role="img">
         {CATS.map((c, i) => (
@@ -220,7 +220,7 @@ export default function Brain() {
         {s.memoryLocked && <button onClick={() => void unlockMemories()} className="btn btn-brand btn-sm pointer-events-auto mt-3 !h-10"><Icon name="memory" size={15} />Open your memories</button>}
         {s.memoryLocked && <p className="mt-2 max-w-[22rem] text-[12.5px] text-ink/60">They are encrypted. Your wallet signs once on this device to open them.</p>}
       </div>
-      <p className={`label pointer-events-none absolute bottom-5 left-5 z-10 text-[9.5px] text-ink/60 transition-opacity sm:left-8 ${focus >= 0 ? "opacity-0 min-[900px]:opacity-100" : ""}`}>Drag to turn · tap a label to open it</p>
+      <p className={`label pointer-events-none absolute inset-x-0 bottom-4 z-10 mx-auto w-max max-w-[calc(100%-2rem)] rounded-full bg-card/85 px-3.5 py-2 text-center text-[9.5px] text-ink/75 shadow-[0_8px_24px_-12px_rgba(20,0,80,.35)] ring-1 ring-line backdrop-blur-md transition-opacity sm:inset-x-auto sm:left-8 sm:mx-0 ${focus >= 0 ? "opacity-0 min-[900px]:opacity-100" : ""}`}>Drag to turn · tap a label to open it</p>
       {failed && <p className="absolute inset-x-5 top-1/2 z-10 text-center text-[15px] text-ink/70">Your browser could not draw the 3D brain. Tap a label above to open that memory area.</p>}
       {focus >= 0 && <Panel s={s} cat={focus} onClose={close} />}
     </section>

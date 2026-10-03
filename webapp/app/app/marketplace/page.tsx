@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PALETTE } from "@shared/components/avatar";
 import { SPECIALISTS, STORE_CATS, compact, storeMeta, type StoreCat } from "@/content/appData";
-import { planOf, seatsLeft, useApp } from "@/lib/store";
+import { useApp } from "@/lib/store";
 import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
 import { Empty } from "@/components/ui";
@@ -117,7 +117,6 @@ export default function Marketplace() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<StoreCat | "All">("All");
   useEffect(() => { const c = new URLSearchParams(window.location.search).get("cat"); const hit = STORE_CATS.find((x) => x.id.toLowerCase() === c?.toLowerCase()); if (hit) setCat(hit.id); }, []);
-  const left = seatsLeft(s);
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     return SPECIALISTS.filter((a) => (cat === "All" || storeMeta(a).cat === cat) && (!t || `${a.name} ${a.job} ${a.cat} ${a.back} ${storeMeta(a).maker}`.toLowerCase().includes(t)));
@@ -138,7 +137,7 @@ export default function Marketplace() {
             <Icon name="search" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/50" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search agents, makers, skills" aria-label="Search the marketplace" className="h-12 w-full rounded-full bg-tint pl-11 pr-4 text-[15px] text-ink outline-none ring-grape placeholder:text-ink/45 focus:ring-2" />
           </label>
-          <Link href="/app/team" className={`label flex h-12 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-[9.5px] ${left > 0 ? "bg-card text-ink ring-1 ring-line" : "bg-ink text-[var(--bg)]"}`}><Icon name="team" size={14} />{left > 0 ? `${left} open seat${left > 1 ? "s" : ""} · ${planOf(s).name}` : "No open seats"}</Link>
+          <Link href="/app/team" aria-label={`Your team: ${s.hired.length + 1} agents`} className="flex h-10 shrink-0 items-center justify-center gap-1.5 self-start rounded-full bg-card px-3.5 text-[13px] font-bold text-ink ring-1 ring-line transition hover:ring-grape/60 sm:h-12 sm:self-auto"><Icon name="team" size={15} className="text-brand-ink" />Team <span className="tab-num rounded-full bg-tint px-1.5 text-[12px] text-brand-ink">{s.hired.length + 1}</span></Link>
         </div>
       </div>
 
