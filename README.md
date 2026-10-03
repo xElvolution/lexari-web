@@ -7,7 +7,7 @@ Two Next.js apps, plus the contracts. `npm run dev` starts both.
 | `landing/` | Its own Next.js app: marketing page and legal pages | http://localhost:3000 |
 | `webapp/` | Its own Next.js app: sign-in, onboarding, and the product at `/app` | http://localhost:3001 |
 | `shared/` | Faces, logo, theme, and ID-card backgrounds used by both apps | |
-| `contracts/` | Solana agent registry and memory records (`contracts/solana`). The Foundry card is the earlier Arbitrum version and the app does not call it. | |
+| `contracts/solana/` | The Lexari Anchor program: agent registry, memory records, Hub coins, quests and referrals | |
 | `mobileapp/` | Reserved for the phone app. Nothing is built here yet | |
 
 A personalized AI agent with its own persistent computer and memory, a roster of specialist agents you hire into seats, and sign in with Phantom, Solflare or Backpack. Google sign-in is still a preview.

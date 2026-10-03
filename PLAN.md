@@ -12,7 +12,7 @@ Pulled `origin/main` at `f62af8f` before this plan.
 - **Solana program (not deployed):** `contracts/solana` program id `BbnD28xf3kwfQRiRA6VQmw4p2R55WivUgozSoo81M6Po`. Instructions today: `register_agent`, `update_agent`, `write_memory`, `revoke_memory`, `delete_memory`. Tests cover happy path + empty name + stranger update + write/revoke/delete. **Devnet account is empty** (`getAccountInfo` → null). Must deploy.
 - **Client chain helpers:** `webapp/lib/chain.ts` already mints Metaplex Core assets, registers the agent PDA, encrypts memories (AES-GCM from a wallet signature), uploads ciphertext (Irys), writes the hash onchain, and can close the memory account.
 - **Hub contract-of-record:** `webapp/lib/hub.ts` documents Player / AgentLevel PDAs and `check_in` / `claim_quest` / `level_up` / `claim_referral_tier`. UI talks to `HubAdapter`. Today `hub = localHub` (localStorage). Swap the adapter, keep the UI.
-- **Foundry / Arbitrum** under `contracts/` (not `contracts/solana`): unused. Remove cleanly after the Solana path is live.
+- **Foundry / Arbitrum**: removed (Oct 3). Only `contracts/solana` remains.
 - **Mobile** (`lexari-wallet`, `mobileapp/`): out of scope.
 
 ## Target architecture
@@ -193,7 +193,7 @@ Tick in this file as each lands. After every milestone: tests, click the flow, c
 - [ ] **Blocked:** no devnet program, no database, so a paid hire cannot be recorded yet
 
 ### M8 — Cleanup + QA
-- [ ] Remove Foundry/Arbitrum dead tree (or isolate under `contracts/legacy/` with a one-line README)
+- [x] Remove Foundry/Arbitrum dead tree
 - [ ] Loading / empty / error on every product surface
 - [ ] Playwright: create, mint, chat, check-in, level up
 - [x] Typecheck and both Next production builds pass (`npm run build`, landing and webapp)

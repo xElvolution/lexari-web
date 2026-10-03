@@ -1,7 +1,6 @@
 /**
  * NFT-style backgrounds for an agent's ID card face window (and its onchain NFT image).
- * One source of truth: backgrounds.json is also compiled into the Solidity contract
- * (contracts/script/gen-backgrounds.mjs), so the web card and the NFT always match.
+ * One source of truth: backgrounds.json, used for both the web card and the minted Core asset's image.
  * Each entry draws a 100x100 tile; "{U}" is replaced with a unique id prefix.
  */
 import data from "./backgrounds.json";
