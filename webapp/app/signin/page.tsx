@@ -52,6 +52,7 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
   const adapterRef = useRef<SigningAdapter | null>(null);
   const [phase, setPhase] = useState<Phase>("connect");
   const [address, setAddress] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
   const [err, setErr] = useState("");
   const card = useRef<HTMLDivElement>(null);
   const wallet = flow.method === "wallet" ? WALLETS.find((w) => w.id === flow.wallet)! : null;
@@ -102,13 +103,54 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
     return () => { cancel = true; };
   }, [flow]);
 
+  useEffect(() => {
+    if (phase !== "sign" || !address || flow.method !== "wallet") return;
+    let cancel = false;
+    (async () => {
+      setMessage("");
+      try {
+        const res = await fetch("/api/auth/nonce", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ wallet: address }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (cancel) return;
+        if (!res.ok || typeof data.message !== "string") {
+          setErr(typeof data.error === "string" ? data.error : "Could not start sign-in.");
+          setPhase("error");
+          return;
+        }
+        setMessage(data.message);
+      } catch {
+        if (!cancel) { setErr("Could not reach sign-in."); setPhase("error"); }
+      }
+    })();
+    return () => { cancel = true; };
+  }, [phase, address, flow]);
+
   const sign = async () => {
     const adapter = adapterRef.current;
     const pk = adapter?.publicKey?.toBase58();
     if (!adapter || !pk || !adapter.signMessage) { setErr("This wallet cannot sign a message."); setPhase("error"); return; }
+    if (!message) { setErr("The sign-in message is not ready."); return; }
     setPhase("signing"); setErr("");
     try {
-      await adapter.signMessage(new TextEncoder().encode(`Sign in to Lexari\n${pk}`));
+      const signed = await adapter.signMessage(new TextEncoder().encode(message));
+      let binary = "";
+      for (const byte of signed) binary += String.fromCharCode(byte);
+      const referral = new URLSearchParams(window.location.search).get("ref") || undefined;
+      const res = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ wallet: pk, message, signature: btoa(binary), referral }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(typeof data.error === "string" ? data.error : "Sign-in was rejected.");
+        setPhase("sign");
+        return;
+      }
       setAddress(pk);
       setPhase("done");
     } catch (e) {
@@ -157,12 +199,12 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
         {(phase === "sign" || phase === "signing") && wallet && address && (
           <div className="mt-5 rounded-2xl bg-alt p-4 text-left ring-1 ring-line">
             <div className="label text-[9px] text-ink/60">Message to sign</div>
-            <p className="mt-1.5 break-all font-mono text-[12px] leading-relaxed text-ink">Sign in to Lexari<br />{address}</p>
+            <p className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-[12px] leading-relaxed text-ink">{message || "Preparing the sign-in message…"}</p>
             {err && <p className="mt-2 text-[13px] text-[#e5484d]">{err}</p>}
-            <button onClick={sign} disabled={phase === "signing"} className="btn btn-brand mt-4 w-full !h-12 !text-[15px] disabled:opacity-60">{phase === "signing" ? "Waiting for wallet…" : "Sign message"}</button>
+            <button onClick={sign} disabled={phase === "signing" || !message} className="btn btn-brand mt-4 w-full !h-12 !text-[15px] disabled:opacity-60">{phase === "signing" ? "Waiting for wallet…" : message ? "Sign message" : "Preparing…"}</button>
           </div>
         )}
-        {phase === "error" && flow.method === "wallet" && (
+        {phase === "error" && flow.method === "wallet" && /not installed|not available/i.test(err) && (
           <a href={DOWNLOAD[flow.wallet]} target="_blank" rel="noreferrer" className="btn btn-brand mt-5 w-full !h-12 !text-[15px]">Get {wallet!.name}</a>
         )}
         <p className="label mt-5 text-[9px] text-ink/55">{flow.method === "google" ? "Preview. Nothing is sent to Google." : "Solana wallet. One signature, no transaction."}</p>

@@ -38,3 +38,23 @@ npm run build && npm start
 ```
 
 Hire, sign-in, and "back to Lexari" jump between the two origins. For a deployed pair, set `NEXT_PUBLIC_LANDING_URL` and `NEXT_PUBLIC_WEBAPP_URL` (no trailing slash) before building. Locally they default to `http://localhost:3000` and `http://localhost:3001`.
+
+## Solana program
+
+Program id `BbnD28xf3kwfQRiRA6VQmw4p2R55WivUgozSoo81M6Po`. Local tests:
+
+```bash
+bash contracts/solana/scripts/test.sh
+```
+
+Use that script. Plain `anchor test` loads the program with upgrades turned off, and `init_config` then has no upgrade authority that can sign.
+
+Devnet deploy is not done. The built program is about 416 KB, so the program account and the temporary buffer each need about 2.11 SOL of rent at the same time. The deployer wallet has less than that on devnet.
+
+## Backend
+
+Copy `.env.example` to `webapp/.env.local`. Wallet sign-in is `POST /api/auth/nonce`, a wallet signature of that exact message, then `POST /api/auth/verify`, which sets an httpOnly `lexari_session` cookie. Without `DATABASE_URL` and `SESSION_SECRET` those routes return 503 and do not create a session. Google on the sign-in page stays a labeled preview.
+
+```bash
+npm run db:migrate -w webapp
+```

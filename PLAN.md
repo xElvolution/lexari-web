@@ -157,16 +157,16 @@ Tick in this file as each lands. After every milestone: tests, click the flow, c
 - [x] `anchor build` green
 
 ### M2 — Deploy program to devnet
-- [ ] Deploy, confirm account exists
+- [ ] Deploy, confirm account exists. **Blocked on SOL.** `lexari.so` is 415,808 bytes. `solana rent` says 2.11 SOL for one account of that size, and deploy holds a buffer of the same size (~4.22 SOL) plus fees. Deployer `EbYuw4JQyG8iTwcEnhQLqPaTounTBDV5i3ApKuyjZDb` has 2.81 SOL on devnet. Need about 2 SOL more, 3 if a retry should have room. Public RPC was not retried.
 - [ ] Commit program id, IDL (`target/idl/lexari.json`, `target/types/lexari.ts`)
 - [ ] **Blocked if:** no deployer key / no devnet SOL — ask, then continue M3
 
 ### M3 — Backend skeleton
-- [ ] Drizzle schema + migrations
-- [ ] SIWS nonce + verify + httpOnly session
-- [ ] Zod on every route, rate limit, no secrets in the client
-- [ ] `.env.example`
-- [ ] **Blocked if:** no `DATABASE_URL` — ship schema anyway, ask for Neon/Supabase URL
+- [x] Drizzle schema + migrations (`webapp/server/db`, `npm run db:migrate -w webapp`)
+- [x] SIWS nonce + verify + httpOnly session (`/api/auth/nonce`, `/api/auth/verify`, `/api/auth/session`, `/api/auth/signout`)
+- [x] Zod on every route, rate limit, no secrets in the client
+- [x] `.env.example` (repo root and `webapp/`)
+- [ ] **Blocked:** no `DATABASE_URL`, so migrate has not been applied and sign-in returns 503 until a Neon or Supabase URL is set. Also need `SESSION_SECRET` (16+ chars).
 
 ### M4 — Engram chat
 - [ ] Cortex stream route
