@@ -42,3 +42,12 @@ export function bridgeFor(address: string | undefined | null) {
 export function useWalletBridge() {
   return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => current, () => null);
 }
+
+/* Sign-out hooks: Privy logout and wallet-adapter disconnect register here so signing out of Lexari ends those sessions too. */
+const hooks = new Map<string, () => Promise<unknown> | unknown>();
+export function onSignOut(key: string, run: (() => Promise<unknown> | unknown) | null) {
+  if (run) hooks.set(key, run); else hooks.delete(key);
+}
+export async function runSignOutHooks() {
+  await Promise.all([...hooks.values()].map((f) => Promise.resolve().then(f).catch(() => {})));
+}

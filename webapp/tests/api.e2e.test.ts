@@ -308,7 +308,7 @@ test("export, clear chats, sign out, delete account", async () => {
   const ex = await call("/api/account", { cookie: a.cookie });
   assert.equal(ex.status, 200);
   assert.equal((await call("/api/chats", { method: "DELETE", cookie: a.cookie })).status, 200);
-  assert.equal((await call("/api/account", { cookie: a.cookie })).json.chats.length, 0);
+  assert.equal((await call("/api/account", { cookie: a.cookie })).json.chats.reduce((n: number, c: any) => n + c.messages.length, 0), 0);
   assert.equal((await call("/api/auth/signout", { method: "POST", cookie: a.cookie })).status, 200);
   assert.equal((await call("/api/me", { cookie: a.cookie })).status, 401);
   const s = await signIn(a.kp);

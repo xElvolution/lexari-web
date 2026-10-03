@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Buffer } from "buffer";
 import { ConnectionProvider, WalletProvider, useWallet } from "@solana/wallet-adapter-react";
-import { setWalletBridge } from "@/lib/walletBridge";
+import { onSignOut, setWalletBridge } from "@/lib/walletBridge";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import { BackpackWalletAdapter } from "@solana/wallet-adapter-backpack";
@@ -14,6 +14,7 @@ if (!(globalThis as { Buffer?: typeof Buffer }).Buffer) (globalThis as { Buffer?
 
 function Bridge() {
   const wallet = useWallet();
+  useEffect(() => { onSignOut("adapter", wallet.connected ? () => wallet.disconnect() : null); }, [wallet]);
   useEffect(() => {
     const { publicKey, signTransaction, signAllTransactions, signMessage } = wallet;
     if (!publicKey || !signTransaction || !signMessage) { setWalletBridge(null, "adapter"); return; }

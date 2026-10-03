@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { useCreateWallet, useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
-import { setWalletBridge } from "@/lib/walletBridge";
+import { onSignOut, setWalletBridge } from "@/lib/walletBridge";
 import { SOLANA_CLUSTER } from "@/lib/nft";
 
 const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "";
@@ -21,7 +21,8 @@ let creating = false;
 
 /** Exposes the Privy (Google / email) Solana wallet to the rest of the app. Creates one if the account has none. */
 function PrivyBridge() {
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated, logout } = usePrivy();
+  useEffect(() => { onSignOut("privy", authenticated ? logout : null); return () => onSignOut("privy", null); }, [authenticated, logout]);
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const wallet = wallets.find((w) => /privy/i.test(w.standardWallet?.name || "")) || wallets[0];

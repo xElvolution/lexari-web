@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { DEMO_GOOGLE, LOOKS, TONES, shortAddr } from "@/content/appData";
+import { LOOKS, TONES, shortAddr } from "@/content/appData";
 import {
-  agentName, clearChats, exportData, setActive, linkMethod, planOf, resetAll, setNotif, setPrefs, signOut, startTour, toast, updateAgent, useApp, type State,
+  agentName, clearChats, deleteAccount, exportData, setActive, planOf, setNotif, setPrefs, signOut, startTour, toast, updateAgent, useApp, type State,
 } from "@/lib/store";
-import { LANDING_URL } from "@shared/sites";
+import { LANDING_URL, WEBAPP_URL } from "@shared/sites";
+import { hirePriceLabel } from "@/lib/prices";
 import Icon from "@/components/Icon";
 import { AgentFace, AgentTile } from "@/components/faces";
-import { DemoTag } from "@/components/ui";
 import { myAgents } from "@/components/agents";
 import { openAdd, openAgent } from "@/components/overlays";
 
@@ -21,8 +21,8 @@ const SECTIONS = [
   { id: "notifications", label: "Notifications", icon: "chat" },
   { id: "data", label: "Data controls", icon: "folder" },
   { id: "security", label: "Security", icon: "pin" },
-  { id: "accounts", label: "Connected accounts", icon: "globe" },
-  { id: "billing", label: "Billing & cards", icon: "wallet" },
+  { id: "accounts", label: "Account", icon: "globe" },
+  { id: "billing", label: "Billing", icon: "wallet" },
   { id: "about", label: "About", icon: "list" },
 ] as const;
 type Sec = (typeof SECTIONS)[number]["id"];
@@ -79,18 +79,15 @@ function General({ s }: { s: State }) {
           </div>
         </Row>
         <Row title="Animations" desc="Smooth motion across the app. Turn off for a calmer screen."><Toggle on={p.motion} onChange={(v) => setPrefs({ motion: v })} label="Animations" /></Row>
-        <Row title="Show demo labels" desc="Keep the small “Demo” tags visible on sample data."><Toggle on={p.demoLabels} onChange={(v) => setPrefs({ demoLabels: v })} label="Show demo labels" /></Row>
       </Group>
       <Group title="Language and voice">
         <Row title="Language" desc="Used for the app and your agents' replies."><Select label="Language" value={p.language} options={["English", "Français", "Español", "Português", "Deutsch", "Yorùbá", "Hausa", "Igbo"]} onChange={(v) => setPrefs({ language: v })} /></Row>
         <Row title="Voice" desc="How agents sound on calls and in voice notes.">
           <Select label="Voice" value={p.voice} options={["Iris", "Nova", "Orbit", "Ember", "Sage"]} onChange={(v) => setPrefs({ voice: v })} />
-          <button onClick={() => toast({ text: `Playing a sample of ${p.voice} (demo, no audio)` })} className={smallBtn}><Icon name="play" size={13} />Play</button>
         </Row>
       </Group>
       <Group title="Chats">
         <Row title="Default agent" desc="Who opens first on the Agents page."><Select label="Default agent" value={p.defaultAgent} options={myAgents(s).map((a) => [a.id, a.name] as [string, string])} onChange={(v) => { setPrefs({ defaultAgent: v }); setActive(v); }} /></Row>
-        <Row title="Send with Enter" desc="Shift+Enter always adds a new line."><Toggle on onChange={() => toast({ text: "Enter to send is always on in the demo" })} label="Send with Enter" /></Row>
       </Group>
       <Group title="Help">
         <Row title="Guided tour" desc={`${agentName(s)} walks you through the app again, step by step.${s.tour?.done ? " You finished it before." : ""}`}><button onClick={() => { startTour(); router.push("/app"); }} className={smallBtn}><Icon name="play" size={14} />Replay tour</button></Row>
@@ -141,10 +138,9 @@ function Personal({ s }: { s: State }) {
 }
 
 function Agents({ s }: { s: State }) {
-  const p = planOf(s);
   return (
     <>
-      <Group title={`Your team · ${1 + s.hired.length} of ${p.seats} seats${s.custom.length ? ` · ${s.custom.length} made by you` : ""}`}>
+      <Group title={`Your team · ${1 + s.hired.length} agent${s.hired.length ? "s" : ""}${s.custom.length ? ` · ${s.custom.length} made by you` : ""}`}>
         {myAgents(s).map((a) => (
           <div key={a.id} className="flex items-center gap-3 py-3.5">
             <AgentTile id={a.id} look={s.agent?.look} size={44} />
@@ -156,7 +152,7 @@ function Agents({ s }: { s: State }) {
       </Group>
       <Group>
         <Row title="Add an agent" desc="Create your own, or hire a specialist from the marketplace."><button onClick={() => openAdd()} className={smallBtn}>Add agent</button></Row>
-        <Row title="Seats and plan" desc="Seats decide how many agents you can have."><Link href="/app/team" className={smallBtn}>Team</Link></Row>
+        <Row title="Your team" desc="Everyone you hired, and the specialists you can bring back for free."><Link href="/app/team" className={smallBtn}>Team</Link></Row>
       </Group>
     </>
   );
@@ -191,18 +187,17 @@ function Data({ s }: { s: State }) {
         <Row title="Help improve Lexari" desc="Share anonymous usage to make agents better. Off by default."><Toggle on={s.prefs.improve} onChange={(v) => setPrefs({ improve: v })} label="Help improve Lexari" /></Row>
       </Group>
       <Group title="Your data">
-        <Row title="Export data" desc="Download everything in this demo as a JSON file."><button onClick={() => { exportData(); toast({ text: "Export downloaded" }); }} className={smallBtn}><Icon name="download" size={15} />Export</button></Row>
+        <Row title="Export data" desc="Download your account, agents, chats, memories and hires as a JSON file."><button onClick={() => { void exportData().then(() => toast({ text: "Export downloaded" }), () => toast({ text: "Export failed. Try again." })); }} className={smallBtn}><Icon name="download" size={15} />Export</button></Row>
         <Row title="Clear all chats" desc="Removes every message. Agents and memory stay."><button onClick={() => { if (confirm("Clear every chat?")) { clearChats(); toast({ text: "All chats cleared" }); } }} className={smallBtn}>Clear</button></Row>
-        <Row title="Reset demo data" desc="Start the demo again from scratch."><button onClick={() => { if (confirm("Reset all demo data in this browser?")) { resetAll(); window.location.assign(LANDING_URL); } }} className={smallBtn}><Icon name="undo" size={15} />Reset</button></Row>
       </Group>
       <Group title="Danger zone">
-        <Row danger title="Delete account" desc="Permanently removes your account, agents, wallets and cards.">{!del && <button onClick={() => setDel(true)} className={dangerBtn}><Icon name="trash" size={15} />Delete</button>}</Row>
+        <Row danger title="Delete account" desc="Permanently removes your account, agents, chats and memories from Lexari. Onchain records and your wallet stay yours.">{!del && <button onClick={() => setDel(true)} className={dangerBtn}><Icon name="trash" size={15} />Delete</button>}</Row>
         {del && (
           <div className="pb-5">
-            <p className="text-[13.5px] text-ink/70">Type <b className="font-mono">DELETE</b> to confirm. In this demo it only wipes data saved in this browser.</p>
+            <p className="text-[13.5px] text-ink/70">Type <b className="font-mono">DELETE</b> to confirm. This cannot be undone.</p>
             <div className="mt-2.5 flex flex-wrap gap-2">
               <input value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Type DELETE" className="field !w-48 !py-2" />
-              <button disabled={typed !== "DELETE"} onClick={() => { resetAll(); window.location.assign(LANDING_URL); }} className="inline-flex h-11 items-center rounded-full bg-[#e5484d] px-4 text-[14px] font-bold text-white disabled:opacity-40">Delete account</button>
+              <button disabled={typed !== "DELETE"} onClick={() => { void deleteAccount().then(() => window.location.assign(LANDING_URL), () => toast({ text: "Could not delete the account. Try again." })); }} className="inline-flex h-11 items-center rounded-full bg-[#e5484d] px-4 text-[14px] font-bold text-white disabled:opacity-40">Delete account</button>
               <button onClick={() => { setDel(false); setTyped(""); }} className={smallBtn}>Cancel</button>
             </div>
           </div>
@@ -212,85 +207,60 @@ function Data({ s }: { s: State }) {
   );
 }
 
-const SESSIONS = [
-  { id: "this", device: "Chrome on Linux", where: "Lagos, NG", when: "Active now", icon: "laptop", current: true },
-  { id: "phone", device: "Safari on iPhone", where: "Lagos, NG", when: "2 hours ago", icon: "phone" },
-  { id: "tab", device: "Firefox on Windows", where: "Abuja, NG", when: "3 days ago", icon: "laptop" },
-];
 function Security({ s }: { s: State }) {
-  const [setup, setSetup] = useState(false);
-  const live = SESSIONS.filter((x) => !s.prefs.signedOut.includes(x.id));
+  const router = useRouter();
+  const google = s.auth?.method === "google";
   return (
     <>
       <Group title="Sign-in protection">
-        <Row title="Two-step verification" desc={s.prefs.twofa ? "On. You'll enter a code from your authenticator app." : "Add a code from an authenticator app when you sign in."}>
-          <Toggle on={s.prefs.twofa} onChange={(v) => { if (v) setSetup(true); else { setPrefs({ twofa: false }); toast({ text: "Two-step verification is off" }); } }} label="Two-step verification" />
-        </Row>
-        {setup && !s.prefs.twofa && (
-          <div className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-center">
-            <div className="grid h-28 w-28 shrink-0 grid-cols-7 gap-0.5 rounded-xl bg-white p-2" aria-label="Setup code (demo)">{Array.from({ length: 49 }).map((_, i) => <i key={i} className={((i * 7919) % 11) % 3 === 0 || [0, 1, 7, 8, 5, 6, 12, 13, 35, 36, 42, 43].includes(i) ? "bg-[#0a0a0a]" : ""} />)}</div>
-            <div className="text-[13.5px] text-ink/70"><p>Scan this with your authenticator app, or enter <b className="font-mono text-ink">LXRI 4F2K 9QZD</b>. Demo code, not a real secret.</p>
-              <div className="mt-3 flex gap-2"><button onClick={() => { setPrefs({ twofa: true }); setSetup(false); toast({ text: "Two-step verification is on (demo)" }); }} className="btn btn-brand btn-sm !h-10">I've added it</button><button onClick={() => setSetup(false)} className={smallBtn}>Cancel</button></div></div>
-          </div>
-        )}
-        <Row title="Passkeys" desc="Sign in with your fingerprint, face or device PIN."><button onClick={() => toast({ text: "Passkeys are coming soon (demo)" })} className={smallBtn}><Icon name="plus" size={15} />Add passkey</button></Row>
+        <Row title={google ? "Google or email" : "Wallet signature"} desc={google ? "Privy checks your Google account or a one-time email code. Your Lexari wallet is created and kept by Privy." : "You sign a one-time message with your wallet. Lexari never sees your keys."} />
+        <Row title="Session" desc="Sessions last up to 30 days on this device. Signing out ends it here and in your wallet." />
       </Group>
-      <Group title="Active sessions">
-        {live.map((x) => (
-          <div key={x.id} className="flex items-center gap-3 py-3.5">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-tint text-ink/75"><Icon name={x.icon} size={18} /></span>
-            <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-[15px] font-semibold text-ink">{x.device}{x.current && <span className="label rounded-full bg-grape px-1.5 py-0.5 text-[8px] text-white">This device</span>}</div><div className="text-[13px] text-ink/55">{x.where} · {x.when}</div></div>
-            {!x.current && <button onClick={() => { setPrefs({ signedOut: [...s.prefs.signedOut, x.id] }); toast({ text: `Signed out of ${x.device}` }); }} className={smallBtn}>Sign out</button>}
-          </div>
-        ))}
-        {live.length > 1 && <Row title="Sign out everywhere else" desc="Ends every session except this one."><button onClick={() => { setPrefs({ signedOut: SESSIONS.filter((x) => !x.current).map((x) => x.id) }); toast({ text: "Signed out of other sessions" }); }} className={dangerBtn}>Sign out all</button></Row>}
+      <Group title="This device">
+        <Row title="Sign out" desc="Ends this session."><button onClick={() => { void signOut().then(() => router.push("/signin")); }} className={smallBtn}><Icon name="out" size={15} />Sign out</button></Row>
       </Group>
     </>
   );
 }
 
 function Accounts({ s }: { s: State }) {
-  const router = useRouter();
-  const walletAddr = s.auth?.address;
-  const methods = [
-    { id: "google" as const, icon: "google", title: "Google", sub: s.links.google ? `${DEMO_GOOGLE.email} · preview` : "Not connected. Google sign-in is a preview." },
-    { id: "wallet" as const, icon: "wallet", title: "Solana wallet", sub: walletAddr ? `${shortAddr(walletAddr)} · ${s.auth?.sub || "Solana"}` : "Not connected. Phantom, Solflare or Backpack." },
-  ];
+  const google = s.auth?.method === "google";
+  const addr = s.auth?.address;
+  const link = s.referralCode ? `${WEBAPP_URL}/signin?ref=${s.referralCode}` : "";
+  const copy = (text: string, what: string) => {
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => toast({ text: `${what} copied` }), () => toast({ text: "Couldn't copy. Long-press to copy instead." }));
+  };
   return (
-    <Group title="Sign in with">
-      {methods.map((m) => { const on = s.links[m.id]; const inUse = s.auth?.method === m.id; return (
-        <div key={m.id} className="flex items-center gap-3 py-4">
-          <span className={`grid h-11 w-11 place-items-center rounded-2xl ${on ? "bg-ink text-[var(--bg)]" : "bg-tint text-ink"}`}><Icon name={m.icon} size={20} /></span>
-          <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-[15px] font-semibold text-ink">{m.title}{inUse && <span className="label rounded-full bg-grape px-1.5 py-0.5 text-[8px] text-white">Signed in</span>}</div><div className="truncate text-[13px] text-ink/55">{m.sub}</div></div>
-          {inUse ? <span className="text-[13px] font-semibold text-ink/50">In use</span> : <button onClick={() => {
-            if (m.id === "wallet" && !on) { router.push("/signin"); return; }
-            if (m.id === "google" && !on) { linkMethod("google", true); toast({ text: "Google is still a preview. Nothing was sent to Google." }); return; }
-            linkMethod(m.id, false);
-            toast({ text: `${m.title} disconnected` });
-          }} className={on ? dangerBtn : smallBtn}>{on ? "Disconnect" : "Connect"}</button>}
+    <>
+      <Group title="Signed in with">
+        <div className="flex items-center gap-3 py-4">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-ink text-[var(--bg)]"><Icon name={google ? "google" : "wallet"} size={20} /></span>
+          <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-[15px] font-semibold text-ink">{google ? "Google or email" : "Solana wallet"}<span className="label rounded-full bg-grape px-1.5 py-0.5 text-[8px] text-white">Signed in</span></div><div className="truncate text-[13px] text-ink/55">{google ? (s.auth?.email || "Privy account") : `${addr ? shortAddr(addr) : ""} · ${s.auth?.sub || "Solana"}`}</div></div>
         </div>
-      ); })}
-    </Group>
+        <Row title={google ? "Lexari wallet" : "Wallet"} desc={addr ? `${shortAddr(addr)} signs your check-ins, quests, ID cards and hires.` : "Your wallet is still loading."}>{addr && <button onClick={() => copy(addr, "Address")} className={smallBtn}><Icon name="copy" size={14} />Copy</button>}</Row>
+      </Group>
+      {s.referralCode && (
+        <Group title="Invite friends">
+          <Row title={`Your code · ${s.referralCode}`} desc="Friends who sign up with your link count toward your referral tiers in the Hub."><button onClick={() => copy(link, "Invite link")} className={smallBtn}><Icon name="copy" size={14} />Copy link</button></Row>
+        </Group>
+      )}
+    </>
   );
 }
 
 function Billing({ s }: { s: State }) {
-  const p = planOf(s); const cards = Object.keys(s.cards).length;
+  const p = planOf(s);
   return (
     <>
       <Group title="Plan">
         <div className="flex flex-wrap items-center gap-5 py-5">
           <div><span className="label text-[9px] text-ink/55">Current plan</span><div className="display mt-1 text-[36px] leading-none text-ink">{p.name}</div></div>
-          <div className="min-w-[180px] flex-1"><div className="flex flex-wrap gap-1">{Array.from({ length: Math.min(p.seats, 20) }).map((_, i) => <i key={i} className={`h-3.5 w-3.5 rounded-[4px] ${i === 0 ? "bg-grape" : i <= s.hired.length ? "bg-lilac" : "border-2 border-dashed border-ink/25"}`} />)}</div><p className="mt-2 text-[13.5px] text-ink/60">{1 + s.hired.length} of {p.seats} seats filled</p></div>
-          <Link href="/app/team" className={smallBtn}>Change plan</Link>
+          <p className="min-w-[180px] flex-1 text-[13.5px] text-ink/60">Your own agent is free. Each specialist is a one-time {hirePriceLabel()} payment from your wallet.</p>
+          <Link href="/app/marketplace" className={smallBtn}>Marketplace</Link>
         </div>
       </Group>
-      <Group title="Agent cards">
-        <Row title="Virtual cards" desc={s.prefs.demoLabels === false ? "Cards are not issued. Hire payments use your Solana wallet." : cards ? `${cards} agent card${cards > 1 ? "s" : ""} active. Freeze, reveal or set limits from Cards.` : "No agent has a card yet. Each card has a one-time fee (demo)."}><Link href="/app/wallets?tab=cards" className={smallBtn}>{s.prefs.demoLabels === false ? "Wallets" : cards ? "Manage cards" : "Get a card"}</Link></Row>
-        <Row title="Wallets" desc={`${Object.keys(s.wallets).length} agent wallet${Object.keys(s.wallets).length === 1 ? "" : "s"}.`}><Link href="/app/wallets" className={smallBtn}>Open wallets</Link></Row>
-      </Group>
-      <Group title="Invoices">
-        <Row title="No invoices" desc={s.prefs.demoLabels === false ? "Nothing has been charged." : "The demo never charges anything, so there's nothing here."} />
+      <Group title="Payments">
+        <Row title="Hires" desc={s.paid.length ? `${s.paid.length} specialist${s.paid.length === 1 ? "" : "s"} paid for. Released ones come back for free.` : "No hires yet."}><Link href="/app/wallets" className={smallBtn}>Wallet</Link></Row>
       </Group>
     </>
   );
@@ -298,19 +268,17 @@ function Billing({ s }: { s: State }) {
 
 function About() {
   const router = useRouter();
-  const demo = useApp()?.prefs.demoLabels !== false;
   return (
     <>
       <Group>
-        <Row title="Version" desc={demo ? "Lexari web · demo build" : "Lexari web"}><span className="font-mono text-[13px] text-ink/60">{demo ? "0.3.0-demo" : "0.4.0"}</span></Row>
-        {demo && <Row title="Sample data" desc="Everything you see runs on example data saved in this browser only. Nothing is live."><DemoTag /></Row>}
+        <Row title="Version" desc="Lexari web"><span className="font-mono text-[13px] text-ink/60">1.0.0</span></Row>
       </Group>
       <Group title="Legal">
         <Row title="Terms of use"><Link href={`${LANDING_URL}/legal/terms`} className={smallBtn}>Read</Link></Row>
         <Row title="Privacy policy"><Link href={`${LANDING_URL}/legal/privacy`} className={smallBtn}>Read</Link></Row>
       </Group>
       <Group>
-        <Row title="Sign out" desc="You can sign back in with Google or a wallet."><button onClick={() => { signOut(); router.push("/signin"); }} className={smallBtn}><Icon name="out" size={15} />Sign out</button></Row>
+        <Row title="Sign out" desc="You can sign back in with Google or a wallet."><button onClick={() => { void signOut().then(() => router.push("/signin")); }} className={smallBtn}><Icon name="out" size={15} />Sign out</button></Row>
       </Group>
     </>
   );

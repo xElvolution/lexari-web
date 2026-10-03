@@ -15,7 +15,7 @@ import type { Account } from "@/server/account";
 import type { HubState } from "@/server/hub/state";
 import { ApiError, api } from "./api";
 import { signOutSession } from "./session";
-import { bridgeFor } from "./walletBridge";
+import { bridgeFor, runSignOutHooks } from "./walletBridge";
 import { openNote, savedKeys, sealNote, unlock } from "./vault";
 
 export type Msg = {
@@ -307,12 +307,14 @@ export async function signIn(..._args: unknown[]) {
 }
 export async function signOut() {
   await signOutSession();
+  await runSignOutHooks();
   state = { ...EMPTY };
   emit();
 }
 /** Deletes the account and everything in it on the server. Onchain records stay onchain. */
 export async function deleteAccount() {
   await api("/api/account", { method: "DELETE" });
+  await runSignOutHooks();
   state = { ...EMPTY };
   emit();
 }

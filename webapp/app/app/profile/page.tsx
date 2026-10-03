@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { DEMO_GOOGLE, shortAddr } from "@/content/appData";
+import { shortAddr } from "@/content/appData";
 import { agentName, planOf, signOut, startTour, toast, updateProfile, useApp, type State } from "@/lib/store";
 import { openAgent } from "@/components/overlays";
 import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
-import { DemoTag } from "@/components/ui";
 import { myAgents } from "@/components/agents";
 
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "Y";
@@ -24,7 +23,7 @@ function EditDialog({ s, onClose }: { s: State; onClose: () => void }) {
     <div className="fixed inset-0 z-[75] flex items-end justify-center bg-black/55 backdrop-blur-sm sm:items-center sm:p-5" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="edit-title" className="pop pb-safe-dlg w-full max-w-[460px] rounded-t-[28px] bg-card p-5 ring-1 ring-line sm:rounded-[28px] sm:p-6">
         <div className="flex items-center justify-between"><h2 id="edit-title" className="display text-[30px] text-ink">Edit profile</h2><button onClick={onClose} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={19} /></button></div>
-        <div className="mt-4 flex items-center gap-4"><span className="grid h-16 w-16 place-items-center rounded-full bg-ink text-[22px] font-bold text-[var(--bg)]">{initials(name)}</span><button onClick={() => toast({ text: "Photo upload is coming soon (demo)" })} className="inline-flex h-10 items-center gap-2 rounded-full bg-tint px-4 text-[14px] font-semibold text-ink hover:bg-grape hover:text-white"><Icon name="edit" size={15} />Change photo</button></div>
+        <div className="mt-4 flex items-center gap-4"><span className="grid h-16 w-16 place-items-center rounded-full bg-ink text-[22px] font-bold text-[var(--bg)]">{initials(name)}</span><span className="text-[13.5px] text-ink/55">Your initials show on your profile.</span></div>
         <label className="mt-5 block"><span className="label text-[9.5px] text-ink/60">Display name</span><input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} className="field mt-1.5 !py-2.5" /></label>
         <label className="mt-3 block"><span className="label text-[9.5px] text-ink/60">Username</span>
           <span className="relative mt-1.5 block"><span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-ink/45">@</span><input value={user} onChange={(e) => setUser(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20))} className="field !py-2.5 !pl-8" /></span>
@@ -49,9 +48,10 @@ export default function ProfilePage() {
   const tz = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "";
   const uid = `lx_${(p.username + "0000").slice(0, 4)}${String(p.since).slice(-6)}`;
   const info: [string, string, string][] = [
-    ["google", "Email", s.links.google ? `${DEMO_GOOGLE.email} · preview` : "Not connected"],
-    ["wallet", "Wallet sign-in", s.auth?.address ? shortAddr(s.auth.address) : "Not connected"],
-    ["user", "Signed in with", s.auth?.method === "wallet" ? (s.auth.sub || "Solana wallet") : "Google preview"],
+    ...(s.auth?.email ? [["google", "Email", s.auth.email] as [string, string, string]] : []),
+    ["wallet", "Wallet", s.auth?.address ? shortAddr(s.auth.address) : "Loading"],
+    ["user", "Signed in with", s.auth?.method === "wallet" ? (s.auth.sub || "Solana wallet") : "Google or email"],
+    ...(s.referralCode ? [["star", "Invite code", s.referralCode] as [string, string, string]] : []),
     ["spark", "Member since", new Date(p.since).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
     ["globe", "Time zone", tz || "Not set"],
     ["list", "User ID", uid],
@@ -61,7 +61,6 @@ export default function ProfilePage() {
     <>
       <section data-rise className="overflow-hidden rounded-[30px] bg-card ring-1 ring-line">
         <div className="grain relative h-32 bg-[linear-gradient(120deg,#2a0f9a,#5b2bff_55%,#8f6bff)] sm:h-40">
-          <span className="absolute right-4 top-4"><DemoTag className="!border-white/50 !text-white" /></span>
         </div>
         <div className="px-5 pb-6 sm:px-8">
           <div className="relative z-10 -mt-12 flex flex-wrap items-end gap-4 sm:-mt-14">
@@ -69,7 +68,7 @@ export default function ProfilePage() {
             <div className="ml-auto flex gap-2 pb-1">
               <button onClick={() => setEdit(true)} className="btn btn-ghost btn-sm !h-10"><Icon name="edit" size={15} />Edit profile</button>
               <button onClick={() => { startTour(); router.push("/app"); }} className="btn btn-ghost btn-sm !h-10"><Icon name="play" size={14} />Replay tour</button>
-              <button onClick={() => { signOut(); router.push("/signin"); }} className="btn btn-line btn-sm !h-10 text-ink"><Icon name="out" size={15} />Sign out</button>
+              <button onClick={() => { void signOut().then(() => router.push("/signin")); }} className="btn btn-line btn-sm !h-10 text-ink"><Icon name="out" size={15} />Sign out</button>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2.5">
@@ -82,7 +81,6 @@ export default function ProfilePage() {
             <span><b className="text-ink">{team.length}</b> <span className="text-ink/60">agents</span></span>
             <span><b className="text-ink">{s.groups.length}</b> <span className="text-ink/60">groups</span></span>
             <span><b className="text-ink">{s.memory.length}</b> <span className="text-ink/60">memories</span></span>
-            <span><b className="text-ink">{Object.keys(s.cards).length}</b> <span className="text-ink/60">cards</span></span>
           </div>
         </div>
       </section>
@@ -94,12 +92,12 @@ export default function ProfilePage() {
             {info.map(([ic, k, v]) => (
               <div key={k} className="flex items-center gap-3 py-3 text-[14.5px]">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-tint text-ink/70"><Icon name={ic} size={16} /></span>
-                <dt className="text-ink/60">{k}</dt><dd className={`ml-auto truncate font-semibold text-ink ${k === "User ID" || k === "Wallet sign-in" ? "font-mono text-[13px]" : ""}`}>{v}</dd>
+                <dt className="text-ink/60">{k}</dt><dd className={`ml-auto truncate font-semibold text-ink ${k === "User ID" || k === "Wallet" || k === "Invite code" ? "font-mono text-[13px]" : ""}`}>{v}</dd>
               </div>
             ))}
           </dl>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/app/settings#accounts" className="inline-flex h-10 items-center gap-2 rounded-full bg-tint px-4 text-[14px] font-semibold text-ink hover:bg-grape hover:text-white">Connected accounts</Link>
+            <Link href="/app/settings#accounts" className="inline-flex h-10 items-center gap-2 rounded-full bg-tint px-4 text-[14px] font-semibold text-ink hover:bg-grape hover:text-white">Account</Link>
             <Link href="/app/settings#security" className="inline-flex h-10 items-center gap-2 rounded-full bg-tint px-4 text-[14px] font-semibold text-ink hover:bg-grape hover:text-white">Security</Link>
           </div>
         </section>
@@ -115,9 +113,8 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between"><h2 className="text-[17px] font-bold text-ink">What they know about you</h2><Link href="/app/memory" className="text-[13.5px] font-bold text-brand-ink hover:underline">Brain</Link></div>
             <ul className="mt-3 space-y-2">{about.length ? about.map((m) => <li key={m.id} className="flex items-start gap-2.5 text-[14.5px] text-ink/80"><i className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-grape" />{m.text}</li>) : <li className="text-[14.5px] text-ink/60">Nothing yet. Tell {agentName(s)} something with “remember…”.</li>}</ul>
           </section>
-          <section data-rise className="grid grid-cols-2 gap-3">
-            <Link href="/app/wallets" className="rounded-[22px] bg-card p-4 ring-1 ring-line transition hover:ring-grape/60"><Icon name="wallet" size={20} className="text-brand-ink" /><div className="mt-2 text-[15px] font-bold text-ink">Wallets</div><div className="text-[13px] text-ink/55">{Object.keys(s.wallets).length} active</div></Link>
-            <Link href="/app/wallets?tab=cards" className="rounded-[22px] bg-card p-4 ring-1 ring-line transition hover:ring-grape/60"><Icon name="file" size={20} className="text-brand-ink" /><div className="mt-2 text-[15px] font-bold text-ink">Cards</div><div className="text-[13px] text-ink/55">{Object.keys(s.cards).length} active</div></Link>
+          <section data-rise className="grid gap-3">
+            <Link href="/app/wallets" className="rounded-[22px] bg-card p-4 ring-1 ring-line transition hover:ring-grape/60"><Icon name="wallet" size={20} className="text-brand-ink" /><div className="mt-2 text-[15px] font-bold text-ink">Lexari wallet</div><div className="text-[13px] text-ink/55">{s.auth?.address ? shortAddr(s.auth.address) : "Balances and activity"}</div></Link>
           </section>
         </div>
       </div>
