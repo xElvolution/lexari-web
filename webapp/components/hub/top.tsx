@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { toast, todayKey, type State } from "@/lib/store";
 import { STREAK_PAY, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, levelOf, nextReset, streakOf, weekStart } from "@/lib/hub";
@@ -169,6 +169,8 @@ export function CheckIn({ s, now }: { s: State; now: number }) {
 }
 
 /** Daily mystery box: shake, pop the lid, reveal the coins. */
+const LID_OPEN = { y: -26, rotate: -18, transformOrigin: "20% 100%" };
+
 export function MysteryBox({ s, now }: { s: State; now: number }) {
   const h = hubOf(s);
   const opened = h.boxes.includes(todayKey(now));
@@ -176,14 +178,20 @@ export function MysteryBox({ s, now }: { s: State; now: number }) {
   const [phase, setPhase] = useState<"idle" | "shaking" | "open">(opened ? "open" : "idle");
   const box = useRef<HTMLDivElement>(null);
   const lid = useRef<SVGGElement>(null);
-  useEffect(() => { if (!opened) setPhase("idle"); }, [opened]);
+  // Already opened today (e.g. after a reload): rest the lid in the same pose the pop ends on, no replay.
+  // When the next box is due, close it again.
+  useLayoutEffect(() => {
+    const el = lid.current; if (!el) return;
+    if (!opened) { gsap.set(el, { clearProps: "all" }); el.removeAttribute("transform"); setPhase("idle"); return; }
+    if (!gsap.isTweening(el)) gsap.set(el, LID_OPEN);
+  }, [opened]);
   const open = () => {
     if (phase !== "idle") return;
     setPhase("shaking");
     setTimeout(() => {
       const r = hub.openBox(now || Date.now());
       setPhase("open");
-      if (lid.current) gsap.fromTo(lid.current, { y: 0, rotate: 0 }, { y: -26, rotate: -18, transformOrigin: "20% 100%", duration: 0.5, ease: "back.out(2)" });
+      if (lid.current) gsap.fromTo(lid.current, { y: 0, rotate: 0 }, { ...LID_OPEN, duration: 0.5, ease: "back.out(2)" });
       flyCoins(box.current, r.coins); burst(box.current, 22);
       toast({ text: r.coins >= 120 ? `Jackpot! +${r.coins} coins` : `Mystery box · +${r.coins} coins`, face: "home" });
     }, 850);
