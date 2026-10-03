@@ -135,7 +135,7 @@ function sync(p: Promise<unknown>, undo?: () => void) {
 }
 
 /* ---------- loading the account ---------- */
-const hello = (a: Agent): Msg => ({ id: "hello", from: "home", at: 0, text: `Hi${a.you ? ` ${a.you}` : ""}, I'm ${a.name}. Ask me anything.` });
+const hello = (a: Agent, at = Date.now()): Msg => ({ id: "hello", from: "home", at, text: `Hi${a.you ? ` ${a.you}` : ""}, I'm ${a.name}. Ask me anything.` });
 
 function customFrom(a: Account["agents"][number]): CustomAgent {
   const look = (a.look && typeof a.look === "object" ? a.look : {}) as Partial<CustomAgent>;
@@ -184,7 +184,7 @@ function fromAccount(acc: Account): State {
     threads[c.slug] = c.messages.map((m) => m as Msg);
     if (c.kind === "group") groups.push({ id: c.slug, name: c.title, members: c.members, at: c.createdAt });
   }
-  if (agent && !(threads.home || []).length) threads.home = [hello(agent)];
+  if (agent && !(threads.home || []).length) threads.home = [hello(agent, Number(acc.user.createdAt) || Date.now())];
   const custom = acc.agents.filter((a) => a.kind === "custom").map(customFrom);
   let active = "home";
   try { active = localStorage.getItem(`${ACTIVE_KEY}:${acc.user.wallet}`) || "home"; } catch {}
