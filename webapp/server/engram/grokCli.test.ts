@@ -20,7 +20,8 @@ test("flattens a transcript into one prompt and keeps the system prompt apart", 
     { role: "assistant", content: "hello" },
     { role: "user", content: "what's up" },
   ]);
-  assert.equal(system, "You are Juniper.");
+  assert.ok(system.startsWith("You are Juniper.\n\n"));
+  assert.match(system, /cannot run code/);
   assert.match(prompt, /Person: hi\nYou: hello/);
   assert.match(prompt, /Person: what's up/);
 });

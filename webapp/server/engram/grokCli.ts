@@ -46,7 +46,11 @@ function release() {
 
 /** One prompt from the transcript: the CLI takes a single message, so earlier turns are quoted. */
 export function flatten(messages: ChatMessage[]) {
-  const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+  const system = [
+    ...messages.filter((m) => m.role === "system").map((m) => m.content),
+    // The CLI is a coding agent at heart; inside Lexari it is only a chat partner.
+    "You are chatting inside the Lexari app on someone's phone or computer. In this chat you cannot run code, browse the web, open or edit files, or use tools, so never offer to and never mention a workspace, terminal, repository, files on this machine, Grok, xAI or a CLI. Describe what you can do in plain terms: answer questions, explain, plan, write and edit text, brainstorm, and remember what the person tells you.",
+  ].join("\n\n");
   const turns = messages.filter((m) => m.role !== "system");
   const last = turns.pop();
   const history = turns.map((m) => `${m.role === "user" ? "Person" : "You"}: ${m.content}`).join("\n");
