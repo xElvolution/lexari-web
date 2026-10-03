@@ -15,13 +15,17 @@ if (!(globalThis as { Buffer?: typeof Buffer }).Buffer) (globalThis as { Buffer?
 function Bridge() {
   const wallet = useWallet();
   useEffect(() => {
-    if (!wallet.publicKey || !wallet.signTransaction) { setWalletBridge(null); return; }
+    const { publicKey, signTransaction, signAllTransactions, signMessage } = wallet;
+    if (!publicKey || !signTransaction || !signMessage) { setWalletBridge(null, "adapter"); return; }
     setWalletBridge({
-      publicKey: wallet.publicKey,
-      signTransaction: (tx) => wallet.signTransaction!(tx),
-      signMessage: wallet.signMessage ? (msg) => wallet.signMessage!(msg) : undefined,
-    });
-    return () => setWalletBridge(null);
+      source: "adapter",
+      name: wallet.wallet?.adapter.name || "Wallet",
+      publicKey,
+      signTransaction: (tx) => signTransaction(tx),
+      signAllTransactions: signAllTransactions ? (txs) => signAllTransactions(txs) : undefined,
+      signMessage: (msg) => signMessage(msg),
+    }, "adapter");
+    return () => setWalletBridge(null, "adapter");
   }, [wallet]);
   return null;
 }

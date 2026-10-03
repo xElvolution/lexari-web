@@ -8,9 +8,12 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletReadyState, type WalletAdapter } from "@solana/wallet-adapter-base";
 
 type SigningAdapter = WalletAdapter & { signMessage?: (message: Uint8Array) => Promise<Uint8Array> };
-import { DEMO_GOOGLE, WALLETS, shortAddr, type WalletId } from "@/content/appData";
-import { get, signIn, startDemo } from "@/lib/store";
+import { WALLETS, shortAddr, type WalletId } from "@/content/appData";
+import { get, signIn } from "@/lib/store";
 import { usePrivy } from "@privy-io/react-auth";
+import { signInWithWallet } from "@/lib/session";
+import { friendly } from "@/lib/api";
+import { useWalletBridge } from "@/lib/walletBridge";
 import { LANDING_URL } from "@shared/sites";
 import Logo from "@shared/components/Logo";
 import ThemeToggle from "@shared/components/ThemeToggle";
@@ -18,7 +21,7 @@ import Face from "@shared/components/Face";
 import Icon from "@/components/Icon";
 import { SpecFace } from "@/components/faces";
 
-type Flow = null | { method: "google" } | { method: "wallet"; wallet: WalletId };
+type Flow = null | { method: "wallet"; wallet: WalletId };
 type Phase = "connect" | "sign" | "signing" | "done" | "error";
 
 const PRIVY_ON = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID;
@@ -65,20 +68,15 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
   const adapterRef = useRef<SigningAdapter | null>(null);
   const [phase, setPhase] = useState<Phase>("connect");
   const [address, setAddress] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
   const [err, setErr] = useState("");
   const card = useRef<HTMLDivElement>(null);
-  const wallet = flow.method === "wallet" ? WALLETS.find((w) => w.id === flow.wallet)! : null;
+  const wallet = WALLETS.find((w) => w.id === flow.wallet)!;
 
   useEffect(() => {
     if (card.current) gsap.fromTo(card.current, { y: 40, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.6)" });
   }, [flow]);
 
   useEffect(() => {
-    if (flow.method === "google") {
-      const t = setTimeout(() => setPhase("done"), 1500);
-      return () => clearTimeout(t);
-    }
     const wanted = WALLETS.find((w) => w.id === flow.wallet)!;
     let cancel = false;
     const ready = async (adapter: SigningAdapter) => {
@@ -124,73 +122,33 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
     return () => { cancel = true; };
   }, [flow]);
 
-  useEffect(() => {
-    if (phase !== "sign" || !address || flow.method !== "wallet") return;
-    let cancel = false;
-    (async () => {
-      setMessage("");
-      try {
-        const res = await fetch("/api/auth/nonce", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ wallet: address }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (cancel) return;
-        if (!res.ok || typeof data.message !== "string") {
-          setErr(typeof data.error === "string" ? data.error : "Could not start sign-in.");
-          setPhase("error");
-          return;
-        }
-        setMessage(data.message);
-      } catch {
-        if (!cancel) { setErr("Could not reach sign-in."); setPhase("error"); }
-      }
-    })();
-    return () => { cancel = true; };
-  }, [phase, address, flow]);
-
   const sign = async () => {
     const adapter = adapterRef.current;
-    const pk = adapter?.publicKey?.toBase58();
+    const pk = adapter?.publicKey;
     if (!adapter || !pk || !adapter.signMessage) { setErr("This wallet cannot sign a message."); setPhase("error"); return; }
-    if (!message) { setErr("The sign-in message is not ready."); return; }
     setPhase("signing"); setErr("");
     try {
-      const signed = await adapter.signMessage(new TextEncoder().encode(message));
-      let binary = "";
-      for (const byte of signed) binary += String.fromCharCode(byte);
-      const referral = new URLSearchParams(window.location.search).get("ref") || undefined;
-      const res = await fetch("/api/auth/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ wallet: pk, message, signature: btoa(binary), referral }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setErr(typeof data.error === "string" ? data.error : "Sign-in was rejected.");
-        setPhase("sign");
-        return;
-      }
-      setAddress(pk);
+      await signInWithWallet({ source: "adapter", name: adapter.name, publicKey: pk, signMessage: (m) => adapter.signMessage!(m), signTransaction: (tx) => Promise.reject(new Error(`unused ${tx ? "" : ""}`)) });
+      setAddress(pk.toBase58());
       setPhase("done");
     } catch (e) {
-      const m = (e as Error)?.message || "The signature failed.";
-      setErr(/reject|denied|cancel/i.test(m) ? "You cancelled the signature." : m.split("\n")[0].slice(0, 160));
+      setErr(friendly(e, "Sign-in was rejected."));
       setPhase("sign");
     }
   };
 
   useEffect(() => {
-    if (phase !== "done") return;
-    if (flow.method === "wallet") {
-      if (!address) return;
-      signIn("wallet", flow.wallet, address);
-    } else return;
+    if (phase !== "done" || !address) return;
+    let cancel = false;
     const name = new URLSearchParams(window.location.search).get("name");
-    const t = setTimeout(() => router.push(get().onboarded ? "/app" : `/onboarding${name ? `?name=${encodeURIComponent(name)}` : ""}`), 1300);
-    return () => clearTimeout(t);
-  }, [phase, flow, router, address]);
+    const started = Date.now();
+    void signIn().then(() => {
+      if (cancel) return;
+      const wait = Math.max(0, 1100 - (Date.now() - started));
+      setTimeout(() => { if (!cancel) router.push(get().onboarded ? "/app" : `/onboarding${name ? `?name=${encodeURIComponent(name)}` : ""}`); }, wait);
+    });
+    return () => { cancel = true; };
+  }, [phase, router, address]);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm" onClick={phase === "done" ? undefined : onClose}>
@@ -204,34 +162,35 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
           ) : (
             <>
               <span className="absolute inset-0 rounded-full bg-tint" /><span className="ring-out absolute inset-0 rounded-full border-2 border-grape" /><span className="ring-out absolute inset-0 rounded-full border-2 border-grape [animation-delay:1.1s]" />
-              {flow.method === "google" ? <span className="grid h-14 w-14 place-items-center rounded-2xl bg-ink text-[var(--bg)]"><Icon name="google" size={28} /></span> : <WalletGlyph id={flow.wallet} />}
+              <WalletGlyph id={flow.wallet} />
             </>
           )}
         </div>
         <h2 className="display mt-6 text-[34px]">
-          {phase === "done" ? "You're in." : phase === "error" ? "That didn't connect." : flow.method === "google" ? "Preview only" : phase === "connect" ? `Opening ${wallet!.name}…` : "Sign to prove it's you"}
+          {phase === "done" ? "You're in." : phase === "error" ? "That didn't connect." : phase === "connect" ? `Opening ${wallet!.name}…` : "Sign to prove it's you"}
         </h2>
         <p className="mt-2 text-[15px] text-ink/75">
           {phase === "error" ? err
             : phase === "done"
-              ? `Signed in as ${flow.method === "google" ? DEMO_GOOGLE.email : shortAddr(address || "")}. Taking you to your agent.`
-              : flow.method === "google" ? "Google sign-in is a preview. Nothing is sent to Google." : phase === "connect" ? "Approve the connection in your wallet." : "One signature, no transaction. It just proves the wallet is yours."}
+              ? `Signed in as ${shortAddr(address || "")}. Taking you to your agent.`
+              : phase === "connect" ? "Approve the connection in your wallet." : "One signature, no transaction. It just proves the wallet is yours."}
         </p>
         {(phase === "sign" || phase === "signing") && wallet && address && (
           <div className="mt-5 rounded-2xl bg-alt p-4 text-left ring-1 ring-line">
-            <div className="label text-[9px] text-ink/60">Message to sign</div>
-            <p className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-[12px] leading-relaxed text-ink">{message || "Preparing the sign-in message…"}</p>
+            <div className="label text-[9px] text-ink/60">Signing in as</div>
+            <p className="mt-1.5 break-all font-mono text-[12px] leading-relaxed text-ink">{address}</p>
+            <p className="mt-1 text-[12.5px] text-ink/65">Your wallet shows the exact message. It names this site and expires in 10 minutes.</p>
             {err && <p className="mt-2 text-[13px] text-[#e5484d]">{err}</p>}
-            <button onClick={sign} disabled={phase === "signing" || !message} className="btn btn-brand mt-4 w-full !h-12 !text-[15px] disabled:opacity-60">{phase === "signing" ? "Waiting for wallet…" : message ? "Sign message" : "Preparing…"}</button>
+            <button onClick={sign} disabled={phase === "signing"} className="btn btn-brand mt-4 w-full !h-12 !text-[15px] disabled:opacity-60">{phase === "signing" ? "Waiting for wallet…" : "Sign message"}</button>
           </div>
         )}
-        {phase === "error" && flow.method === "wallet" && isMobile() && (
+        {phase === "error" && isMobile() && (
           <a href={walletBrowse(flow.wallet)} className="btn btn-brand mt-5 w-full !h-12 !text-[15px]">Open in the {wallet!.name} app</a>
         )}
-        {phase === "error" && flow.method === "wallet" && !isMobile() && /not installed|not available/i.test(err) && (
+        {phase === "error" && !isMobile() && /not installed|not available/i.test(err) && (
           <a href={DOWNLOAD[flow.wallet]} target="_blank" rel="noreferrer" className="btn btn-brand mt-5 w-full !h-12 !text-[15px]">Get {wallet!.name}</a>
         )}
-        <p className="label mt-5 text-[9px] text-ink/55">{flow.method === "google" ? "Preview. Nothing is sent to Google." : "Solana wallet. One signature, no transaction."}</p>
+        <p className="label mt-5 text-[9px] text-ink/55">Solana wallet. One signature, no transaction.</p>
       </div>
     </div>
   );
@@ -241,21 +200,37 @@ export default function SignIn() {
   const [flow, setFlow] = useState<Flow>(null);
   const root = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { ready, authenticated, user, login } = usePrivy();
+  const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy();
+  const bridge = useWalletBridge();
   const entered = useRef(false);
   const [slow, setSlow] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [privyStep, setPrivyStep] = useState<"" | "wallet" | "sign" | "error">("");
+  const [privyErr, setPrivyErr] = useState("");
   useEffect(() => { setMobile(isMobile()); if (ready || !PRIVY_ON) return; const t = setTimeout(() => setSlow(true), 12000); return () => clearTimeout(t); }, [ready]);
-  const googleNote = !PRIVY_ON ? "Sign-in by Google or email is not set up here yet. Use a wallet." : ready ? "No wallet needed. A new agent starts empty." : slow ? "Sign-in could not load. Check your connection and reload." : "Loading sign-in…";
+  const googleNote = !PRIVY_ON ? "Sign-in by Google or email is not set up here yet. Use a wallet." : ready ? "No wallet needed. We make one for you." : slow ? "Sign-in could not load. Check your connection and reload." : "Loading sign-in…";
+  // After Google or email: the Privy wallet signs the same sign-in message a Phantom user would.
   useEffect(() => {
     if (!ready || !authenticated || !user || entered.current) return;
+    if (!bridge || bridge.source !== "privy") { setPrivyStep("wallet"); return; }
     entered.current = true;
+    setPrivyStep("sign");
     const email = user.google?.email || user.email?.address || "";
-    const name = user.google?.name || (email ? email.split("@")[0] : "") || "You";
-    signIn("google", undefined, user.id, user.google?.name || email || name);
-    const first = name.split(" ")[0] || "";
-    router.push(get().onboarded ? "/app" : `/onboarding${first ? `?name=${encodeURIComponent(first)}` : ""}`);
-  }, [ready, authenticated, user, router]);
+    const first = (user.google?.name || (email ? email.split("@")[0] : "")).split(" ")[0] || "";
+    (async () => {
+      try {
+        const privyToken = (await getAccessToken()) || undefined;
+        await signInWithWallet(bridge, { privyToken, ...(email ? { email } : {}) });
+        await signIn();
+        router.push(get().onboarded ? "/app" : `/onboarding${first ? `?name=${encodeURIComponent(first)}` : ""}`);
+      } catch (e) {
+        entered.current = false;
+        setPrivyErr(friendly(e, "Sign-in did not finish."));
+        setPrivyStep("error");
+      }
+    })();
+  }, [ready, authenticated, user, bridge, router, getAccessToken]);
+  const privyBusy = authenticated && (privyStep === "wallet" || privyStep === "sign");
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = gsap.context(() => {
@@ -288,18 +263,19 @@ export default function SignIn() {
 
       <section className="relative flex items-center justify-center px-5 py-10 sm:px-10">
         <div className="absolute right-6 top-6 z-10 flex items-center gap-2">
-          <button type="button" onClick={() => { startDemo(); router.push("/app"); }} className="btn btn-line !h-10 !px-4 text-[13px] text-ink">Try the demo</button>
           <span className="hidden lg:block"><ThemeToggle /></span>
         </div>
         <div className="w-full max-w-[440px]">
           <h2 data-in className="display text-[40px] sm:text-[52px]">Welcome in.</h2>
           <p data-in className="mt-2 text-[16px] text-ink/75">Pick how you want to sign in. No new password to remember.</p>
 
-          <button data-in disabled={!PRIVY_ON || !ready} onClick={() => login()} className="group mt-8 flex w-full items-center gap-4 rounded-[22px] bg-ink p-2 pr-5 text-left text-[var(--bg)] shadow-[0_6px_0_#5b2bff] transition hover:-translate-y-1 hover:shadow-[0_9px_0_#5b2bff] active:scale-[.98] disabled:opacity-60">
+          <button data-in disabled={!PRIVY_ON || !ready || privyBusy} onClick={() => { setPrivyErr(""); setPrivyStep(""); if (authenticated) { entered.current = false; void logout().then(() => login()); } else login(); }} className="group mt-8 flex w-full items-center gap-4 rounded-[22px] bg-ink p-2 pr-5 text-left text-[var(--bg)] shadow-[0_6px_0_#5b2bff] transition hover:-translate-y-1 hover:shadow-[0_9px_0_#5b2bff] active:scale-[.98] disabled:opacity-60">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--bg)] text-ink"><Icon name="google" size={24} /></span>
-            <span className="flex-1"><span className="block text-[17px] font-bold">Continue with Google or email</span><span className="block text-[13px] opacity-70">{googleNote}</span></span>
+            <span className="flex-1"><span className="block text-[17px] font-bold">Continue with Google or email</span><span className="block text-[13px] opacity-70">{privyStep === "wallet" && authenticated ? "Setting up your wallet…" : privyStep === "sign" ? "Signing you in…" : googleNote}</span></span>
             <Icon name="arrow" size={20} className="transition group-hover:translate-x-1" />
           </button>
+
+          {privyStep === "error" && <p role="alert" className="mt-3 text-[13.5px] text-[#e5484d]">{privyErr} Tap the button to try again.</p>}
 
           <div data-in className="my-7 flex items-center gap-3"><span className="h-px flex-1 bg-line" /><span className="label text-[10px] text-ink/60">or a Solana wallet</span><span className="h-px flex-1 bg-line" /></div>
 
@@ -317,7 +293,7 @@ export default function SignIn() {
               </li>
             ))}
           </ul>
-          <p data-in className="mt-7 text-[13px] leading-relaxed text-ink/65">Google and a Solana wallet each open your own account. Try the demo, on the right, is the only place with sample chats.</p>
+          <p data-in className="mt-7 text-[13px] leading-relaxed text-ink/65">Google or email and a Solana wallet each open their own account. Every account starts empty.</p>
         </div>
       </section>
       {flow && <Sheet flow={flow} onClose={() => setFlow(null)} />}

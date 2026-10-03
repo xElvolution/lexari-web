@@ -1,20 +1,26 @@
 "use client";
 
 /**
- * Client-side app state, saved in localStorage.
- * The ID card and memory records also write to Solana when a wallet is connected.
- * Chat replies come from the Engram route. The thread on this device is the live transcript.
+ * App state. The account lives on the server (Postgres, behind a signed-in session) and on Solana.
+ * This module loads it once from /api/me, keeps it in memory for the UI, and sends every change
+ * to the API. Memories are encrypted in the browser (lib/vault.ts) before they leave it.
  */
 import type { FaceLook } from "@shared/components/avatar";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
-  DEMO_GOOGLE, PLANS, SEED_JOBS, SEED_MEMORY, SPECIALISTS, WALLETS, cannedReply, groupReply, registerCustom, scriptFor, shortAddr, walletFor,
+  PLANS, SPECIALISTS, WALLETS, registerCustom, shortAddr,
   type CustomAgent, type Job, type MemoryTag, type PlanId, type ToneId, type WalletId,
 } from "@/content/appData";
+import type { Account } from "@/server/account";
+import type { HubState } from "@/server/hub/state";
+import { ApiError, api } from "./api";
+import { signOutSession } from "./session";
+import { bridgeFor } from "./walletBridge";
+import { openNote, savedKeys, sealNote, unlock } from "./vault";
 
 export type Msg = {
   id: string; from: string; text: string; at: number; jobId?: number;
-  file?: { name: string; size: string }; // an attachment (demo: only the name and size are kept)
+  file?: { name: string; size: string }; // an attachment: only its name and size are sent
   voice?: number; // a voice note, length in seconds
   call?: number; // a call log line, length in seconds
   re?: Record<string, string[]>; // reactions: emoji → who reacted ("you" or an agent id)
@@ -23,7 +29,7 @@ export type Msg = {
 /** Your own notes on any agent. Hired agents only get nick, notes and memory; the maker controls the rest. */
 export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; about?: string; skills?: string[]; /** onchain ID card, once minted */ nft?: import("@/lib/nft").NftRecord };
 export type Tour = { on: boolean; step: number; done: boolean };
-/** Local coins and the days they checked in. Coins are kept on this device. */
+/** Coins (from the onchain Player account) and check-in days. */
 export type BondLog = { days: string[]; coins: number; claimed: string[] };
 export type Group = { id: string; name: string; members: string[]; at: number };
 export type Card = { number: string; exp: string; cvv: string; frozen: boolean; limit: number; at: number };
@@ -38,84 +44,67 @@ export const DEFAULT_PREFS: Prefs = {
   motion: true, demoLabels: false, instructions: "", twofa: false, signedOut: [],
   notif: { replies: true, groups: true, calls: true, wallet: true, cards: true, digest: false, product: false },
 };
-export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number; chainHash?: string; chainAsset?: string; pendingChain?: boolean; serverId?: string };
+/** A memory. `locked` until this device has the key (one wallet signature). */
+export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number; chainHash?: string; chainAsset?: string; chainTx?: string; pendingChain?: boolean; serverId?: string; locked?: boolean; saving?: boolean };
 /** look: a seed number (null = the house face) or a face built in the creator */
 export type AgentLook = number | null | FaceLook;
 export type Agent = { name: string; look: AgentLook; you: string; role: string; tone: ToneId };
-export type Auth = { method: "google" | "wallet"; label: string; sub: string; wallet?: WalletId; address?: string };
+export type Auth = { method: "google" | "wallet"; label: string; sub: string; wallet?: WalletId; address?: string; email?: string };
 export type State = {
   v: 1; auth: Auth | null; links: { google: boolean; wallet: boolean };
   agent: Agent | null; onboarded: boolean; plan: PlanId; hired: string[];
   memory: Note[]; jobs: Job[]; chat: Msg[]; nextJob: number;
-  threads: Record<string, Msg[]>; // one chat per agent ("home" or a specialist slug) or per group ("g-…")
+  threads: Record<string, Msg[]>; // one chat per agent ("home", a specialist slug, "c-…") or per group ("g-…")
   groups: Group[]; active: string; // the conversation open on Home
-  wallets: Record<string, string>; // agent id → wallet address (demo). Only your own agent has one at first.
-  cards: Record<string, Card>; // agent id → its virtual card (demo)
+  wallets: Record<string, string>; // agent id → wallet address. Your agents use your wallet.
+  cards: Record<string, Card>;
   prefs: Prefs; profile: Profile | null;
   custom: CustomAgent[]; // agents you made (ids start with "c-")
   born: Record<string, number>; // agent id → the day it joined you (printed on its ID card)
   meta: Record<string, AgentMeta>;
   tour: Tour;
   bond: BondLog;
-  /** Hub: quests, agent levels, referrals, achievements. See lib/hub.ts. Coins live in bond.coins. */
   hub?: import("@/lib/hub").HubData;
+  /** Hub state from the server (chain accounts + server records). */
+  live?: HubState | null;
+  /** Specialists you have paid for (a released one can come back for free). */
+  paid: string[];
+  referralCode: string;
+  memoryLocked: boolean;
 };
 
-const DEMO_KEY = "lexari-app-v1";
-const LIVE_KEY = "lexari-live";
-const POINTER = "lexari-active";
-let activeKey = LIVE_KEY;
-
-function currentKey() {
-  if (typeof localStorage === "undefined") return activeKey;
-  try { return localStorage.getItem(POINTER) || LIVE_KEY; } catch { return activeKey; }
-}
-const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null, custom: [], born: {}, meta: {}, tour: { on: false, step: 0, done: false }, bond: { days: [], coins: 0, claimed: [] } };
+const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null, custom: [], born: {}, meta: {}, tour: { on: false, step: 0, done: false }, bond: { days: [], coins: 0, claimed: [] }, live: null, paid: [], referralCode: "", memoryLocked: false };
 
 let state: State | null = null;
+let loading: Promise<void> | null = null;
+let loadError = "";
 const subs = new Set<() => void>();
-const uid = () => Math.random().toString(36).slice(2, 10);
+const uid = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "").slice(0, 12) : Math.random().toString(36).slice(2, 14));
+const ACTIVE_KEY = "lexari-active-convo";
 
-function load(): State {
-  activeKey = currentKey();
-  try { const raw = localStorage.getItem(activeKey); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; if (!Array.isArray(st.groups)) st.groups = [];
-      if (!s.wallets) st.wallets = {};
-      st.prefs = { ...DEFAULT_PREFS, ...(s.prefs || {}), notif: { ...DEFAULT_PREFS.notif, ...(s.prefs?.notif || {}) } };
-      if (!Array.isArray(s.custom)) st.custom = [];
-      if (!s.meta) st.meta = {};
-      if (!s.born) { const t0 = s.profile?.since ?? Date.now(); st.born = { home: t0 }; (st.hired || []).forEach((h, i) => { st.born[h] = t0 + (i + 1) * 36e5; }); }
-      if (!s.tour) st.tour = { on: !!s.onboarded, step: 0, done: false }; // saved before the tour existed: show it once
-      if (!s.bond || !Array.isArray(s.bond.days)) st.bond = { days: [], coins: 0, claimed: [] };
-      else st.bond = {
-        days: s.bond.days.filter((d: unknown) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)),
-        coins: typeof s.bond.coins === "number" && s.bond.coins > 0 ? Math.floor(s.bond.coins) : 0,
-        claimed: Array.isArray(s.bond.claimed) ? s.bond.claimed.filter((id: unknown) => typeof id === "string") : [],
-      };
-      registerCustom(st.custom);
-      return st; } } } catch {}
-  registerCustom([]);
-  return EMPTY;
-}
-function snapshot() { if (state === null) state = load(); return state; }
+function emit() { subs.forEach((f) => f()); }
+function snapshot() { return state; }
 function subscribe(f: () => void) {
   subs.add(f);
-  const onStorage = (e: StorageEvent) => { if (e.key === activeKey || e.key === POINTER) { state = load(); subs.forEach((s) => s()); } };
-  window.addEventListener("storage", onStorage);
-  return () => { subs.delete(f); window.removeEventListener("storage", onStorage); };
+  if (state === null && !loading) void hydrate();
+  return () => { subs.delete(f); };
 }
+/** Local state change only. Callers send the change to the server themselves. */
 export function set(fn: (s: State) => State) {
-  const before = snapshot().custom;
-  state = fn(snapshot());
+  const cur = state ?? EMPTY;
+  const before = cur.custom;
+  state = fn(cur);
   if (state.custom !== before) registerCustom(state.custom);
-  activeKey = currentKey();
-  try { localStorage.setItem(activeKey, JSON.stringify(state)); } catch {}
-  subs.forEach((f) => f());
+  emit();
 }
-export const get = snapshot;
+export const get = () => state ?? EMPTY;
 
-/** Returns null during the server render and the first hydration pass, then the saved state. */
+/** Returns null while the account loads, then the state (auth is null when signed out). */
 export function useApp(): State | null {
   return useSyncExternalStore(subscribe, snapshot, () => null);
+}
+export function useLoadError() {
+  return useSyncExternalStore(subscribe, () => loadError, () => "");
 }
 export function useNow(ms = 500) {
   const [now, setNow] = useState(0);
@@ -136,10 +125,172 @@ const emptyToasts: Toast[] = [];
 export function useToasts() {
   return useSyncExternalStore((f) => { tsubs.add(f); return () => { tsubs.delete(f); }; }, () => toasts, () => emptyToasts);
 }
+/** Runs a server call; on failure, shows why and optionally rolls the local change back. */
+function sync(p: Promise<unknown>, undo?: () => void) {
+  p.catch((e) => {
+    undo?.();
+    if (e instanceof ApiError && e.status === 401) { toast({ text: "You're signed out. Sign in again.", face: "home" }); void hydrate(); return; }
+    toast({ text: (e as Error)?.message || "Could not save that.", face: "home" });
+  });
+}
+
+/* ---------- loading the account ---------- */
+const hello = (a: Agent): Msg => ({ id: "hello", from: "home", at: 0, text: `Hi${a.you ? ` ${a.you}` : ""}, I'm ${a.name}. Ask me anything.` });
+
+function customFrom(a: Account["agents"][number]): CustomAgent {
+  const look = (a.look && typeof a.look === "object" ? a.look : {}) as Partial<CustomAgent>;
+  return {
+    id: a.slug, name: a.name, role: a.role, about: a.about, template: look.template ?? null,
+    shape: look.shape ?? "round", color: look.color ?? "purple", eyes: look.eyes ?? "dot", mouth: look.mouth ?? "smile",
+    tone: (a.tone || "short") as ToneId, skills: a.skills || [], memory: a.memoryOn, at: a.createdAt,
+    extra: look.extra, blush: look.blush, brows: look.brows, orbit: look.orbit, dots: look.dots, bg: look.bg,
+  } as CustomAgent;
+}
+
+function jobFrom(j: Account["jobs"][number], i: number): Job {
+  const title = j.title || j.prompt.slice(0, 80);
+  const file = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "output"}.md`;
+  const body = `# ${title}\n\nAsked: ${j.prompt}\n\n${j.output}\n`;
+  return {
+    id: i + 1, title, prompt: j.prompt, assignee: j.assignee, status: j.status === "done" ? "done" : j.status === "failed" ? "needs-you" : "running",
+    startedAt: j.startedAt, duration: Math.max(1000, (j.finishedAt ?? j.startedAt) - j.startedAt),
+    steps: ["Reads the brief", "Thinks it through", "Writes the answer", "Saves the file"], terminal: [], url: "",
+    files: j.output ? [{ name: file, size: `${Math.max(1, Math.round(body.length / 1024))} KB`, body }] : [],
+  };
+}
+
+function fromAccount(acc: Account): State {
+  const home = acc.agents.find((a) => a.slug === "home");
+  const prefsRaw = acc.prefs as Partial<Prefs> & { tourDone?: boolean };
+  const prefs: Prefs = { ...DEFAULT_PREFS, ...prefsRaw, demoLabels: false, notif: { ...DEFAULT_PREFS.notif, ...(prefsRaw.notif || {}) } };
+  const label = acc.user.email || shortAddr(acc.user.wallet);
+  const auth: Auth = acc.user.method === "google"
+    ? { method: "google", label, sub: acc.user.email || "Google or email", address: acc.user.wallet, email: acc.user.email || undefined }
+    : { method: "wallet", label, sub: "Solana wallet", address: acc.user.wallet };
+  const agent: Agent | null = home ? { name: home.name, look: (home.look ?? null) as AgentLook, you: String((home.meta as { you?: string }).you || ""), role: home.role, tone: (home.tone || "short") as ToneId } : null;
+  const meta: Record<string, AgentMeta> = {};
+  const born: Record<string, number> = {};
+  for (const a of acc.agents) {
+    const m = a.meta as { nick?: string; notes?: string; mintTx?: string; dna?: string };
+    born[a.slug] = a.createdAt;
+    meta[a.slug] = {
+      nick: m.nick, notes: m.notes, memory: a.memoryOn,
+      ...(a.asset ? { nft: { tokenId: a.asset, tx: m.mintTx || "", dna: m.dna || "", name: a.name, role: a.role, owner: acc.user.wallet, at: a.mintedAt ?? a.createdAt, registered: true } } : {}),
+    };
+  }
+  const threads: Record<string, Msg[]> = {};
+  const groups: Group[] = [];
+  for (const c of acc.chats) {
+    threads[c.slug] = c.messages.map((m) => m as Msg);
+    if (c.kind === "group") groups.push({ id: c.slug, name: c.title, members: c.members, at: c.createdAt });
+  }
+  if (agent && !(threads.home || []).length) threads.home = [hello(agent)];
+  const custom = acc.agents.filter((a) => a.kind === "custom").map(customFrom);
+  let active = "home";
+  try { active = localStorage.getItem(`${ACTIVE_KEY}:${acc.user.wallet}`) || "home"; } catch {}
+  const memory: Note[] = acc.memories.map((m) => ({
+    id: m.id, serverId: m.id, tag: (m.tag || "About you") as MemoryTag, text: "", source: m.source || "You", at: m.at, locked: true,
+    chainHash: m.onchainPda ? m.contentHash : undefined, chainTx: m.chainTx || undefined,
+  }));
+  return {
+    ...EMPTY, auth, links: { google: acc.user.method === "google", wallet: acc.user.method === "wallet" },
+    agent, onboarded: !!home, plan: "free",
+    hired: acc.agents.filter((a) => a.kind === "hired").map((a) => a.slug),
+    paid: acc.hires.map((h) => h.slug),
+    memory, memoryLocked: memory.length > 0,
+    jobs: acc.jobs.slice().reverse().map(jobFrom), nextJob: acc.jobs.length + 1,
+    threads, groups, active,
+    wallets: { home: acc.user.wallet },
+    prefs,
+    profile: { name: String((acc.profile as Partial<Profile>).name || (acc.user.email ? acc.user.email.split("@")[0] : agent?.you || "You")), username: String((acc.profile as Partial<Profile>).username || ""), bio: String((acc.profile as Partial<Profile>).bio || ""), since: acc.user.createdAt },
+    custom, born, meta,
+    tour: { on: !!home && !prefsRaw.tourDone, step: 0, done: !!prefsRaw.tourDone },
+    referralCode: acc.user.referralCode,
+    _memRaw: acc.memories,
+  } as State;
+}
+
+type RawMem = Account["memories"];
+/** Loads (or reloads) the account from the server. */
+export function hydrate(): Promise<void> {
+  if (loading) return loading;
+  loading = (async () => {
+    try {
+      const acc = await api<Account>("/api/me");
+      const next = fromAccount(acc);
+      registerCustom(next.custom);
+      state = next;
+      loadError = "";
+      emit();
+      void decryptMemories(acc.user.wallet, acc.memories, false);
+      void refreshHub();
+    } catch (e) {
+      if (e instanceof ApiError && (e.status === 401 || e.status === 503)) { state = { ...EMPTY }; loadError = e.status === 503 ? e.message : ""; }
+      else { state = state ?? { ...EMPTY }; loadError = (e as Error).message || "Could not load your account."; }
+      emit();
+    } finally {
+      loading = null;
+    }
+  })();
+  return loading;
+}
+
+async function decryptMemories(wallet: string, raw: RawMem, ask: boolean) {
+  if (!raw.length) return true;
+  const signer = bridgeFor(wallet);
+  const keys = (await savedKeys(wallet)) || (ask && signer ? await unlock(wallet, signer.signMessage) : null);
+  if (!keys) return false;
+  const opened = new Map<string, string>();
+  for (const m of raw) {
+    try { opened.set(m.id, await openNote(keys, m.ciphertext, m.iv)); } catch { /* sealed with another key */ }
+  }
+  set((s) => ({ ...s, memoryLocked: false, memory: s.memory.map((n) => (n.serverId && opened.has(n.serverId) ? { ...n, text: opened.get(n.serverId)!, locked: false } : n)) }));
+  return true;
+}
+
+/** Asks the wallet for the memory key (once per device) and opens your memories. */
+export async function unlockMemories() {
+  const s = get();
+  const wallet = s.auth?.address;
+  if (!wallet) return false;
+  if (!bridgeFor(wallet)) { toast({ text: "Connect the wallet you signed in with to open your memories.", face: "home" }); return false; }
+  try {
+    const raw = await api<{ memories: RawMem }>("/api/memories");
+    return await decryptMemories(wallet, raw.memories, true);
+  } catch (e) {
+    toast({ text: (e as Error).message || "Could not open your memories.", face: "home" });
+    return false;
+  }
+}
+
+async function memoryKeys() {
+  const wallet = get().auth?.address;
+  if (!wallet) throw new Error("Sign in first.");
+  const have = await savedKeys(wallet);
+  if (have) return have;
+  const signer = bridgeFor(wallet);
+  if (!signer) throw new Error("Connect the wallet you signed in with to save memories.");
+  return unlock(wallet, signer.signMessage);
+}
+
+/* ---------- hub ---------- */
+let hubLoading: Promise<HubState | null> | null = null;
+export function refreshHub(): Promise<HubState | null> {
+  if (hubLoading) return hubLoading;
+  hubLoading = api<HubState>("/api/hub/state")
+    .then((live) => { applyHub(live); return live; })
+    .catch(() => null)
+    .finally(() => { hubLoading = null; });
+  return hubLoading;
+}
+export function applyHub(live: HubState) {
+  set((s) => ({ ...s, live, bond: { ...s.bond, coins: live.player?.coins ?? 0 } }));
+}
 
 /* ---------- helpers ---------- */
-export const planOf = (s: State) => PLANS.find((p) => p.id === s.plan) ?? PLANS[0];
-export const seatsLeft = (s: State) => planOf(s).seats - 1 - s.hired.length;
+/** One free plan. Hiring is paid per specialist; seats are not limited. */
+export const planOf = (_s: State) => ({ ...PLANS[0], seats: 100 });
+export const seatsLeft = (s: State) => 99 - s.hired.length;
 export const agentName = (s: State | null) => s?.agent?.name || "Your agent";
 export const jobNo = (id: number) => `#${String(id).padStart(3, "0")}`;
 export function progressOf(j: Job, now: number) {
@@ -147,185 +298,100 @@ export function progressOf(j: Job, now: number) {
   return Math.max(0, Math.min(1, (now - j.startedAt) / j.duration));
 }
 
-/* ---------- actions ---------- */
-function openAccount(id: string, auth: Auth) {
-  const key = `lexari-acct-${id}`;
-  activeKey = key;
-  try { localStorage.setItem(POINTER, key); } catch {}
-  let saved: State | null = null;
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) { const s = JSON.parse(raw); if (s?.v === 1 && s.onboarded && s.agent) saved = { ...EMPTY, ...s, prefs: { ...DEFAULT_PREFS, ...(s.prefs || {}) } }; }
-  } catch {}
-  state = saved
-    ? { ...saved, auth, links: { ...saved.links, [auth.method]: true } }
-    : { ...EMPTY, auth, links: { google: auth.method === "google", wallet: auth.method === "wallet" }, prefs: { ...DEFAULT_PREFS, demoLabels: false } };
-  try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
-  subs.forEach((f) => f());
+/* ---------- session ---------- */
+/** Called after the server set the session cookie. Loads the account. */
+export async function signIn(..._args: unknown[]) {
+  state = null;
+  emit();
+  await hydrate();
 }
-
-export function signIn(method: "google" | "wallet", wallet?: WalletId, address?: string, label?: string) {
-  const auth: Auth = method === "google"
-    ? { method, label: label || address || "Google", sub: address || label || "google" }
-    : { method, label: shortAddr(address || "wallet"), sub: WALLETS.find((w) => w.id === wallet)?.name || "Solana wallet", wallet, address };
-  if (address) { openAccount(address, auth); return; }
-  set((s) => ({ ...s, auth, links: { ...s.links, [method]: true } }));
+export async function signOut() {
+  await signOutSession();
+  state = { ...EMPTY };
+  emit();
 }
-export function signOut() { set((s) => ({ ...s, auth: null })); }
-export function resetAll() { set(() => EMPTY); }
-export function linkMethod(m: "google" | "wallet", on: boolean) { set((s) => ({ ...s, links: { ...s.links, [m]: on } })); }
+/** Deletes the account and everything in it on the server. Onchain records stay onchain. */
+export async function deleteAccount() {
+  await api("/api/account", { method: "DELETE" });
+  state = { ...EMPTY };
+  emit();
+}
+export const resetAll = deleteAccount;
+export function linkMethod(_m: "google" | "wallet", _on: boolean) { /* one sign-in method per account */ }
 
-function seeded(s: State, agent: Agent, knows: string[]): State {
-  const now = Date.now();
-  const jobs: Job[] = [...SEED_JOBS].sort((a, b) => b.ago - a.ago).map((j, i) => ({
-    ...scriptFor(j.prompt, j.assignee, agent.name), id: i + 1, status: j.status, startedAt: now - j.ago,
+const homeBody = (a: Agent) => ({ slug: "home", kind: "home", name: a.name, role: a.role, tone: a.tone, look: a.look ?? null, meta: { you: a.you } });
+
+export async function finishOnboarding(agent: Agent, knows: string[]) {
+  await api("/api/agents", { body: homeBody(agent) });
+  set((s) => ({
+    ...s, agent, onboarded: true, born: { ...s.born, home: Date.now() }, threads: { ...s.threads, home: s.threads.home?.length ? s.threads.home : [hello(agent)] },
+    tour: { on: !s.tour.done, step: 0, done: s.tour.done },
   }));
-  const memory: Note[] = [
-    ...knows.filter(Boolean).map((text) => ({ id: uid(), tag: "About you" as MemoryTag, text, source: "You, day one", at: now })),
-    ...(agent.you ? [{ id: uid(), tag: "About you" as MemoryTag, text: `Calls you ${agent.you}${agent.role ? `, ${agent.role.toLowerCase()}` : ""}`, source: "You, day one", at: now }] : []),
-    ...SEED_MEMORY.map((m) => ({ id: uid(), tag: m.tag, text: m.text, source: m.source, at: now - m.ago })),
-  ];
-  const chat: Msg[] = [{ id: uid(), from: "home", at: now, re: { "👋": ["you"] }, text: `Hi${agent.you ? ` ${agent.you}` : ""}, I'm ${agent.name}. I've read what you told me and my computer is on. Ask me for anything, or just say hi.` }];
-  const threads: Record<string, Msg[]> = {
-    home: chat,
-    scout: [
-      { id: uid(), from: "scout", at: now - 3 * 864e5, text: "Scout here. I'm in seat 02. Send me anything that needs reading, comparing or checking." },
-      { id: uid(), from: "you", at: now - 3 * 864e5 + 6e4, text: "Compare three budgeting tools and keep it to one page", re: { "👍": ["scout"] } },
-      { id: uid(), from: "scout", at: now - 3 * 864e5 + 9e4, text: "Done. Read 3 feature pages and 14 plans. The one-page summary and a table are in Files, with links to every source.", re: { "🔥": ["you"] } },
-      { id: uid(), from: "you", at: now - 3 * 864e5 + 12e4, text: "Perfect, thank you!", re: { "❤️": ["scout"] } },
-      { id: uid(), from: "scout", at: now - 3 * 864e5 + 15e4, text: "Anytime. Want the same one-pager for note apps next?" },
-    ],
-  };
-  const d = (days: number, min = 0) => now - days * 864e5 + min * 6e4;
-  threads.quill = [
-    { id: uid(), from: "quill", at: d(2), text: "Quill here, seat 03. Send me a rough idea and I'll give it back sharp." },
-    { id: uid(), from: "you", at: d(2, 2), text: "Tighten the intro of my launch post" },
-    { id: uid(), from: "quill", at: d(2, 4), text: "Cut it from 90 words to 41 and led with the one line people will quote. Draft is in Files." },
-  ];
-  threads.tally = [{ id: uid(), from: "tally", at: d(1), text: "Tally here, seat 04. Messy sheet? Send it over and I'll tell you what changed." }];
-  const crew: Group = { id: "g-launch", name: "Launch crew", members: ["home", "scout", "quill"], at: d(1, 30) };
-  threads[crew.id] = [
-    { id: uid(), from: "you", at: d(0, -95), text: "Launch is Friday. What do we still need?", re: { "👀": ["home"], "👍": ["scout"] } },
-    { id: uid(), from: "home", at: d(0, -94), text: `I'll keep the list. Scout, can you check what similar launches did? Quill, the post needs a final pass.` },
-    { id: uid(), from: "scout", at: d(0, -93), text: "On it. Reading five recent launches now. Short table by tonight." },
-    { id: uid(), from: "quill", at: d(0, -92), text: "Final pass on the post is done. Two headline options are in Files.", re: { "🎉": ["you", "home"], "🔥": ["scout"] } },
-  ];
-  const who = s.auth?.method === "google" ? s.auth.label : agent.you || "You";
-  const profile: Profile = { name: who, username: who.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 14) || "you", bio: agent.role ? `${agent.role}.` : "", since: now };
-  return { ...s, agent, onboarded: true, plan: "pro", hired: ["scout", "quill", "tally"], memory, jobs, chat, threads, groups: [crew], active: "home", nextJob: jobs.length + 1,
-    wallets: { home: walletFor("home").address }, cards: {}, profile,
-    custom: [], meta: {}, born: { home: now, scout: now - 3 * 864e5 - 36e5, quill: now - 2 * 864e5 - 36e5, tally: now - 864e5 - 36e5 }, tour: { on: true, step: 0, done: false } };
+  const notes = [...knows.filter(Boolean), ...(agent.you ? [`Calls you ${agent.you}${agent.role ? `, ${agent.role.toLowerCase()}` : ""}`] : [])];
+  for (const text of notes) addNote(text, "About you", "You");
 }
-function beginAccount(s: State, agent: Agent, knows: string[]): State {
-  const now = Date.now();
-  const who = s.auth?.method === "google" ? s.auth.label : agent.you || "You";
-  const memory: Note[] = [
-    ...knows.filter(Boolean).map((text) => ({ id: uid(), tag: "About you" as MemoryTag, text, source: "You", at: now })),
-    ...(agent.you ? [{ id: uid(), tag: "About you" as MemoryTag, text: `Calls you ${agent.you}${agent.role ? `, ${agent.role.toLowerCase()}` : ""}`, source: "You", at: now }] : []),
-  ];
-  const hello: Msg = { id: uid(), from: "home", at: now, text: `Hi${agent.you ? ` ${agent.you}` : ""}, I'm ${agent.name}. Ask me anything.` };
-  return {
-    ...EMPTY,
-    auth: s.auth,
-    links: s.links,
-    agent,
-    onboarded: true,
-    plan: "free",
-    hired: [],
-    memory,
-    jobs: [],
-    chat: [hello],
-    threads: { home: [hello] },
-    groups: [],
-    active: "home",
-    prefs: { ...DEFAULT_PREFS, demoLabels: false },
-    profile: { name: who, username: who.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 14) || "you", bio: agent.role ? `${agent.role}.` : "", since: now },
-    born: { home: now },
-    tour: { on: true, step: 0, done: false },
-  };
+export function updateAgent(p: Partial<Agent>) {
+  const prev = get().agent;
+  if (!prev) return;
+  const next = { ...prev, ...p };
+  set((s) => ({ ...s, agent: next }));
+  sync(api("/api/agents", { body: homeBody(next) }), () => set((s) => ({ ...s, agent: prev })));
 }
-export function finishOnboarding(agent: Agent, knows: string[]) {
-  set((s) => beginAccount(s, agent, knows));
-  void fetch("/api/agents", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ slug: "home", name: agent.name, role: agent.role, tone: agent.tone }),
-  }).catch(() => {});
-}
-export function startDemo() {
-  activeKey = DEMO_KEY;
-  try { localStorage.setItem(POINTER, DEMO_KEY); } catch {}
-  state = seeded(
-    { ...EMPTY, auth: { method: "google", label: DEMO_GOOGLE.name, sub: DEMO_GOOGLE.email }, links: { google: true, wallet: false } },
-    { name: "Juniper", look: null, you: "Ada", role: "Founder", tone: "short" },
-    ["Keep summaries to one page", "Always link your sources"],
-  );
-  state = { ...state, prefs: { ...state.prefs, demoLabels: true } };
-  try { localStorage.setItem(DEMO_KEY, JSON.stringify(state)); } catch {}
-  subs.forEach((f) => f());
-}
-export function updateAgent(p: Partial<Agent>) { set((s) => (s.agent ? { ...s, agent: { ...s.agent, ...p } } : s)); }
 
+/** Puts a paid specialist on the team (after /api/hires confirmed the payment). */
 export function hire(slug: string): "ok" | "full" | "already" {
   const s = get();
   if (s.hired.includes(slug)) return "already";
-  if (seatsLeft(s) <= 0) return "full";
-  set((x) => ({ ...x, hired: [...x.hired, slug], born: { ...x.born, [slug]: Date.now() } }));
+  set((x) => ({ ...x, hired: [...x.hired, slug], paid: x.paid.includes(slug) ? x.paid : [...x.paid, slug], born: { ...x.born, [slug]: Date.now() } }));
   return "ok";
 }
-export function release(slug: string) { set((s) => ({ ...s, hired: s.hired.filter((h) => h !== slug), groups: s.groups.map((g) => ({ ...g, members: g.members.filter((m) => m !== slug) })) })); }
-export function setPlan(id: PlanId) {
-  set((s) => { const seats = PLANS.find((p) => p.id === id)!.seats; return { ...s, plan: id, hired: s.hired.slice(0, seats - 1) }; });
+export function release(slug: string) {
+  const prev = get();
+  set((s) => ({ ...s, hired: s.hired.filter((h) => h !== slug), groups: s.groups.map((g) => ({ ...g, members: g.members.filter((m) => m !== slug) })) }));
+  sync(api(`/api/agents/${encodeURIComponent(slug)}`, { method: "DELETE" }), () => set(() => prev));
 }
+export function setPlan(_id: PlanId) { /* single free plan */ }
 
+/* ---------- memory ---------- */
 export function addNote(text: string, tag: MemoryTag = "About you", source = "You", chain = false) {
-  const n: Note = { id: uid(), tag, text, source, at: Date.now(), pendingChain: chain || undefined };
+  const n: Note = { id: uid(), tag, text, source, at: Date.now(), pendingChain: chain || undefined, saving: true };
   set((s) => ({ ...s, memory: [n, ...s.memory] }));
+  void (async () => {
+    try {
+      const sealed = await sealNote(await memoryKeys(), text);
+      const r = await api<{ id: string; duplicate?: boolean }>("/api/memories", { body: { agentSlug: "home", tag, source: source.slice(0, 60), ...sealed } });
+      if (r.duplicate) set((s) => ({ ...s, memory: s.memory.filter((m) => m.id !== n.id) }));
+      else set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === n.id ? { ...m, serverId: r.id, saving: false, chainHash: undefined, _hash: sealed.contentHash } as Note : m)) }));
+    } catch (e) {
+      set((s) => ({ ...s, memory: s.memory.filter((m) => m.id !== n.id) }));
+      toast({ text: `Not saved. ${(e as Error).message || ""}`.trim(), face: "home" });
+    }
+  })();
   return n;
 }
-export function editNote(id: string, p: Partial<Note>) { set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === id ? { ...m, ...p } : m)) })); }
-/** Local calendar day, so a check-in matches the day the person is actually in. */
+export function editNote(id: string, p: Partial<Note>) {
+  const before = get().memory.find((m) => m.id === id);
+  set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === id ? { ...m, ...p } : m)) }));
+  if (!before?.serverId || (p.text === undefined && p.tag === undefined)) return;
+  const text = p.text ?? before.text, tag = p.tag ?? before.tag;
+  sync((async () => {
+    const sealed = await sealNote(await memoryKeys(), text);
+    await api(`/api/memories/${before.serverId}`, { method: "PATCH", body: { tag, ...sealed } });
+  })(), () => set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === id ? before : m)) })));
+}
+export function forgetNote(id: string) {
+  const s = get(); const idx = s.memory.findIndex((m) => m.id === id); const note = s.memory[idx];
+  set((x) => ({ ...x, memory: x.memory.filter((m) => m.id !== id) }));
+  if (note?.serverId) sync(api(`/api/memories/${note.serverId}`, { method: "DELETE" }), () => set((x) => ({ ...x, memory: [...x.memory.slice(0, idx), note, ...x.memory.slice(idx)] })));
+  // Undo puts it back as a new memory.
+  return () => { if (note) addNote(note.text, note.tag, note.source); };
+}
+/** Local calendar day. */
 export function todayKey(now = Date.now()) {
   const d = new Date(now);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 export const CHECKIN_COINS = 10;
-export const TASK_COINS = 25;
-export const LEASE_COST = 40;
-
-function bondOf(s: State): BondLog {
-  return { days: s.bond?.days || [], coins: s.bond?.coins || 0, claimed: s.bond?.claimed || [] };
-}
-/** Daily check-in. Pays coins once per local day. It does not ask anything. */
-export function claimCheckIn(now = Date.now()) {
-  const key = todayKey(now);
-  if ((get().bond?.days || []).includes(key)) return false;
-  set((s) => { const b = bondOf(s); return { ...s, bond: { ...b, days: [...b.days, key].slice(-420), coins: b.coins + CHECKIN_COINS } }; });
-  return true;
-}
-/** Collect the coins for one finished job. A second collect does nothing. */
-export function claimTask(jobId: number) {
-  const key = `job-${jobId}`;
-  const cur = get();
-  const job = cur.jobs.find((j) => j.id === jobId && j.status === "done");
-  if (!job || (cur.bond?.claimed || []).includes(key)) return false;
-  set((s) => { const b = bondOf(s); return { ...s, bond: { ...b, coins: b.coins + TASK_COINS, claimed: [...b.claimed, key] } }; });
-  return true;
-}
-/** Spend coins to put a specialist in an open seat. */
-export function leaseAgent(slug: string): "ok" | "full" | "already" | "short" {
-  if ((get().bond?.coins || 0) < LEASE_COST) return "short";
-  const hired = hire(slug);
-  if (hired !== "ok") return hired;
-  set((s) => { const b = bondOf(s); return { ...s, bond: { ...b, coins: Math.max(0, b.coins - LEASE_COST) } }; });
-  return "ok";
-}
-export function forgetNote(id: string) {
-  const s = get(); const idx = s.memory.findIndex((m) => m.id === id); const note = s.memory[idx];
-  if (note?.serverId) void fetch(`/api/memories/${note.serverId}`, { method: "DELETE" }).catch(() => {});
-  set((x) => ({ ...x, memory: x.memory.filter((m) => m.id !== id) }));
-  return () => set((x) => { const mem = [...x.memory]; mem.splice(Math.min(idx, mem.length), 0, note); return { ...x, memory: mem }; });
-}
 
 /** Figures out who takes a job: an @mention or a keyword match with a hired specialist, else your agent. */
 export function routeJob(s: State, text: string) {
@@ -337,109 +403,71 @@ export function routeJob(s: State, text: string) {
   return kw?.slug ?? "home";
 }
 
-/* ---------- chats: one thread per agent or group, demo replies ---------- */
+/* ---------- chats ---------- */
 export const isGroup = (id: string) => id.startsWith("g-");
 export const groupOf = (s: State, id: string) => s.groups.find((g) => g.id === id);
-/** Every conversation id that still exists: your agent, hired specialists and groups. */
 export const convoExists = (s: State, id: string | null | undefined) => !!id && (id === "home" || s.hired.includes(id) || s.custom.some((c) => c.id === id) || s.groups.some((g) => g.id === id));
 export const isCustom = (id: string) => id.startsWith("c-");
 
-const typingWho = new Map<string, string>(); // conversation → the agent typing in it
+const typingWho = new Map<string, string>();
 const queued = new Set<string>();
-/** Which agent is typing its demo reply in a conversation, or null. */
 export function useTyping(id: string) {
   return useSyncExternalStore(subscribe, () => typingWho.get(id) ?? null, () => null);
 }
-const ping = () => subs.forEach((f) => f());
 const push = (convo: string, m: Omit<Msg, "id" | "at">) => {
   const id = uid();
-  set((x) => ({ ...x, threads: { ...x.threads, [convo]: [...(x.threads[convo] || []), { ...m, id, at: Date.now() }].slice(-120) } }));
+  set((x) => ({ ...x, threads: { ...x.threads, [convo]: [...(x.threads[convo] || []), { ...m, id, at: Date.now() }].slice(-200) } }));
   return id;
 };
-
-const fmtSecs = (n: number) => `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, "0")}`;
-
-function replyText(convo: string, who: string, last: Msg, turn: number, others: string[]) {
-  const st = get(); const a = st.agent!;
-  const n = (st.threads[convo] || []).filter((m) => m.from === who).length;
-  if (last.voice) return who === "home" ? `Got your voice note (${fmtSecs(last.voice)}). I've written it down and I'm on it.` : `Heard your voice note. I'll take my part and post it here.`;
-  if (last.file && !last.text) return `Thanks, I have ${last.file.name}. What should I do with it?`;
-  if (isGroup(convo)) return groupReply({ who, text: last.text, turn, n, agentName: a.name, you: a.you, others });
-  const c = st.custom.find((x) => x.id === who);
-  if (c && n <= 1 && !/^(hi|hey|hello)/i.test(last.text)) return `${c.name} here. ${c.about ? "Going by the brief you gave me, " : ""}I'll start on "${last.text.replace(/[?.!]+$/, "").split(/\s+/).slice(0, 7).join(" ")}" now.`;
-  return cannedReply({ id: who, text: last.text, n, agentName: a.name, you: a.you, tone: c?.tone ?? a.tone });
-}
-
-/** Queue demo replies. In a group, one or two members answer in turn, each after a typing pause. */
-function scheduleReplies(convo: string, delay: number) {
-  if (queued.has(convo)) return;
-  const st = get(); const thread = st.threads[convo] || []; const last = thread[thread.length - 1];
-  if (!st.agent || !last || last.from !== "you") return;
-  let who: string[] = [convo];
-  if (isGroup(convo)) {
-    const g = groupOf(st, convo); if (!g || !g.members.length) return;
-    const names = g.members.map((m) => ({ m, name: (m === "home" ? st.agent!.name : st.meta[m]?.nick || (st.custom.find((c) => c.id === m)?.name ?? SPECIALISTS.find((p) => p.slug === m)?.name ?? m)).toLowerCase() }));
-    const t = last.text.toLowerCase();
-    const named = names.filter((x) => t.includes(x.name) || t.includes(`@${x.name}`)).map((x) => x.m);
-    const k = thread.filter((m) => m.from === "you").length;
-    who = named.length ? named.slice(0, 3) : g.members.length === 1 ? g.members : [g.members[k % g.members.length], g.members[(k + 1) % g.members.length]];
-  }
-  queued.add(convo);
-  const step = (i: number, wait: number) => {
-    typingWho.set(convo, who[i]); ping();
-    setTimeout(() => {
-      const now = get(); const l = (now.threads[convo] || []).filter((m) => m.from === "you").pop();
-      if (!now.agent || !l || !convoExists(now, convo)) { typingWho.delete(convo); queued.delete(convo); ping(); return; }
-      let text = replyText(convo, who[i], l, i, who.filter((w) => w !== who[i]));
-      const rem = convo === "home" && !l.voice ? l.text.match(/^\s*(please\s+)?remember( that)?\s+(.{3,120})/i) : null; // "remember ..." really files a memory
-      if (rem) { const note = rem[3].replace(/[.!\s]+$/, ""); addNote(note.charAt(0).toUpperCase() + note.slice(1), "About you", "Chat", true); text = `Filed in my brain under About you: "${note}". I'll use it from now on.`; }
-      typingWho.delete(convo);
-      push(convo, { from: who[i], text });
-      if (i + 1 < who.length) step(i + 1, 1100 + Math.random() * 700);
-      else { queued.delete(convo); ping(); }
-    }, wait);
-  };
-  step(0, delay);
-}
-
 function setMsg(convo: string, id: string, text: string) {
   set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((m) => (m.id === id ? { ...m, text } : m)) } }));
 }
 
-/** Ask Engram for a real reply and stream the tokens into the thread. */
-async function replyFromModel(convo: string) {
+/** Who answers in a conversation: the agent itself, or in a group the member you named (else members take turns). */
+function speakerFor(st: State, convo: string, text: string) {
+  if (!isGroup(convo)) return convo;
+  const g = groupOf(st, convo);
+  if (!g?.members.length) return "home";
+  const t = text.toLowerCase();
+  const nameOf = (m: string) => (m === "home" ? st.agent?.name : st.meta[m]?.nick || st.custom.find((c) => c.id === m)?.name || SPECIALISTS.find((p) => p.slug === m)?.name || m)?.toLowerCase() || m;
+  const named = g.members.find((m) => t.includes(nameOf(m)));
+  if (named) return named;
+  const k = (st.threads[convo] || []).filter((m) => m.from === "you").length;
+  return g.members[k % g.members.length];
+}
+
+/** Ask the model for a reply and stream the tokens into the thread. The server saves both messages. */
+async function replyFromModel(convo: string, userMsg: Msg) {
   if (queued.has(convo)) return "";
   const st = get();
-  const last = (st.threads[convo] || []).filter((m) => m.from === "you").pop();
-  if (!st.agent || !last || !convoExists(st, convo)) return "";
+  if (!st.agent || !convoExists(st, convo)) return "";
   queued.add(convo);
-  const speaker = isGroup(convo) ? (groupOf(st, convo)?.members[0] || "home") : convo;
-  const custom = st.custom.find((c) => c.id === speaker);
-  const speakerName = speaker === "home" ? st.agent.name : custom?.name || st.meta[speaker]?.nick || speaker;
-  typingWho.set(convo, speaker); ping();
+  const speaker = speakerFor(st, convo, userMsg.text);
+  typingWho.set(convo, speaker); emit();
   const bubble = push(convo, { from: speaker, text: "" });
-  const history = (st.threads[convo] || []).slice(-13).filter((m) => m.id !== last.id && m.text).map((m) => ({ from: m.from, text: m.text }));
-  const recall = st.memory.slice(0, 8).map((n) => ({ tag: n.tag, text: n.text }));
-  const text = last.text || (last.voice ? `Voice note, ${last.voice} seconds.` : last.file ? `Attachment: ${last.file.name}` : "");
+  const history = (st.threads[convo] || []).filter((m) => m.id !== userMsg.id && m.id !== "hello" && m.text && m.from !== "system").slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) }));
+  const memoryOn = st.prefs.memory !== false && st.meta[speaker]?.memory !== false;
+  const recall = memoryOn ? st.memory.filter((n) => !n.locked && n.text).slice(0, 8).map((n) => ({ tag: n.tag.slice(0, 40), text: n.text.slice(0, 240) })) : [];
+  const text = userMsg.text || (userMsg.voice ? `Voice note, ${userMsg.voice} seconds.` : userMsg.file ? `Attachment: ${userMsg.file.name}` : "");
+  const meta: Record<string, unknown> = {};
+  if (userMsg.file) meta.file = userMsg.file;
+  if (userMsg.voice) meta.voice = userMsg.voice;
+  if (userMsg.reply) meta.reply = { ...userMsg.reply, text: userMsg.reply.text.slice(0, 300) };
+  const fail = (m: string) => { setMsg(convo, bubble, m); set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, from: "system" } : mm)) } })); return m; };
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        convo, text, agentName: st.agent.name, role: st.agent.role, tone: custom?.tone || st.agent.tone,
-        speaker: speakerName, history, recall,
-      }),
+      body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history, recall, userMsgId: userMsg.id, replyMsgId: bubble, meta }),
     });
     if (!res.ok || !res.body) {
       const data = await res.json().catch(() => ({}));
-      const fail = typeof data.error === "string" ? data.error : "The agent could not answer.";
-      setMsg(convo, bubble, fail);
-      return fail;
+      if (res.status === 401) void hydrate();
+      return fail(typeof data.error === "string" ? data.error : "The agent could not answer.");
     }
     const reader = res.body.getReader();
     const dec = new TextDecoder();
-    let buf = "";
-    let full = "";
+    let buf = "", full = "";
     while (true) {
       const step = await reader.read();
       if (step.done) break;
@@ -449,152 +477,176 @@ async function replyFromModel(convo: string) {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed.startsWith("data:")) continue;
-        let payload: { token?: string; remember?: string; error?: string } = {};
+        let payload: { token?: string; remember?: string; error?: string; done?: boolean } = {};
         try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
-        if (payload.error) { setMsg(convo, bubble, payload.error); return payload.error; }
-        if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{3,180}\s*$/, "").trim()); }
-        if (payload.remember) addNote(payload.remember, "About you", "Chat", true);
+        if (payload.error) return fail(payload.error);
+        if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
+        if (payload.remember && memoryOn) addNote(payload.remember, "About you", "Chat", true);
+        if (payload.done && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
       }
     }
-    if (!full.trim()) setMsg(convo, bubble, "The agent sent an empty reply.");
+    if (!full.trim()) return fail("The agent sent an empty reply.");
     return (get().threads[convo] || []).find((m) => m.id === bubble)?.text || full;
   } catch {
-    setMsg(convo, bubble, "Could not reach the agent.");
-    return "Could not reach the agent.";
+    return fail("Could not reach the agent.");
   } finally {
     typingWho.delete(convo);
     queued.delete(convo);
-    ping();
+    emit();
   }
 }
 
-/** Send a message. Returns the agent's reply once Grok finishes. */
+async function refreshJobs() {
+  try {
+    const acc = await api<Account>("/api/me");
+    set((s) => ({ ...s, jobs: acc.jobs.slice().reverse().map(jobFrom), nextJob: acc.jobs.length + 1 }));
+  } catch {}
+}
+
+/** Send a message. Resolves with the agent's reply once the model finishes. */
 export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voice" | "reply"> = {}) {
   const v = text.trim(); if (!v && !extra.file && !extra.voice) return Promise.resolve("");
-  push(id, { from: "you", text: v, ...extra });
-  return replyFromModel(id);
+  const msgId = push(id, { from: "you", text: v, ...extra });
+  const msg = (get().threads[id] || []).find((m) => m.id === msgId)!;
+  return replyFromModel(id, msg);
 }
 
 /* ---------- reactions ---------- */
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎉", "👀", "🔥"];
 export const MORE_REACTIONS = ["😮", "😢", "🙏", "💯", "✅", "👏", "🤔", "🚀", "😍", "🤝", "💡", "👋"];
-/** Add or remove one person's reaction on a message. */
 export function toggleReaction(convo: string, msgId: string, emoji: string, who = "you") {
+  let re: Record<string, string[]> = {};
   set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((m) => {
     if (m.id !== msgId) return m;
-    const re = { ...(m.re || {}) }; const list = re[emoji] || [];
+    re = { ...(m.re || {}) }; const list = re[emoji] || [];
     re[emoji] = list.includes(who) ? list.filter((w) => w !== who) : [...list, who];
     if (!re[emoji].length) delete re[emoji];
     return { ...m, re };
   }) } }));
+  if (msgId !== "hello") sync(api("/api/messages", { method: "PATCH", body: { convo, clientId: msgId, re } }));
 }
-/** Demo: agents sometimes react to what you send. Thanks get a heart, good news a party, requests a thumbs up. */
-function agentReacts(convo: string, msgId: string, text: string, voice: boolean) {
-  const t = text.toLowerCase();
-  const pick = /\b(thanks|thank you|thx|ty|love|appreciate)\b/.test(t) ? "❤️"
-    : /\b(launched|shipped|done|won|finally|great news|good news|yay|we did it|live|passed|hired)\b|!{2,}/.test(t) ? "🎉"
-    : /\b(haha|lol|lmao|funny)\b|😂/.test(t) ? "😂"
-    : /\b(urgent|asap|now|deadline|tonight)\b/.test(t) ? "👀"
-    : voice || /\b(please|can you|could you|compare|find|write|draft|plan|make|build|check|fix|review|remember)\b|\?$/.test(t) ? "👍" : null;
-  if (!pick) return;
-  const strong = pick !== "👍";
-  if (!strong && Math.random() > 0.65) return;
-  const st = get();
-  const who: string[] = isGroup(convo) ? [...(groupOf(st, convo)?.members ?? [])].sort(() => Math.random() - 0.5).slice(0, strong ? 2 : 1) : [convo];
-  who.forEach((w, i) => setTimeout(() => {
-    const m = (get().threads[convo] || []).find((x) => x.id === msgId); if (!m) return;
-    const emoji = i === 0 ? pick : pick === "🎉" ? "🔥" : pick === "❤️" ? "🙏" : "👍";
-    if (!(m.re?.[emoji] || []).includes(w)) toggleReaction(convo, msgId, emoji, w);
-  }, 650 + i * 900 + Math.random() * 500));
+/** Nothing waits for a reply after a reload: the server saved finished turns only. */
+export function ensureReplies() {}
+export function logCall(id: string, secs: number) {
+  if (secs <= 0) return;
+  const clientId = push(id, { from: "system", text: "Voice call", call: secs });
+  sync(api("/api/messages", { body: { convo: id, clientId, from: "system", text: "Voice call", meta: { call: Math.round(secs) } } }));
 }
-/** After a reload, ask Engram to answer any message that is still waiting. */
-export function ensureReplies() {
-  const st = get();
-  Object.entries(st.threads).forEach(([id, t]) => { if (t[t.length - 1]?.from === "you" && convoExists(st, id)) void replyFromModel(id); });
+export function setActive(id: string) {
+  if (get().active === id) return;
+  set((x) => ({ ...x, active: id }));
+  try { localStorage.setItem(`${ACTIVE_KEY}:${get().auth?.address}`, id); } catch {}
 }
-export function logCall(id: string, secs: number) { if (secs > 0) push(id, { from: "system", text: "Voice call", call: secs }); }
-export function setActive(id: string) { if (get().active !== id) set((x) => ({ ...x, active: id })); }
 
 export function createGroup(name: string, members: string[]) {
-  const g: Group = { id: `g-${uid()}`, name: name.trim() || "New group", members, at: Date.now() };
-  set((x) => ({ ...x, groups: [...x.groups, g], threads: { ...x.threads, [g.id]: [{ id: uid(), from: "system", at: Date.now(), text: `You made the group “${g.name}”` }] } }));
+  const g: Group = { id: `g-${uid().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10)}`, name: name.trim().slice(0, 60) || "New group", members, at: Date.now() };
+  const line = { id: uid(), from: "system", at: Date.now(), text: `You made the group “${g.name}”` };
+  set((x) => ({ ...x, groups: [...x.groups, g], threads: { ...x.threads, [g.id]: [line] } }));
+  sync((async () => {
+    await api("/api/chats", { body: { slug: g.id, title: g.name, members } });
+    await api("/api/messages", { body: { convo: g.id, clientId: line.id, from: "system", text: line.text.slice(0, 200) } });
+  })(), () => set((x) => ({ ...x, groups: x.groups.filter((y) => y.id !== g.id) })));
   return g.id;
 }
-export function updateGroup(id: string, p: Partial<Pick<Group, "name" | "members">>) { set((x) => ({ ...x, groups: x.groups.map((g) => (g.id === id ? { ...g, ...p } : g)) })); }
+export function updateGroup(id: string, p: Partial<Pick<Group, "name" | "members">>) {
+  const prev = get().groups.find((g) => g.id === id);
+  if (!prev) return;
+  const next = { ...prev, ...p };
+  set((x) => ({ ...x, groups: x.groups.map((g) => (g.id === id ? next : g)) }));
+  sync(api("/api/chats", { body: { slug: id, title: next.name.slice(0, 60) || "Group", members: next.members.length ? next.members : ["home"] } }), () => set((x) => ({ ...x, groups: x.groups.map((g) => (g.id === id ? prev : g)) })));
+}
 export function deleteGroup(id: string) {
   set((x) => { const threads = { ...x.threads }; delete threads[id]; return { ...x, groups: x.groups.filter((g) => g.id !== id), threads, active: x.active === id ? "home" : x.active }; });
+  sync(api(`/api/chats/${encodeURIComponent(id)}`, { method: "DELETE" }));
 }
 
 export function resolveJob(id: number) { set((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, status: "done" } : j)) })); }
-/** Called every second by the app shell. Finishes jobs whose time is up and files what they learned. */
-export function tick(now = Date.now()) {
-  const s = get();
-  const done = s.jobs.filter((j) => j.status === "running" && now >= j.startedAt + j.duration);
-  if (!done.length || !s.agent) return;
-  const learned: Note[] = [];
-  const msgs: Msg[] = done.map((j) => {
-    if (j.learned && !s.memory.some((m) => m.text === j.learned) && !learned.some((m) => m.text === j.learned))
-      learned.push({ id: uid(), tag: "Preferences", text: j.learned, source: `Job ${jobNo(j.id)}`, at: now });
-    return { id: uid(), from: j.assignee, at: now, jobId: j.id, text: `Done with ${jobNo(j.id)}. ${j.files.map((f) => f.name).join(" and ")} ${j.files.length > 1 ? "are" : "is"} in my output folder.` };
-  });
-  set((x) => ({ ...x, jobs: x.jobs.map((j) => (done.some((d) => d.id === j.id) ? { ...j, status: "done" } : j)), memory: [...learned, ...x.memory], chat: [...x.chat, ...msgs].slice(-60) }));
-  done.forEach((j) => { const sp = SPECIALISTS.find((p) => p.slug === j.assignee); toast({ text: `Job ${jobNo(j.id)} is done`, face: sp ? sp.seed : "home", color: sp?.color }); });
-  learned.forEach((n) => toast({ text: `${s.agent!.name} remembered: ${n.text}`, face: "home" }));
-}
+/** Jobs finish on the server; nothing to advance here. */
+export function tick(_now = Date.now()) {}
 
-/** Real client-side download of a job output file. */
+/** Client-side download of a text file. */
 export function downloadFile(name: string, body: string) {
   const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
   const a = document.createElement("a"); a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/* ---------- wallets, cards, preferences, profile (all demo) ---------- */
-export function createWallet(id: string) { set((x) => ({ ...x, wallets: { ...x.wallets, [id]: walletFor(id).address } })); }
-export function issueCard(id: string, limit: number) {
-  const d = () => Math.floor(Math.random() * 10);
-  const number = `4000${Array.from({ length: 12 }, d).join("")}`;
-  const now = new Date();
-  const card: Card = { number, exp: `${String(now.getMonth() + 1).padStart(2, "0")}/${String((now.getFullYear() + 3) % 100).padStart(2, "0")}`, cvv: `${d()}${d()}${d()}`, frozen: false, limit, at: Date.now() };
-  set((x) => ({ ...x, cards: { ...x.cards, [id]: card } }));
-  return card;
+/* ---------- preferences, profile, export ---------- */
+let prefTimer: ReturnType<typeof setTimeout> | null = null;
+function savePrefs() {
+  if (prefTimer) clearTimeout(prefTimer);
+  prefTimer = setTimeout(() => {
+    const { language, voice, defaultAgent, memory, history, improve, motion, instructions, notif } = get().prefs;
+    sync(api("/api/me", { method: "PATCH", body: { prefs: { language, voice, defaultAgent, memory, history, improve, motion, instructions: instructions.slice(0, 2000), notif, tourDone: get().tour.done } } }));
+  }, 500);
 }
-export function updateCard(id: string, p: Partial<Card>) { set((x) => (x.cards[id] ? { ...x, cards: { ...x.cards, [id]: { ...x.cards[id], ...p } } } : x)); }
-export function cancelCard(id: string) { set((x) => { const cards = { ...x.cards }; delete cards[id]; return { ...x, cards }; }); }
-export function setPrefs(p: Partial<Prefs>) { set((x) => ({ ...x, prefs: { ...x.prefs, ...p } })); }
-export function setNotif(k: string, v: boolean) { set((x) => ({ ...x, prefs: { ...x.prefs, notif: { ...x.prefs.notif, [k]: v } } })); }
-export function updateProfile(p: Partial<Profile>) { set((x) => ({ ...x, profile: { ...(x.profile ?? { name: "You", username: "you", bio: "", since: Date.now() }), ...p } })); }
-export function clearChats() { set((x) => ({ ...x, threads: {} })); }
-export function exportData() {
-  const st = get();
-  const url = URL.createObjectURL(new Blob([JSON.stringify({ exported: new Date().toISOString(), note: "Lexari demo export", ...st }, null, 2)], { type: "application/json" }));
-  const a = document.createElement("a"); a.href = url; a.download = "lexari-export.json"; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+export function setPrefs(p: Partial<Prefs>) { set((x) => ({ ...x, prefs: { ...x.prefs, ...p } })); savePrefs(); }
+export function setNotif(k: string, v: boolean) { set((x) => ({ ...x, prefs: { ...x.prefs, notif: { ...x.prefs.notif, [k]: v } } })); savePrefs(); }
+export function updateProfile(p: Partial<Profile>) {
+  set((x) => ({ ...x, profile: { ...(x.profile ?? { name: "You", username: "", bio: "", since: Date.now() }), ...p } }));
+  const { name, username, bio } = get().profile!;
+  sync(api("/api/me", { method: "PATCH", body: { profile: { name: name.slice(0, 60), username: username.slice(0, 30), bio: bio.slice(0, 300) } } }));
+}
+export function clearChats() {
+  const prev = get().threads;
+  set((x) => ({ ...x, threads: x.agent ? { home: [hello(x.agent)] } : ({} as Record<string, Msg[]>) }));
+  sync(api("/api/chats", { method: "DELETE" }), () => set((x) => ({ ...x, threads: prev })));
+}
+/** Downloads everything the server holds for you, plus your memories opened on this device. */
+export async function exportData() {
+  try {
+    const acc = await api<Account>("/api/account");
+    const opened = get().memory.filter((n) => !n.locked).map((n) => ({ id: n.serverId, tag: n.tag, text: n.text, source: n.source, at: new Date(n.at).toISOString() }));
+    const url = URL.createObjectURL(new Blob([JSON.stringify({ exported: new Date().toISOString(), ...acc, memoriesOpened: opened }, null, 2)], { type: "application/json" }));
+    const a = document.createElement("a"); a.href = url; a.download = "lexari-export.json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    toast({ text: (e as Error).message || "Could not export.", face: "home" });
+  }
 }
 
 /* ---------- agents you create, your notes on any agent ---------- */
+const customBody = (c: CustomAgent) => ({
+  slug: c.id, kind: "custom", name: c.name.slice(0, 40), role: c.role.slice(0, 80), tone: c.tone, about: (c.about || "").slice(0, 2000), skills: (c.skills || []).slice(0, 20), memoryOn: c.memory !== false,
+  look: { template: c.template, shape: c.shape, color: c.color, eyes: c.eyes, mouth: c.mouth, extra: c.extra, blush: c.blush, brows: c.brows, orbit: c.orbit, dots: c.dots, bg: c.bg },
+});
 export function createAgent(a: Omit<CustomAgent, "id" | "at">) {
-  const c: CustomAgent = { ...a, id: `c-${uid()}`, at: Date.now() };
+  const c: CustomAgent = { ...a, id: `c-${uid().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10)}`, at: Date.now() };
   const you = get().agent?.you;
-  const hello = `Hi${you ? ` ${you}` : ""}, I'm ${c.name}. ${c.about ? `I've read the brief you gave me: “${c.about.replace(/\s+$/, "")}”` : "Tell me what you want me to do."} My computer is on and my memory is ${c.memory ? "on" : "off"}. What should I start with?`;
-  set((x) => ({ ...x, custom: [...x.custom, c], born: { ...x.born, [c.id]: c.at }, active: c.id,
-    threads: { ...x.threads, [c.id]: [{ id: uid(), from: c.id, at: Date.now(), text: hello }] } }));
+  const hi = `Hi${you ? ` ${you}` : ""}, I'm ${c.name}. ${c.about ? "I've read the brief you gave me." : "Tell me what you want me to do."} What should I start with?`;
+  set((x) => ({ ...x, custom: [...x.custom, c], born: { ...x.born, [c.id]: c.at }, active: c.id, threads: { ...x.threads, [c.id]: [{ id: "hello", from: c.id, at: Date.now(), text: hi }] } }));
+  sync(api("/api/agents", { body: customBody(c) }), () => set((x) => ({ ...x, custom: x.custom.filter((y) => y.id !== c.id) })));
   return c.id;
 }
-export function updateCustom(id: string, p: Partial<CustomAgent>) { set((x) => ({ ...x, custom: x.custom.map((c) => (c.id === id ? { ...c, ...p } : c)) })); }
+export function updateCustom(id: string, p: Partial<CustomAgent>) {
+  const prev = get().custom.find((c) => c.id === id);
+  if (!prev) return;
+  const next = { ...prev, ...p };
+  set((x) => ({ ...x, custom: x.custom.map((c) => (c.id === id ? next : c)) }));
+  sync(api("/api/agents", { body: customBody(next) }), () => set((x) => ({ ...x, custom: x.custom.map((c) => (c.id === id ? prev : c)) })));
+}
 export function deleteCustom(id: string) {
+  const prev = get();
   set((x) => {
     const threads = { ...x.threads }; delete threads[id];
-    const wallets = { ...x.wallets }; delete wallets[id];
-    const cards = { ...x.cards }; delete cards[id];
     const meta = { ...x.meta }; delete meta[id];
-    return { ...x, custom: x.custom.filter((c) => c.id !== id), threads, wallets, cards, meta, active: x.active === id ? "home" : x.active,
+    return { ...x, custom: x.custom.filter((c) => c.id !== id), threads, meta, active: x.active === id ? "home" : x.active,
       groups: x.groups.map((g) => ({ ...g, members: g.members.filter((m) => m !== id) })) };
   });
+  sync(api(`/api/agents/${encodeURIComponent(id)}`, { method: "DELETE" }), () => set(() => prev));
 }
-export function setMeta(id: string, p: AgentMeta) { set((x) => ({ ...x, meta: { ...x.meta, [id]: { ...(x.meta[id] || {}), ...p } } })); }
+export function setMeta(id: string, p: AgentMeta) {
+  set((x) => ({ ...x, meta: { ...x.meta, [id]: { ...(x.meta[id] || {}), ...p } } }));
+  const body: Record<string, unknown> = {};
+  if (p.nick !== undefined) body.nick = p.nick.slice(0, 40);
+  if (p.notes !== undefined) body.notes = p.notes.slice(0, 2000);
+  if (p.memory !== undefined) body.memoryOn = p.memory;
+  if (Object.keys(body).length) sync(api(`/api/agents/${encodeURIComponent(id)}`, { method: "PATCH", body }));
+}
 
 /* ---------- guided tour ---------- */
 export function startTour() { set((x) => ({ ...x, tour: { on: true, step: 0, done: x.tour?.done ?? false } })); }
 export function setTourStep(step: number) { set((x) => ({ ...x, tour: { ...x.tour, step } })); }
-export function endTour() { set((x) => ({ ...x, tour: { on: false, step: 0, done: true } })); }
+export function endTour() { set((x) => ({ ...x, tour: { on: false, step: 0, done: true } })); savePrefs(); }
+
+export { WALLETS };

@@ -9,7 +9,7 @@ import { db } from "../db";
 import { agents, chainLedger, memories } from "../db/schema";
 import { recordEvent } from "../events";
 import { HttpError } from "../http";
-import { PROGRAM_ID, agentPda, coreAssetOwner, decodeAgent, decodeLevel, levelPda, parseLexariIx, type ParsedIx } from "@/lib/lexari-ix";
+import { PROGRAM_ID, STREAK_PAY, TIER_REWARD, decodePlayer, playerPda, agentPda, coreAssetOwner, decodeAgent, decodeLevel, levelPda, parseLexariIx, type ParsedIx } from "@/lib/lexari-ix";
 import { connection, fetchMany } from "./chain";
 
 export async function fetchConfirmed(signature: string, tries = 10): Promise<VersionedTransactionResponse> {
@@ -48,13 +48,22 @@ export async function confirmSignature(user: { userId: string; wallet: string },
     if (OWNER_FIRST.has(ix.name) && ix.accounts[0] !== user.wallet) continue;
     const amount = "args" in ix && "coins" in ix.args ? ix.args.coins : 0;
     const data: Record<string, unknown> = "args" in ix ? { ...ix.args } : {};
+    let coins = amount;
+    if (ix.name === "check_in") {
+      // The pay depends on the streak, which the program computes. Read it back from the Player account.
+      const pl = (await fetchMany([playerPda(new PublicKey(user.wallet))])).get(playerPda(new PublicKey(user.wallet)).toBase58());
+      const streak = pl ? decodePlayer(pl.data)?.streak ?? 1 : 1;
+      coins = STREAK_PAY[Math.min(STREAK_PAY.length, Math.max(1, streak)) - 1];
+      data.streak = streak;
+    }
+    if (ix.name === "claim_referral_tier") coins = TIER_REWARD[ix.args.tier] ?? 0;
     if (ix.name === "level_up") {
       const agent = ix.accounts[2];
       const lv = (await fetchMany([levelPda(new PublicKey(agent))])).get(levelPda(new PublicKey(agent)).toBase58());
       data.agent = agent;
       data.levelAfter = lv ? decodeLevel(lv.data)?.level ?? 1 : 1;
     }
-    const inserted = await database.insert(chainLedger).values({ signature, ixIndex: index, userId: user.userId, kind: ix.name, amount, data, slot: tx.slot })
+    const inserted = await database.insert(chainLedger).values({ signature, ixIndex: index, userId: user.userId, kind: ix.name, amount: coins, data, slot: tx.slot })
       .onConflictDoNothing().returning({ kind: chainLedger.kind });
     if (!inserted.length) continue;
     recorded.push(ix.name);

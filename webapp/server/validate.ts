@@ -37,6 +37,9 @@ export const agentBody = z.object({
   meta: z.object({ nick: z.string().max(40).optional(), notes: z.string().max(2000).optional(), you: z.string().max(40).optional(), color: z.string().max(20).optional() }).partial().default({}),
 }).strict();
 
+export const agentNotes = z.object({ nick: z.string().max(40).optional(), notes: z.string().max(2000).optional(), memoryOn: z.boolean().optional() }).strict();
+export const rehireBody = z.object({ slug: z.string().min(1).max(40) }).strict();
+
 export const hireBody = z.object({
   slug: z.string().min(1).max(40),
   tx: z.string().min(64).max(100),

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { PLANS } from "@/content/appData";
-import { startDemo, tick, useApp, type State } from "@/lib/store";
+import { tick, useApp, useLoadError, type State } from "@/lib/store";
 import { LANDING_URL } from "@shared/sites";
 import Logo from "@shared/components/Logo";
 import ThemeToggle from "@shared/components/ThemeToggle";
@@ -146,16 +146,16 @@ function Loading() {
 
 function Gate({ s }: { s: State }) {
   const signedIn = !!s.auth;
+  const loadError = useLoadError();
   return (
     <main className="carpet relative grid min-h-screen place-items-center overflow-hidden bg-base px-5 py-16">
       <div className="pointer-events-none absolute left-1/2 top-1/3 h-[480px] w-[480px] -translate-x-1/2 rounded-full bg-[var(--glow)] blur-[130px]" />
       <div className="relative w-full max-w-[460px] rounded-[32px] bg-card p-7 text-center shadow-[0_14px_0_#5b2bff] ring-1 ring-line sm:p-9">
         <div className="bob mx-auto grid h-24 w-24 place-items-center rounded-[26px] bg-[#0a0a0a]"><Face size={80} track /></div>
         <h1 className="display mt-6 text-[40px] text-ink sm:text-[48px]">{signedIn ? "Almost there." : "Your agent is waiting."}</h1>
-        <p className="mt-3 text-[16px] text-ink/75">{signedIn ? "You are signed in. Name your agent and it clocks in." : "Sign in with Phantom, Solflare or Backpack. Google is a preview. Or look around a demo first."}</p>
+        <p className="mt-3 text-[16px] text-ink/75">{loadError || (signedIn ? "You are signed in. Name your agent and it clocks in." : "Sign in with Google, email, or a Solana wallet like Phantom, Solflare or Backpack.")}</p>
         <div className="mt-7 grid gap-3">
           {signedIn ? <Link href="/onboarding" className="btn btn-brand">Name your agent →</Link> : <Link href="/signin" className="btn btn-brand">Sign in →</Link>}
-          <button onClick={startDemo} className="btn btn-line text-ink">Try the demo</button>
         </div>
         <Link href={LANDING_URL} className="mt-6 inline-block text-[14px] font-semibold text-ink/65 hover:text-brand-ink">Back to lexari</Link>
       </div>

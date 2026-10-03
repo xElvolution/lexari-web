@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { KNOW_SUGGESTIONS, LOOKS, ROLES, TONES, type ToneId } from "@/content/appData";
-import { finishOnboarding, startDemo, useApp, type AgentLook } from "@/lib/store";
+import { finishOnboarding, toast, useApp, type AgentLook } from "@/lib/store";
 import FaceCreator from "@/components/agent/FaceCreator";
 import { lookVariant } from "@shared/components/avatar";
 import Badge from "@shared/components/Badge";
@@ -17,6 +17,7 @@ import { AgentFace } from "@/components/faces";
 import { burst } from "@/components/fly";
 import SetupSequence from "@/components/agent/SetupSequence";
 import MintFinish from "@/components/agent/MintFinish";
+import Toaster from "@/components/Toaster";
 
 const STEPS = ["Name", "Look", "About you", "Meet"];
 const NAMES = ["Juniper", "Nova", "Pip", "Otto", "Mika", "Sol"];
@@ -37,6 +38,7 @@ export default function Onboarding() {
   const panel = useRef<HTMLDivElement>(null);
   const cta = useRef<HTMLButtonElement>(null);
   const [finale, setFinale] = useState<"none" | "setup" | "done">("none");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("name");
@@ -64,9 +66,13 @@ export default function Onboarding() {
   const toggleKnow = (k: string) => setKnows((l) => (l.includes(k) ? l.filter((x) => x !== k) : [...l, k].slice(0, 8)));
   const addCustom = () => { const t = custom.trim(); if (t && !knows.includes(t)) setKnows((l) => [...l, t].slice(0, 8)); setCustom(""); };
   const meet = () => {
+    if (saving) return;
     burst(cta.current, 22);
-    finishOnboarding({ name: name.trim() || "Juniper", look, you: you.trim(), role, tone }, knows);
-    setTimeout(() => setFinale("setup"), 380);
+    setSaving(true);
+    finishOnboarding({ name: name.trim() || "Juniper", look, you: you.trim(), role, tone }, knows)
+      .then(() => setTimeout(() => setFinale("setup"), 380))
+      .catch((e) => toast({ text: (e as Error).message || "Could not save your agent. Try again.", face: "home" }))
+      .finally(() => setSaving(false));
   };
   const v = lookVariant(look); const bg = look && typeof look === "object" ? look.bg : undefined;
   const agentName = name.trim() || "Juniper";
@@ -88,7 +94,7 @@ export default function Onboarding() {
   if (s && !s.auth) return (
     <main className="carpet grid min-h-[100svh] place-items-center bg-base px-5 text-center text-ink">
       <div className="max-w-md"><h1 className="display text-[44px]">Sign in first.</h1><p className="mt-3 text-ink/75">Your agent needs to know who it works for.</p>
-        <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center"><Link href="/signin" className="btn btn-brand">Sign in →</Link><button onClick={() => { startDemo(); router.push("/app"); }} className="btn btn-line">Try the demo</button></div></div>
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center"><Link href="/signin" className="btn btn-brand">Sign in →</Link></div></div>
     </main>
   );
 
@@ -193,11 +199,12 @@ export default function Onboarding() {
             {step < 3 ? (
               <button onClick={next} disabled={!can} className="btn btn-brand disabled:opacity-40">{step === 0 ? `Continue with ${shown}` : "Continue"} <Icon name="arrow" size={18} /></button>
             ) : (
-              <button ref={cta} onClick={meet} className="btn btn-brand !h-16 !px-9 !text-[18px]">Meet {shown} <Icon name="arrow" size={20} /></button>
+              <button ref={cta} onClick={meet} disabled={saving} className="btn btn-brand !h-16 !px-9 !text-[18px] disabled:opacity-60">{saving ? "Saving…" : <>Meet {shown} <Icon name="arrow" size={20} /></>}</button>
             )}
           </div>
         </div>
       </div>
+    <Toaster />
     </main>
   );
 }

@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { agents, chainLedger, questProgress as progressTable } from "../db/schema";
 import {
@@ -48,7 +48,9 @@ export async function hubState(user: { userId: string; wallet: string; referralC
   })));
 
   const boxRow = await db().select().from(progressTable).where(and(eq(progressTable.userId, user.userId), eq(progressTable.questId, "box"), eq(progressTable.periodKey, String(today)))).limit(1);
-  const lifetimeLedger = await db().select({ kind: chainLedger.kind }).from(chainLedger).where(eq(chainLedger.userId, user.userId)).limit(1);
+  const ledgerRows = await db().select({ kind: chainLedger.kind, amount: chainLedger.amount, data: chainLedger.data, at: chainLedger.createdAt, signature: chainLedger.signature })
+    .from(chainLedger).where(eq(chainLedger.userId, user.userId)).orderBy(desc(chainLedger.createdAt)).limit(60);
+  const [{ n: claimedTotal }] = await db().select({ n: sql<number>`count(*)::int` }).from(chainLedger).where(and(eq(chainLedger.userId, user.userId), eq(chainLedger.kind, "claim_quest")));
   const friends = await qualifiedReferrals(user.userId);
   return {
     program: { live: status.ok, attestorReady: !!status.attestor },
@@ -62,6 +64,8 @@ export async function hubState(user: { userId: string; wallet: string; referralC
       friends,
       tiers: TIER_FRIENDS.map((need, i) => ({ tier: i, friends: need, reward: TIER_REWARD[i], claimed: !!accts.get(tiers[i].toBase58()) })),
     },
-    active: lifetimeLedger.length > 0,
+    active: ledgerRows.length > 0,
+    claimedTotal: Number(claimedTotal),
+    ledger: ledgerRows.map((r) => ({ kind: r.kind, amount: Number(r.amount), at: r.at.getTime(), tx: r.signature, data: r.data as Record<string, unknown> })),
   };
 }

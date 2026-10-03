@@ -6,10 +6,23 @@ import { verifyPayment } from "@/server/hires";
 import { fetchConfirmed } from "@/server/hub/confirm";
 import { jsonError, readJson } from "@/server/http";
 import { withUser } from "@/server/route";
-import { hireBody } from "@/server/validate";
+import { hireBody, rehireBody } from "@/server/validate";
 import { SPECIALISTS } from "@/content/appData";
 
 export const runtime = "nodejs";
+
+/** Puts a specialist you paid for before back on your team, without paying again. */
+export const PUT = withUser(async (user, req) => {
+  const body = await readJson(req, rehireBody);
+  if (body instanceof Response) return body;
+  const sp = SPECIALISTS.find((s) => s.slug === body.slug);
+  if (!sp) return jsonError(404, "There is no such specialist.");
+  const database = db();
+  const [paid] = await database.select({ id: hires.id }).from(hires).where(and(eq(hires.buyerId, user.userId), eq(hires.slug, sp.slug))).limit(1);
+  if (!paid) return jsonError(402, "Hire this specialist first.");
+  await database.insert(agents).values({ userId: user.userId, slug: sp.slug, kind: "hired", name: sp.name, role: sp.job, tone: "" }).onConflictDoNothing();
+  return Response.json({ ok: true });
+});
 
 /** Confirms a hire payment onchain, then puts the specialist on your team. One payment, one hire. */
 export const POST = withUser(async (user, req) => {
