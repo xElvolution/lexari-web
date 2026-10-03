@@ -11,7 +11,6 @@ import Logo from "@shared/components/Logo";
 import ThemeToggle from "@shared/components/ThemeToggle";
 import Face from "@shared/components/Face";
 import Icon from "./Icon";
-import { DemoTag } from "./ui";
 import Toaster from "./Toaster";
 import Tour from "./Tour";
 import AgentPanel from "./agent/AgentPanel";
@@ -114,7 +113,6 @@ function MobileBars({ s, path }: { s: State; path: string }) {
       <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-line bg-base/90 px-4 backdrop-blur-md lg:hidden">
         <Link href="/app" aria-label="Agents"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
         <div className="flex items-center gap-2">
-          <DemoTag className="hidden min-[400px]:inline-flex" />
           <ThemeToggle />
           <Link href="/app/profile" aria-label="Profile" className="grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)]">{initials(s)}</Link>
         </div>

@@ -162,7 +162,7 @@ function Create() {
 
       <div className="sticky bottom-0 -mx-1 mt-6 flex items-center gap-2 bg-card px-1 pt-2">
         {step > 0 && <button type="button" onClick={() => setStep(step - 1)} className="btn btn-line btn-sm text-ink">Back</button>}
-        <span className="flex-1 text-[12.5px] text-ink/50">{planOf(s).name} plan · agents you make don&apos;t use a seat (demo)</span>
+        <span className="flex-1 text-[12.5px] text-ink/50">{planOf(s).name} plan · agents you make don&apos;t take a desk</span>
         {step < 2
           ? <button type="button" disabled={!nameOk} onClick={() => setStep(step + 1)} className="btn btn-brand btn-sm disabled:opacity-40 disabled:shadow-none">Next</button>
           : <button type="button" onClick={make} className="btn btn-brand btn-sm"><Icon name="spark" size={16} />Create {name.trim() || "agent"}</button>}
@@ -228,7 +228,6 @@ function Hire({ startCat }: { startCat?: string }) {
       <Link href={`/app/marketplace${cat ? `?cat=${cat}` : ""}`} onClick={closeAdd} className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-tint py-3.5 text-[14.5px] font-bold text-brand-ink transition hover:bg-grape hover:text-white">
         Browse the full marketplace{cat ? ` · ${cat}` : ""}<Icon name="arrow" size={16} />
       </Link>
-      <p className="mt-2 text-center text-[12px] text-ink/45">Ratings and hires are demo data.</p>
     </div>
   );
 }

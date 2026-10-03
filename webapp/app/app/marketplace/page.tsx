@@ -7,7 +7,7 @@ import { SPECIALISTS, STORE_CATS, compact, storeMeta, type StoreCat } from "@/co
 import { planOf, seatsLeft, useApp } from "@/lib/store";
 import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
-import { DemoTag, Empty } from "@/components/ui";
+import { Empty } from "@/components/ui";
 import { AppCard, HireBtn, ShelfRow } from "@/components/market/parts";
 
 const FEATURED = ["scout", "frame", "atlas"];
@@ -66,7 +66,7 @@ function TopCharts() {
   return (
     <section data-rise className="mt-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h2 className="text-[22px] font-bold tracking-tight text-ink sm:text-[24px]">Top charts</h2><p className="mt-0.5 text-[14px] text-ink/55">Updated daily · demo rankings</p></div>
+        <div><h2 className="text-[22px] font-bold tracking-tight text-ink sm:text-[24px]">Top charts</h2><p className="mt-0.5 text-[14px] text-ink/55">Updated daily</p></div>
         <div className="inline-flex rounded-full bg-tint p-1" role="tablist" aria-label="Chart">
           {CHART_TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`rounded-full px-4 py-2 text-[13.5px] font-bold transition ${tab === t.id ? "bg-card text-ink shadow-sm" : "text-ink/60 hover:text-ink"}`}>{t.label}</button>)}
         </div>
@@ -130,7 +130,7 @@ export default function Marketplace() {
     <>
       <div data-rise className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="flex items-center gap-2.5"><span className="label text-brand-ink">Marketplace</span><DemoTag /></div>
+          <div className="flex items-center gap-2.5"><span className="label text-brand-ink">Marketplace</span></div>
           <h1 className="display mt-3 text-[44px] text-ink sm:text-[60px]">Find your next hire.</h1>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -174,7 +174,6 @@ export default function Marketplace() {
               ); })}
             </div>
           </section>
-          <p className="mt-10 text-center text-[12.5px] text-ink/45">Ratings, hires and rankings are demo data.</p>
         </>
       )}
     </>

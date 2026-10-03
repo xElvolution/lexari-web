@@ -10,7 +10,7 @@ import { release, sendTo, toast, useApp } from "@/lib/store";
 import Face from "@shared/components/Face";
 import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
-import { DemoTag, Empty } from "@/components/ui";
+import { Empty } from "@/components/ui";
 import { hireWithFx } from "@/components/hireAction";
 import { AppCard, HireBtn, ShelfRow, StarRow } from "@/components/market/parts";
 
@@ -57,7 +57,6 @@ export default function Detail({ slug }: { slug: string }) {
     <>
       <div data-rise className="flex items-center justify-between">
         <Link href="/app/marketplace" className="inline-flex items-center gap-2 rounded-full py-1 text-[14px] font-bold text-ink/75 hover:text-brand-ink"><Icon name="back" size={16} />Marketplace</Link>
-        <DemoTag />
       </div>
 
       {/* header */}
@@ -167,7 +166,6 @@ export default function Detail({ slug }: { slug: string }) {
           <dl className="mt-2 divide-y divide-[var(--line)] text-[14px]">
             {[["Maker", m.maker], ["Category", m.cat], ["Updated", m.updated], ["Version", m.version], ["Languages", m.languages], ["Age rating", m.age], ["Tools", a.tools.join(", ")], ["Seats", "1 seat"]].map(([k, v]) => <div key={k} className="flex justify-between gap-4 py-2.5"><dt className="text-ink/55">{k}</dt><dd className="text-right font-semibold text-ink">{v}</dd></div>)}
           </dl>
-          <p className="mt-3 text-[12.5px] text-ink/45">Listing, ratings and hires are demo data.</p>
         </aside>
       </div>
 

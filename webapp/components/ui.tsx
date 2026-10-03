@@ -14,7 +14,7 @@ export function PageHead({ kicker, title, body, right, demo = false }: { kicker:
   return (
     <div data-rise className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <div className="flex items-center gap-2.5"><span className="label text-brand-ink">{kicker}</span>{demo && <DemoTag />}</div>
+        <div className="flex items-center gap-2.5"><span className="label text-brand-ink">{kicker}</span></div>
         <h1 className="display mt-3 text-[44px] text-ink sm:text-[64px]">{title}</h1>
         {body && <p className="mt-3 max-w-[40rem] text-[16px] leading-relaxed text-ink/75 sm:text-[17px]">{body}</p>}
       </div>

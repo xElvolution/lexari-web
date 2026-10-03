@@ -6,7 +6,6 @@ import { CHAT_SUGGESTIONS, specialistBySlug } from "@/content/appData";
 import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, toast, toggleReaction, useNow, useTyping, type Msg, type State } from "@/lib/store";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
-import { DemoTag } from "../ui";
 import { convoOf, dayLabel, fmtSecs, nameOf, shortTime } from "../agents";
 import Composer from "./Composer";
 import { openAgent } from "../overlays";
@@ -266,7 +265,6 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
             </span>
           </button>
         )}
-        <DemoTag className="hidden md:inline-flex" />
         {c.group && <button onClick={onEditGroup} aria-label="Edit group" title="Edit group" className="grid h-10 w-10 place-items-center rounded-full text-ink/75 transition hover:bg-tint hover:text-brand-ink"><Icon name="users" size={19} /></button>}
       </header>
 
