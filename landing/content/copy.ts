@@ -1,6 +1,6 @@
 /**
  * All words on the Lexari landing page.
- * House rules: plain language, no em dashes, say what a thing is and why you should care.
+ * House rules: plain language, no em dashes, say what a thing is and what it does for you.
  * Sign in with Google or email (Privy), or a Solana wallet: Phantom, Solflare or Backpack.
  */
 import { badgeCopy } from "@shared/content/badge";
