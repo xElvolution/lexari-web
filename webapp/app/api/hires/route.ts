@@ -1,44 +1,31 @@
-import { Connection } from "@solana/web3.js";
 import { and, eq } from "drizzle-orm";
-import { currentSession } from "@/server/auth/session";
 import { db } from "@/server/db";
-import { agents, hires, listings } from "@/server/db/schema";
+import { agents, hires } from "@/server/db/schema";
 import { recordEvent } from "@/server/events";
-import { configError, jsonError, readJson, toErrorResponse } from "@/server/http";
+import { verifyPayment } from "@/server/hires";
+import { fetchConfirmed } from "@/server/hub/confirm";
+import { jsonError, readJson } from "@/server/http";
+import { withUser } from "@/server/route";
 import { hireBody } from "@/server/validate";
+import { SPECIALISTS } from "@/content/appData";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+/** Confirms a hire payment onchain, then puts the specialist on your team. One payment, one hire. */
+export const POST = withUser(async (user, req) => {
   const body = await readJson(req, hireBody);
   if (body instanceof Response) return body;
-  const missing = configError();
-  if (missing) return jsonError(503, missing);
-  try {
-    const session = await currentSession();
-    if (!session) return jsonError(401, "Not signed in.");
-    const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com";
-    const connection = new Connection(rpc, "confirmed");
-    const tx = await connection.getTransaction(body.tx, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
-    if (!tx) return jsonError(400, "That payment is not on devnet yet.");
-    const database = db();
-    let listing = await database.select().from(listings).where(and(eq(listings.active, true), eq(listings.mint, body.mint), eq(listings.priceLamports, body.priceLamports))).limit(1);
-    if (!listing[0]) {
-      const sellerAgent = await database.select().from(agents).where(eq(agents.slug, body.slug)).limit(1);
-      const created = await database.insert(listings).values({
-        sellerId: session.userId,
-        agentId: sellerAgent[0]?.id,
-        priceLamports: body.priceLamports,
-        mint: body.mint,
-      }).returning();
-      listing = created;
-    }
-    const listingId = listing[0]?.id;
-    if (!listingId) return jsonError(500, "Could not record the listing.");
-    await database.insert(hires).values({ listingId, buyerId: session.userId, tx: body.tx });
-    await recordEvent(session.userId, "hire");
-    return Response.json({ ok: true });
-  } catch (error) {
-    return toErrorResponse(error);
-  }
-}
+  const sp = SPECIALISTS.find((s) => s.slug === body.slug);
+  if (!sp) return jsonError(404, "There is no such specialist.");
+  const database = db();
+  const [used] = await database.select().from(hires).where(eq(hires.tx, body.tx)).limit(1);
+  if (used) return used.buyerId === user.userId && used.slug === body.slug ? Response.json({ ok: true }) : jsonError(409, "That payment was already used.");
+  const tx = await fetchConfirmed(body.tx);
+  const paid = verifyPayment(tx, user.wallet, body.mint);
+  const inserted = await database.insert(hires).values({ buyerId: user.userId, tx: body.tx, slug: sp.slug, mint: paid.mint, amount: paid.amount, payer: paid.payer }).onConflictDoNothing().returning({ id: hires.id });
+  if (!inserted.length) return jsonError(409, "That payment was already used.");
+  const [have] = await database.select().from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, sp.slug))).limit(1);
+  if (!have) await database.insert(agents).values({ userId: user.userId, slug: sp.slug, kind: "hired", name: sp.name, role: sp.job, tone: "" }).onConflictDoNothing();
+  await recordEvent(user.userId, "hire", { ref: body.tx });
+  return Response.json({ ok: true });
+});

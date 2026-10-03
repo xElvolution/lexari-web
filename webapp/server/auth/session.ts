@@ -5,6 +5,7 @@ import { db } from "../db";
 import { referrals, sessions, users } from "../db/schema";
 import { HttpError } from "../http";
 import { buildSignInMessage, isWallet, verifySolanaSignature } from "./siws";
+import { verifyPrivyToken } from "./privy";
 
 export const SESSION_COOKIE = "lexari_session";
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -70,7 +71,7 @@ export async function issueNonce(wallet: string, origin: { domain: string; uri: 
   return { message, expiresAt: nonceExpires.toISOString() };
 }
 
-export async function verifySignIn(input: { wallet: string; message: string; signature: string; referral?: string }) {
+export async function verifySignIn(input: { wallet: string; message: string; signature: string; referral?: string; privyToken?: string; email?: string }) {
   if (!isWallet(input.wallet)) throw new HttpError(400, "That is not a Solana wallet address.");
   if (!verifySolanaSignature(input.message, input.signature, input.wallet)) {
     throw new HttpError(401, "Signature does not match this wallet.");
@@ -84,7 +85,18 @@ export async function verifySignIn(input: { wallet: string; message: string; sig
 
   await database.update(users).set({ nonce: null, nonceMessage: null, nonceExpires: null }).where(eq(users.id, user.id));
 
-  if (input.referral && !user.referredBy) {
+  // Google/email through Privy: the embedded wallet signed above; the token ties the Privy account to it.
+  if (input.privyToken) {
+    const did = await verifyPrivyToken(input.privyToken);
+    if (user.privyDid && user.privyDid !== did) throw new HttpError(409, "This wallet belongs to a different Google or email account.");
+    const other = await database.select({ id: users.id }).from(users).where(eq(users.privyDid, did)).limit(1);
+    if (other[0] && other[0].id !== user.id) throw new HttpError(409, "That Google or email account already uses a different wallet.");
+    await database.update(users).set({ privyDid: did, email: input.email?.slice(0, 200) || user.email }).where(eq(users.id, user.id));
+  }
+
+  // A referral counts only for a brand-new account (first sign-in).
+  const before = await database.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, user.id)).limit(1);
+  if (input.referral && !user.referredBy && !before.length) {
     const referrer = await database.select().from(users).where(eq(users.referralCode, input.referral)).limit(1);
     const ref = referrer[0];
     if (ref && ref.id !== user.id) {
@@ -104,7 +116,7 @@ export async function currentSession() {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const rows = await db()
-    .select({ wallet: users.wallet, referralCode: users.referralCode, userId: users.id })
+    .select({ wallet: users.wallet, referralCode: users.referralCode, userId: users.id, privyDid: users.privyDid, email: users.email, createdAt: users.createdAt })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
     .where(and(eq(sessions.tokenHash, hashToken(token)), gt(sessions.expiresAt, new Date())))
@@ -120,3 +132,5 @@ export async function destroySession() {
   }
   jar.set(SESSION_COOKIE, "", { ...sessionCookieOptions(new Date(0)), maxAge: 0 });
 }
+
+export type SessionUser = NonNullable<Awaited<ReturnType<typeof currentSession>>>;

@@ -9,6 +9,10 @@ export const users = pgTable("users", {
   nonceExpires: timestamp("nonce_expires", { withTimezone: true }),
   referralCode: text("referral_code").notNull().unique(),
   referredBy: uuid("referred_by"),
+  privyDid: text("privy_did"),
+  email: text("email"),
+  profile: jsonb("profile").$type<Record<string, unknown>>().notNull().default({}),
+  prefs: jsonb("prefs").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -32,7 +36,15 @@ export const agents = pgTable(
     asset: text("asset"),
     agentPda: text("agent_pda"),
     mintedAt: timestamp("minted_at", { withTimezone: true }),
+    /** home: your agent; custom: one you made; hired: a house specialist you hired */
+    kind: text("kind").notNull().default("home"),
+    about: text("about").notNull().default(""),
+    skills: jsonb("skills").$type<string[]>().notNull().default([]),
+    memoryOn: boolean("memory_on").notNull().default(true),
+    /** your nickname and notes, the minted card record */
+    meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("agents_user_slug").on(t.userId, t.slug)],
 );
@@ -49,6 +61,8 @@ export const memories = pgTable("memories", {
   uri: text("uri").notNull().default(""),
   onchainPda: text("onchain_pda"),
   useCount: integer("use_count").notNull().default(0),
+  source: text("source").notNull().default(""),
+  chainTx: text("chain_tx"),
   revoked: boolean("revoked").notNull().default(false),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -64,6 +78,7 @@ export const chats = pgTable(
     title: text("title").notNull().default(""),
     memberSlugs: text("member_slugs").array().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("chats_user_slug").on(t.userId, t.slug)],
 );
@@ -74,6 +89,7 @@ export const messages = pgTable("messages", {
   fromId: text("from_id").notNull(),
   text: text("text").notNull(),
   metaJson: jsonb("meta_json").$type<Record<string, unknown>>(),
+  clientId: text("client_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -82,7 +98,13 @@ export const jobs = pgTable("jobs", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   agentId: uuid("agent_id").references(() => agents.id, { onDelete: "set null" }),
   prompt: text("prompt").notNull(),
+  /** running | done | failed */
   status: text("status").notNull(),
+  assignee: text("assignee").notNull().default("home"),
+  title: text("title").notNull().default(""),
+  output: text("output").notNull().default(""),
+  error: text("error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
 });
@@ -103,7 +125,32 @@ export const questEvents = pgTable("quest_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   kind: text("kind").notNull(),
+  /** what caused it: a tx signature, a job id. (user, kind, ref) is unique. */
+  ref: text("ref"),
+  amount: integer("amount").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Each Lexari instruction seen confirmed onchain, once. */
+export const chainLedger = pgTable(
+  "chain_ledger",
+  {
+    signature: text("signature").notNull(),
+    ixIndex: integer("ix_index").notNull(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull().default(0),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+    slot: bigint("slot", { mode: "number" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.signature, t.ixIndex] })],
+);
+
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull().defaultNow(),
+  count: integer("count").notNull().default(0),
 });
 
 export const listings = pgTable("listings", {
@@ -118,9 +165,14 @@ export const listings = pgTable("listings", {
 
 export const hires = pgTable("hires", {
   id: uuid("id").primaryKey().defaultRandom(),
-  listingId: uuid("listing_id").notNull().references(() => listings.id, { onDelete: "cascade" }),
+  listingId: uuid("listing_id").references(() => listings.id, { onDelete: "cascade" }),
   buyerId: uuid("buyer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** payment signature, unique */
   tx: text("tx").notNull(),
+  slug: text("slug").notNull().default(""),
+  mint: text("mint").notNull().default("SOL"),
+  amount: bigint("amount", { mode: "number" }).notNull().default(0),
+  payer: text("payer").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

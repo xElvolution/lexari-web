@@ -1,22 +1,21 @@
 import { readFileSync } from "node:fs";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
+import bs58 from "bs58";
 
-// One-time devnet setup. Uses ANCHOR_PROVIDER_URL, ANCHOR_WALLET, and LEXARI_ATTESTOR_KEY.
-const raw = process.env.LEXARI_ATTESTOR_KEY;
-if (!raw) {
-  console.error("LEXARI_ATTESTOR_KEY is not set");
-  process.exit(1);
+// Sets (or rotates) the hub attestor. Run by the program upgrade authority.
+// Env: ANCHOR_PROVIDER_URL, ANCHOR_WALLET, and LEXARI_ATTESTOR_PUBKEY or LEXARI_ATTESTOR_KEY (JSON bytes or base58).
+function attestorPubkey() {
+  const pub = process.env.LEXARI_ATTESTOR_PUBKEY?.trim();
+  if (pub) return new PublicKey(pub);
+  const raw = process.env.LEXARI_ATTESTOR_KEY?.trim();
+  if (!raw) throw new Error("Set LEXARI_ATTESTOR_PUBKEY or LEXARI_ATTESTOR_KEY");
+  const secret = raw.startsWith("[") ? Uint8Array.from(JSON.parse(raw)) : bs58.decode(raw);
+  return Keypair.fromSecretKey(secret).publicKey;
 }
-const secret = raw.trim().startsWith("[")
-  ? Uint8Array.from(JSON.parse(raw))
-  : null;
-if (!secret) {
-  console.error("LEXARI_ATTESTOR_KEY must be a JSON byte array");
-  process.exit(1);
-}
-const attestor = Keypair.fromSecretKey(secret);
-const idl = JSON.parse(readFileSync(new URL("../target/idl/lexari.json", import.meta.url), "utf8"));
+
+const attestor = attestorPubkey();
+const idl = JSON.parse(readFileSync(new URL("../idl/lexari.json", import.meta.url), "utf8"));
 const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);
 const program = new anchor.Program(idl, provider);
@@ -27,19 +26,20 @@ const [programData] = PublicKey.findProgramAddressSync([program.programId.toBuff
 const existing = await provider.connection.getAccountInfo(config);
 if (existing) {
   const row = await program.account.config.fetch(config);
-  console.log("config already set", row.authority.toBase58());
+  if (row.authority.equals(attestor)) {
+    console.log("config already set to", attestor.toBase58());
+    process.exit(0);
+  }
+  const sig = await program.methods
+    .updateConfig(attestor)
+    .accounts({ authority: provider.wallet.publicKey, config, program: program.programId, programData })
+    .rpc();
+  console.log("update_config", sig, "attestor", attestor.toBase58());
   process.exit(0);
 }
 
 const sig = await program.methods
-  .initConfig(attestor.publicKey)
-  .accounts({
-    payer: provider.wallet.publicKey,
-    config,
-    program: program.programId,
-    programData,
-    systemProgram: anchor.web3.SystemProgram.programId,
-  })
+  .initConfig(attestor)
+  .accounts({ payer: provider.wallet.publicKey, config, program: program.programId, programData, systemProgram: anchor.web3.SystemProgram.programId })
   .rpc();
-console.log("init_config", sig);
-console.log("attestor", attestor.publicKey.toBase58());
+console.log("init_config", sig, "attestor", attestor.toBase58());
