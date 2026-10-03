@@ -5,13 +5,13 @@ import { openAdd } from "../overlays";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { SPECIALISTS, type MemoryTag } from "@/content/appData";
-import type { Transaction } from "@solana/web3.js";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { eraseMemory } from "@/lib/chain";
-import { addNote, agentName, downloadFile, editNote, forgetNote, toast, useApp, type Note, type State } from "@/lib/store";
+import { friendly } from "@/lib/api";
+import { bridgeFor } from "@/lib/walletBridge";
+import { addNote, agentName, downloadFile, editNote, forgetNote, get, toast, unlockMemories, useApp, type Note, type State } from "@/lib/store";
 import Icon from "../Icon";
 import { SpecFace } from "../faces";
-import { DemoTag, ago } from "../ui";
+import { ago } from "../ui";
 import { BrainScene, CATS } from "./scene";
 
 const EDITABLE = new Set(["About you", "Preferences", "People", "Tools", "Habits"]);
@@ -36,16 +36,16 @@ function NoteRow({ n, now }: { n: Note; now: number }) {
   const [text, setText] = useState(n.text);
   const [busy, setBusy] = useState(false);
   const row = useRef<HTMLLIElement>(null);
-  const { connection } = useConnection();
-  const { publicKey, signTransaction } = useWallet();
+  const signer = () => bridgeFor(get().auth?.address);
   const save = () => {
     const t = text.trim();
     if (t && t !== n.text) {
       const oldHash = n.chainHash;
       const asset = n.chainAsset;
       editNote(n.id, { text: t, chainHash: undefined, chainAsset: undefined, pendingChain: true });
-      if (oldHash && asset && publicKey && signTransaction) {
-        eraseMemory({ connection, payer: { publicKey, signTransaction: (tx: Transaction) => signTransaction(tx) }, asset, hashHex: oldHash }).catch(() => toast({ text: "The new note is saved here. The old onchain copy could not be removed.", face: "home" }));
+      const b = signer();
+      if (oldHash && asset && b) {
+        eraseMemory({ bridge: b, asset, hashHex: oldHash }).catch(() => toast({ text: "The new note is saved. The old onchain record could not be removed.", face: "home" }));
       }
       toast({ text: "Memory updated", face: "home" });
     }
@@ -55,12 +55,12 @@ function NoteRow({ n, now }: { n: Note; now: number }) {
     const el = row.current; if (!el || busy) return;
     const onchain = !!(n.chainHash && n.chainAsset);
     if (onchain) {
-      if (!publicKey || !signTransaction) { toast({ text: "Connect the wallet that owns this memory to delete it on Solana.", face: "home" }); return; }
+      const b = signer();
+      if (!b) { toast({ text: "Connect the wallet that owns this memory to delete it on Solana.", face: "home" }); return; }
       setBusy(true);
-      try { await eraseMemory({ connection, payer: { publicKey, signTransaction: (tx: Transaction) => signTransaction(tx) }, asset: n.chainAsset!, hashHex: n.chainHash! }); }
+      try { await eraseMemory({ bridge: b, asset: n.chainAsset!, hashHex: n.chainHash! }); }
       catch (e) {
-        const m = (e as Error)?.message || "Could not delete it on Solana.";
-        toast({ text: /reject|denied|cancel/i.test(m) ? "Still remembered. The wallet cancelled the delete." : "Still remembered. The onchain delete did not go through.", face: "home" });
+        toast({ text: `Still remembered. ${friendly(e)}`, face: "home" });
         setBusy(false);
         return;
       }
@@ -68,7 +68,7 @@ function NoteRow({ n, now }: { n: Note; now: number }) {
     }
     gsap.to(el, { x: 40, opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, marginTop: 0, duration: 0.4, ease: "power2.in", onComplete: () => {
       const undo = forgetNote(n.id);
-      toast({ text: onchain ? "Deleted on Solana. Undo brings it back on this device only." : "Forgotten", face: "home", action: { label: "Undo", run: undo } });
+      toast({ text: onchain ? "Deleted on Solana. Undo saves it again, off-chain." : "Forgotten", face: "home", action: { label: "Undo", run: undo } });
     } });
   };
   return (
@@ -81,7 +81,7 @@ function NoteRow({ n, now }: { n: Note; now: number }) {
       ) : (
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-semibold leading-snug text-ink">{n.text}</p>
+            <p className="text-[15px] font-semibold leading-snug text-ink">{n.locked ? <span className="text-ink/45">Encrypted. Open your memories to read it.</span> : n.text}</p>
             <p className="label mt-1.5 text-[9px] text-ink/60">{n.source} · {ago(n.at, now)}{n.chainHash ? " · on Solana" : ""}</p>
           </div>
           <div className="flex shrink-0 gap-1 opacity-100 transition sm:opacity-60 sm:group-hover:opacity-100">
@@ -216,7 +216,9 @@ export default function Brain() {
       <div className="pointer-events-none absolute left-5 top-5 z-10 sm:left-8 sm:top-8">
         <p className="label flex items-center gap-2 text-brand-ink"><i className="live-dot h-2 w-2 rounded-full bg-grape" />Memory</p>
         <h1 className="display mt-2 text-[40px] text-ink sm:text-[60px]">{agentName(s)}&apos;s brain</h1>
-        <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink/70"><span className="tab-num font-bold text-ink">{total}</span> memories in {CATS.length} areas <DemoTag className="pointer-events-auto hidden sm:inline-flex" /></p>
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink/70"><span className="tab-num font-bold text-ink">{total}</span> memories in {CATS.length} areas</p>
+        {s.memoryLocked && <button onClick={() => void unlockMemories()} className="btn btn-brand btn-sm pointer-events-auto mt-3 !h-10"><Icon name="memory" size={15} />Open your memories</button>}
+        {s.memoryLocked && <p className="mt-2 max-w-[22rem] text-[12.5px] text-ink/60">They are encrypted. Your wallet signs once on this device to open them.</p>}
       </div>
       <p className={`label pointer-events-none absolute bottom-5 left-5 z-10 text-[9.5px] text-ink/60 transition-opacity sm:left-8 ${focus >= 0 ? "opacity-0 min-[900px]:opacity-100" : ""}`}>Drag to turn · tap a label to open it</p>
       {failed && <p className="absolute inset-x-5 top-1/2 z-10 text-center text-[15px] text-ink/70">Your browser could not draw the 3D brain. Tap a label above to open that memory area.</p>}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { gsap } from "gsap";
 import { toast, type State } from "@/lib/store";
-import { countdown, hub, nextReset, questsView, type Period, type QuestView } from "@/lib/hub";
+import { countdown, hub, nextReset, useHubBusy, questsView, type Period, type QuestView } from "@/lib/hub";
 import Icon from "@/components/Icon";
 import { burst } from "@/components/fly";
 import { Coin, flyCoins } from "./coin";
@@ -51,6 +51,7 @@ export default function Quests({ s, now }: { s: State; now: number }) {
 
 function QuestRow({ q, i, hard }: { q: QuestView; i: number; hard: boolean }) {
   const btn = useRef<HTMLButtonElement>(null);
+  const busy = useHubBusy();
   const row = useRef<HTMLLIElement>(null);
   const pct = Math.round((q.have / q.goal) * 100);
   const claim = () => {
@@ -78,7 +79,7 @@ function QuestRow({ q, i, hard }: { q: QuestView; i: number; hard: boolean }) {
       <span className="flex shrink-0 flex-col items-end gap-1.5">
         <span className={`flex items-center gap-1 text-[14px] font-extrabold tabular-nums ${q.claimed ? "opacity-50" : ""}`}><Coin size={18} />{q.reward}</span>
         {q.claimed ? <span className={`flex h-10 items-center gap-1 px-1 text-[13px] font-bold ${hard ? "text-lilac" : "text-brand-ink"}`}><Icon name="check" size={14} stroke={3} />Collected</span>
-          : q.done ? <button ref={btn} type="button" onClick={claim} className="hub-claim h-10 rounded-full bg-grape px-5 text-[14px] font-extrabold text-white transition hover:-translate-y-0.5">Claim</button>
+          : q.done ? <button ref={btn} type="button" onClick={claim} disabled={!!busy} className="hub-claim h-10 disabled:opacity-60 rounded-full bg-grape px-5 text-[14px] font-extrabold text-white transition hover:-translate-y-0.5">{busy === `quest:${q.id}` ? "Signing…" : "Claim"}</button>
           : q.go ? goEl("Go") : <span className={`h-10 px-1 text-[12.5px] font-semibold leading-10 ${hard ? "text-white/50" : "text-ink/45"}`}>In progress</span>}
       </span>
     </li>

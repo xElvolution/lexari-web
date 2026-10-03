@@ -45,7 +45,7 @@ export const DEFAULT_PREFS: Prefs = {
   notif: { replies: true, groups: true, calls: true, wallet: true, cards: true, digest: false, product: false },
 };
 /** A memory. `locked` until this device has the key (one wallet signature). */
-export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number; chainHash?: string; chainAsset?: string; chainTx?: string; pendingChain?: boolean; serverId?: string; locked?: boolean; saving?: boolean };
+export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number; chainHash?: string; chainAsset?: string; chainTx?: string; pendingChain?: boolean; serverId?: string; locked?: boolean; saving?: boolean; /** HMAC of the text: the dedupe key and the onchain hash */ hash?: string };
 /** look: a seed number (null = the house face) or a face built in the creator */
 export type AgentLook = number | null | FaceLook;
 export type Agent = { name: string; look: AgentLook; you: string; role: string; tone: ToneId };
@@ -190,7 +190,7 @@ function fromAccount(acc: Account): State {
   try { active = localStorage.getItem(`${ACTIVE_KEY}:${acc.user.wallet}`) || "home"; } catch {}
   const memory: Note[] = acc.memories.map((m) => ({
     id: m.id, serverId: m.id, tag: (m.tag || "About you") as MemoryTag, text: "", source: m.source || "You", at: m.at, locked: true,
-    chainHash: m.onchainPda ? m.contentHash : undefined, chainTx: m.chainTx || undefined,
+    hash: m.contentHash, chainHash: m.onchainPda ? m.contentHash : undefined, chainAsset: m.onchainPda ? home?.asset || undefined : undefined, chainTx: m.chainTx || undefined,
   }));
   return {
     ...EMPTY, auth, links: { google: acc.user.method === "google", wallet: acc.user.method === "wallet" },
@@ -361,7 +361,7 @@ export function addNote(text: string, tag: MemoryTag = "About you", source = "Yo
       const sealed = await sealNote(await memoryKeys(), text);
       const r = await api<{ id: string; duplicate?: boolean }>("/api/memories", { body: { agentSlug: "home", tag, source: source.slice(0, 60), ...sealed } });
       if (r.duplicate) set((s) => ({ ...s, memory: s.memory.filter((m) => m.id !== n.id) }));
-      else set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === n.id ? { ...m, serverId: r.id, saving: false, chainHash: undefined, _hash: sealed.contentHash } as Note : m)) }));
+      else set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === n.id ? { ...m, serverId: r.id, saving: false, hash: sealed.contentHash } : m)) }));
     } catch (e) {
       set((s) => ({ ...s, memory: s.memory.filter((m) => m.id !== n.id) }));
       toast({ text: `Not saved. ${(e as Error).message || ""}`.trim(), face: "home" });
@@ -377,6 +377,7 @@ export function editNote(id: string, p: Partial<Note>) {
   sync((async () => {
     const sealed = await sealNote(await memoryKeys(), text);
     await api(`/api/memories/${before.serverId}`, { method: "PATCH", body: { tag, ...sealed } });
+    set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === id ? { ...m, hash: sealed.contentHash, chainHash: undefined } : m)) }));
   })(), () => set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === id ? before : m)) })));
 }
 export function forgetNote(id: string) {

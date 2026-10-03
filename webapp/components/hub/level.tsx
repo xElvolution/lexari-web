@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { gsap } from "gsap";
 import type { FaceState } from "@shared/components/avatar";
 import { toast, type State } from "@/lib/store";
-import { MAX_LEVEL, PERKS, coinsOf, hub, levelOf, xpFor } from "@/lib/hub";
+import { MAX_LEVEL, PERKS, coinsOf, hub, levelOf, xpFor, useHubBusy } from "@/lib/hub";
 import { myAgents } from "@/components/agents";
 import { WhoFace } from "@/components/faces";
 import Icon from "@/components/Icon";
@@ -29,6 +29,7 @@ export default function LevelUp({ s }: { s: State }) {
   const [rises, setRises] = useState<{ k: number; t: string }[]>([]);
   const [party, setParty] = useState<{ level: number; id: string } | null>(null);
   const stage = useRef<HTMLDivElement>(null);
+  const busy = useHubBusy();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -86,11 +87,11 @@ export default function LevelUp({ s }: { s: State }) {
           </div>
           <div className="relative mt-5 grid grid-cols-3 gap-2">
             {[25, 100].map((n) => (
-              <button key={n} type="button" onClick={() => train(n)} disabled={level >= MAX_LEVEL || coins <= 0} className="flex h-12 flex-col items-center justify-center rounded-2xl bg-white/10 text-[14px] font-bold ring-1 ring-white/15 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40">
+              <button key={n} type="button" onClick={() => train(n)} disabled={!!busy || level >= MAX_LEVEL || coins <= 0} className="flex h-12 flex-col items-center justify-center rounded-2xl bg-white/10 text-[14px] font-bold ring-1 ring-white/15 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40">
                 <span>+{n} XP</span><span className="flex items-center gap-1 text-[11px] font-semibold text-white/60"><Coin size={12} />{n}</span>
               </button>
             ))}
-            <button type="button" onClick={() => train(toNext)} disabled={level >= MAX_LEVEL || coins < toNext} className="hub-shine flex h-12 flex-col items-center justify-center rounded-2xl bg-grape text-[14px] font-extrabold shadow-[0_5px_0_#3514b0] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">
+            <button type="button" onClick={() => train(toNext)} disabled={!!busy || level >= MAX_LEVEL || coins < toNext} className="hub-shine flex h-12 flex-col items-center justify-center rounded-2xl bg-grape text-[14px] font-extrabold shadow-[0_5px_0_#3514b0] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none">
               <span>Level up</span><span className="flex items-center gap-1 text-[11px] font-semibold text-white/75"><Coin size={12} />{toNext}</span>
             </button>
           </div>

@@ -110,14 +110,17 @@ async function linkAgent(user: { userId: string; wallet: string }, asset: string
   const database = db();
   const byAsset = await database.select().from(agents).where(eq(agents.asset, asset)).limit(1);
   if (byAsset[0]) {
+    const meta = { ...(byAsset[0].meta || {}), dna: agent.dna, mintTx: (byAsset[0].meta as { mintTx?: string })?.mintTx || signature };
     if (byAsset[0].userId !== user.userId) {
       // The card was transferred to this person: the agent comes with it.
-      await database.update(agents).set({ userId: user.userId, kind: "custom", slug: `c-${asset.slice(0, 8).toLowerCase()}`, updatedAt: new Date() }).where(eq(agents.id, byAsset[0].id));
+      await database.update(agents).set({ userId: user.userId, kind: "custom", slug: `c-${asset.slice(0, 8).toLowerCase()}`, meta, updatedAt: new Date() }).where(eq(agents.id, byAsset[0].id));
+    } else {
+      await database.update(agents).set({ meta, updatedAt: new Date() }).where(eq(agents.id, byAsset[0].id));
     }
     return;
   }
   // First mint: attach to the agent with this name, else the home agent.
   const mine = await database.select().from(agents).where(eq(agents.userId, user.userId));
   const target = mine.find((r) => !r.asset && r.name === agent.name) || mine.find((r) => !r.asset && r.slug === "home");
-  if (target) await database.update(agents).set({ asset, agentPda: pda.toBase58(), mintedAt: new Date(), meta: { ...(target.meta || {}), mintTx: signature }, updatedAt: new Date() }).where(eq(agents.id, target.id));
+  if (target) await database.update(agents).set({ asset, agentPda: pda.toBase58(), mintedAt: new Date(), meta: { ...(target.meta || {}), mintTx: signature, dna: agent.dna }, updatedAt: new Date() }).where(eq(agents.id, target.id));
 }

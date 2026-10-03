@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PublicKey, type Transaction } from "@solana/web3.js";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { Connection, PublicKey } from "@solana/web3.js";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 import Face from "@shared/components/Face";
 import type { Variant } from "@shared/components/avatar";
 import Icon from "../Icon";
 import { setMeta, toast, type State } from "@/lib/store";
-import { CHAIN_NAME, cleanName, cleanRole, faceDna, faceFragment, faceSvg, tokenUrl, txUrl, type NftRecord } from "@/lib/nft";
+import { useWalletBridge } from "@/lib/walletBridge";
+import { friendly } from "@/lib/api";
+import { CHAIN_NAME, SOLANA_RPC, cleanName, cleanRole, faceDna, faceFragment, faceSvg, tokenUrl, txUrl, type NftRecord } from "@/lib/nft";
 import { mintCard, programIsLive, updateCard } from "@/lib/chain";
 import { WALLETS } from "@/content/appData";
 
@@ -25,8 +27,10 @@ export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID c
   const saved = s.meta[id]?.nft;
   const rec = saved && solAsset(saved.tokenId) ? saved : undefined;
   const holder = useRef<HTMLSpanElement>(null);
-  const { connection } = useConnection();
-  const { publicKey, wallets, wallet, signTransaction } = useWallet();
+  const { wallets } = useWallet();
+  const bridge = useWalletBridge();
+  const mine = !!bridge && bridge.publicKey.toBase58() === s.auth?.address;
+  const publicKey = mine ? bridge!.publicKey : null;
   const [live, setLive] = useState<boolean | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [err, setErr] = useState("");
@@ -39,15 +43,11 @@ export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID c
 
   useEffect(() => {
     let on = true;
-    programIsLive(connection).then((v) => { if (on) setLive(v); }).catch(() => { if (on) setLive(false); });
+    programIsLive().then((v) => { if (on) setLive(v); }).catch(() => { if (on) setLive(false); });
     return () => { on = false; };
-  }, [connection]);
+  }, []);
 
-  const fail = (e: unknown) => {
-    const m = (e as Error)?.message || "Something went wrong";
-    setErr(/reject|denied|cancel/i.test(m) ? "You cancelled it in your wallet." : m.split("\n")[0].slice(0, 180));
-    setPhase("error");
-  };
+  const fail = (e: unknown) => { setErr(friendly(e)); setPhase("error"); };
 
   const installed = wallets.filter((w) => w.readyState === WalletReadyState.Installed || w.readyState === WalletReadyState.Loadable);
   const preferred = WALLETS.find((w) => w.id === s.auth?.wallet)?.name;
@@ -63,32 +63,27 @@ export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID c
   };
 
   const send = async (kind: "mint" | "update") => {
-    const adapter = wallet?.adapter ?? pick?.adapter;
-    if (!publicKey || !signTransaction || !adapter) return;
+    if (!publicKey || !bridge) return;
     const face = faceFragment(holder.current?.querySelector("svg") ?? null);
     if (!face) { setErr("This face can't be stored with the card."); setPhase("error"); return; }
     setErr(""); setTx(""); setPhase("signing");
     try {
-      const bal = await connection.getBalance(publicKey);
+      const bal = await new Connection(SOLANA_RPC, "confirmed").getBalance(publicKey);
       if (bal === 0) {
         setErr(`This wallet has no SOL on ${CHAIN_NAME}. Add a little, then try again.`);
         setPhase("error");
         return;
       }
-      const payer = { publicKey, signTransaction: (tx: Transaction) => signTransaction(tx) };
       setPhase("pending");
       if (kind === "mint") {
-        const next = await mintCard({ connection, adapter, payer, name: nm, role: rl, dna, svg: faceSvg(face) });
+        const next = await mintCard({ bridge, name: nm, role: rl, dna, svg: faceSvg(face) });
         setMeta(id, { nft: next });
         setTx(next.tx);
         setPhase("idle");
         onMinted?.();
-        toast({
-          text: next.registered ? `${nm}'s ID card is on Solana.` : `${nm}'s card was minted. Press Update to finish the registry.`,
-          face: "home",
-        });
+        toast({ text: `${nm}'s ID card is on Solana.`, face: "home" });
       } else {
-        const res = await updateCard({ connection, adapter, payer, asset: rec!.tokenId, name: nm, role: rl, dna, svg: faceSvg(face) });
+        const res = await updateCard({ bridge, asset: rec!.tokenId, name: nm, role: rl, dna, svg: faceSvg(face) });
         const next: NftRecord = { ...rec!, tx: res.tx, dna, name: nm, role: rl, owner: publicKey.toBase58(), at: Date.now(), uri: res.uri, registered: true };
         setMeta(id, { nft: next });
         setTx(res.tx);
@@ -104,7 +99,7 @@ export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID c
   if (live === null) status = { tone: "muted", text: "Checking the Lexari program…" };
   else if (live === false) status = { tone: "warn", text: `The Lexari program is not on ${CHAIN_NAME} yet.` };
   else if (!installed.length && !publicKey) status = { tone: "muted", text: "No Solana wallet found. Install Phantom, Solflare or Backpack to mint." };
-  else if (!publicKey) status = { tone: "muted", text: "Connect a wallet to mint this card." };
+  else if (!publicKey) status = { tone: "muted", text: bridge ? `Switch to the wallet you signed in with (${short(s.auth?.address || "")}).` : s.auth?.method === "google" ? "Your wallet is still loading." : "Connect the wallet you signed in with to mint this card." };
   else if (phase === "signing" || phase === "pending") status = { tone: "muted", text: phase === "signing" ? "Confirm in your wallet…" : "Waiting for Solana…" };
   else if (registryOpen) status = { tone: "warn", text: "The card is minted. The registry write did not finish. Update it to try again." };
   else if (rec && (faceChanged || cardChanged)) status = { tone: "warn", text: `You changed ${faceChanged && cardChanged ? "the face and the name" : faceChanged ? "the face" : "the name or role"} since minting. Update the card to match.` };

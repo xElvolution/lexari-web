@@ -1,42 +1,29 @@
 "use client";
 
-import { Buffer } from "buffer";
-import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
+/**
+ * Everything the browser sends to Solana. Instructions come from lib/lexari-ix.ts (shared with the server).
+ * Each transaction is signed by the wallet bridge (Phantom/Solflare/Backpack or the Privy wallet), then
+ * posted to /api/hub/confirm so the server records what the chain did.
+ */
+import { Connection, PublicKey, Transaction, type TransactionInstruction } from "@solana/web3.js";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { create, fetchAsset, mplCore, update } from "@metaplex-foundation/mpl-core";
-import { createGenericFile, generateSigner, publicKey } from "@metaplex-foundation/umi";
+import { createGenericFile, generateSigner, publicKey as umiPk, type Umi } from "@metaplex-foundation/umi";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
+import { fromWeb3JsInstruction } from "@metaplex-foundation/umi-web3js-adapters";
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys";
-import type { WalletAdapter } from "@solana/wallet-adapter-base";
-import { CHAIN_NAME, LEXARI_PROGRAM_ID, SOLANA_CLUSTER, SOLANA_RPC, faceSvg, type NftRecord } from "./nft";
+import type { HubState } from "@/server/hub/state";
+import { api } from "./api";
+import {
+  PROGRAM_ID, agentPda, checkInIx, deleteMemoryIx, initPlayerIx, levelUpIx, memoryPda, playerPda, registerAgentIx, updateAgentIx, writeMemoryIx,
+} from "./lexari-ix";
+import { CHAIN_NAME, SOLANA_CLUSTER, SOLANA_RPC, type NftRecord } from "./nft";
+import { applyHub } from "./store";
+import { hexToBytes } from "./vault";
+import type { WalletBridge } from "./walletBridge";
 
-const PROGRAM = new PublicKey(LEXARI_PROGRAM_ID);
-const DISC = {
-  register_agent: Uint8Array.from([135, 157, 66, 195, 2, 113, 175, 30]),
-  update_agent: Uint8Array.from([85, 2, 178, 9, 119, 139, 102, 164]),
-  write_memory: Uint8Array.from([230, 48, 240, 225, 213, 184, 250, 80]),
-  delete_memory: Uint8Array.from([197, 189, 203, 106, 20, 99, 209, 134]),
-};
-
-type Payer = { publicKey: PublicKey; signTransaction: (tx: Transaction) => Promise<Transaction> };
-
-const u32 = (n: number) => {
-  const b = new Uint8Array(4);
-  new DataView(b.buffer).setUint32(0, n, true);
-  return b;
-};
+export const connection = () => new Connection(SOLANA_RPC, "confirmed");
 const utf8 = (s: string) => new TextEncoder().encode(s);
-const str = (s: string) => {
-  const body = utf8(s);
-  return concat(u32(body.length), body);
-};
-function concat(...parts: Uint8Array[]) {
-  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-  let o = 0;
-  for (const p of parts) { out.set(p, o); o += p.length; }
-  return out;
-}
-
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 function b58(bytes: Uint8Array) {
   let zeros = 0;
@@ -44,336 +31,139 @@ function b58(bytes: Uint8Array) {
   const digits = [0];
   for (let i = zeros; i < bytes.length; i++) {
     let carry = bytes[i];
-    for (let j = 0; j < digits.length; j++) {
-      carry += digits[j] << 8;
-      digits[j] = carry % 58;
-      carry = Math.floor(carry / 58);
-    }
+    for (let j = 0; j < digits.length; j++) { carry += digits[j] << 8; digits[j] = carry % 58; carry = Math.floor(carry / 58); }
     while (carry > 0) { digits.push(carry % 58); carry = Math.floor(carry / 58); }
   }
   return "1".repeat(zeros) + digits.reverse().map((d) => B58[d]).join("");
 }
-const toHex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-const fromHex = (hex: string) => Uint8Array.from(hex.match(/../g)!.map((b) => parseInt(b, 16)));
-const b64 = (bytes: Uint8Array) => {
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s);
-};
 
-export function agentPda(owner: PublicKey, asset: PublicKey) {
-  return PublicKey.findProgramAddressSync([utf8("agent"), owner.toBuffer(), asset.toBuffer()], PROGRAM)[0];
-}
-export function memoryPda(agent: PublicKey, hash: Uint8Array) {
-  return PublicKey.findProgramAddressSync([utf8("memory"), agent.toBuffer(), hash], PROGRAM)[0];
-}
-
-/** The home agent's card, or the first minted card. Old numeric token ids are ignored. */
+/** The home agent's card, or the first minted card. */
 export function registryAsset(meta: Record<string, { nft?: { tokenId?: string } } | undefined>): string | undefined {
   const ids = [meta.home?.nft?.tokenId, ...Object.values(meta).map((m) => m?.nft?.tokenId)];
-  return ids.find((id) => {
-    if (!id || /^\d+$/.test(id)) return false;
-    try { new PublicKey(id); return true; } catch { return false; }
-  });
+  return ids.find((id) => { if (!id || /^\d+$/.test(id)) return false; try { new PublicKey(id); return true; } catch { return false; } });
 }
 
-export async function programIsLive(connection: Connection) {
-  const info = await connection.getAccountInfo(PROGRAM);
-  return !!info;
+let liveCache: { at: number; ok: boolean } | null = null;
+export async function programIsLive(conn = connection()) {
+  if (liveCache && Date.now() - liveCache.at < 60_000) return liveCache.ok;
+  const info = await conn.getAccountInfo(PROGRAM_ID);
+  liveCache = { at: Date.now(), ok: !!info?.executable };
+  return liveCache.ok;
 }
 
-function umiFor(adapter: WalletAdapter) {
+/** Records a confirmed transaction on the server and refreshes the Hub. */
+export async function confirmOnServer(signature: string) {
+  const r = await api<{ recorded: string[]; state: HubState }>("/api/hub/confirm", { body: { signature } });
+  applyHub(r.state);
+  return r;
+}
+
+async function sendSigned(tx: Transaction, lastValidBlockHeight: number) {
+  const conn = connection();
+  const sig = await conn.sendRawTransaction(tx.serialize());
+  const res = await conn.confirmTransaction({ signature: sig, blockhash: tx.recentBlockhash!, lastValidBlockHeight }, "confirmed");
+  if (res.value.err) throw new Error("The transaction failed on Solana.");
+  return sig;
+}
+
+/** Signs and sends instructions with your wallet, then lets the server record them. */
+export async function sendAndRecord(bridge: WalletBridge, ixs: TransactionInstruction[]) {
+  const { blockhash, lastValidBlockHeight } = await connection().getLatestBlockhash("confirmed");
+  const tx = new Transaction({ feePayer: bridge.publicKey, blockhash, lastValidBlockHeight }).add(...ixs);
+  const signed = await bridge.signTransaction(tx);
+  const sig = await sendSigned(signed, lastValidBlockHeight);
+  const r = await confirmOnServer(sig);
+  return { sig, ...r };
+}
+
+/** A reward the server checked and co-signed (quest, box, referral tier). Your wallet signs and pays the fee. */
+export async function claimReward(bridge: WalletBridge, req: { kind: "quest"; questId: string } | { kind: "box" } | { kind: "tier"; tier: number }) {
+  const built = await api<{ tx: string; coins: number; lastValidBlockHeight: number }>("/api/hub/claim", { body: req });
+  const tx = Transaction.from(Uint8Array.from(atob(built.tx), (c) => c.charCodeAt(0)));
+  if (!tx.feePayer?.equals(bridge.publicKey)) throw new Error("That reward was built for another wallet.");
+  const signed = await bridge.signTransaction(tx);
+  const sig = await sendSigned(signed, built.lastValidBlockHeight);
+  const r = await confirmOnServer(sig);
+  return { sig, coins: built.coins, ...r };
+}
+
+export async function checkIn(bridge: WalletBridge, live: HubState | null | undefined) {
+  const ixs: TransactionInstruction[] = [];
+  if (!live?.player) ixs.push(initPlayerIx(bridge.publicKey, live?.referrerPlayer ? new PublicKey(live.referrerPlayer) : null));
+  ixs.push(checkInIx(bridge.publicKey));
+  return sendAndRecord(bridge, ixs);
+}
+
+export async function levelUp(bridge: WalletBridge, asset: string, coins: number) {
+  const player = await connection().getAccountInfo(playerPda(bridge.publicKey));
+  if (!player) throw new Error("Check in once first. That opens your coin account.");
+  return sendAndRecord(bridge, [levelUpIx(bridge.publicKey, new PublicKey(asset), coins)]);
+}
+
+/* ---------- ID cards (Metaplex Core) ---------- */
+function umiFor(bridge: WalletBridge): Umi {
   const irys = SOLANA_CLUSTER === "mainnet-beta" ? "https://node1.irys.xyz" : "https://devnet.irys.xyz";
-  return createUmi(SOLANA_RPC).use(mplCore()).use(walletAdapterIdentity(adapter)).use(irysUploader({ address: irys }));
+  // umi only needs these four members of a wallet adapter.
+  const adapter = {
+    publicKey: bridge.publicKey,
+    signMessage: bridge.signMessage,
+    signTransaction: bridge.signTransaction,
+    signAllTransactions: bridge.signAllTransactions || (async <T,>(txs: T[]) => { const out: T[] = []; for (const t of txs) out.push(await bridge.signTransaction(t as never) as T); return out; }),
+  };
+  return createUmi(SOLANA_RPC, "confirmed").use(mplCore()).use(walletAdapterIdentity(adapter as never)).use(irysUploader({ address: irys }));
 }
 
-async function uploadCard(adapter: WalletAdapter, name: string, role: string, dna: string, svg: string) {
-  const umi = umiFor(adapter);
+async function uploadCard(umi: Umi, name: string, role: string, dna: string, svg: string) {
   const file = createGenericFile(utf8(svg), "face.svg", { contentType: "image/svg+xml" });
   const [imageUri] = await umi.uploader.upload([file]);
   if (!imageUri) throw new Error("The face could not be stored. Nothing was minted.");
   const uri = await umi.uploader.uploadJson({
-    name,
-    symbol: "LXID",
-    description: `${name} is a Lexari agent. ${role}. The owner can update this card.`,
-    image: imageUri,
-    attributes: [
-      { trait_type: "Role", value: role },
-      { trait_type: "Face", value: dna },
-    ],
+    name, symbol: "LXID", description: `${name} is a Lexari agent. ${role}. The owner can update this card.`, image: imageUri,
+    attributes: [{ trait_type: "Role", value: role }, { trait_type: "Face", value: dna }],
   });
   if (!uri || uri.length > 200) throw new Error("The metadata link is missing or too long. Nothing was minted.");
   return uri;
 }
 
-async function send(connection: Connection, payer: Payer, ix: TransactionInstruction) {
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-  const tx = new Transaction({ feePayer: payer.publicKey, blockhash, lastValidBlockHeight }).add(ix);
-  const signed = await payer.signTransaction(tx);
-  const sig = await connection.sendRawTransaction(signed.serialize());
-  const result = await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-  if (result.value.err) throw new Error("The transaction failed on Solana.");
-  return sig;
-}
-
-function ix(data: Uint8Array, keys: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[]) {
-  return new TransactionInstruction({ programId: PROGRAM, keys, data: Buffer.from(data) });
-}
-
-async function register(connection: Connection, payer: Payer, asset: PublicKey, name: string, role: string, dna: string) {
-  const agent = agentPda(payer.publicKey, asset);
-  const existing = await connection.getAccountInfo(agent);
-  const data = existing
-    ? concat(DISC.update_agent, str(name), str(role), str(dna))
-    : concat(DISC.register_agent, asset.toBytes(), str(name), str(role), str(dna));
-  const keys = existing
-    ? [
-        { pubkey: payer.publicKey, isSigner: true, isWritable: false },
-        { pubkey: agent, isSigner: false, isWritable: true },
-      ]
-    : [
-        { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-        { pubkey: agent, isSigner: false, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ];
-  return send(connection, payer, ix(data, keys));
-}
-
-export async function mintCard(opts: {
-  connection: Connection;
-  adapter: WalletAdapter;
-  payer: Payer;
-  name: string;
-  role: string;
-  dna: string;
-  svg: string;
-}): Promise<NftRecord> {
-  const umi = umiFor(opts.adapter);
-  const uri = await uploadCard(opts.adapter, opts.name, opts.role, opts.dna, opts.svg);
+/** Mints the Core asset and registers the agent in one transaction, so a card is never half made. */
+export async function mintCard(opts: { bridge: WalletBridge; name: string; role: string; dna: string; svg: string }): Promise<NftRecord> {
+  const umi = umiFor(opts.bridge);
+  const uri = await uploadCard(umi, opts.name, opts.role, opts.dna, opts.svg);
   const assetSigner = generateSigner(umi);
-  const created = await create(umi, { asset: assetSigner, name: opts.name, uri }).sendAndConfirm(umi);
   const asset = new PublicKey(assetSigner.publicKey);
-  const coreTx = b58(created.signature);
-  let registered = true;
-  let tx = coreTx;
-  try {
-    tx = await register(opts.connection, opts.payer, asset, opts.name, opts.role, opts.dna);
-  } catch {
-    registered = false;
-    tx = coreTx;
-  }
-  return {
-    tokenId: asset.toBase58(),
-    tx,
-    dna: opts.dna,
-    name: opts.name,
-    role: opts.role,
-    owner: opts.payer.publicKey.toBase58(),
-    at: Date.now(),
-    uri,
-    registered,
-  };
+  const reg = fromWeb3JsInstruction(registerAgentIx(opts.bridge.publicKey, asset, opts.name, opts.role, opts.dna));
+  const built = create(umi, { asset: assetSigner, name: opts.name, uri }).add({ instruction: reg, signers: [umi.identity], bytesCreatedOnChain: 0 });
+  const res = await built.sendAndConfirm(umi);
+  const tx = b58(res.signature);
+  await confirmOnServer(tx);
+  return { tokenId: asset.toBase58(), tx, dna: opts.dna, name: opts.name, role: opts.role, owner: opts.bridge.publicKey.toBase58(), at: Date.now(), uri, registered: true };
 }
 
-export async function updateCard(opts: {
-  connection: Connection;
-  adapter: WalletAdapter;
-  payer: Payer;
-  asset: string;
-  name: string;
-  role: string;
-  dna: string;
-  svg: string;
-}): Promise<{ tx: string; uri: string }> {
-  const uri = await uploadCard(opts.adapter, opts.name, opts.role, opts.dna, opts.svg);
-  const umi = umiFor(opts.adapter);
-  const assetAccount = await fetchAsset(umi, publicKey(opts.asset));
-  await update(umi, { asset: assetAccount, name: opts.name, uri }).sendAndConfirm(umi);
-  const tx = await register(opts.connection, opts.payer, new PublicKey(opts.asset), opts.name, opts.role, opts.dna);
+export async function updateCard(opts: { bridge: WalletBridge; asset: string; name: string; role: string; dna: string; svg: string }): Promise<{ tx: string; uri: string }> {
+  const umi = umiFor(opts.bridge);
+  const uri = await uploadCard(umi, opts.name, opts.role, opts.dna, opts.svg);
+  const assetAccount = await fetchAsset(umi, umiPk(opts.asset));
+  const upd = fromWeb3JsInstruction(updateAgentIx(opts.bridge.publicKey, new PublicKey(opts.asset), opts.name, opts.role, opts.dna));
+  const res = await update(umi, { asset: assetAccount, name: opts.name, uri }).add({ instruction: upd, signers: [umi.identity], bytesCreatedOnChain: 0 }).sendAndConfirm(umi);
+  const tx = b58(res.signature);
+  await confirmOnServer(tx);
   return { tx, uri };
 }
 
-function copyBytes(bytes: Uint8Array) {
-  const out = new Uint8Array(bytes.byteLength);
-  out.set(bytes);
-  return out;
-}
-async function sha256(bytes: Uint8Array) {
-  const digest = await crypto.subtle.digest("SHA-256", copyBytes(bytes));
-  return new Uint8Array(digest);
-}
-
-/** Encrypts the note with a key from the wallet signature, uploads the ciphertext, and records the hash. */
-export async function publishMemory(opts: {
-  connection: Connection;
-  adapter: WalletAdapter;
-  payer: Payer;
-  signMessage: (msg: Uint8Array) => Promise<Uint8Array>;
-  asset: string;
-  text: string;
-}) {
-  const sig = await opts.signMessage(utf8("Lexari memory key v1"));
-  const raw = await crypto.subtle.digest("SHA-256", copyBytes(sig));
-  const key = await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt"]);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, utf8(opts.text)));
-  const hash = await sha256(ct);
-  const umi = umiFor(opts.adapter);
-  const uri = await umi.uploader.uploadJson({ v: 1, iv: b64(iv), ct: b64(ct) });
-  if (!uri || uri.length > 200) throw new Error("The memory link is missing or too long to store onchain.");
-  const agent = agentPda(opts.payer.publicKey, new PublicKey(opts.asset));
-  const memory = memoryPda(agent, hash);
-  const data = concat(DISC.write_memory, hash, str(uri));
-  const tx = await send(opts.connection, opts.payer, ix(data, [
-    { pubkey: opts.payer.publicKey, isSigner: true, isWritable: true },
-    { pubkey: agent, isSigner: false, isWritable: false },
-    { pubkey: memory, isSigner: false, isWritable: true },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-  ]));
-  return { hash: toHex(hash), tx, uri, iv: b64(iv), ct: b64(ct) };
+/* ---------- memories ---------- */
+/** Records a memory's hash onchain under your agent's card. The ciphertext stays in your account. */
+export async function publishMemory(opts: { bridge: WalletBridge; asset: string; hashHex: string; serverId: string }) {
+  const hash = hexToBytes(opts.hashHex);
+  const pda = memoryPda(agentPda(new PublicKey(opts.asset)), hash);
+  if (await connection().getAccountInfo(pda)) return { sig: "", pda: pda.toBase58() };
+  const r = await sendAndRecord(opts.bridge, [writeMemoryIx(opts.bridge.publicKey, new PublicKey(opts.asset), hash, `lexari:memory/${opts.serverId}`)]);
+  return { sig: r.sig, pda: pda.toBase58() };
 }
 
-export async function eraseMemory(opts: {
-  connection: Connection;
-  payer: Payer;
-  asset: string;
-  hashHex: string;
-}) {
-  const hash = fromHex(opts.hashHex);
-  const agent = agentPda(opts.payer.publicKey, new PublicKey(opts.asset));
-  const memory = memoryPda(agent, hash);
-  const info = await opts.connection.getAccountInfo(memory);
-  if (!info) return "";
-  return send(opts.connection, opts.payer, ix(DISC.delete_memory, [
-    { pubkey: opts.payer.publicKey, isSigner: true, isWritable: true },
-    { pubkey: memory, isSigner: false, isWritable: true },
-  ]));
+export async function eraseMemory(opts: { bridge: WalletBridge; asset: string; hashHex: string }) {
+  const pda = memoryPda(agentPda(new PublicKey(opts.asset)), hexToBytes(opts.hashHex));
+  if (!(await connection().getAccountInfo(pda))) return "";
+  return (await sendAndRecord(opts.bridge, [deleteMemoryIx(opts.bridge.publicKey, pda)])).sig;
 }
 
 export const chainLabel = CHAIN_NAME;
-
-const u16 = (n: number) => {
-  const b = new Uint8Array(2);
-  new DataView(b.buffer).setUint16(0, n, true);
-  return b;
-};
-const u64 = (n: number) => {
-  const b = new Uint8Array(8);
-  new DataView(b.buffer).setBigUint64(0, BigInt(n), true);
-  return b;
-};
-
-const HUB_DISC = {
-  init_player: Uint8Array.from([114, 27, 219, 144, 50, 15, 228, 66]),
-  check_in: Uint8Array.from([209, 253, 4, 217, 250, 241, 207, 50]),
-  claim_quest: Uint8Array.from([38, 197, 33, 123, 0, 108, 206, 161]),
-  open_box: Uint8Array.from([225, 220, 10, 104, 173, 151, 214, 199]),
-  level_up: Uint8Array.from([128, 64, 197, 116, 226, 129, 119, 234]),
-  claim_referral_tier: Uint8Array.from([197, 164, 29, 180, 105, 249, 176, 130]),
-};
-
-export function playerPda(owner: PublicKey) {
-  return PublicKey.findProgramAddressSync([utf8("player"), owner.toBuffer()], PROGRAM)[0];
-}
-export function levelPda(agent: PublicKey) {
-  return PublicKey.findProgramAddressSync([utf8("level"), agent.toBuffer()], PROGRAM)[0];
-}
-export function configPda() {
-  return PublicKey.findProgramAddressSync([utf8("config")], PROGRAM)[0];
-}
-
-export async function ensurePlayer(connection: Connection, payer: Payer) {
-  const player = playerPda(payer.publicKey);
-  if (await connection.getAccountInfo(player)) return player;
-  await send(connection, payer, ix(HUB_DISC.init_player, [
-    { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-    { pubkey: player, isSigner: false, isWritable: true },
-    { pubkey: PROGRAM, isSigner: false, isWritable: false },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-  ]));
-  return player;
-}
-
-export async function checkInOnchain(connection: Connection, payer: Payer) {
-  const player = await ensurePlayer(connection, payer);
-  return send(connection, payer, ix(HUB_DISC.check_in, [
-    { pubkey: payer.publicKey, isSigner: true, isWritable: false },
-    { pubkey: player, isSigner: false, isWritable: true },
-  ]));
-}
-
-export function readPlayer(data: Uint8Array) {
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  return { coins: Number(view.getBigUint64(40, true)), streak: view.getUint16(48, true) };
-}
-
-export async function levelUpOnchain(connection: Connection, payer: Payer, asset: PublicKey, coins: number) {
-  const player = await ensurePlayer(connection, payer);
-  const agent = agentPda(payer.publicKey, asset);
-  const level = levelPda(agent);
-  return send(connection, payer, ix(concat(HUB_DISC.level_up, u64(coins)), [
-    { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-    { pubkey: player, isSigner: false, isWritable: true },
-    { pubkey: agent, isSigner: false, isWritable: false },
-    { pubkey: level, isSigner: false, isWritable: true },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-  ]));
-}
-
-/** Build a co-signed instruction. The attestor pubkey must sign before it is sent. */
-export function questTransaction(payer: PublicKey, attestor: PublicKey, questId: number, period: number, coins: number) {
-  const player = playerPda(payer);
-  const periodBytes = u32(period);
-  const idBytes = u16(questId);
-  const claim = PublicKey.findProgramAddressSync([utf8("quest"), player.toBuffer(), idBytes, periodBytes], PROGRAM)[0];
-  return ix(concat(HUB_DISC.claim_quest, idBytes, periodBytes, u64(coins)), [
-    { pubkey: payer, isSigner: true, isWritable: true },
-    { pubkey: attestor, isSigner: true, isWritable: false },
-    { pubkey: configPda(), isSigner: false, isWritable: false },
-    { pubkey: player, isSigner: false, isWritable: true },
-    { pubkey: claim, isSigner: false, isWritable: true },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-  ]);
-}
-
-export function boxTransaction(payer: PublicKey, attestor: PublicKey, day: number, coins: number) {
-  const player = playerPda(payer);
-  const dayBytes = u32(day);
-  const claim = PublicKey.findProgramAddressSync([utf8("box"), player.toBuffer(), dayBytes], PROGRAM)[0];
-  return ix(concat(HUB_DISC.open_box, dayBytes, u64(coins)), [
-    { pubkey: payer, isSigner: true, isWritable: true },
-    { pubkey: attestor, isSigner: true, isWritable: false },
-    { pubkey: configPda(), isSigner: false, isWritable: false },
-    { pubkey: player, isSigner: false, isWritable: true },
-    { pubkey: claim, isSigner: false, isWritable: true },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-  ]);
-}
-
-export function tierTransaction(payer: PublicKey, attestor: PublicKey, tier: number) {
-  const player = playerPda(payer);
-  const claim = PublicKey.findProgramAddressSync([utf8("ref"), player.toBuffer(), Uint8Array.of(tier)], PROGRAM)[0];
-  return ix(concat(HUB_DISC.claim_referral_tier, Uint8Array.of(tier)), [
-    { pubkey: payer, isSigner: true, isWritable: true },
-    { pubkey: attestor, isSigner: true, isWritable: false },
-    { pubkey: configPda(), isSigner: false, isWritable: false },
-    { pubkey: player, isSigner: false, isWritable: true },
-    { pubkey: claim, isSigner: false, isWritable: true },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-  ]);
-}
-
-export async function sendCoSigned(connection: Connection, payer: Payer, instruction: TransactionInstruction) {
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-  const tx = new Transaction({ feePayer: payer.publicKey, blockhash, lastValidBlockHeight }).add(instruction);
-  const ownerSigned = await payer.signTransaction(tx);
-  const body = Buffer.from(ownerSigned.serialize({ requireAllSignatures: false, verifySignatures: false })).toString("base64");
-  const res = await fetch("/api/hub/attest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tx: body }) });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || typeof data.tx !== "string") throw new Error(typeof data.error === "string" ? data.error : "The server did not co-sign.");
-  const signed = Transaction.from(Buffer.from(data.tx, "base64"));
-  const sig = await connection.sendRawTransaction(signed.serialize());
-  const result = await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-  if (result.value.err) throw new Error("The transaction failed on Solana.");
-  return sig;
-}

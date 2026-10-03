@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "../db";
-import { agents, chainLedger, questProgress as progressTable } from "../db/schema";
+import { agents, chainLedger, questProgress as progressTable, users } from "../db/schema";
 import {
   TIER_FRIENDS, TIER_REWARD, agentPda, boxClaimPda, coreAssetOwner, decodeLevel, decodePlayer, levelPda, playerPda, questClaimPda, tierClaimPda,
   type PlayerAccount,
@@ -66,6 +66,19 @@ export async function hubState(user: { userId: string; wallet: string; referralC
     },
     active: ledgerRows.length > 0,
     claimedTotal: Number(claimedTotal),
+    /** For a first check-in: the referrer's Player account to pass to init_player. */
+    referrerPlayer: p ? null : (await referrerPlayer(user.userId))?.toBase58() ?? null,
     ledger: ledgerRows.map((r) => ({ kind: r.kind, amount: Number(r.amount), at: r.at.getTime(), tx: r.signature, data: r.data as Record<string, unknown> })),
   };
+}
+
+/** The referrer's player account, if they have one, so init_player records who invited this person. */
+export async function referrerPlayer(userId: string): Promise<PublicKey | null> {
+  const me = await db().select({ referredBy: users.referredBy }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!me[0]?.referredBy) return null;
+  const ref = await db().select({ wallet: users.wallet }).from(users).where(eq(users.id, me[0].referredBy)).limit(1);
+  if (!ref[0]) return null;
+  const pda = playerPda(new PublicKey(ref[0].wallet));
+  const info = (await fetchMany([pda])).get(pda.toBase58());
+  return info ? pda : null;
 }

@@ -14,7 +14,7 @@ import { TIER_FRIENDS, TIER_REWARD, claimQuestIx, claimTierIx, initPlayerIx, ope
 import { QUEST_RULES, periodNumber, rollBox } from "./catalog";
 import { connection, fetchMany, programStatus, utcDay } from "./chain";
 import { attestorKeypair } from "./keys";
-import { hubState } from "./state";
+import { hubState, referrerPlayer } from "./state";
 
 export type ClaimRequest = { kind: "quest"; questId: string } | { kind: "box" } | { kind: "tier"; tier: number };
 
@@ -70,13 +70,3 @@ export async function buildClaim(user: { userId: string; wallet: string; referra
   return { tx: tx.serialize({ requireAllSignatures: false, verifySignatures: false }).toString("base64"), coins, lastValidBlockHeight };
 }
 
-/** The referrer's player account, if they have one, so init_player records who invited this person. */
-export async function referrerPlayer(userId: string): Promise<PublicKey | null> {
-  const me = await db().select({ referredBy: users.referredBy }).from(users).where(eq(users.id, userId)).limit(1);
-  if (!me[0]?.referredBy) return null;
-  const ref = await db().select({ wallet: users.wallet }).from(users).where(eq(users.id, me[0].referredBy)).limit(1);
-  if (!ref[0]) return null;
-  const pda = playerPda(new PublicKey(ref[0].wallet));
-  const info = (await fetchMany([pda])).get(pda.toBase58());
-  return info ? pda : null;
-}

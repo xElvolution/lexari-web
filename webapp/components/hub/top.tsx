@@ -2,8 +2,10 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { toast, todayKey, type State } from "@/lib/store";
-import { STREAK_PAY, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, levelOf, nextReset, streakOf, weekStart } from "@/lib/hub";
+import { toast, type State } from "@/lib/store";
+import { STREAK_PAY, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, levelOf, nextReset, streakOf, useHubBusy, weekStart } from "@/lib/hub";
+
+const utcKey = (t: number) => new Date(t).toISOString().slice(0, 10);
 import { myAgents } from "@/components/agents";
 import { WhoFace } from "@/components/faces";
 import Icon from "@/components/Icon";
@@ -114,11 +116,12 @@ export function CheckIn({ s, now }: { s: State; now: number }) {
   const start = Math.max(1, cur - 6);
   const tiles = Array.from({ length: 7 }, (_, i) => start + i);
   const btn = useRef<HTMLButtonElement>(null);
+  const busy = useHubBusy();
   const flame = useRef<HTMLSpanElement>(null);
   const track = useRef<HTMLOListElement>(null);
   const pay = STREAK_PAY[Math.min(STREAK_PAY.length, cur) - 1];
-  const days = new Set(s.bond?.days || []);
-  const grid = Array.from({ length: 28 }, (_, i) => { const d = new Date(now); d.setDate(d.getDate() - (27 - i)); return todayKey(d.getTime()); });
+  const days = new Set((s.live?.ledger || []).filter((e) => e.kind === "check_in").map((e) => utcKey(e.at)));
+  const grid = Array.from({ length: 28 }, (_, i) => utcKey(now - (27 - i) * 864e5));
 
   const claim = () => {
     void hub.checkIn(now || Date.now()).then((r) => {
@@ -158,11 +161,11 @@ export function CheckIn({ s, now }: { s: State; now: number }) {
       </ol>
       {done
         ? <p className="mt-5 flex h-12 items-center justify-center gap-2 rounded-full bg-tint text-[14.5px] font-bold text-ink"><Icon name="check" size={17} className="text-brand-ink" stroke={3} />Checked in · next in {countdown(nextReset("daily", now) - now)}</p>
-        : <button ref={btn} type="button" onClick={claim} className="hub-claim mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-grape text-[16px] font-extrabold text-white transition hover:-translate-y-0.5 active:translate-y-0.5">Check in · +{pay}<Coin size={22} /></button>}
+        : <button ref={btn} type="button" onClick={claim} disabled={!!busy} aria-busy={busy === "checkin"} className="hub-claim disabled:opacity-60 mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-grape text-[16px] font-extrabold text-white transition hover:-translate-y-0.5 active:translate-y-0.5">{busy === "checkin" ? "Confirm in your wallet…" : <>Check in · +{pay}<Coin size={22} /></>}</button>}
       <div className="mt-6">
         <div className="flex items-center justify-between"><span className="label text-[9.5px] text-ink/55">Last 4 weeks</span><span className="text-[12px] font-semibold text-ink/55">{grid.filter((k) => days.has(k)).length} of 28 days</span></div>
         <div className="mt-2 grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1.5">
-          {grid.map((k) => <span key={k} title={k} className={`aspect-square rounded-[5px] ${days.has(k) ? "bg-grape" : "bg-tint"} ${k === todayKey(now) ? "ring-2 ring-grape/50 ring-offset-1 ring-offset-[var(--card)]" : ""}`} />)}
+          {grid.map((k) => <span key={k} title={k} className={`aspect-square rounded-[5px] ${days.has(k) ? "bg-grape" : "bg-tint"} ${k === utcKey(now) ? "ring-2 ring-grape/50 ring-offset-1 ring-offset-[var(--card)]" : ""}`} />)}
         </div>
       </div>
     </section>
@@ -174,8 +177,9 @@ const LID_OPEN = { y: -26, rotate: -18, transformOrigin: "20% 100%" };
 
 export function MysteryBox({ s, now }: { s: State; now: number }) {
   const h = hubOf(s);
-  const opened = h.boxes.includes(todayKey(now));
-  const won = opened ? h.ledger.find((e) => e.reason === "Mystery box" && todayKey(e.at) === todayKey(now))?.delta ?? 0 : 0;
+  const opened = h.boxes.length > 0;
+  const won = opened ? h.ledger.find((e) => e.reason === "Mystery box" && utcKey(e.at) === utcKey(now))?.delta ?? 0 : 0;
+  const busy = useHubBusy();
   const [phase, setPhase] = useState<"idle" | "shaking" | "open">(opened ? "open" : "idle");
   const box = useRef<HTMLDivElement>(null);
   const lid = useRef<SVGGElement>(null);
@@ -222,7 +226,7 @@ export function MysteryBox({ s, now }: { s: State; now: number }) {
       </div>
       {phase === "open"
         ? <p className="relative mt-auto flex h-12 items-center justify-center gap-2 rounded-full bg-white/10 text-[14.5px] font-bold">Next box in {countdown(nextReset("daily", now) - now)}</p>
-        : <button type="button" onClick={open} disabled={phase === "shaking"} className="hub-shine relative mt-auto flex h-12 items-center justify-center gap-2 rounded-full bg-white text-[16px] font-extrabold text-[#0a0a0a] transition hover:-translate-y-0.5 disabled:opacity-80">{phase === "shaking" ? "Opening…" : "Open the box"}</button>}
+        : <button type="button" onClick={open} disabled={phase === "shaking" || !!busy} className="hub-shine relative mt-auto flex h-12 items-center justify-center gap-2 rounded-full bg-white text-[16px] font-extrabold text-[#0a0a0a] transition hover:-translate-y-0.5 disabled:opacity-80">{phase === "shaking" ? "Opening…" : "Open the box"}</button>}
     </section>
   );
 }
