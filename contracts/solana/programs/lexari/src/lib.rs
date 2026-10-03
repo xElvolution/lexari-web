@@ -1,10 +1,25 @@
 use anchor_lang::prelude::*;
 
+pub mod errors;
+pub mod state;
+
+use errors::LexariError;
+use state::*;
+
 declare_id!("BbnD28xf3kwfQRiRA6VQmw4p2R55WivUgozSoo81M6Po");
 
-/// Agent registry and memory records.
-/// The ID card itself is a Metaplex Core asset. This program records who owns
-/// that asset and the memory hashes the owner can revoke or delete.
+/// Marker so `Program<LexariId>` checks the executable account is this program.
+#[derive(Clone)]
+pub struct LexariId;
+
+impl Id for LexariId {
+    fn id() -> Pubkey {
+        crate::ID
+    }
+}
+
+/// Agent registry, memory records, and Hub (coins, check-in, quests, levels).
+/// The ID card itself is a Metaplex Core asset.
 #[program]
 pub mod lexari {
     use super::*;
@@ -40,7 +55,6 @@ pub mod lexari {
         Ok(())
     }
 
-    /// Stores a hash of the memory and an optional URI (Arweave or similar) where the ciphertext lives.
     pub fn write_memory(ctx: Context<WriteMemory>, content_hash: [u8; 32], uri: String) -> Result<()> {
         check_uri(&uri)?;
         let memory = &mut ctx.accounts.memory;
@@ -60,8 +74,128 @@ pub mod lexari {
         Ok(())
     }
 
-    /// Closes the record and returns the rent to the owner. The hash can be written again later.
     pub fn delete_memory(_ctx: Context<DeleteMemory>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn init_config(ctx: Context<InitConfig>, authority: Pubkey) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        config.authority = authority;
+        config.bump = ctx.bumps.config;
+        Ok(())
+    }
+
+    pub fn init_player(ctx: Context<InitPlayer>) -> Result<()> {
+        let owner = ctx.accounts.owner.key();
+        let referrer = ctx.accounts.referrer_player.as_ref().map(|p| p.owner);
+        if let Some(r) = referrer {
+            require!(r != owner, LexariError::SelfReferral);
+        }
+        let player = &mut ctx.accounts.player;
+        player.owner = owner;
+        player.coins = 0;
+        player.streak = 0;
+        player.last_check_in = 0;
+        player.referrer = referrer;
+        player.lifetime = 0;
+        player.bump = ctx.bumps.player;
+        Ok(())
+    }
+
+    pub fn check_in(ctx: Context<CheckIn>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let today = utc_day(now);
+        let player = &mut ctx.accounts.player;
+        if player.last_check_in != 0 {
+            let last = utc_day(player.last_check_in);
+            require!(last < today, LexariError::AlreadyCheckedIn);
+            player.streak = if last == today - 1 { player.streak.saturating_add(1) } else { 1 };
+        } else {
+            player.streak = 1;
+        }
+        let idx = (player.streak.saturating_sub(1) as usize).min(STREAK_PAY.len() - 1);
+        let pay = STREAK_PAY[idx];
+        player.coins = player.coins.saturating_add(pay);
+        player.lifetime = player.lifetime.saturating_add(pay);
+        player.last_check_in = now;
+        Ok(())
+    }
+
+    pub fn claim_quest(ctx: Context<ClaimQuest>, quest_id: u16, period: u32, coins: u64) -> Result<()> {
+        require!(
+            ctx.accounts.attestor.key() == ctx.accounts.config.authority,
+            LexariError::BadAttestor
+        );
+        let claim = &mut ctx.accounts.claim;
+        claim.player = ctx.accounts.player.key();
+        claim.quest_id = quest_id;
+        claim.period = period;
+        claim.coins = coins;
+        claim.bump = ctx.bumps.claim;
+        let player = &mut ctx.accounts.player;
+        player.coins = player.coins.saturating_add(coins);
+        player.lifetime = player.lifetime.saturating_add(coins);
+        Ok(())
+    }
+
+    pub fn open_box(ctx: Context<OpenBox>, day: u32, coins: u64) -> Result<()> {
+        require!(
+            ctx.accounts.attestor.key() == ctx.accounts.config.authority,
+            LexariError::BadAttestor
+        );
+        let claim = &mut ctx.accounts.claim;
+        claim.player = ctx.accounts.player.key();
+        claim.day = day;
+        claim.coins = coins;
+        claim.bump = ctx.bumps.claim;
+        let player = &mut ctx.accounts.player;
+        player.coins = player.coins.saturating_add(coins);
+        player.lifetime = player.lifetime.saturating_add(coins);
+        Ok(())
+    }
+
+    pub fn level_up(ctx: Context<LevelUp>, coins: u64) -> Result<()> {
+        require!(coins > 0, LexariError::ZeroSpend);
+        let player = &mut ctx.accounts.player;
+        require!(player.coins >= coins, LexariError::InsufficientCoins);
+        let level = &mut ctx.accounts.level;
+        if level.level == 0 {
+            level.agent = ctx.accounts.agent.key();
+            level.owner = player.owner;
+            level.level = 1;
+            level.xp = 0;
+            level.bump = ctx.bumps.level;
+        }
+        require!(level.level < AgentLevel::MAX_LEVEL, LexariError::MaxLevel);
+        player.coins = player.coins.saturating_sub(coins);
+        let mut xp = level.xp.saturating_add(coins as u32);
+        let mut lv = level.level;
+        while lv < AgentLevel::MAX_LEVEL && xp >= xp_for(lv) {
+            xp -= xp_for(lv);
+            lv += 1;
+        }
+        if lv >= AgentLevel::MAX_LEVEL {
+            xp = 0;
+        }
+        level.level = lv;
+        level.xp = xp;
+        Ok(())
+    }
+
+    pub fn claim_referral_tier(ctx: Context<ClaimReferralTier>, tier: u8) -> Result<()> {
+        require!(
+            ctx.accounts.attestor.key() == ctx.accounts.config.authority,
+            LexariError::BadAttestor
+        );
+        require!((tier as usize) < TIER_REWARD.len(), LexariError::BadTier);
+        let reward = TIER_REWARD[tier as usize];
+        let claim = &mut ctx.accounts.claim;
+        claim.player = ctx.accounts.player.key();
+        claim.tier = tier;
+        claim.bump = ctx.bumps.claim;
+        let player = &mut ctx.accounts.player;
+        player.coins = player.coins.saturating_add(reward);
+        player.lifetime = player.lifetime.saturating_add(reward);
         Ok(())
     }
 }
@@ -145,48 +279,128 @@ pub struct DeleteMemory<'info> {
     pub memory: Account<'info, Memory>,
 }
 
-#[account]
-pub struct Agent {
-    pub owner: Pubkey,
-    pub asset: Pubkey,
-    pub name: String,
-    pub role: String,
-    pub dna: String,
-    pub bump: u8,
+#[derive(Accounts)]
+pub struct InitConfig<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + Config::SIZE,
+        seeds = [b"config"],
+        bump
+    )]
+    pub config: Account<'info, Config>,
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
+    pub program: Program<'info, LexariId>,
+    #[account(
+        constraint = program_data.upgrade_authority_address == Some(payer.key()) @ LexariError::NotUpgradeAuthority
+    )]
+    pub program_data: Account<'info, ProgramData>,
+    pub system_program: Program<'info, System>,
 }
 
-impl Agent {
-    pub const MAX_NAME: usize = 32;
-    pub const MAX_ROLE: usize = 32;
-    pub const MAX_DNA: usize = 180;
-    pub const SIZE: usize = 32 + 32 + 4 + Self::MAX_NAME + 4 + Self::MAX_ROLE + 4 + Self::MAX_DNA + 1;
+#[derive(Accounts)]
+pub struct InitPlayer<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + Player::SIZE,
+        seeds = [b"player", owner.key().as_ref()],
+        bump
+    )]
+    pub player: Account<'info, Player>,
+    pub referrer_player: Option<Account<'info, Player>>,
+    pub system_program: Program<'info, System>,
 }
 
-#[account]
-pub struct Memory {
-    pub owner: Pubkey,
-    pub agent: Pubkey,
-    pub content_hash: [u8; 32],
-    pub uri: String,
-    pub revoked: bool,
-    pub bump: u8,
+#[derive(Accounts)]
+pub struct CheckIn<'info> {
+    pub owner: Signer<'info>,
+    #[account(mut, has_one = owner, seeds = [b"player", owner.key().as_ref()], bump = player.bump)]
+    pub player: Account<'info, Player>,
 }
 
-impl Memory {
-    pub const MAX_URI: usize = 200;
-    pub const SIZE: usize = 32 + 32 + 32 + 4 + Self::MAX_URI + 1 + 1;
+#[derive(Accounts)]
+#[instruction(quest_id: u16, period: u32)]
+pub struct ClaimQuest<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub attestor: Signer<'info>,
+    #[account(seeds = [b"config"], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    #[account(mut, has_one = owner, seeds = [b"player", owner.key().as_ref()], bump = player.bump)]
+    pub player: Account<'info, Player>,
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + QuestClaim::SIZE,
+        seeds = [b"quest", player.key().as_ref(), &quest_id.to_le_bytes(), &period.to_le_bytes()],
+        bump
+    )]
+    pub claim: Account<'info, QuestClaim>,
+    pub system_program: Program<'info, System>,
 }
 
-#[error_code]
-pub enum LexariError {
-    #[msg("Name is empty or longer than 32 bytes")]
-    BadName,
-    #[msg("Role is longer than 32 bytes")]
-    BadRole,
-    #[msg("Face DNA is empty or longer than 180 bytes")]
-    BadDna,
-    #[msg("Memory URI is longer than 200 bytes")]
-    BadUri,
-    #[msg("That memory is already revoked")]
-    AlreadyRevoked,
+#[derive(Accounts)]
+#[instruction(day: u32)]
+pub struct OpenBox<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub attestor: Signer<'info>,
+    #[account(seeds = [b"config"], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    #[account(mut, has_one = owner, seeds = [b"player", owner.key().as_ref()], bump = player.bump)]
+    pub player: Account<'info, Player>,
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + BoxClaim::SIZE,
+        seeds = [b"box", player.key().as_ref(), &day.to_le_bytes()],
+        bump
+    )]
+    pub claim: Account<'info, BoxClaim>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct LevelUp<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    #[account(mut, has_one = owner, seeds = [b"player", owner.key().as_ref()], bump = player.bump)]
+    pub player: Account<'info, Player>,
+    #[account(has_one = owner)]
+    pub agent: Account<'info, Agent>,
+    #[account(
+        init_if_needed,
+        payer = owner,
+        space = 8 + AgentLevel::SIZE,
+        seeds = [b"level", agent.key().as_ref()],
+        bump
+    )]
+    pub level: Account<'info, AgentLevel>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(tier: u8)]
+pub struct ClaimReferralTier<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub attestor: Signer<'info>,
+    #[account(seeds = [b"config"], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    #[account(mut, has_one = owner, seeds = [b"player", owner.key().as_ref()], bump = player.bump)]
+    pub player: Account<'info, Player>,
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + ReferralClaim::SIZE,
+        seeds = [b"ref", player.key().as_ref(), &[tier]],
+        bump
+    )]
+    pub claim: Account<'info, ReferralClaim>,
+    pub system_program: Program<'info, System>,
 }

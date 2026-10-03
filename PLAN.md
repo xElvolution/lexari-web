@@ -151,10 +151,10 @@ Tick in this file as each lands. After every milestone: tests, click the flow, c
 - [x] Survey repo and write this file
 
 ### M1 — Program: Hub + tests
-- [ ] `Config`, `Player`, `AgentLevel`, `QuestClaim`, `ReferralClaim`, `BoxClaim`
-- [ ] Instructions listed above, attestor as extra signer
-- [ ] Anchor tests: success + wrong signer, double claim, insufficient coins, self-referral, attestor mismatch
-- [ ] `anchor build` green
+- [x] `Config`, `Player`, `AgentLevel`, `QuestClaim`, `ReferralClaim`, `BoxClaim`
+- [x] Instructions listed above, attestor as extra signer. `init_config` is upgrade-authority only.
+- [x] Anchor tests: success + wrong signer, double claim, insufficient coins, self-referral, attestor mismatch, stranger `init_config`. 16 passing via `bash contracts/solana/scripts/test.sh` (upgradeable local validator; plain `anchor test` loads `--bpf-program` and sets a zero upgrade authority, so `init_config` cannot succeed there).
+- [x] `anchor build` green
 
 ### M2 — Deploy program to devnet
 - [ ] Deploy, confirm account exists
