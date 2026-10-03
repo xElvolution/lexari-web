@@ -113,7 +113,7 @@ export default function LevelUp({ s }: { s: State }) {
           </ol>
         </div>
       </div>
-      {party && <Celebrate s={s} id={party.id} level={party.level} name={team.find((a) => a.id === party.id)?.name ?? "Agent"} onClose={() => { setParty(null); setFace("idle"); }} />}
+      {party && <Celebrate key={`${party.id}-${party.level}`} s={s} id={party.id} level={party.level} name={team.find((a) => a.id === party.id)?.name ?? "Agent"} onClose={() => { setParty(null); setFace("idle"); }} />}
     </section>
   );
 }
@@ -122,19 +122,26 @@ export default function LevelUp({ s }: { s: State }) {
 function Celebrate({ s, id, level, name, onClose }: { s: State; id: string; level: number; name: string; onClose: () => void }) {
   const card = useRef<HTMLDivElement>(null);
   const perk = PERKS.find((p) => p.level === level);
+  // The Hub re-renders every second (countdowns), which hands us a fresh onClose each time.
+  // Keep it in a ref so the entrance animation and confetti run once, on mount only.
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k);
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); };
+    window.addEventListener("keydown", k);
     const el = card.current;
-    if (el && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const ctx = gsap.context(() => {
+      if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       gsap.fromTo(el, { scale: 0.6, opacity: 0, y: 30 }, { scale: 1, opacity: 1, y: 0, duration: 0.65, ease: "back.out(1.8)" });
       gsap.fromTo(el.querySelector("[data-lv]"), { scale: 3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.7, delay: 0.25, ease: "elastic.out(1, .5)" });
       const face = el.querySelector("[data-face]") as HTMLElement | null;
-      [0, 350, 800].forEach((d) => setTimeout(() => burst(face, 26), d));
-    }
-    return () => window.removeEventListener("keydown", k);
-  }, [onClose]);
+      [0, 350, 800].forEach((d) => timers.push(setTimeout(() => burst(face, 26), d)));
+    });
+    return () => { window.removeEventListener("keydown", k); timers.forEach(clearTimeout); ctx.kill(); };
+  }, []);
   return createPortal(
-    <div className="fixed inset-0 z-[110] grid place-items-center bg-black/70 p-4 backdrop-blur-md" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }} role="dialog" aria-modal="true" aria-label={`${name} reached level ${level}`}>
+    <div className="fixed inset-0 z-[110] grid place-items-center bg-black/70 p-4 backdrop-blur-md" onMouseDown={(e) => { if (e.target === e.currentTarget) close.current(); }} role="dialog" aria-modal="true" aria-label={`${name} reached level ${level}`}>
       <div ref={card} className="relative w-full max-w-[400px] overflow-hidden rounded-[34px] bg-grape p-7 pt-9 text-center text-white shadow-[0_30px_80px_-20px_rgba(91,43,255,.9)]">
         <span className="hub-rays pointer-events-none absolute left-1/2 top-[34%] h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2" style={{ background: "repeating-conic-gradient(from 0deg, rgba(255,255,255,.16) 0deg 9deg, transparent 9deg 22deg)", maskImage: "radial-gradient(circle, #000 15%, transparent 55%)", WebkitMaskImage: "radial-gradient(circle, #000 15%, transparent 55%)" }} />
         <p className="label relative text-white/80">Level up</p>
@@ -150,7 +157,7 @@ function Celebrate({ s, id, level, name, onClose }: { s: State; id: string; leve
             <span><span className="label block text-[9px] text-white/70">Perk unlocked</span><span className="block text-[16px] font-bold">{perk.title}</span><span className="block text-[13px] text-white/75">{perk.body}</span></span>
           </div>
         )}
-        <button type="button" onClick={onClose} autoFocus className="relative mt-6 h-12 w-full rounded-full bg-white text-[16px] font-extrabold text-[#0a0a0a] transition hover:-translate-y-0.5">Keep going</button>
+        <button type="button" onClick={() => close.current()} autoFocus className="relative mt-6 h-12 w-full rounded-full bg-white text-[16px] font-extrabold text-[#0a0a0a] transition hover:-translate-y-0.5">Keep going</button>
       </div>
     </div>,
     document.body,
