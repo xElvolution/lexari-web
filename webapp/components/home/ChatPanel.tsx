@@ -73,20 +73,14 @@ function Pills({ m, s, convo, mine }: { m: Msg; s: State; convo: string; mine: b
   );
 }
 
-/** Reaction bar plus Reply and Copy. Opens on hover (desktop) or a long press (touch). */
-function MsgMenu({ m, convo, mine, open, more, below, onOpen, onMore, onReply, onClose }: {
-  m: Msg; convo: string; mine: boolean; open: boolean; more: boolean; below: boolean; onOpen: () => void; onMore: () => void; onReply: () => void; onClose: () => void;
+/** Reaction bar plus Reply and Copy. Opens on a hold, and stays until a click outside the message. */
+function MsgMenu({ m, convo, mine, open, more, below, onMore, onReply, onClose }: {
+  m: Msg; convo: string; mine: boolean; open: boolean; more: boolean; below: boolean; onMore: () => void; onReply: () => void; onClose: () => void;
 }) {
   const react = (e: string) => { toggleReaction(convo, m.id, e); onClose(); };
   const copy = () => { navigator.clipboard?.writeText(m.text || m.file?.name || "").then(() => toast({ text: "Copied" }), () => toast({ text: "Couldn't copy" })); onClose(); };
-  const act = "grid h-8 w-8 place-items-center rounded-full text-ink/65 transition hover:bg-tint hover:text-brand-ink";
   return (
     <>
-      <div className={`absolute top-1/2 z-[3] flex -translate-y-1/2 items-center gap-0.5 rounded-full bg-card p-0.5 shadow-lg ring-1 ring-line transition ${mine ? "right-full mr-2" : "left-full ml-2"} ${open ? "pointer-events-none opacity-0" : "pointer-events-none opacity-0 [@media(hover:hover)]:group-hover/msg:pointer-events-auto [@media(hover:hover)]:group-hover/msg:opacity-100"}`}>
-        <button onClick={onOpen} aria-label="React" title="React" className={act}><Icon name="smile" size={17} /></button>
-        <button onClick={onReply} aria-label="Reply" title="Reply" className={act}><Icon name="reply" size={17} /></button>
-        {(m.text || m.file) && <button onClick={copy} aria-label="Copy" title="Copy" className={act}><Icon name="copy" size={16} /></button>}
-      </div>
       {open && (
         <div data-menu className={`pop absolute z-[4] w-max ${below ? "top-full mt-2" : "bottom-full mb-2"} max-w-[min(330px,86vw)] ${mine ? "right-0 origin-bottom-right" : "left-0 origin-bottom-left"}`} role="menu" aria-label="React to message">
           <div className="flex flex-wrap items-center gap-0.5 rounded-[22px] bg-card p-1 shadow-[0_18px_40px_-16px_rgba(0,0,0,.45)] ring-1 ring-line">
@@ -197,7 +191,7 @@ function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
           <Body m={m} mine={mine} s={s} />
           {gesture.pop && <span className="pop pointer-events-none absolute -right-1 -top-3 text-[22px]" aria-hidden>❤️</span>}
         </div>
-        <MsgMenu m={m} convo={convo} mine={mine} open={open} more={!!menu?.more} below={below} onOpen={() => setMenu({ id: m.id, more: false })} onMore={() => setMenu({ id: m.id, more: true })} onReply={() => { setMenu(null); onReply(m); }} onClose={() => setMenu(null)} />
+        <MsgMenu m={m} convo={convo} mine={mine} open={open} more={!!menu?.more} below={below} onMore={() => setMenu({ id: m.id, more: true })} onReply={() => { setMenu(null); onReply(m); }} onClose={() => setMenu(null)} />
       </div>
       <Pills m={m} s={s} convo={convo} mine={mine} />
     </div>
