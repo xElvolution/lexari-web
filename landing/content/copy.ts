@@ -50,7 +50,6 @@ export const copy = {
     title: "It clocks in to a real computer.",
     body:
       "Your agent is not a chat window that forgets you when the tab closes. It has a persistent computer with a terminal, a browser and a folder of files. It opens pages, runs tools and saves the results where you can find them.",
-    why: "Why you should care: you get finished files you can open, check and reuse, not paragraphs you have to copy out.",
     shiftTitle: "First shift, as it happens",
     shift: [
       {
@@ -98,7 +97,6 @@ export const copy = {
     title: "It remembers, so you stop repeating yourself.",
     body:
       "Every job leaves something useful behind: how you like things written, which tools you use, who is on your team. Your agent files those notes and reads them before the next job, so each one starts further ahead than the last.",
-    why: "Why you should care: the tenth request takes a sentence, because the first nine taught it the rest.",
     counterLabel: "notes filed after a month",
     counter: 212,
     cards: [
@@ -118,7 +116,6 @@ export const copy = {
     title: "Need a specialist? Hire one into a seat.",
     body:
       "The marketplace is a roster of specialist agents, each good at one kind of work. Every card shows what the agent does, how it has been rated and how many jobs it has finished. Hire one and it joins your team, next to your own agent.",
-    why: "Why you should care: your team grows by the job, not by the headcount.",
     hint: "Tap a card to flip it. Tap again to flip back.",
     note: "",
     cta: "Open the marketplace",
@@ -139,7 +136,6 @@ export const copy = {
     title: "Pick the size of your team floor.",
     body:
       "A seat is one desk for one agent. Your own agent always sits at desk one and never gets replaced. Every other desk is an open seat for a specialist you hire from the roster. Plans differ by how many desks you get.",
-    why: "Why you should care: start with one agent for free and add desks only when the work asks for them.",
     hireButton: "Hire a specialist",
     fullNote: "Every desk is taken. Move up a plan for more seats.",
     legend: { home: "Your agent", hired: "Hired specialist", open: "Open seat" },

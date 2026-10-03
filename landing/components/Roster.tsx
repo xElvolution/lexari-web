@@ -66,7 +66,7 @@ export default function Roster() {
     <section id="roster" className="sheet grain scroll-mt-16 overflow-hidden bg-grape pb-28 pt-24 text-white sm:pb-36 sm:pt-32">
       <div className="relative mx-auto max-w-[1320px] px-5 sm:px-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <SectionIntro label={R.label} title={R.title} body={R.body} why={R.why} tone="grape" />
+          <SectionIntro label={R.label} title={R.title} body={R.body} tone="grape" />
           <a href={`${APP}/marketplace`} className="reveal btn btn-white shrink-0 self-start lg:self-end">{R.cta} →</a>
         </div>
       </div>

@@ -36,7 +36,7 @@ export default function Memory() {
       <div className="pointer-events-none absolute right-[-10%] top-10 h-[480px] w-[480px] rounded-full bg-[var(--glow)] blur-[140px]" />
       <div className="relative mx-auto grid max-w-[1320px] gap-14 px-5 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
         <div>
-          <SectionIntro label={M.label} title={M.title} body={M.body} why={M.why} tone="base" />
+          <SectionIntro label={M.label} title={M.title} body={M.body} tone="base" />
           <div className="reveal mt-10 flex items-end gap-4">
             <span ref={num} className="display text-[clamp(5rem,12vw,9rem)] tabular-nums text-brand-ink">0</span>
             <span className="pb-4 text-[15px] leading-snug text-ink/70">{M.counterLabel}</span>

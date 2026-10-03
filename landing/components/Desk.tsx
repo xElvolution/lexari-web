@@ -83,7 +83,7 @@ export default function Desk() {
   return (
     <section id="desk" className="relative scroll-mt-16 bg-base pb-28 pt-28 sm:pb-36 sm:pt-40">
       <div className="mx-auto max-w-[1320px] px-5 sm:px-8">
-        <SectionIntro label={D.label} title={D.title} body={D.body} why={D.why} />
+        <SectionIntro label={D.label} title={D.title} body={D.body} />
 
         <div className="mt-14 grid gap-8 lg:mt-20 lg:grid-cols-[.9fr_1.1fr] lg:gap-16">
           {/* the computer: sticky while the shift scrolls past */}

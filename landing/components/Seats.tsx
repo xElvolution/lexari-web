@@ -23,7 +23,7 @@ export default function Seats() {
   return (
     <section id="seats" className="sheet scroll-mt-16 bg-base pb-28 pt-24 sm:pb-36 sm:pt-32">
       <div className="mx-auto max-w-[1320px] px-5 sm:px-8">
-        <SectionIntro label={S.label} title={S.title} body={S.body} why={S.why} />
+        <SectionIntro label={S.label} title={S.title} body={S.body} />
 
         <div className="reveal mt-12 flex flex-wrap gap-2" role="tablist">
           {S.plans.map((p, i) => (
