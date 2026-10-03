@@ -62,12 +62,13 @@ export type State = {
 };
 
 const DEMO_KEY = "lexari-app-v1";
+const LIVE_KEY = "lexari-live";
 const POINTER = "lexari-active";
-let activeKey = DEMO_KEY;
+let activeKey = LIVE_KEY;
 
 function currentKey() {
   if (typeof localStorage === "undefined") return activeKey;
-  try { return localStorage.getItem(POINTER) || DEMO_KEY; } catch { return activeKey; }
+  try { return localStorage.getItem(POINTER) || LIVE_KEY; } catch { return activeKey; }
 }
 const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null, custom: [], born: {}, meta: {}, tour: { on: false, step: 0, done: false }, bond: { days: [], coins: 0, claimed: [] } };
 
@@ -78,7 +79,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 function load(): State {
   activeKey = currentKey();
   try { const raw = localStorage.getItem(activeKey); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; if (!Array.isArray(st.groups)) st.groups = [];
-      if (!s.wallets) st.wallets = s.agent ? { home: walletFor("home").address } : {};
+      if (!s.wallets) st.wallets = {};
       st.prefs = { ...DEFAULT_PREFS, ...(s.prefs || {}), notif: { ...DEFAULT_PREFS.notif, ...(s.prefs?.notif || {}) } };
       if (!Array.isArray(s.custom)) st.custom = [];
       if (!s.meta) st.meta = {};
@@ -407,10 +408,10 @@ function setMsg(convo: string, id: string, text: string) {
 
 /** Ask Engram for a real reply and stream the tokens into the thread. */
 async function replyFromModel(convo: string) {
-  if (queued.has(convo)) return;
+  if (queued.has(convo)) return "";
   const st = get();
   const last = (st.threads[convo] || []).filter((m) => m.from === "you").pop();
-  if (!st.agent || !last || !convoExists(st, convo)) return;
+  if (!st.agent || !last || !convoExists(st, convo)) return "";
   queued.add(convo);
   const speaker = isGroup(convo) ? (groupOf(st, convo)?.members[0] || "home") : convo;
   const custom = st.custom.find((c) => c.id === speaker);
@@ -431,8 +432,9 @@ async function replyFromModel(convo: string) {
     });
     if (!res.ok || !res.body) {
       const data = await res.json().catch(() => ({}));
-      setMsg(convo, bubble, typeof data.error === "string" ? data.error : "The agent could not answer.");
-      return;
+      const fail = typeof data.error === "string" ? data.error : "The agent could not answer.";
+      setMsg(convo, bubble, fail);
+      return fail;
     }
     const reader = res.body.getReader();
     const dec = new TextDecoder();
@@ -449,14 +451,16 @@ async function replyFromModel(convo: string) {
         if (!trimmed.startsWith("data:")) continue;
         let payload: { token?: string; remember?: string; error?: string } = {};
         try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
-        if (payload.error) { setMsg(convo, bubble, payload.error); return; }
+        if (payload.error) { setMsg(convo, bubble, payload.error); return payload.error; }
         if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{3,180}\s*$/, "").trim()); }
         if (payload.remember) addNote(payload.remember, "About you", "Chat", true);
       }
     }
     if (!full.trim()) setMsg(convo, bubble, "The agent sent an empty reply.");
+    return (get().threads[convo] || []).find((m) => m.id === bubble)?.text || full;
   } catch {
     setMsg(convo, bubble, "Could not reach the agent.");
+    return "Could not reach the agent.";
   } finally {
     typingWho.delete(convo);
     queued.delete(convo);
@@ -464,11 +468,11 @@ async function replyFromModel(convo: string) {
   }
 }
 
-/** Send a message (text, an attachment or a voice note) to an agent or a group. */
+/** Send a message. Returns the agent's reply once Grok finishes. */
 export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voice" | "reply"> = {}) {
-  const v = text.trim(); if (!v && !extra.file && !extra.voice) return;
+  const v = text.trim(); if (!v && !extra.file && !extra.voice) return Promise.resolve("");
   push(id, { from: "you", text: v, ...extra });
-  void replyFromModel(id);
+  return replyFromModel(id);
 }
 
 /* ---------- reactions ---------- */

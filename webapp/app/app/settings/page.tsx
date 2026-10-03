@@ -286,11 +286,11 @@ function Billing({ s }: { s: State }) {
         </div>
       </Group>
       <Group title="Agent cards">
-        <Row title="Virtual cards" desc={cards ? `${cards} agent card${cards > 1 ? "s" : ""} active. Freeze, reveal or set limits from Cards.` : "No agent has a card yet. Each card has a one-time fee (demo)."}><Link href="/app/wallets?tab=cards" className={smallBtn}>{cards ? "Manage cards" : "Get a card"}</Link></Row>
+        <Row title="Virtual cards" desc={s.prefs.demoLabels === false ? "Cards are not issued. Hire payments use your Solana wallet." : cards ? `${cards} agent card${cards > 1 ? "s" : ""} active. Freeze, reveal or set limits from Cards.` : "No agent has a card yet. Each card has a one-time fee (demo)."}><Link href="/app/wallets?tab=cards" className={smallBtn}>{s.prefs.demoLabels === false ? "Wallets" : cards ? "Manage cards" : "Get a card"}</Link></Row>
         <Row title="Wallets" desc={`${Object.keys(s.wallets).length} agent wallet${Object.keys(s.wallets).length === 1 ? "" : "s"}.`}><Link href="/app/wallets" className={smallBtn}>Open wallets</Link></Row>
       </Group>
       <Group title="Invoices">
-        <Row title="No invoices" desc="The demo never charges anything, so there's nothing here." />
+        <Row title="No invoices" desc={s.prefs.demoLabels === false ? "Nothing has been charged." : "The demo never charges anything, so there's nothing here."} />
       </Group>
     </>
   );
@@ -298,11 +298,12 @@ function Billing({ s }: { s: State }) {
 
 function About() {
   const router = useRouter();
+  const demo = useApp()?.prefs.demoLabels !== false;
   return (
     <>
       <Group>
-        <Row title="Version" desc="Lexari web · demo build"><span className="font-mono text-[13px] text-ink/60">0.3.0-demo</span></Row>
-        <Row title="Sample data" desc="Everything you see runs on example data saved in this browser only. Nothing is live."><DemoTag /></Row>
+        <Row title="Version" desc={demo ? "Lexari web · demo build" : "Lexari web"}><span className="font-mono text-[13px] text-ink/60">{demo ? "0.3.0-demo" : "0.4.0"}</span></Row>
+        {demo && <Row title="Sample data" desc="Everything you see runs on example data saved in this browser only. Nothing is live."><DemoTag /></Row>}
       </Group>
       <Group title="Legal">
         <Row title="Terms of use"><Link href={`${LANDING_URL}/legal/terms`} className={smallBtn}>Read</Link></Row>

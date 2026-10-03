@@ -1,8 +1,11 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { Connection } from "@solana/web3.js";
+import { SOLANA_RPC } from "@/lib/nft";
 import { openAdd } from "../overlays";
-import { useState } from "react";
 import { cardTxns, shortAddr, walletFor } from "@/content/appData";
 import { cancelCard, createWallet, toast, updateCard, useApp, type State } from "@/lib/store";
 import Icon from "../Icon";
@@ -131,8 +134,42 @@ function CardRow({ s, a, onGet }: { s: State; a: MyAgent; onGet: () => void }) {
   );
 }
 
+function LiveWallets({ s }: { s: State }) {
+  const { publicKey, connected } = useWallet();
+  const [sol, setSol] = useState("…");
+  useEffect(() => {
+    if (!publicKey) return;
+    const conn = new Connection(SOLANA_RPC, "confirmed");
+    conn.getBalance(publicKey).then((n) => setSol((n / 1e9).toFixed(4))).catch(() => setSol("unavailable"));
+  }, [publicKey]);
+  const home = myAgents(s)[0];
+  const addr = publicKey?.toBase58() || "";
+  return (
+    <>
+      <div data-rise>
+        <span className="label text-brand-ink">Money</span>
+        <h1 className="display mt-3 text-[44px] text-ink sm:text-[60px]">Wallets.</h1>
+        <p className="mt-2 max-w-[38rem] text-[16px] text-ink/70">This is the Solana wallet you signed in with. Cards are not issued.</p>
+      </div>
+      <section data-rise className="mt-8 rounded-[28px] bg-card p-6 ring-1 ring-line">
+        <div className="text-[17px] font-bold text-ink">{home?.name || "Your agent"}</div>
+        {connected && addr ? (
+          <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="label text-[9px] text-ink/55">SOL on devnet</div>
+              <div className="display mt-2 text-[48px] leading-none text-ink">{sol}</div>
+            </div>
+            <button onClick={() => copy(addr, "wallet address")} className="flex items-center gap-2 rounded-full bg-tint py-2 pl-3 pr-4 font-mono text-[13px] text-ink"><Icon name="wallet" size={15} />{shortAddr(addr)}<Icon name="copy" size={14} /></button>
+          </div>
+        ) : <p className="mt-4 text-[15px] text-ink/70">Connect Phantom, Solflare or Backpack from Sign in. Nothing here is a made-up balance.</p>}
+      </section>
+    </>
+  );
+}
+
 export default function WalletsView() {
   const s = useApp()!;
+  if (s.prefs.demoLabels === false) return <LiveWallets s={s} />;
   const params = useSearchParams();
   const [tab, setTab] = useState<"wallets" | "cards">(params.get("tab") === "cards" ? "cards" : "wallets");
   const [getFor, setGetFor] = useState<string | null>(null);

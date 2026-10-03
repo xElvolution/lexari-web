@@ -22,16 +22,19 @@ export function Leaderboard({ s, now }: { s: State; now: number }) {
   const wk = weekStart(now);
   const day = Math.max(1, Math.ceil((now - wk) / 864e5));
   const you = earnedSince(s, wk);
-  const rows = [
-    ...RIVALS.map((r, i) => ({ id: r.name, name: r.name, coins: Math.round((r.base * day) / 7 + ((wk / 864e5 + i * 7) % 13) * 3), face: <Face seed={r.seed} variant={{ color: r.color }} size={32} />, me: false })),
-    { id: "you", name: s.agent?.you ? `${s.agent.you} (you)` : "You", coins: you, face: <AgentFace look={s.agent?.look} size={32} />, me: true },
-  ].sort((a, b) => b.coins - a.coins);
+  const youRow = { id: "you", name: s.agent?.you ? `${s.agent.you} (you)` : "You", coins: you, face: <AgentFace look={s.agent?.look} size={32} />, me: true };
+  const rows = s.prefs.demoLabels === false
+    ? [youRow]
+    : [
+      ...RIVALS.map((r, i) => ({ id: r.name, name: r.name, coins: Math.round((r.base * day) / 7 + ((wk / 864e5 + i * 7) % 13) * 3), face: <Face seed={r.seed} variant={{ color: r.color }} size={32} />, me: false })),
+      youRow,
+    ].sort((a, b) => b.coins - a.coins);
   const rank = rows.findIndex((r) => r.me) + 1;
   return (
     <section data-rise className="rounded-[30px] bg-card p-5 ring-1 ring-line sm:p-7">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="label flex items-center gap-2 text-[10px] text-brand-ink">Leaderboard <DemoTag /></p>
+          <p className="label flex items-center gap-2 text-[10px] text-brand-ink">Leaderboard {s.prefs.demoLabels !== false && <DemoTag />}</p>
           <h2 className="display mt-1 text-[36px] leading-none text-ink sm:text-[42px]">You&apos;re #{rank}.</h2>
           <p className="mt-2 text-[13.5px] text-ink/60">Coins earned this week. New week in {countdown(nextReset("weekly", now) - now)}.</p>
         </div>

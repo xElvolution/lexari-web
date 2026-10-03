@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { sendTo, useApp } from "@/lib/store";
+import { sendTo, toast, useApp } from "@/lib/store";
+import { listen } from "@/lib/voice";
 import Icon from "../Icon";
 import { fmtSecs } from "../agents";
 
@@ -31,7 +32,16 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
     if (!v.trim() && !file) return;
     sendTo(id, v, { ...(file ? { file } : {}), ...(reply ? { reply } : {}) }); setText(""); setFile(null); onClearReply?.(); requestAnimationFrame(grow); input.current?.focus();
   };
-  const sendVoice = () => { const secs = Math.max(1, Math.round(rec ?? 1)); setRec(null); sendTo(id, "", { voice: secs, ...(reply ? { reply } : {}) }); onClearReply?.(); };
+  const sendVoice = () => {
+    const secs = Math.max(1, Math.round(rec ?? 1));
+    setRec(null);
+    if (demo) { sendTo(id, "", { voice: secs, ...(reply ? { reply } : {}) }); onClearReply?.(); return; }
+    void listen().then((said) => {
+      if (!said) { toast({ text: "I didn't hear anything. Try again." }); return; }
+      sendTo(id, said, reply ? { reply } : {});
+      onClearReply?.();
+    }).catch((e: Error) => toast({ text: e.message }));
+  };
   useEffect(() => { if (reply) input.current?.focus(); }, [reply]);
   const demo = useApp()?.prefs.demoLabels !== false;
   const ready = !!text.trim() || !!file;
@@ -68,7 +78,7 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
               <button type="button" onClick={onDesktop} data-tour="desktop-btn" aria-pressed={desktopOpen} aria-label={`Open ${name}'s desktop`} title="Desktop" className={desktopOpen ? "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition" : iconBtn}><Icon name="monitor" size={19} /></button>
               <button type="button" onClick={() => picker.current?.click()} aria-label="Attach a file" title="Attach a file" className={iconBtn}><Icon name="clip" size={19} /></button>
               <textarea ref={input} value={text} rows={1} onChange={(e) => { setText(e.target.value.slice(0, 2000)); grow(); }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } else if (e.key === "Escape" && reply) onClearReply?.(); }} placeholder={`Message ${name}`} aria-label={`Message ${name}`} className="max-h-40 min-h-[40px] min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-6 text-ink outline-none placeholder:text-ink/45" />
-              <button type="button" onClick={() => setRec(0)} aria-label="Record a voice message" title="Voice message" className={iconBtn}><Icon name="mic" size={19} /></button>
+              <button type="button" onClick={() => { if (demo) setRec(0); else void sendVoice(); }} aria-label="Record a voice message" title="Voice message" className={iconBtn}><Icon name="mic" size={19} /></button>
               <button type="button" onClick={onCall} aria-label={`Call ${name}`} title="Voice call" className={iconBtn}><Icon name="call" size={18} /></button>
               <button disabled={!ready} aria-label="Send" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:bg-grape-deep disabled:bg-ink/15 disabled:text-ink/40"><Icon name="send" size={18} stroke={2.4} /></button>
             </form>
