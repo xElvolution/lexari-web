@@ -14,6 +14,7 @@ import AgentIdCard, { type IdInfo } from "./AgentIdCard";
 import { Field, SkillPicker, Toggle, TonePicker, areaCls, inputCls, variant, type Look } from "./fields";
 import FaceCreator from "./FaceCreator";
 import OnchainCard from "./OnchainCard";
+import AgentMoney from "../wallet/AgentMoney";
 import { lookVariant } from "@shared/components/avatar";
 import type { AgentLook } from "@/lib/store";
 
@@ -135,6 +136,7 @@ function Panel({ s, id }: { s: State; id: string }) {
                   <h3 className="label text-[9.5px] text-ink/55">{k === "hired" ? "Skills" : "Can do"}</h3>
                   <div className="mt-2 flex flex-wrap gap-1.5">{(k === "hired" ? sp?.skills.map((x) => x[0]) ?? [] : info.chips).map((x) => <span key={x} className="rounded-full bg-tint px-3 py-1.5 text-[13px] font-semibold text-ink/80">{x}</span>)}</div>
                 </section>
+                <AgentMoney s={s} id={id} name={info.name} />
                 {k !== "hired" && <OnchainCard s={s} id={id} name={info.name} role={info.role} bg={info.bg}
                   v={k === "home" ? lookVariant(s.agent?.look) : variant({ shape: c!.shape, color: c!.color, eyes: c!.eyes, mouth: c!.mouth, extra: c!.extra, blush: c!.blush ?? (c!.tone === "warm" || c!.tone === "playful"), brows: c!.brows, orbit: c!.orbit, dots: c!.dots, bg: c!.bg })} />}
                 <button onClick={() => setTab("edit")} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-tint py-3 text-[14px] font-bold text-brand-ink transition hover:bg-grape hover:text-white"><Icon name="edit" size={15} />{k === "hired" ? "Add a nickname or notes" : `Edit ${info.name}`}</button>
