@@ -1,28 +1,40 @@
-# Lexari landing
+# Lexari
 
-A standalone marketing site for Lexari: a personalized AI agent with its own persistent computer and memory, a roster of specialist agents you hire into seats, and sign in with Google or a crypto wallet (OKX Wallet is one option).
+Two Next.js apps, plus the contracts. `npm run dev` starts both.
+
+| Folder | What lives there | Local address |
+| --- | --- | --- |
+| `landing/` | Its own Next.js app: marketing page and legal pages | http://localhost:3000 |
+| `webapp/` | Its own Next.js app: sign-in, onboarding, and the product at `/app` | http://localhost:3001 |
+| `shared/` | Faces, logo, theme, and ID-card backgrounds used by both apps | |
+| `contracts/` | Solana agent registry and memory records (`contracts/solana`). The Foundry card is the earlier Arbitrum version and the app does not call it. | |
+| `mobileapp/` | Reserved for the phone app. Nothing is built here yet | |
+
+A personalized AI agent with its own persistent computer and memory, a roster of specialist agents you hire into seats, and sign in with Phantom, Solflare or Backpack. Google sign-in is still a preview.
 
 ## Identity
 
 - **Concept:** "Meet your first personalized AI agent. And hire more." Lexari presents your agent like a new employee. It wears a lanyard ID badge, works a shift at its own computer, files memory notes, and sits at desk one on your team floor.
-- **Color:** black, purple (`#5b2bff`) and white. Light and dark themes share semantic tokens in `src/app/globals.css` (`--bg`, `--alt`, `--card`, `--tint`, `--ink`, `--line`, `--brand-ink`). The toggle in the nav follows the system theme by default, saves the choice to localStorage, and a script in `layout.tsx` applies it before first paint.
+- **Color:** black, purple (`#5b2bff`) and white. Light and dark themes share semantic tokens in `shared/styles/theme.css` (`--bg`, `--alt`, `--card`, `--tint`, `--ink`, `--line`, `--brand-ink`). The toggle in the nav follows the system theme by default, saves the choice to localStorage, and a script in each app's `app/layout.tsx` applies it before first paint.
 - **Type:** Bricolage Grotesque (display, condensed width axis), Figtree (body), Martian Mono (labels).
 - **Motion:** a draggable ID badge on a spring pendulum, eyes that follow the cursor, a scroll-synced computer screen, memory cards dealt by GSAP ScrollTrigger, a pinned horizontal roster with flip cards, an interactive seat floor plan with a generated avatar at every filled desk, a welcome letter that signs itself as you scroll, and agents that occasionally peek in from the screen edges (off for reduced motion).
-- **Avatars:** generated in code as SVG from parts (shape, eyes, mouth, extras) in the brand palette. See `src/components/avatar.ts` and `Face.tsx`. A seed always gives the same face.
-- **Logo:** placeholder only, isolated in `src/components/Logo.tsx` so the final mark can be dropped in.
+- **Avatars:** generated in code as SVG from parts (shape, eyes, mouth, extras) in the brand palette. See `shared/components/avatar.ts` and `Face.tsx`. A seed always gives the same face.
+- **Logo:** placeholder only, isolated in `shared/components/Logo.tsx` so the final mark can be dropped in.
 
 ## Content
 
-Every word lives in `src/content/copy.ts`.
+Every landing word lives in `landing/content/copy.ts`. Product copy and sample data live in `webapp/content/appData.ts`.
 - `[sample]` marks illustrative data.
-- `[placeholder]` marks OKX and wallet specifics that are not final.
+- Wallet sign-in is Phantom, Solflare and Backpack on Solana. The agent ID card is a Metaplex Core NFT. The registry and memory records live in `contracts/solana`.
 
 ## Run
 
 ```bash
 npm install
-npm run dev            # http://localhost:3000
-NEXT_PUBLIC_APP_URL=https://your-app.example npm run build && npm start
+npm run dev            # landing on :3000, web app on :3001
+npm run dev:landing    # marketing site only
+npm run dev:webapp     # product only
+npm run build && npm start
 ```
 
-`NEXT_PUBLIC_APP_URL` sets where the "Hire" buttons go (default `https://app.lexari.ai`).
+Hire, sign-in, and "back to Lexari" jump between the two origins. For a deployed pair, set `NEXT_PUBLIC_LANDING_URL` and `NEXT_PUBLIC_WEBAPP_URL` (no trailing slash) before building. Locally they default to `http://localhost:3000` and `http://localhost:3001`.

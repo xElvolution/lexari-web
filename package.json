@@ -1,27 +1,16 @@
 {
-  "name": "lexari-landing-new",
+  "name": "lexari",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "landing",
+    "webapp"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@types/three": "^0.186.0",
-    "gsap": "^3.15.0",
-    "next": "16.3.6",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "three": "^0.186.1",
-    "viem": "^2.57.2"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "dev": "node scripts/dev.mjs dev",
+    "dev:landing": "npm run dev -w landing",
+    "dev:webapp": "npm run dev -w webapp",
+    "build": "npm run build -w landing && npm run build -w webapp",
+    "start": "node scripts/dev.mjs start"
   }
 }
