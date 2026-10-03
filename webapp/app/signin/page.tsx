@@ -9,7 +9,8 @@ import { WalletReadyState, type WalletAdapter } from "@solana/wallet-adapter-bas
 
 type SigningAdapter = WalletAdapter & { signMessage?: (message: Uint8Array) => Promise<Uint8Array> };
 import { DEMO_GOOGLE, WALLETS, shortAddr, type WalletId } from "@/content/appData";
-import { get, signIn } from "@/lib/store";
+import { get, signIn, startDemo } from "@/lib/store";
+import { usePrivy } from "@privy-io/react-auth";
 import { LANDING_URL } from "@shared/sites";
 import Logo from "@shared/components/Logo";
 import ThemeToggle from "@shared/components/ThemeToggle";
@@ -165,7 +166,7 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
     if (flow.method === "wallet") {
       if (!address) return;
       signIn("wallet", flow.wallet, address);
-    } else signIn("google");
+    } else return;
     const name = new URLSearchParams(window.location.search).get("name");
     const t = setTimeout(() => router.push(get().onboarded ? "/app" : `/onboarding${name ? `?name=${encodeURIComponent(name)}` : ""}`), 1300);
     return () => clearTimeout(t);
@@ -216,6 +217,18 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
 export default function SignIn() {
   const [flow, setFlow] = useState<Flow>(null);
   const root = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { ready, authenticated, user, login } = usePrivy();
+  const entered = useRef(false);
+  useEffect(() => {
+    if (!ready || !authenticated || !user || entered.current) return;
+    entered.current = true;
+    const email = user.google?.email || user.email?.address || "";
+    const name = user.google?.name || email || "You";
+    signIn("google", undefined, user.id, name);
+    const first = name.split(" ")[0] || "";
+    router.push(get().onboarded ? "/app" : `/onboarding${first ? `?name=${encodeURIComponent(first)}` : ""}`);
+  }, [ready, authenticated, user, router]);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = gsap.context(() => {
@@ -247,14 +260,17 @@ export default function SignIn() {
       </section>
 
       <section className="relative flex items-center justify-center px-5 py-10 sm:px-10">
-        <div className="absolute right-6 top-6 hidden lg:block"><ThemeToggle /></div>
+        <div className="absolute right-6 top-6 z-10 flex items-center gap-2">
+          <button type="button" onClick={() => { startDemo(); router.push("/app"); }} className="btn btn-line !h-10 !px-4 text-[13px] text-ink">Try the demo</button>
+          <span className="hidden lg:block"><ThemeToggle /></span>
+        </div>
         <div className="w-full max-w-[440px]">
           <h2 data-in className="display text-[40px] sm:text-[52px]">Welcome in.</h2>
           <p data-in className="mt-2 text-[16px] text-ink/75">Pick how you want to sign in. No new password to remember.</p>
 
-          <button data-in onClick={() => setFlow({ method: "google" })} className="group mt-8 flex w-full items-center gap-4 rounded-[22px] bg-ink p-2 pr-5 text-left text-[var(--bg)] shadow-[0_6px_0_#5b2bff] transition hover:-translate-y-1 hover:shadow-[0_9px_0_#5b2bff] active:scale-[.98]">
+          <button data-in disabled={!ready} onClick={() => login({ loginMethods: ["google"] })} className="group mt-8 flex w-full items-center gap-4 rounded-[22px] bg-ink p-2 pr-5 text-left text-[var(--bg)] shadow-[0_6px_0_#5b2bff] transition hover:-translate-y-1 hover:shadow-[0_9px_0_#5b2bff] active:scale-[.98] disabled:opacity-60">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--bg)] text-ink"><Icon name="google" size={24} /></span>
-            <span className="flex-1"><span className="block text-[17px] font-bold">Continue with Google</span><span className="block text-[13px] opacity-70">Preview. This does not contact Google.</span></span>
+            <span className="flex-1"><span className="block text-[17px] font-bold">Continue with Google</span><span className="block text-[13px] opacity-70">{ready ? "Your Google account. A new agent starts empty." : "Opening Google…"}</span></span>
             <Icon name="arrow" size={20} className="transition group-hover:translate-x-1" />
           </button>
 
@@ -274,7 +290,7 @@ export default function SignIn() {
               </li>
             ))}
           </ul>
-          <p data-in className="mt-7 text-[13px] leading-relaxed text-ink/65">Wallet sign-in asks Phantom, Solflare or Backpack for one signature. Google stays a preview in this browser.</p>
+          <p data-in className="mt-7 text-[13px] leading-relaxed text-ink/65">Google and a Solana wallet each open your own account. Try the demo, on the right, is the only place with sample chats.</p>
         </div>
       </section>
       {flow && <Sheet flow={flow} onClose={() => setFlow(null)} />}

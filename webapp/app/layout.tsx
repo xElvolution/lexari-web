@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Figtree, Martian_Mono } from "next/font/google";
 import "./globals.css";
+import PrivyGate from "@/components/PrivyGate";
 import SolanaProviders from "@/components/SolanaProviders";
 
 const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", axes: ["wdth"] });
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body><SolanaProviders>{children}</SolanaProviders></body>
+      <body><PrivyGate><SolanaProviders>{children}</SolanaProviders></PrivyGate></body>
     </html>
   );
 }

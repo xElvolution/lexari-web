@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { sendTo } from "@/lib/store";
+import { sendTo, useApp } from "@/lib/store";
 import Icon from "../Icon";
 import { fmtSecs } from "../agents";
 
@@ -33,6 +33,7 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
   };
   const sendVoice = () => { const secs = Math.max(1, Math.round(rec ?? 1)); setRec(null); sendTo(id, "", { voice: secs, ...(reply ? { reply } : {}) }); onClearReply?.(); };
   useEffect(() => { if (reply) input.current?.focus(); }, [reply]);
+  const demo = useApp()?.prefs.demoLabels !== false;
   const ready = !!text.trim() || !!file;
   const iconBtn = "grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink/70 transition hover:bg-tint hover:text-brand-ink";
 
@@ -78,12 +79,12 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
               <span className="flex h-10 min-w-0 flex-1 items-center gap-[3px] overflow-hidden" aria-hidden>
                 {Array.from({ length: BARS }).map((_, i) => <i key={i} className="wave w-[3px] shrink-0 rounded-full bg-brand-ink" style={{ animationDelay: `${(i * 97) % 900}ms`, height: `${30 + ((i * 37) % 60)}%` }} />)}
               </span>
-              <span className="label hidden text-[8.5px] text-ink/50 sm:inline">Demo</span>
+              {demo && <span className="label hidden text-[8.5px] text-ink/50 sm:inline">Demo</span>}
               <button onClick={sendVoice} aria-label="Send voice message" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:bg-grape-deep"><Icon name="send" size={18} stroke={2.4} /></button>
             </div>
           )}
         </div>
-        <p className="label mt-2 text-center text-[8.5px] text-ink/45"><span className="hidden sm:inline">Enter to send · Shift+Enter for a new line · </span>Demo replies</p>
+        <p className="label mt-2 text-center text-[8.5px] text-ink/45"><span className="hidden sm:inline">Enter to send · Shift+Enter for a new line{demo ? " · " : ""}</span>{demo ? "Demo replies" : "Enter to send"}</p>
       </div>
     </div>
   );

@@ -61,7 +61,14 @@ export type State = {
   hub?: import("@/lib/hub").HubData;
 };
 
-const KEY = "lexari-app-v1";
+const DEMO_KEY = "lexari-app-v1";
+const POINTER = "lexari-active";
+let activeKey = DEMO_KEY;
+
+function currentKey() {
+  if (typeof localStorage === "undefined") return activeKey;
+  try { return localStorage.getItem(POINTER) || DEMO_KEY; } catch { return activeKey; }
+}
 const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null, custom: [], born: {}, meta: {}, tour: { on: false, step: 0, done: false }, bond: { days: [], coins: 0, claimed: [] } };
 
 let state: State | null = null;
@@ -69,7 +76,8 @@ const subs = new Set<() => void>();
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 function load(): State {
-  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; if (!Array.isArray(st.groups)) st.groups = [];
+  activeKey = currentKey();
+  try { const raw = localStorage.getItem(activeKey); if (raw) { const s = JSON.parse(raw); if (s && s.v === 1) { const st: State = { ...EMPTY, ...s }; if (!s.threads) st.threads = { home: (st.chat || []).filter((m) => m.from === "home" || m.from === "you") }; if (!Array.isArray(st.groups)) st.groups = [];
       if (!s.wallets) st.wallets = s.agent ? { home: walletFor("home").address } : {};
       st.prefs = { ...DEFAULT_PREFS, ...(s.prefs || {}), notif: { ...DEFAULT_PREFS.notif, ...(s.prefs?.notif || {}) } };
       if (!Array.isArray(s.custom)) st.custom = [];
@@ -90,7 +98,7 @@ function load(): State {
 function snapshot() { if (state === null) state = load(); return state; }
 function subscribe(f: () => void) {
   subs.add(f);
-  const onStorage = (e: StorageEvent) => { if (e.key === KEY) { state = load(); subs.forEach((s) => s()); } };
+  const onStorage = (e: StorageEvent) => { if (e.key === activeKey || e.key === POINTER) { state = load(); subs.forEach((s) => s()); } };
   window.addEventListener("storage", onStorage);
   return () => { subs.delete(f); window.removeEventListener("storage", onStorage); };
 }
@@ -98,7 +106,8 @@ export function set(fn: (s: State) => State) {
   const before = snapshot().custom;
   state = fn(snapshot());
   if (state.custom !== before) registerCustom(state.custom);
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
+  activeKey = currentKey();
+  try { localStorage.setItem(activeKey, JSON.stringify(state)); } catch {}
   subs.forEach((f) => f());
 }
 export const get = snapshot;
@@ -138,10 +147,27 @@ export function progressOf(j: Job, now: number) {
 }
 
 /* ---------- actions ---------- */
-export function signIn(method: "google" | "wallet", wallet?: WalletId, address?: string) {
+function openAccount(id: string, auth: Auth) {
+  const key = `lexari-acct-${id}`;
+  activeKey = key;
+  try { localStorage.setItem(POINTER, key); } catch {}
+  let saved: State | null = null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) { const s = JSON.parse(raw); if (s?.v === 1 && s.onboarded && s.agent) saved = { ...EMPTY, ...s, prefs: { ...DEFAULT_PREFS, ...(s.prefs || {}) } }; }
+  } catch {}
+  state = saved
+    ? { ...saved, auth, links: { ...saved.links, [auth.method]: true } }
+    : { ...EMPTY, auth, links: { google: auth.method === "google", wallet: auth.method === "wallet" }, prefs: { ...DEFAULT_PREFS, demoLabels: false } };
+  try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
+  subs.forEach((f) => f());
+}
+
+export function signIn(method: "google" | "wallet", wallet?: WalletId, address?: string, label?: string) {
   const auth: Auth = method === "google"
-    ? { method, label: DEMO_GOOGLE.name, sub: DEMO_GOOGLE.email }
+    ? { method, label: label || address || "Google", sub: address || label || "google" }
     : { method, label: shortAddr(address || "wallet"), sub: WALLETS.find((w) => w.id === wallet)?.name || "Solana wallet", wallet, address };
+  if (address) { openAccount(address, auth); return; }
   set((s) => ({ ...s, auth, links: { ...s.links, [method]: true } }));
 }
 export function signOut() { set((s) => ({ ...s, auth: null })); }
@@ -189,8 +215,36 @@ function seeded(s: State, agent: Agent, knows: string[]): State {
     wallets: { home: walletFor("home").address }, cards: {}, profile,
     custom: [], meta: {}, born: { home: now, scout: now - 3 * 864e5 - 36e5, quill: now - 2 * 864e5 - 36e5, tally: now - 864e5 - 36e5 }, tour: { on: true, step: 0, done: false } };
 }
+function beginAccount(s: State, agent: Agent, knows: string[]): State {
+  const now = Date.now();
+  const who = s.auth?.method === "google" ? s.auth.label : agent.you || "You";
+  const memory: Note[] = [
+    ...knows.filter(Boolean).map((text) => ({ id: uid(), tag: "About you" as MemoryTag, text, source: "You", at: now })),
+    ...(agent.you ? [{ id: uid(), tag: "About you" as MemoryTag, text: `Calls you ${agent.you}${agent.role ? `, ${agent.role.toLowerCase()}` : ""}`, source: "You", at: now }] : []),
+  ];
+  const hello: Msg = { id: uid(), from: "home", at: now, text: `Hi${agent.you ? ` ${agent.you}` : ""}, I'm ${agent.name}. Ask me anything.` };
+  return {
+    ...EMPTY,
+    auth: s.auth,
+    links: s.links,
+    agent,
+    onboarded: true,
+    plan: "free",
+    hired: [],
+    memory,
+    jobs: [],
+    chat: [hello],
+    threads: { home: [hello] },
+    groups: [],
+    active: "home",
+    prefs: { ...DEFAULT_PREFS, demoLabels: false },
+    profile: { name: who, username: who.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 14) || "you", bio: agent.role ? `${agent.role}.` : "", since: now },
+    born: { home: now },
+    tour: { on: true, step: 0, done: false },
+  };
+}
 export function finishOnboarding(agent: Agent, knows: string[]) {
-  set((s) => seeded(s, agent, knows));
+  set((s) => beginAccount(s, agent, knows));
   void fetch("/api/agents", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -198,8 +252,16 @@ export function finishOnboarding(agent: Agent, knows: string[]) {
   }).catch(() => {});
 }
 export function startDemo() {
-  set((s) => seeded({ ...s, auth: s.auth ?? { method: "google", label: DEMO_GOOGLE.name, sub: DEMO_GOOGLE.email }, links: { ...s.links, google: true } },
-    { name: "Juniper", look: null, you: "Ada", role: "Founder", tone: "short" }, ["Keep summaries to one page", "Always link your sources"]));
+  activeKey = DEMO_KEY;
+  try { localStorage.setItem(POINTER, DEMO_KEY); } catch {}
+  state = seeded(
+    { ...EMPTY, auth: { method: "google", label: DEMO_GOOGLE.name, sub: DEMO_GOOGLE.email }, links: { google: true, wallet: false } },
+    { name: "Juniper", look: null, you: "Ada", role: "Founder", tone: "short" },
+    ["Keep summaries to one page", "Always link your sources"],
+  );
+  state = { ...state, prefs: { ...state.prefs, demoLabels: true } };
+  try { localStorage.setItem(DEMO_KEY, JSON.stringify(state)); } catch {}
+  subs.forEach((f) => f());
 }
 export function updateAgent(p: Partial<Agent>) { set((s) => (s.agent ? { ...s, agent: { ...s.agent, ...p } } : s)); }
 
