@@ -8,9 +8,9 @@ import { bridgeFor } from "./walletBridge";
 
 async function ready() {
   const s = get();
+  if (!(await programIsLive().catch(() => false))) return { who: null, error: "Rewards open soon. The Lexari program is not live on Solana yet." };
   const who = bridgeFor(s.auth?.address);
   if (!who) return { who: null, error: s.auth?.method === "google" ? "Your wallet is still loading. Try again in a moment." : "Connect the wallet you signed in with first." };
-  if (!(await programIsLive().catch(() => false))) return { who: null, error: "The Lexari program is not live on this network yet." };
   return { who, error: "" };
 }
 

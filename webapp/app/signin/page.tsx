@@ -42,20 +42,13 @@ const DOWNLOAD: Record<WalletId, string> = {
   backpack: "https://backpack.app/download",
 };
 
+/* Official wallet icons, as shipped in each wallet's @solana/wallet-adapter package. */
+const WALLET_ICON: Record<WalletId, string> = { phantom: "/wallets/phantom.svg", solflare: "/wallets/solflare.svg", backpack: "/wallets/backpack.png" };
 function WalletGlyph({ id }: { id: WalletId }) {
-  if (id === "phantom") return (
-    <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#ab9ff2] text-[#2d1b69]">
-      <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden><path fill="currentColor" d="M12 2.5c2.6 2.7 3.8 5.2 3.8 7.6 0 1.3-.4 2.5-.9 3.4 1.8.3 3.1.9 4 1.8-2.4 1.6-5.5 2.5-8.9 2.5s-6.5-.9-8.9-2.5c.9-.9 2.2-1.5 4-1.8-.5-.9-.9-2.1-.9-3.4 0-2.4 1.2-4.9 3.8-7.6.6.8 1.5 1.3 2.5 1.3s1.9-.5 2.5-1.3zM9.6 10.2a1.15 1.15 0 1 0 0-2.3 1.15 1.15 0 0 0 0 2.3zm4.8 0a1.15 1.15 0 1 0 0-2.3 1.15 1.15 0 0 0 0 2.3z" /></svg>
-    </span>
-  );
-  if (id === "solflare") return (
-    <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#ffef46] text-[#c2410c]">
-      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden><path fill="currentColor" d="M12 2.2 14.2 8l6.1.5-4.7 3.9 1.5 5.9L12 15.4 6.9 18.3l1.5-5.9L3.7 8.5 9.8 8 12 2.2z" /></svg>
-    </span>
-  );
   return (
-    <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#e33e3f] text-white">
-      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden><path fill="currentColor" d="M7 8.5V7a5 5 0 0 1 10 0v1.5h1.2A1.8 1.8 0 0 1 20 10.3v8.4a2.3 2.3 0 0 1-2.3 2.3H6.3A2.3 2.3 0 0 1 4 18.7v-8.4A1.8 1.8 0 0 1 5.8 8.5H7zm2 0h6V7a3 3 0 0 0-6 0v1.5z" /></svg>
+    <span className={`grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl ${id === "backpack" ? "bg-white ring-1 ring-black/10" : ""}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={WALLET_ICON[id]} alt="" width={44} height={44} className={id === "backpack" ? "h-8 w-8" : "h-11 w-11"} />
     </span>
   );
 }
@@ -208,7 +201,7 @@ export default function SignIn() {
   const [privyStep, setPrivyStep] = useState<"" | "wallet" | "sign" | "error">("");
   const [privyErr, setPrivyErr] = useState("");
   useEffect(() => { setMobile(isMobile()); if (ready || !PRIVY_ON) return; const t = setTimeout(() => setSlow(true), 12000); return () => clearTimeout(t); }, [ready]);
-  const googleNote = !PRIVY_ON ? "Sign-in by Google or email is not set up here yet. Use a wallet." : ready ? "No wallet needed. We make one for you." : slow ? "Sign-in could not load. Check your connection and reload." : "Loading sign-in…";
+  const googleNote = !PRIVY_ON ? "Sign-in by Google or email is not set up here yet. Use a wallet." : ready ? "" : slow ? "Sign-in could not load. Check your connection and reload." : "Loading sign-in…";
   // After Google or email: the Privy wallet signs the same sign-in message a Phantom user would.
   useEffect(() => {
     if (!ready || !authenticated || !user || entered.current) return;
@@ -271,7 +264,7 @@ export default function SignIn() {
 
           <button data-in disabled={!PRIVY_ON || !ready || privyBusy} onClick={() => { setPrivyErr(""); setPrivyStep(""); if (authenticated) { entered.current = false; void logout().then(() => login()); } else login(); }} className="group mt-8 flex w-full items-center gap-4 rounded-[22px] bg-ink p-2 pr-5 text-left text-[var(--bg)] shadow-[0_6px_0_#5b2bff] transition hover:-translate-y-1 hover:shadow-[0_9px_0_#5b2bff] active:scale-[.98] disabled:opacity-60">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--bg)] text-ink"><Icon name="google" size={24} /></span>
-            <span className="flex-1"><span className="block text-[17px] font-bold">Continue with Google or email</span><span className="block text-[13px] opacity-70">{privyStep === "wallet" && authenticated ? "Setting up your wallet…" : privyStep === "sign" ? "Signing you in…" : googleNote}</span></span>
+            <span className="flex-1"><span className="block text-[17px] font-bold">Continue with Google or email</span>{(() => { const t = privyStep === "wallet" && authenticated ? "Setting up your wallet…" : privyStep === "sign" ? "Signing you in…" : googleNote; return t ? <span className="block text-[13px] opacity-70">{t}</span> : null; })()}</span>
             <Icon name="arrow" size={20} className="transition group-hover:translate-x-1" />
           </button>
 
@@ -293,7 +286,6 @@ export default function SignIn() {
               </li>
             ))}
           </ul>
-          <p data-in className="mt-7 text-[13px] leading-relaxed text-ink/65">Google or email and a Solana wallet each open their own account. Every account starts empty.</p>
         </div>
       </section>
       {flow && <Sheet flow={flow} onClose={() => setFlow(null)} />}

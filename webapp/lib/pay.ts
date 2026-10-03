@@ -19,9 +19,9 @@ async function record(slug: string, tx: string, mint: "SOL" | "USDC") {
 }
 
 export async function payForHire(slug: string): Promise<{ ok: true; tx: string; mint: "SOL" | "USDC"; price: number } | { ok: false; error: string }> {
+  if (!TREASURY) return { ok: false, error: "Hiring opens soon. Payments are not switched on yet." };
   const bridge = bridgeFor(get().auth?.address);
   if (!bridge) return { ok: false, error: "Connect the wallet you signed in with to hire." };
-  if (!TREASURY) return { ok: false, error: "Hiring is not open yet." };
   const mint = hireMint();
   const price = mint === "USDC" ? HIRE_USDC : HIRE_LAMPORTS;
   const treasury = new PublicKey(TREASURY);
