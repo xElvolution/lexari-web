@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   // shared/ sits next to this app, so the workspace root has to be visible
   turbopack: { root: path.join(__dirname, "..") },
   outputFileTracingRoot: path.join(__dirname, ".."),
+  // Bond was renamed to Hub
+  async redirects() {
+    return [{ source: "/app/bond", destination: "/app/hub", permanent: true }];
+  },
 };
 
 export default nextConfig;
