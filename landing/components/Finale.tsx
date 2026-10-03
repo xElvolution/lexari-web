@@ -24,7 +24,7 @@ export default function Finale() {
             <a href="#top" aria-label="Lexari home" className="inline-flex rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-grape"><Logo /></a>
             <p className="mt-5 max-w-[28ch] text-[16px] leading-relaxed text-ink/70">{Ft.line}</p>
           </div>
-          <div className="grid gap-10 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3">
             {Ft.groups.map((group) => (
               <nav key={group.title} aria-label={group.title}>
                 <h2 className="display text-[22px]">{group.title}</h2>
@@ -46,10 +46,6 @@ export default function Finale() {
         <div className="border-t border-line">
           <div className="mx-auto flex max-w-[1320px] flex-col gap-2 px-5 py-6 text-[13px] leading-relaxed text-ink/60 sm:flex-row sm:items-baseline sm:justify-between sm:px-8">
             <span>© 2026 Lexari</span>
-            <span className="grid gap-1 sm:text-right">
-              <span>{Ft.fine}</span>
-              <span>{Ft.wallets}</span>
-            </span>
           </div>
         </div>
       </footer>

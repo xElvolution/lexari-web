@@ -37,6 +37,7 @@ export default function Header() {
           {copy.nav.links.map((l) => (
             <a key={l.href} href={l.href} onClick={() => setOpen(false)} className="display py-2 text-[34px] text-ink">{l.label}</a>
           ))}
+          <a href={SIGNIN} onClick={() => setOpen(false)} className="btn btn-brand mt-4 w-full !text-[17px]">{copy.nav.signin} <span aria-hidden>→</span></a>
         </nav>
       )}
     </header>

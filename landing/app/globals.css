@@ -3,3 +3,8 @@
 @source "../../shared";
 @import "../../shared/styles/theme.css";
 @import "../../shared/styles/mobile-type.css";
+
+/* The hero headline stays big on phones (mobile-type.css shrinks every other size). */
+@media (max-width: 430px) {
+  .hero-title { font-size: clamp(2.85rem, 12.8vw, 3.4rem); line-height: 0.98; }
+}

@@ -23,8 +23,8 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="pt-24 [grid-area:head] lg:pt-28">
-          <h1 className="display text-[clamp(3.25rem,6.8vw,6.3rem)]">
+        <div className="pt-32 [grid-area:head] sm:pt-28">
+          <h1 className="display hero-title text-[clamp(3.25rem,6.8vw,6.3rem)]">
             <span className="block">{H.title[0]}</span>
             <span className="block text-brand-ink">{H.title[1]}</span>
           </h1>

@@ -124,9 +124,9 @@ export default function Badge({ name, setName, look }: { name: string; setName: 
   return (
     <div ref={rig} className="relative mx-auto flex w-fit flex-col items-center will-change-transform" style={{ transformOrigin: "50% 0%" }}>
       {/* lanyard */}
-      <div className="strap h-[36px] w-[30px] rounded-b-sm shadow-[4px_0_0_rgba(0,0,0,.12)] sm:h-[170px] lg:h-[190px]">
+      <div className="strap h-[84px] w-[30px] rounded-b-sm shadow-[4px_0_0_rgba(0,0,0,.12)] sm:h-[170px] lg:h-[190px]">
         <div className="flex h-full flex-col items-center justify-around overflow-hidden py-2">
-          {[0, 1, 2].map((i) => <span key={i} className="label rotate-90 whitespace-nowrap text-[8px] font-bold text-white/85">lexari</span>)}
+          {[0, 1, 2].map((i) => <span key={i} className={`label rotate-90 whitespace-nowrap text-[8px] font-bold text-white/85 ${i ? "hidden sm:inline" : ""}`}>lexari</span>)}
         </div>
       </div>
       {/* clip */}

@@ -75,7 +75,7 @@ export default function Roster() {
           {R.agents.map((a, i) => <Card key={a.name} a={a} i={i} />)}
         </div>
         <div className="relative mx-auto mt-6 flex max-w-[1320px] flex-col gap-1 px-5 text-[13px] text-white/70 sm:flex-row sm:justify-between sm:px-8">
-          <span>{R.hint}</span><span>{R.note}</span>
+          <span>{R.hint}</span>{R.note && <span>{R.note}</span>}
         </div>
       </div>
     </section>

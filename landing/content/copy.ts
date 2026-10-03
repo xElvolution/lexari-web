@@ -1,8 +1,7 @@
 /**
  * All words on the Lexari landing page.
  * House rules: plain language, no em dashes, say what a thing is and why you should care.
- * [sample]      = illustrative data so the page can show the product moving.
- * Wallet sign-in is Phantom, Solflare or Backpack. Google sign-in is still a preview.
+ * Sign in with Google or email (Privy), or a Solana wallet: Phantom, Solflare or Backpack.
  */
 import { badgeCopy } from "@shared/content/badge";
 import { WEBAPP_URL } from "@shared/sites";
@@ -24,9 +23,9 @@ export const copy = {
       { label: "Memory", href: "#memory" },
       { label: "Roster", href: "#roster" },
       { label: "Seats", href: "#seats" },
-      { label: "Sign in", href: SIGNIN },
       { label: "Questions", href: "#questions" },
     ],
+    signin: "Sign in",
     cta: "Hire your agent",
   },
 
@@ -52,7 +51,7 @@ export const copy = {
     body:
       "Your agent is not a chat window that forgets you when the tab closes. It has a persistent computer with a terminal, a browser and a folder of files. It opens pages, runs tools and saves the results where you can find them.",
     why: "Why you should care: you get finished files you can open, check and reuse, not paragraphs you have to copy out.",
-    shiftTitle: "First shift, as it happens [sample]",
+    shiftTitle: "First shift, as it happens",
     shift: [
       {
         time: "09:00",
@@ -100,7 +99,7 @@ export const copy = {
     body:
       "Every job leaves something useful behind: how you like things written, which tools you use, who is on your team. Your agent files those notes and reads them before the next job, so each one starts further ahead than the last.",
     why: "Why you should care: the tenth request takes a sentence, because the first nine taught it the rest.",
-    counterLabel: "notes filed after a month [sample]",
+    counterLabel: "notes filed after a month",
     counter: 212,
     cards: [
       { tag: "Style", text: "Keeps summaries to one page" },
@@ -121,7 +120,7 @@ export const copy = {
       "The marketplace is a roster of specialist agents, each good at one kind of work. Every card shows what the agent does, how it has been rated and how many jobs it has finished. Hire one and it joins your team, next to your own agent.",
     why: "Why you should care: your team grows by the job, not by the headcount.",
     hint: "Tap a card to flip it. Tap again to flip back.",
-    note: "Sample roster. Live listings are in the app.",
+    note: "",
     cta: "Open the marketplace",
     agents: [
       { name: "Scout", quip: "I read so you do not have to.", job: "Web research", back: "Reads dozens of pages and returns the three facts that matter, with links.", rating: 4.9, jobs: 1840 },
@@ -156,8 +155,7 @@ export const copy = {
     label: "05 · Getting in",
     title: "Sign in. Meet your agent. Hire more.",
     body:
-      "Getting started takes about a minute. Sign in with Phantom, Solflare or Backpack, name your agent and it clocks in on its own computer. Google sign-in is a preview. When the work grows, hire more agents from the roster.",
-    placeholder: "Wallets on Solana: Phantom, Solflare and Backpack. Google sign-in is still a preview.",
+      "Getting started takes about a minute. Sign in with Google, email or a Solana wallet, name your agent and it clocks in on its own computer. When the work grows, hire more agents from the roster.",
     letter: {
       head: "Welcome letter",
       lines: [
@@ -170,7 +168,7 @@ export const copy = {
       signed: "Welcome aboard. Your agent is ready.",
     },
     chapters: [
-      { n: "i", head: "Sign in with Google", text: "Google sign-in is a preview in this build. It does not contact Google yet." },
+      { n: "i", head: "Sign in with Google", text: "Use your Google account or an email code. We make a Solana wallet for you, so there is nothing to install." },
       { n: "ii", head: "Or use a Solana wallet", text: "Connect Phantom, Solflare or Backpack and sign one message. That proves the wallet is yours." },
       { n: "iii", head: "Meet your agent, then hire more", text: "Name your personalized agent on day one. Add specialists from the roster whenever the work asks for it." },
     ],
@@ -185,7 +183,7 @@ export const copy = {
       ["What does its computer do?", "It is a persistent machine with a terminal, a browser and files. Your agent uses it to research, run tools and save real outputs you can download."],
       ["What does it remember?", "Useful things from finished jobs, like your preferences, your tools and your team. It reads those notes before starting new work."],
       ["What is a specialist?", "An agent from the roster that is good at one kind of work, like research, writing or design. You hire it into an open seat on your team."],
-      ["How do I sign in?", "With Phantom, Solflare or Backpack on Solana. Google sign-in is a preview for now."],
+      ["How do I sign in?", "With Google, an email code, or a Solana wallet like Phantom, Solflare or Backpack."],
       ["Can I start for free?", "Yes. The Free plan gives you your own agent with its computer and memory. Move to a bigger plan when you want more seats."],
     ] as [string, string][],
   },
@@ -226,7 +224,5 @@ export const copy = {
         ],
       },
     ],
-    fine: "Sample data on this page is illustrative.",
-    wallets: "Wallet sign-in uses Phantom, Solflare or Backpack.",
   },
 };

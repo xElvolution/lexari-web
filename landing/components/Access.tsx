@@ -29,7 +29,6 @@ export default function Access() {
         <div className="grid gap-12 lg:grid-cols-[1fr_.85fr] lg:items-center">
           <div>
             <SectionIntro label={O.label} title={O.title} body={O.body} tone="base" />
-            <p className="reveal mt-6 flex w-fit gap-2 rounded-xl border-2 border-dashed border-brand-ink/70 px-4 py-3 text-[14px] font-semibold text-brand-ink">{O.placeholder}</p>
             <div className="reveal mt-8 flex flex-col gap-3 sm:flex-row">
               <a href={SIGNIN} className="btn btn-brand">Sign in with Google</a>
               <a href={SIGNIN} className="btn btn-line text-ink">Use a crypto wallet</a>
