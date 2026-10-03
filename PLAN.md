@@ -196,7 +196,8 @@ Tick in this file as each lands. After every milestone: tests, click the flow, c
 - [ ] Remove Foundry/Arbitrum dead tree (or isolate under `contracts/legacy/` with a one-line README)
 - [ ] Loading / empty / error on every product surface
 - [ ] Playwright: create, mint, chat, check-in, level up
-- [ ] Lint, typecheck, both Next builds
+- [x] Typecheck and both Next production builds pass (`npm run build`, landing and webapp)
+- [ ] Playwright is still open. Mint, check-in, and level-up need a wallet, devnet SOL, and the deployed program
 
 ### M9 — Ship
 - [ ] Vercel landing + webapp, env URLs cross-linked
