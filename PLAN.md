@@ -166,14 +166,14 @@ Tick in this file as each lands. After every milestone: tests, click the flow, c
 - [x] SIWS nonce + verify + httpOnly session (`/api/auth/nonce`, `/api/auth/verify`, `/api/auth/session`, `/api/auth/signout`)
 - [x] Zod on every route, rate limit, no secrets in the client
 - [x] `.env.example` (repo root and `webapp/`)
-- [ ] **Blocked:** no `DATABASE_URL`, so migrate has not been applied and sign-in returns 503 until a Neon or Supabase URL is set. Also need `SESSION_SECRET` (16+ chars).
+- [x] Neon is connected locally and `0001_init.sql` is applied. `GET /api/health` is ok and `POST /api/auth/nonce` writes a real user. The URL stays in `webapp/.env.local`.
 
 ### M4 — Engram chat
 - [x] Cortex stream route (`POST /api/chat`, OpenAI-compatible SSE)
 - [x] Spinal routing + memory recall pack
 - [x] Hippocampus remember proposal (`REMEMBER:` line)
 - [x] Wire Composer/ChatPanel; live replies no longer use canned lines
-- [ ] **Blocked:** the configured host lists models but rejects calls (`gpt-6-luna` is not enabled for this account; other ids return upstream forbidden). A working `OPENAI_API_KEY` / `OPENAI_MODEL` is still required for a real sentence.
+- [x] Chat streams from Grok (`grok-4.7` at `api.x.ai`) using the local CLI session copied into `webapp/.env.local`. A live call returned a real sentence. That session token expires, so chat needs a fresh `grok` login when it does.
 
 ### M5 — Agents, mint, memory
 - [x] Create agent → `POST /api/agents` from onboarding (needs a session)

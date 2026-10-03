@@ -24,7 +24,8 @@ export function tokenFromData(data: string): string {
 export async function* streamCompletion(messages: ChatMessage[]): AsyncGenerator<string> {
   const { key, base, model } = llmConfig();
   if (!key) throw new Error("OPENAI_API_KEY is not set");
-  const res = await fetch(`${base}/v1/chat/completions`, {
+  const endpoint = base.endsWith("/v1") ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({ model, messages, stream: true, temperature: 0.7 }),
