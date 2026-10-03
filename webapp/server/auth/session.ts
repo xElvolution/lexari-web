@@ -96,8 +96,10 @@ export async function verifySignIn(input: { wallet: string; message: string; sig
 
   // A referral counts only for a brand-new account (first sign-in).
   const before = await database.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, user.id)).limit(1);
-  if (input.referral && !user.referredBy && !before.length) {
-    const referrer = await database.select().from(users).where(eq(users.referralCode, input.referral)).limit(1);
+  // Codes are uppercase (CODE_ALPHABET); people type and paste them in any case.
+  const refCode = input.referral?.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (refCode && !user.referredBy && !before.length) {
+    const referrer = await database.select().from(users).where(eq(users.referralCode, refCode)).limit(1);
     const ref = referrer[0];
     if (ref && ref.id !== user.id) {
       await database.update(users).set({ referredBy: ref.id }).where(and(eq(users.id, user.id), isNull(users.referredBy)));

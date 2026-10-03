@@ -13,6 +13,8 @@ export function verifyPayment(tx: VersionedTransactionResponse, payer: string, m
   const to = treasury();
   if (!to) throw new HttpError(503, "Hiring is not open yet.");
   if (tx.meta?.err) throw new HttpError(400, "That payment failed on Solana.");
+  // A hire must be paid for now: an old transfer to the treasury can't be turned into a hire later.
+  if (!tx.blockTime || Date.now() / 1000 - tx.blockTime > 3600) throw new HttpError(400, "That payment is too old. Hire again to make a new one.");
   const msg = tx.transaction.message;
   const keys = msg.getAccountKeys({ accountKeysFromLookups: tx.meta?.loadedAddresses }).keySegments().flat().map((k) => k.toBase58());
   if (!keys.slice(0, msg.header.numRequiredSignatures).includes(payer)) throw new HttpError(403, "That payment was not signed by your wallet.");

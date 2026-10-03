@@ -24,7 +24,7 @@ export function referralCode() {
     if (fromUrl && /^[A-Za-z0-9-]{4,16}$/.test(fromUrl)) sessionStorage.setItem("lexari-ref", fromUrl.toUpperCase());
     return sessionStorage.getItem("lexari-ref") || undefined;
   } catch {
-    return fromUrl || undefined;
+    return fromUrl?.toUpperCase() || undefined;
   }
 }
 

@@ -85,11 +85,11 @@ export default function Detail({ slug }: { slug: string }) {
             {hired ? (
               <>
                 <Link href={`/app?c=${a.slug}`} className="inline-flex h-12 items-center gap-2 rounded-full bg-grape px-7 text-[16px] font-bold text-white hover:bg-grape-deep">Chat with {a.name}<Icon name="arrow" size={17} /></Link>
-                <button onClick={() => { release(a.slug); toast({ text: `${a.name} left the seat. It's open again.`, face: a.seed, color: a.color }); }} className="inline-flex h-12 items-center rounded-full px-5 text-[15px] font-bold text-ink ring-1 ring-line hover:ring-grape">Release seat</button>
+                <button onClick={() => { release(a.slug); toast({ text: `${a.name} left your team.`, face: a.seed, color: a.color }); }} className="inline-flex h-12 items-center rounded-full px-5 text-[15px] font-bold text-ink ring-1 ring-line hover:ring-grape">Release seat</button>
               </>
             ) : <HireBtn a={a} size="lg" faceEl={() => face.current} />}
             <button onClick={() => { navigator.clipboard?.writeText(location.href).catch(() => {}); toast({ text: "Link copied" }); }} aria-label="Share" className="grid h-12 w-12 place-items-center rounded-full bg-tint text-ink hover:bg-grape hover:text-white"><Icon name="copy" size={18} /></button>
-            <span className="text-[13px] text-ink/55">Takes one seat on your plan</span>
+            <span className="text-[13px] text-ink/55">Joins your team next to {s.agent?.name || "your agent"}</span>
           </div>
         </div>
       </section>
@@ -121,7 +121,7 @@ export default function Detail({ slug }: { slug: string }) {
           <section data-rise>
             <h2 className="text-[22px] font-bold text-ink">About this agent</h2>
             <p className="mt-3 text-[16px] leading-relaxed text-ink/80">{a.back} It works on its own computer, keeps notes in your team&apos;s brain and reports back in chat.</p>
-            {more && <p className="mt-3 text-[16px] leading-relaxed text-ink/80">{a.name} is built by {m.maker}. Hire it into an open seat and it joins your team next to your personal agent. Mention it in a group chat or open a direct chat to give it work. You can release the seat at any time.</p>}
+            {more && <p className="mt-3 text-[16px] leading-relaxed text-ink/80">{a.name} is built by {m.maker}. Hire it and it joins your team next to your personal agent. Mention it in a group chat or open a direct chat to give it work. You can release the seat at any time.</p>}
             <button onClick={() => setMore((x) => !x)} className="mt-2 text-[14px] font-bold text-brand-ink hover:underline">{more ? "Show less" : "Read more"}</button>
             <div className="mt-4 flex flex-wrap gap-1.5">{a.tools.map((t) => <span key={t} className="rounded-full bg-tint px-3 py-1.5 text-[12.5px] font-semibold text-ink">{t}</span>)}</div>
           </section>

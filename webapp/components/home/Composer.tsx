@@ -9,7 +9,7 @@ import { fmtSecs } from "../agents";
 const kb = (n: number) => (n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
 const BARS = 36;
 
-/** Message box: attach, text, voice note (demo recording), call and send. Enter sends, Shift+Enter adds a line. */
+/** Message box: attach, text, voice note, call and send. Enter sends, Shift+Enter adds a line. */
 type Reply = { id: string; from: string; text: string };
 export default function Composer({ id, name, suggestions, onCall, onDesktop, desktopOpen, reply = null, replyName = "", onClearReply }: { id: string; name: string; suggestions: string[]; onCall: () => void; onDesktop: () => void; desktopOpen: boolean; reply?: Reply | null; replyName?: string; onClearReply?: () => void }) {
   const [text, setText] = useState("");
@@ -35,7 +35,6 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
   const sendVoice = () => {
     const secs = Math.max(1, Math.round(rec ?? 1));
     setRec(null);
-    if (demo) { sendTo(id, "", { voice: secs, ...(reply ? { reply } : {}) }); onClearReply?.(); return; }
     void listen().then((said) => {
       if (!said) { toast({ text: "I didn't hear anything. Try again." }); return; }
       sendTo(id, said, reply ? { reply } : {});
@@ -43,7 +42,6 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
     }).catch((e: Error) => toast({ text: e.message }));
   };
   useEffect(() => { if (reply) input.current?.focus(); }, [reply]);
-  const demo = useApp()?.prefs.demoLabels !== false;
   const ready = !!text.trim() || !!file;
   const iconBtn = "grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink/70 transition hover:bg-tint hover:text-brand-ink";
 
@@ -78,7 +76,7 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
               <button type="button" onClick={onDesktop} data-tour="desktop-btn" aria-pressed={desktopOpen} aria-label={`Open ${name}'s desktop`} title="Desktop" className={desktopOpen ? "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition" : iconBtn}><Icon name="monitor" size={19} /></button>
               <button type="button" onClick={() => picker.current?.click()} aria-label="Attach a file" title="Attach a file" className={iconBtn}><Icon name="clip" size={19} /></button>
               <textarea ref={input} value={text} rows={1} onChange={(e) => { setText(e.target.value.slice(0, 2000)); grow(); }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } else if (e.key === "Escape" && reply) onClearReply?.(); }} placeholder={`Message ${name}`} aria-label={`Message ${name}`} className="max-h-40 min-h-[40px] min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-6 text-ink outline-none placeholder:text-ink/45" />
-              <button type="button" onClick={() => { if (demo) setRec(0); else void sendVoice(); }} aria-label="Record a voice message" title="Voice message" className={iconBtn}><Icon name="mic" size={19} /></button>
+              <button type="button" onClick={() => void sendVoice()} aria-label="Record a voice message" title="Voice message" className={iconBtn}><Icon name="mic" size={19} /></button>
               <button type="button" onClick={onCall} aria-label={`Call ${name}`} title="Voice call" className={iconBtn}><Icon name="call" size={18} /></button>
               <button disabled={!ready} aria-label="Send" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:bg-grape-deep disabled:bg-ink/15 disabled:text-ink/40"><Icon name="send" size={18} stroke={2.4} /></button>
             </form>
@@ -89,12 +87,11 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
               <span className="flex h-10 min-w-0 flex-1 items-center gap-[3px] overflow-hidden" aria-hidden>
                 {Array.from({ length: BARS }).map((_, i) => <i key={i} className="wave w-[3px] shrink-0 rounded-full bg-brand-ink" style={{ animationDelay: `${(i * 97) % 900}ms`, height: `${30 + ((i * 37) % 60)}%` }} />)}
               </span>
-              {demo && <span className="label hidden text-[8.5px] text-ink/50 sm:inline">Demo</span>}
               <button onClick={sendVoice} aria-label="Send voice message" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:bg-grape-deep"><Icon name="send" size={18} stroke={2.4} /></button>
             </div>
           )}
         </div>
-        <p className="label mt-2 text-center text-[8.5px] text-ink/45"><span className="hidden sm:inline">Enter to send · Shift+Enter for a new line{demo ? " · " : ""}</span>{demo ? "Demo replies" : "Enter to send"}</p>
+        <p className="label mt-2 text-center text-[8.5px] text-ink/45"><span className="hidden sm:inline">Enter to send · Shift+Enter for a new line</span><span className="sm:hidden">Enter to send</span></p>
       </div>
     </div>
   );

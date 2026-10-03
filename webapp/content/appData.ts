@@ -312,57 +312,6 @@ export function groupReply(o: { who: string; text: string; turn: number; n: numb
   return lines[o.n % lines.length];
 }
 
-/* ---------- each agent's computer (demo desktop pane) ---------- */
-export type DesktopScript = { url: string; title: string; kind: "browser" | "doc" | "sheet"; steps: string[]; terminal: string[]; files: { name: string; size: string }[] };
-export function desktopFor(id: string, agentName: string): DesktopScript {
-  const sp = specialistBySlug(id);
-  const tag = (sp?.slug ?? "home");
-  const byCat: Record<string, Omit<DesktopScript, "terminal">> = {
-    home: { url: "notes.example.com/this-week", title: "This week", kind: "doc", steps: ["Read your new messages", "Opened this week's notes", "Checked two deadlines", "Updated the plan", "Saved notes to Files"], files: [{ name: "week-plan.md", size: "2 KB" }, { name: "team-report.md", size: "3 KB" }] },
-    Research: { url: "compare.example.com/pricing", title: "Pricing pages", kind: "browser", steps: ["Opened 3 product sites", "Reading pricing page 1 of 3", "Reading pricing page 2 of 3", "Checking every source", "Building the table"], files: [{ name: "comparison.md", size: "4 KB" }, { name: "sources.txt", size: "1 KB" }] },
-    Writing: { url: "docs.example.com/launch-post", title: "Launch post", kind: "doc", steps: ["Opened the draft", "Reading it in your voice", "Cutting the intro", "Trying two headlines", "Saved draft v3"], files: [{ name: "launch-post-v3.md", size: "3 KB" }] },
-    Data: { url: "sheets.example.com/q3-numbers", title: "Q3 numbers", kind: "sheet", steps: ["Opened the sheet", "Found 14 duplicate rows", "Fixed date formats", "Added a totals row", "Wrote what changed"], files: [{ name: "q3-clean.csv", size: "12 KB" }, { name: "changes.md", size: "1 KB" }] },
-  };
-  const base = byCat[tag === "home" ? "home" : sp!.cat] ?? { url: `${tag}.example.com/workspace`, title: sp?.job ?? "Workspace", kind: "browser" as const, steps: ["Opened the brief", "Gathering what it needs", "Working through it", "Checking the result", "Saved to Files"], files: [{ name: `${tag}-output.md`, size: "2 KB" }] };
-  const host = (sp?.name ?? agentName).toLowerCase();
-  return { ...base, terminal: [`$ open ${base.url}`, "  page loaded", `$ notes add "${base.title.toLowerCase()}"`, "  saved", "$ files ls ~/output", ...base.files.map((f) => `  ${f.name}  ${f.size}`), `$ wait --for ${host === "you" ? "you" : "next message"}`] };
-}
-
-/* ---------- agent wallets (demo) ---------- */
-export type WalletLine = { label: string; amount: number; ago: string };
-/** A made-up address and balance per agent. The balance is a demo. This is not a real Solana wallet. */
-export function walletFor(id: string) {
-  let h = 2166136261; for (const ch of `lexari-${id}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
-  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  const b58 = (n: number) => { let out = "", x = n; for (let i = 0; i < 44; i++) { x = Math.imul(x ^ (x >>> 13), 1274126177) >>> 0; out += alphabet[x % 58]; } return out; };
-  const address = b58(h);
-  const balance = Math.round(((h % 40000) / 100 + 25) * 100) / 100;
-  const lines: WalletLine[] = [
-    { label: "Added by you", amount: 50, ago: "3 days ago" },
-    { label: "Tools used", amount: -Math.round((h % 500) / 10) / 10 - 0.4, ago: "yesterday" },
-    { label: "File storage", amount: -0.4, ago: "today" },
-  ];
-  const spark = Array.from({ length: 12 }, (_, i) => 30 + (((h >>> (i % 24)) & 31) + i * 2));
-  return { address, balance, lines, spark };
-}
-
-/* ---------- agent cards (demo) ---------- */
-/** Placeholder card fee. No real payment: the confirm step only pretends. Units are left neutral on purpose. */
-export const CARD_FEE = "5.00";
-export const CARD_LIMITS = [100, 250, 500, 1000];
-export function cardTxns(id: string) {
-  const who = specialistBySlug(id);
-  return who ? [
-    { label: `${who.tools[0] ?? "Tool"} add-on`, amount: 4.99, ago: "today" },
-    { label: "Cloud compute", amount: 12.4, ago: "yesterday" },
-    { label: "API credits", amount: 20, ago: "3 days ago" },
-  ] : [
-    { label: "Domain renewal", amount: 11.99, ago: "today" },
-    { label: "Cloud compute", amount: 8.2, ago: "yesterday" },
-    { label: "Notes app, monthly", amount: 4, ago: "4 days ago" },
-  ];
-}
-
 /* ---------- marketplace store listing (demo) ---------- */
 export const STORE_CATS = [
   { id: "Research", icon: "search", from: ["Research"] },
