@@ -3,7 +3,7 @@
  *
  * The CLI is an agent with tools (shell, files, web). Lexari only wants text, so every run is locked down:
  * an empty temp working dir, only the harmless todo_write tool allowed, shell/subagents/scheduler denied,
- * no web search, no plan mode, two turns max, and a hard timeout. The prompt goes in as an argument
+ * no web search, no plan mode, two turns max, and a hard timeout. The run's CLI session transcript is deleted afterwards. The prompt goes in as an argument
  * (no shell), the system prompt replaces Grok's own.
  *
  * Env: GROK_CLI_BIN (default "grok"), GROK_CLI_HOME (HOME holding the CLI login, default the process HOME),
@@ -120,7 +120,10 @@ export async function* streamGrokCli(messages: ChatMessage[], signal?: AbortSign
   } finally {
     clearTimeout(timer);
     kill();
+    await exited;
     rmSync(cwd, { recursive: true, force: true });
+    // The CLI keeps a transcript per working dir under its HOME; drop ours so chats are not stored there.
+    if (cfg.home) rmSync(join(cfg.home, ".grok", "sessions", encodeURIComponent(cwd)), { recursive: true, force: true });
     release();
   }
 }

@@ -26,9 +26,11 @@ export function WhoFace({ who, look, size = 40, className = "", animated = false
 
 /** An agent's face on its soft colour tile. Rounded square, sized in px. */
 export function AgentTile({ id, look, size = 48, face, className = "", radius }: { id: string; look: AgentLook | undefined; size?: number; face?: number; className?: string; radius?: number }) {
+  // big tiles shrink a little on phones (--av-scale is set in mobile-compact.css)
+  const big = size >= 44;
   return (
-    <span className={`grid shrink-0 place-items-center ${className}`} style={{ width: size, height: size, borderRadius: radius ?? Math.round(size * 0.32), background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)" }}>
-      <WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} />
+    <span className={`grid shrink-0 place-items-center ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: radius ?? Math.round(size * 0.32), background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)" }}>
+      <span className="grid place-items-center" style={big ? { transform: "scale(var(--av-scale, 1))" } : undefined}><WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} /></span>
     </span>
   );
 }
