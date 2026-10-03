@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import Bond from "@/components/bond/Bond";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Lexari · Bond" };
-
+/** Bond was renamed to Hub. Old links still work. */
 export default function BondPage() {
-  return <Bond />;
+  redirect("/app/hub");
 }

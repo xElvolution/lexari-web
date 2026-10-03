@@ -9,19 +9,19 @@ import { tileBg } from "./agents";
 /** Your agent's face. look null is the house face from the landing badge. */
 export function AgentFace({ look, size = 48, track = false, className = "", animated = false, state }: { look: AgentLook | undefined; size?: number; track?: boolean; className?: string; animated?: boolean; state?: FaceState }) {
   if (look && typeof look === "object") return <Face variant={lookVariant(look)} size={size} track={track} className={className} animated={animated} state={state} />;
-  return look === null || look === undefined ? <Face size={size} track={track} className={className} /> : <Face seed={look} size={size} track={track} className={className} />;
+  return look === null || look === undefined ? <Face size={size} track={track} className={className} animated={animated} state={state} /> : <Face seed={look} size={size} track={track} className={className} animated={animated} state={state} />;
 }
 
 /** A marketplace specialist's face, same seed and color as the landing roster. */
-export function SpecFace({ slug, size = 48, track = false, className = "", animated = false }: { slug: string; size?: number; track?: boolean; className?: string; animated?: boolean }) {
+export function SpecFace({ slug, size = 48, track = false, className = "", animated = false, state }: { slug: string; size?: number; track?: boolean; className?: string; animated?: boolean; state?: FaceState }) {
   const s = specialistBySlug(slug);
   if (!s) return null;
-  return <Face seed={s.seed} variant={{ color: s.color, ...s.face }} size={size} track={track} className={className} animated={animated} />;
+  return <Face seed={s.seed} variant={{ color: s.color, ...s.face }} size={size} track={track} className={className} animated={animated} state={state} />;
 }
 
 /** Either one, by assignee id ("home" or a slug). */
-export function WhoFace({ who, look, size = 40, className = "", animated = false }: { who: string; look: AgentLook | undefined; size?: number; className?: string; animated?: boolean }) {
-  return who === "home" || who === "you" ? <AgentFace look={look} size={size} className={className} animated={animated} /> : <SpecFace slug={who} size={size} className={className} animated={animated} />;
+export function WhoFace({ who, look, size = 40, className = "", animated = false, state }: { who: string; look: AgentLook | undefined; size?: number; className?: string; animated?: boolean; state?: FaceState }) {
+  return who === "home" || who === "you" ? <AgentFace look={look} size={size} className={className} animated={animated} state={state} /> : <SpecFace slug={who} size={size} className={className} animated={animated} state={state} />;
 }
 
 /** An agent's face on its soft colour tile. Rounded square, sized in px. */

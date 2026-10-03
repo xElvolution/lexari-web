@@ -57,6 +57,8 @@ export type State = {
   meta: Record<string, AgentMeta>;
   tour: Tour;
   bond: BondLog;
+  /** Hub: quests, agent levels, referrals, achievements. See lib/hub.ts. Coins live in bond.coins. */
+  hub?: import("@/lib/hub").HubData;
 };
 
 const KEY = "lexari-app-v1";

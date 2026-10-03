@@ -23,7 +23,7 @@ export const NAV = [
   { href: "/app/memory", label: "Brain", icon: "memory" },
   { href: "/app/marketplace", label: "Market", icon: "market" },
   { href: "/app/team", label: "Team", icon: "team" },
-  { href: "/app/bond", label: "Bond", icon: "bond" },
+  { href: "/app/hub", label: "Hub", icon: "hub" },
   { href: "/app/wallets", label: "Wallets", icon: "wallet" },
   { href: "/app/settings", label: "Settings", icon: "settings" },
 ];
@@ -57,7 +57,7 @@ function Rail({ s, path }: { s: State; path: string }) {
 }
 
 type Item = { key: string; label: string; icon: string; href?: string; run?: () => void };
-const MORE_PATHS = ["/app/wallets", "/app/settings", "/app/profile", "/app/bond"];
+const MORE_PATHS = ["/app/wallets", "/app/settings", "/app/profile", "/app/hub"];
 const PRIMARY = new Set(["/app", "/app/memory", "/app/marketplace", "/app/team"]);
 
 /** Phone header and bottom nav. "More" lifts the main items away and brings up a second row. */
@@ -72,7 +72,7 @@ function MobileBars({ s, path }: { s: State; path: string }) {
     { key: "/app/wallets", label: "Wallets", icon: "wallet", href: "/app/wallets" },
     { key: "/app/settings", label: "Settings", icon: "settings", href: "/app/settings" },
     { key: "/app/profile", label: "Profile", icon: "user", href: "/app/profile" },
-    { key: "/app/bond", label: "Bond", icon: "bond", href: "/app/bond" },
+    { key: "/app/hub", label: "Hub", icon: "hub", href: "/app/hub" },
     { key: "close", label: "Close", icon: "x", run: () => setMore(false) },
   ];
 
