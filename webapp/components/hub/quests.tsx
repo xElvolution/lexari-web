@@ -54,11 +54,12 @@ function QuestRow({ q, i, hard }: { q: QuestView; i: number; hard: boolean }) {
   const row = useRef<HTMLLIElement>(null);
   const pct = Math.round((q.have / q.goal) * 100);
   const claim = () => {
-    const r = hub.claimQuest(q.id);
-    if (!r.ok) return;
+    void hub.claimQuest(q.id).then((r) => {
+    if (!r.ok) { toast({ text: r.error || "That quest is not ready.", face: "home" }); return; }
     if (row.current) gsap.fromTo(row.current, { scale: 0.98 }, { scale: 1, duration: 0.5, ease: "back.out(3)" });
     flyCoins(btn.current, r.coins); burst(btn.current, hard ? 24 : 14);
     toast({ text: `${q.title} · +${r.coins} coins`, face: "home" });
+    });
   };
   const goEl = (label: string) => q.go?.startsWith("#")
     ? <a href={q.go} className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full px-4 text-[13.5px] font-bold ring-1 ring-current/20 transition hover:bg-grape hover:text-white hover:ring-grape">{label}<Icon name="arrow" size={14} /></a>

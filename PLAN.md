@@ -169,25 +169,28 @@ Tick in this file as each lands. After every milestone: tests, click the flow, c
 - [ ] **Blocked:** no `DATABASE_URL`, so migrate has not been applied and sign-in returns 503 until a Neon or Supabase URL is set. Also need `SESSION_SECRET` (16+ chars).
 
 ### M4 — Engram chat
-- [ ] Cortex stream route
-- [ ] Spinal routing + memory recall pack
-- [ ] Hippocampus remember proposal
-- [ ] Wire Composer/ChatPanel; delete canned replies from the live path
-- [ ] **Blocked if:** no `OPENAI_API_KEY` — keep the route, ask for the key
+- [x] Cortex stream route (`POST /api/chat`, OpenAI-compatible SSE)
+- [x] Spinal routing + memory recall pack
+- [x] Hippocampus remember proposal (`REMEMBER:` line)
+- [x] Wire Composer/ChatPanel; live replies no longer use canned lines
+- [ ] **Blocked:** the configured host lists models but rejects calls (`gpt-6-luna` is not enabled for this account; other ids return upstream forbidden). A working `OPENAI_API_KEY` / `OPENAI_MODEL` is still required for a real sentence.
 
 ### M5 — Agents, mint, memory
-- [ ] Create agent → DB row
-- [ ] Mint Core + register, tx status + explorer link
-- [ ] Memory list/edit/delete: encrypt client-side, persist ciphertext, onchain write/revoke/delete really deletes
+- [x] Create agent → `POST /api/agents` from onboarding (needs a session)
+- [x] Mint Core + register stays the existing client flow, with tx status and explorer link
+- [x] Memory ciphertext is posted after the onchain write; delete marks the row and still closes the chain account
+- [ ] **Blocked:** no `DATABASE_URL`, and the program is not on devnet, so mint and the DB row cannot be confirmed live
 
 ### M6 — Hub adapter on chain
-- [ ] `chainHub` implements `HubAdapter`
-- [ ] Check-in, quest claim (server attests), level-up, referral tier, mystery box
-- [ ] Quest events from real actions (message, memory, hire, check-in, level, agent create)
+- [x] `chainHub` implements `HubAdapter` (check-in, quest claim, level-up, referral tier, mystery box)
+- [x] Quest and box and referral claims are co-signed by `/api/hub/attest` after a database check
+- [x] Chat, memory, hire, and agent create record quest events when a session exists
+- [ ] **Blocked:** program is not deployed, and `LEXARI_ATTESTOR_KEY` is not set, so Hub buttons return that error instead of minting coins
 
 ### M7 — Marketplace + referrals
-- [ ] List / hire with SOL (and USDC if mint set)
-- [ ] Referral code on signup, attribution, tier claims
+- [x] Hire pays 0.01 SOL (or 1 USDC when `NEXT_PUBLIC_USDC_MINT` is set) to the treasury, then `POST /api/hires`
+- [x] Referral code on signup and tier claims (attestor co-signs once enough real signups exist)
+- [ ] **Blocked:** no devnet program, no database, so a paid hire cannot be recorded yet
 
 ### M8 — Cleanup + QA
 - [ ] Remove Foundry/Arbitrum dead tree (or isolate under `contracts/legacy/` with a one-line README)

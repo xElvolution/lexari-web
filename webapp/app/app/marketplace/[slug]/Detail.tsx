@@ -39,8 +39,10 @@ export default function Detail({ slug }: { slug: string }) {
   const col = PALETTE[a.color].fill;
   const similar = SPECIALISTS.filter((x) => x.slug !== a.slug && storeMeta(x).cat === m.cat).concat(SPECIALISTS.filter((x) => x.slug !== a.slug)).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 8);
   const tryJob = (ex: string) => {
-    if (!hired) { const r = hireWithFx(a.slug, face.current, () => router.push("/app/team")); if (r !== "ok") return; }
-    sendTo(a.slug, ex); router.push(`/app?c=${a.slug}`);
+    void (async () => {
+      if (!hired) { const r = await hireWithFx(a.slug, face.current, () => router.push("/app/team")); if (r !== "ok") return; }
+      sendTo(a.slug, ex); router.push(`/app?c=${a.slug}`);
+    })();
   };
   const reviews = [...a.review.map((r, i) => ({ ...r, when: i ? "1 week ago" : "3 days ago" })), ...EXTRA_REVIEWS];
   const stats = [

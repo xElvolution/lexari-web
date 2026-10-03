@@ -230,7 +230,7 @@ export async function publishMemory(opts: {
     { pubkey: memory, isSigner: false, isWritable: true },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
   ]));
-  return { hash: toHex(hash), tx, uri };
+  return { hash: toHex(hash), tx, uri, iv: b64(iv), ct: b64(ct) };
 }
 
 export async function eraseMemory(opts: {
@@ -251,3 +251,129 @@ export async function eraseMemory(opts: {
 }
 
 export const chainLabel = CHAIN_NAME;
+
+const u16 = (n: number) => {
+  const b = new Uint8Array(2);
+  new DataView(b.buffer).setUint16(0, n, true);
+  return b;
+};
+const u64 = (n: number) => {
+  const b = new Uint8Array(8);
+  new DataView(b.buffer).setBigUint64(0, BigInt(n), true);
+  return b;
+};
+
+const HUB_DISC = {
+  init_player: Uint8Array.from([114, 27, 219, 144, 50, 15, 228, 66]),
+  check_in: Uint8Array.from([209, 253, 4, 217, 250, 241, 207, 50]),
+  claim_quest: Uint8Array.from([38, 197, 33, 123, 0, 108, 206, 161]),
+  open_box: Uint8Array.from([225, 220, 10, 104, 173, 151, 214, 199]),
+  level_up: Uint8Array.from([128, 64, 197, 116, 226, 129, 119, 234]),
+  claim_referral_tier: Uint8Array.from([197, 164, 29, 180, 105, 249, 176, 130]),
+};
+
+export function playerPda(owner: PublicKey) {
+  return PublicKey.findProgramAddressSync([utf8("player"), owner.toBuffer()], PROGRAM)[0];
+}
+export function levelPda(agent: PublicKey) {
+  return PublicKey.findProgramAddressSync([utf8("level"), agent.toBuffer()], PROGRAM)[0];
+}
+export function configPda() {
+  return PublicKey.findProgramAddressSync([utf8("config")], PROGRAM)[0];
+}
+
+export async function ensurePlayer(connection: Connection, payer: Payer) {
+  const player = playerPda(payer.publicKey);
+  if (await connection.getAccountInfo(player)) return player;
+  await send(connection, payer, ix(HUB_DISC.init_player, [
+    { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+    { pubkey: player, isSigner: false, isWritable: true },
+    { pubkey: PROGRAM, isSigner: false, isWritable: false },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  ]));
+  return player;
+}
+
+export async function checkInOnchain(connection: Connection, payer: Payer) {
+  const player = await ensurePlayer(connection, payer);
+  return send(connection, payer, ix(HUB_DISC.check_in, [
+    { pubkey: payer.publicKey, isSigner: true, isWritable: false },
+    { pubkey: player, isSigner: false, isWritable: true },
+  ]));
+}
+
+export function readPlayer(data: Uint8Array) {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  return { coins: Number(view.getBigUint64(40, true)), streak: view.getUint16(48, true) };
+}
+
+export async function levelUpOnchain(connection: Connection, payer: Payer, asset: PublicKey, coins: number) {
+  const player = await ensurePlayer(connection, payer);
+  const agent = agentPda(payer.publicKey, asset);
+  const level = levelPda(agent);
+  return send(connection, payer, ix(concat(HUB_DISC.level_up, u64(coins)), [
+    { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+    { pubkey: player, isSigner: false, isWritable: true },
+    { pubkey: agent, isSigner: false, isWritable: false },
+    { pubkey: level, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  ]));
+}
+
+/** Build a co-signed instruction. The attestor pubkey must sign before it is sent. */
+export function questTransaction(payer: PublicKey, attestor: PublicKey, questId: number, period: number, coins: number) {
+  const player = playerPda(payer);
+  const periodBytes = u32(period);
+  const idBytes = u16(questId);
+  const claim = PublicKey.findProgramAddressSync([utf8("quest"), player.toBuffer(), idBytes, periodBytes], PROGRAM)[0];
+  return ix(concat(HUB_DISC.claim_quest, idBytes, periodBytes, u64(coins)), [
+    { pubkey: payer, isSigner: true, isWritable: true },
+    { pubkey: attestor, isSigner: true, isWritable: false },
+    { pubkey: configPda(), isSigner: false, isWritable: false },
+    { pubkey: player, isSigner: false, isWritable: true },
+    { pubkey: claim, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  ]);
+}
+
+export function boxTransaction(payer: PublicKey, attestor: PublicKey, day: number, coins: number) {
+  const player = playerPda(payer);
+  const dayBytes = u32(day);
+  const claim = PublicKey.findProgramAddressSync([utf8("box"), player.toBuffer(), dayBytes], PROGRAM)[0];
+  return ix(concat(HUB_DISC.open_box, dayBytes, u64(coins)), [
+    { pubkey: payer, isSigner: true, isWritable: true },
+    { pubkey: attestor, isSigner: true, isWritable: false },
+    { pubkey: configPda(), isSigner: false, isWritable: false },
+    { pubkey: player, isSigner: false, isWritable: true },
+    { pubkey: claim, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  ]);
+}
+
+export function tierTransaction(payer: PublicKey, attestor: PublicKey, tier: number) {
+  const player = playerPda(payer);
+  const claim = PublicKey.findProgramAddressSync([utf8("ref"), player.toBuffer(), Uint8Array.of(tier)], PROGRAM)[0];
+  return ix(concat(HUB_DISC.claim_referral_tier, Uint8Array.of(tier)), [
+    { pubkey: payer, isSigner: true, isWritable: true },
+    { pubkey: attestor, isSigner: true, isWritable: false },
+    { pubkey: configPda(), isSigner: false, isWritable: false },
+    { pubkey: player, isSigner: false, isWritable: true },
+    { pubkey: claim, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+  ]);
+}
+
+export async function sendCoSigned(connection: Connection, payer: Payer, instruction: TransactionInstruction) {
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+  const tx = new Transaction({ feePayer: payer.publicKey, blockhash, lastValidBlockHeight }).add(instruction);
+  const ownerSigned = await payer.signTransaction(tx);
+  const body = Buffer.from(ownerSigned.serialize({ requireAllSignatures: false, verifySignatures: false })).toString("base64");
+  const res = await fetch("/api/hub/attest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tx: body }) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || typeof data.tx !== "string") throw new Error(typeof data.error === "string" ? data.error : "The server did not co-sign.");
+  const signed = Transaction.from(Buffer.from(data.tx, "base64"));
+  const sig = await connection.sendRawTransaction(signed.serialize());
+  const result = await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  if (result.value.err) throw new Error("The transaction failed on Solana.");
+  return sig;
+}

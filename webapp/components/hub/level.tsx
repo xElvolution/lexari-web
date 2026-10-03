@@ -33,14 +33,15 @@ export default function LevelUp({ s }: { s: State }) {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const train = (amount: number) => {
-    const r = hub.train(agent.id, amount);
-    if (!r.ok) { toast({ text: level >= MAX_LEVEL ? `${agent.name} is already at the top level.` : "Not enough coins. Do a quest first.", face: "home" }); return; }
+    void hub.train(agent.id, amount).then((r) => {
+    if (!r.ok) { toast({ text: r.error || (level >= MAX_LEVEL ? `${agent.name} is already at the top level.` : "Not enough coins. Do a quest first."), face: "home" }); return; }
     const k = Date.now(); setRises((x) => [...x.slice(-3), { k, t: `+${Math.min(amount, coins)} XP` }]);
     setTimeout(() => setRises((x) => x.filter((y) => y.k !== k)), 1200);
     if (stage.current) gsap.fromTo(stage.current, { scale: 0.96 }, { scale: 1, duration: 0.5, ease: "back.out(3)" });
     clearTimeout(timer.current);
     if (r.levelsGained > 0) { setFace("happy"); setParty({ level: r.level, id: agent.id }); }
     else { setFace("thinking"); timer.current = setTimeout(() => setFace("idle"), 900); }
+    });
   };
 
   const R = 112, C = 2 * Math.PI * R;

@@ -10,7 +10,6 @@ import { TIERS, hub, hubOf, inviteCode } from "@/lib/hub";
 import { AgentFace } from "@/components/faces";
 import Icon from "@/components/Icon";
 import { burst } from "@/components/fly";
-import { DemoTag } from "@/components/ui";
 import { Coin, flyCoins } from "./coin";
 
 const SHARE = [
@@ -51,11 +50,12 @@ export default function Referral({ s }: { s: State }) {
     else copy("link");
   };
   const claim = (i: number, el: HTMLElement) => {
-    const r = hub.claimTier(i); if (!r.ok) return;
-    flyCoins(el, r.coins); burst(el, 22);
-    toast({ text: `${TIERS[i].title} · +${r.coins} coins`, face: "home" });
+    void hub.claimTier(i).then((r) => {
+      if (!r.ok) { toast({ text: r.error || "That tier is not ready.", face: "home" }); return; }
+      flyCoins(el, r.coins); burst(el, 22);
+      toast({ text: `${TIERS[i].title} · +${r.coins} coins`, face: "home" });
+    });
   };
-  const simulate = () => { const f = hub.invite(); toast({ text: `${f.name} joined with your code`, face: "home" }); };
 
   // fill along the road: nodes sit at the centres of four equal columns
   const fill = (() => {
@@ -133,7 +133,7 @@ export default function Referral({ s }: { s: State }) {
       <div className="relative border-t border-white/10 p-5 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-[16px] font-bold">{friends.length} {friends.length === 1 ? "friend" : "friends"} joined{nextTier ? ` · ${nextTier.friends - friends.length} more to ${nextTier.title.toLowerCase()}` : " · every milestone reached"}</h3>
-          <span className="flex items-center gap-2"><DemoTag className="!border-white/30 !text-white/70" /><button type="button" onClick={simulate} className="h-9 rounded-full px-3.5 text-[13px] font-bold text-lilac ring-1 ring-lilac/40 transition hover:bg-lilac hover:text-[#0a0a0a]">Simulate a friend joining</button></span>
+          <span className="text-[13px] text-white/60">Friends count when they sign up with your code.</span>
         </div>
         <div className="relative mt-6">
           <div className="absolute left-[12.5%] right-[12.5%] top-[22px] h-1.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#8f6bff] to-grape transition-[width] duration-700 ease-out" style={{ width: `${fill * 100}%` }} /></div>

@@ -3,7 +3,7 @@
 /**
  * Client-side app state, saved in localStorage.
  * The ID card and memory records also write to Solana when a wallet is connected.
- * Chat replies are still sample lines until a model is connected.
+ * Chat replies come from the Engram route. The thread on this device is the live transcript.
  */
 import type { FaceLook } from "@shared/components/avatar";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -35,10 +35,10 @@ export type Prefs = {
 export type Profile = { name: string; username: string; bio: string; since: number };
 export const DEFAULT_PREFS: Prefs = {
   language: "English", voice: "Iris", defaultAgent: "home", memory: true, history: true, improve: false,
-  motion: true, demoLabels: true, instructions: "", twofa: false, signedOut: [],
+  motion: true, demoLabels: false, instructions: "", twofa: false, signedOut: [],
   notif: { replies: true, groups: true, calls: true, wallet: true, cards: true, digest: false, product: false },
 };
-export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number; chainHash?: string; chainAsset?: string; pendingChain?: boolean };
+export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number; chainHash?: string; chainAsset?: string; pendingChain?: boolean; serverId?: string };
 /** look: a seed number (null = the house face) or a face built in the creator */
 export type AgentLook = number | null | FaceLook;
 export type Agent = { name: string; look: AgentLook; you: string; role: string; tone: ToneId };
@@ -189,7 +189,14 @@ function seeded(s: State, agent: Agent, knows: string[]): State {
     wallets: { home: walletFor("home").address }, cards: {}, profile,
     custom: [], meta: {}, born: { home: now, scout: now - 3 * 864e5 - 36e5, quill: now - 2 * 864e5 - 36e5, tally: now - 864e5 - 36e5 }, tour: { on: true, step: 0, done: false } };
 }
-export function finishOnboarding(agent: Agent, knows: string[]) { set((s) => seeded(s, agent, knows)); }
+export function finishOnboarding(agent: Agent, knows: string[]) {
+  set((s) => seeded(s, agent, knows));
+  void fetch("/api/agents", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ slug: "home", name: agent.name, role: agent.role, tone: agent.tone }),
+  }).catch(() => {});
+}
 export function startDemo() {
   set((s) => seeded({ ...s, auth: s.auth ?? { method: "google", label: DEMO_GOOGLE.name, sub: DEMO_GOOGLE.email }, links: { ...s.links, google: true } },
     { name: "Juniper", look: null, you: "Ada", role: "Founder", tone: "short" }, ["Keep summaries to one page", "Always link your sources"]));
@@ -252,6 +259,7 @@ export function leaseAgent(slug: string): "ok" | "full" | "already" | "short" {
 }
 export function forgetNote(id: string) {
   const s = get(); const idx = s.memory.findIndex((m) => m.id === id); const note = s.memory[idx];
+  if (note?.serverId) void fetch(`/api/memories/${note.serverId}`, { method: "DELETE" }).catch(() => {});
   set((x) => ({ ...x, memory: x.memory.filter((m) => m.id !== id) }));
   return () => set((x) => { const mem = [...x.memory]; mem.splice(Math.min(idx, mem.length), 0, note); return { ...x, memory: mem }; });
 }
@@ -331,12 +339,74 @@ function scheduleReplies(convo: string, delay: number) {
   step(0, delay);
 }
 
-/** Send a message (text, an attachment or a voice note) to an agent or a group. Demo replies follow. */
+function setMsg(convo: string, id: string, text: string) {
+  set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((m) => (m.id === id ? { ...m, text } : m)) } }));
+}
+
+/** Ask Engram for a real reply and stream the tokens into the thread. */
+async function replyFromModel(convo: string) {
+  if (queued.has(convo)) return;
+  const st = get();
+  const last = (st.threads[convo] || []).filter((m) => m.from === "you").pop();
+  if (!st.agent || !last || !convoExists(st, convo)) return;
+  queued.add(convo);
+  const speaker = isGroup(convo) ? (groupOf(st, convo)?.members[0] || "home") : convo;
+  const custom = st.custom.find((c) => c.id === speaker);
+  const speakerName = speaker === "home" ? st.agent.name : custom?.name || st.meta[speaker]?.nick || speaker;
+  typingWho.set(convo, speaker); ping();
+  const bubble = push(convo, { from: speaker, text: "" });
+  const history = (st.threads[convo] || []).slice(-13).filter((m) => m.id !== last.id && m.text).map((m) => ({ from: m.from, text: m.text }));
+  const recall = st.memory.slice(0, 8).map((n) => ({ tag: n.tag, text: n.text }));
+  const text = last.text || (last.voice ? `Voice note, ${last.voice} seconds.` : last.file ? `Attachment: ${last.file.name}` : "");
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        convo, text, agentName: st.agent.name, role: st.agent.role, tone: custom?.tone || st.agent.tone,
+        speaker: speakerName, history, recall,
+      }),
+    });
+    if (!res.ok || !res.body) {
+      const data = await res.json().catch(() => ({}));
+      setMsg(convo, bubble, typeof data.error === "string" ? data.error : "The agent could not answer.");
+      return;
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let full = "";
+    while (true) {
+      const step = await reader.read();
+      if (step.done) break;
+      buf += dec.decode(step.value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() || "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        let payload: { token?: string; remember?: string; error?: string } = {};
+        try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
+        if (payload.error) { setMsg(convo, bubble, payload.error); return; }
+        if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{3,180}\s*$/, "").trim()); }
+        if (payload.remember) addNote(payload.remember, "About you", "Chat", true);
+      }
+    }
+    if (!full.trim()) setMsg(convo, bubble, "The agent sent an empty reply.");
+  } catch {
+    setMsg(convo, bubble, "Could not reach the agent.");
+  } finally {
+    typingWho.delete(convo);
+    queued.delete(convo);
+    ping();
+  }
+}
+
+/** Send a message (text, an attachment or a voice note) to an agent or a group. */
 export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voice" | "reply"> = {}) {
   const v = text.trim(); if (!v && !extra.file && !extra.voice) return;
-  const mid = push(id, { from: "you", text: v, ...extra });
-  scheduleReplies(id, 900 + Math.min(1400, v.length * 18));
-  agentReacts(id, mid, v, !!extra.voice);
+  push(id, { from: "you", text: v, ...extra });
+  void replyFromModel(id);
 }
 
 /* ---------- reactions ---------- */
@@ -371,10 +441,10 @@ function agentReacts(convo: string, msgId: string, text: string, voice: boolean)
     if (!(m.re?.[emoji] || []).includes(w)) toggleReaction(convo, msgId, emoji, w);
   }, 650 + i * 900 + Math.random() * 500));
 }
-/** After a reload, answer any message that was still waiting for a reply. */
+/** After a reload, ask Engram to answer any message that is still waiting. */
 export function ensureReplies() {
   const st = get();
-  Object.entries(st.threads).forEach(([id, t]) => { if (t[t.length - 1]?.from === "you" && convoExists(st, id)) scheduleReplies(id, 700); });
+  Object.entries(st.threads).forEach(([id, t]) => { if (t[t.length - 1]?.from === "you" && convoExists(st, id)) void replyFromModel(id); });
 }
 export function logCall(id: string, secs: number) { if (secs > 0) push(id, { from: "system", text: "Voice call", call: secs }); }
 export function setActive(id: string) { if (get().active !== id) set((x) => ({ ...x, active: id })); }

@@ -53,7 +53,7 @@ Devnet deploy is not done. The built program is about 416 KB, so the program acc
 
 ## Backend
 
-Copy `.env.example` to `webapp/.env.local`. Wallet sign-in is `POST /api/auth/nonce`, a wallet signature of that exact message, then `POST /api/auth/verify`, which sets an httpOnly `lexari_session` cookie. Without `DATABASE_URL` and `SESSION_SECRET` those routes return 503 and do not create a session. Google on the sign-in page stays a labeled preview.
+Copy `.env.example` to `webapp/.env.local`. Wallet sign-in is `POST /api/auth/nonce`, a wallet signature of that exact message, then `POST /api/auth/verify`, which sets an httpOnly `lexari_session` cookie. Chat streams from `POST /api/chat`. Hiring an agent pays 0.01 SOL to the treasury. Hub claims are co-signed by the server. Without `DATABASE_URL` and `SESSION_SECRET` those routes return 503 and do not create a session. Google on the sign-in page stays a labeled preview.
 
 ```bash
 npm run db:migrate -w webapp

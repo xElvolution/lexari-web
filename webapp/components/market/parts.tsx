@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { compact, storeMeta, type Specialist } from "@/content/appData";
+import { hirePriceLabel } from "@/lib/prices";
 import { useApp } from "@/lib/store";
 import Icon from "../Icon";
 import { AgentTile } from "../faces";
@@ -18,8 +19,8 @@ export function HireBtn({ a, size = "sm", faceEl }: { a: Specialist; size?: "sm"
   const cls = size === "lg" ? "h-12 px-7 text-[16px]" : "h-8 px-4 text-[13px]";
   if (hired) return <Link href={`/app?c=${a.slug}`} onClick={(e) => e.stopPropagation()} className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint font-bold text-brand-ink transition hover:bg-grape hover:text-white ${cls}`}>Open</Link>;
   return (
-    <button ref={me} onClick={(e) => { e.preventDefault(); e.stopPropagation(); hireWithFx(a.slug, faceEl?.() ?? me.current, () => router.push("/app/team")); }} className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-grape font-bold text-white transition hover:bg-grape-deep ${cls}`}>
-      Hire
+    <button ref={me} onClick={(e) => { e.preventDefault(); e.stopPropagation(); void hireWithFx(a.slug, faceEl?.() ?? me.current, () => router.push("/app/team")); }} className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-grape font-bold text-white transition hover:bg-grape-deep ${cls}`}>
+      Hire · {hirePriceLabel()}
     </button>
   );
 }

@@ -41,6 +41,12 @@ export default function MemoryChain() {
               text: next.text,
             });
             editNote(next.id, { chainHash: pub.hash, chainAsset: card, pendingChain: false });
+            const saved = await fetch("/api/memories", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ agentSlug: "home", tag: next.tag, ciphertext: pub.ct, iv: pub.iv, contentHash: pub.hash, uri: pub.uri }),
+            }).then((r) => r.json()).catch(() => ({}));
+            if (typeof saved.id === "string") editNote(next.id, { serverId: saved.id });
             toast({ text: "Saved on Solana.", face: "home" });
           } catch (e) {
             failed.current.add(keyOf(next.id, next.text));

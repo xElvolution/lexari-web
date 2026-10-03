@@ -32,13 +32,14 @@ export type HubData = {
   ledger: LedgerEntry[]; // newest first, capped
   lifetime: number; // coins ever earned
 };
+export type HubResult = { ok: boolean; coins: number; error?: string };
 export interface HubAdapter {
-  checkIn(now?: number): { ok: boolean; coins: number; day: number };
-  claimQuest(id: QuestId, now?: number): { ok: boolean; coins: number };
-  train(agent: string, coins: number): { ok: boolean; levelsGained: number; level: number };
-  claimTier(i: number): { ok: boolean; coins: number };
-  openBox(now?: number): { ok: boolean; coins: number };
-  invite(friend?: Partial<Invitee>): Invitee;
+  checkIn(now?: number): Promise<HubResult & { day: number }>;
+  claimQuest(id: QuestId, now?: number): Promise<HubResult>;
+  train(agent: string, coins: number): Promise<{ ok: boolean; levelsGained: number; level: number; error?: string }>;
+  claimTier(i: number): Promise<HubResult>;
+  openBox(now?: number): Promise<HubResult>;
+  invite(friend?: Partial<Invitee>): Promise<Invitee>;
 }
 
 /* ---------- constants ---------- */
@@ -87,7 +88,7 @@ const shift = (now: number, days: number) => { const d = new Date(now); d.setDat
 const EMPTY_HUB: HubData = { v: 1, claimed: [], levels: {}, invited: [], tiers: [], boxes: [], ledger: [], lifetime: 0 };
 export function hubOf(s: State): HubData {
   const h = s.hub;
-  if (!h || h.v !== 1) return { ...EMPTY_HUB, invited: seedInvites(s), lifetime: s.bond?.coins || 0 };
+  if (!h || h.v !== 1) return { ...EMPTY_HUB, invited: [], lifetime: s.bond?.coins || 0 };
   return { ...EMPTY_HUB, ...h };
 }
 export const coinsOf = (s: State) => s.bond?.coins || 0;
@@ -174,20 +175,20 @@ function write(fn: (h: HubData, s: State) => { hub: HubData; coins?: number; day
 const credit = (h: HubData, delta: number, reason: string): HubData => ({ ...h, ledger: [{ at: Date.now(), delta, reason }, ...h.ledger].slice(0, 80), lifetime: h.lifetime + Math.max(0, delta) });
 
 export const localHub: HubAdapter = {
-  checkIn(now = Date.now()) {
+  async checkIn(now = Date.now()) {
     const s = get();
     if (checkedInToday(s, now)) return { ok: false, coins: 0, day: streakOf(s, now) };
     const day = streakOf(s, now) + 1; const pay = STREAK_PAY[Math.min(STREAK_PAY.length, day) - 1];
     write((h, st) => ({ hub: credit(h, pay, `Check-in, day ${day}`), coins: coinsOf(st) + pay, days: [...(st.bond?.days || []), todayKey(now)].slice(-420) }));
     return { ok: true, coins: pay, day };
   },
-  claimQuest(id, now = Date.now()) {
+  async claimQuest(id, now = Date.now()) {
     const s = get(); const q = questsView(s, now).find((x) => x.id === id);
     if (!q || !q.done || q.claimed) return { ok: false, coins: 0 };
     write((h, st) => ({ hub: credit({ ...h, claimed: [...h.claimed, `${q.id}@${periodKey(q.period, now)}`].slice(-400) }, q.reward, `Quest: ${q.title}`), coins: coinsOf(st) + q.reward }));
     return { ok: true, coins: q.reward };
   },
-  train(agent, coins) {
+  async train(agent, coins) {
     const s = get(); const have = coinsOf(s); const cur = levelOf(s, agent);
     const spend = Math.min(Math.floor(coins), have);
     if (spend <= 0 || cur.level >= MAX_LEVEL) return { ok: false, levelsGained: 0, level: cur.level };
@@ -202,13 +203,13 @@ export const localHub: HubAdapter = {
     });
     return { ok: true, levelsGained: gained, level };
   },
-  claimTier(i) {
+  async claimTier(i) {
     const s = get(); const h = hubOf(s); const t = TIERS[i];
     if (!t || h.tiers.includes(i) || h.invited.length < t.friends) return { ok: false, coins: 0 };
     write((hh, st) => ({ hub: credit({ ...hh, tiers: [...hh.tiers, i] }, t.reward, `Referral: ${t.title}`), coins: coinsOf(st) + t.reward }));
     return { ok: true, coins: t.reward };
   },
-  openBox(now = Date.now()) {
+  async openBox(now = Date.now()) {
     const s = get(); const key = todayKey(now);
     if (hubOf(s).boxes.includes(key)) return { ok: false, coins: 0 };
     const total = BOX_ODDS.reduce((a, [, w]) => a + w, 0); let r = Math.random() * total; let pay = BOX_ODDS[0][0];
@@ -216,12 +217,19 @@ export const localHub: HubAdapter = {
     write((h, st) => ({ hub: credit({ ...h, boxes: [...h.boxes, key].slice(-60) }, pay, "Mystery box"), coins: coinsOf(st) + pay }));
     return { ok: true, coins: pay };
   },
-  invite(friend) {
+  async invite(friend) {
     const h = hubOf(get()); const i = h.invited.length;
     const f: Invitee = { id: `f-${Date.now().toString(36)}`, name: FRIEND_NAMES[(i + 2) % FRIEND_NAMES.length], seed: 11 + i * 17, color: FRIEND_COLORS[(i * 3 + 1) % FRIEND_COLORS.length], at: Date.now(), demo: true, ...friend };
     write((hh) => ({ hub: { ...hh, invited: [...hh.invited, f] } }));
     return f;
   },
 };
-/** The adapter the UI uses. Replace with a chain-backed one when the program grows coin/level instructions. */
-export const hub: HubAdapter = localHub;
+/** Chain-backed Hub. Buttons fail with a clear error until the program is on devnet and the attestor key is set. */
+export const hub: HubAdapter = {
+  checkIn: (now) => import("./chainHub").then((m) => m.chainHub.checkIn(now)),
+  claimQuest: (id, now) => import("./chainHub").then((m) => m.chainHub.claimQuest(id, now)),
+  train: (agent, coins) => import("./chainHub").then((m) => m.chainHub.train(agent, coins)),
+  claimTier: (i) => import("./chainHub").then((m) => m.chainHub.claimTier(i)),
+  openBox: (now) => import("./chainHub").then((m) => m.chainHub.openBox(now)),
+  invite: (friend) => import("./chainHub").then((m) => m.chainHub.invite(friend)),
+};
