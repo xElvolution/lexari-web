@@ -10,4 +10,4 @@ export function hirePriceLabel() {
   return hireMint() === "USDC" ? "1 USDC" : "0.01 SOL";
 }
 
-export const TREASURY = process.env.NEXT_PUBLIC_LEXARI_TREASURY || "EbYuw4JQyG8iTwcEnhQLqPaTounTBDV5i3ApKuyjZDb";
+export const TREASURY = process.env.NEXT_PUBLIC_LEXARI_TREASURY || "";
