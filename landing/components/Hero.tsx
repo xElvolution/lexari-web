@@ -24,10 +24,7 @@ export default function Hero() {
         </div>
 
         <div className="pt-24 [grid-area:head] lg:pt-28">
-          <p className="flex w-fit items-center gap-2 rounded-2xl bg-tint px-3.5 py-2 sm:rounded-full text-[13px] font-semibold text-ink/90 ring-1 ring-line">
-            <span className="h-2 w-2 rounded-full bg-grape shadow-[0_0_0_4px_rgba(91,43,255,.25)]" />{H.kicker}
-          </p>
-          <h1 className="display mt-6 text-[clamp(3.25rem,6.8vw,6.3rem)]">
+          <h1 className="display text-[clamp(3.25rem,6.8vw,6.3rem)]">
             <span className="block">{H.title[0]}</span>
             <span className="block text-brand-ink">{H.title[1]}</span>
           </h1>

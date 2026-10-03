@@ -31,7 +31,6 @@ export const copy = {
   },
 
   hero: {
-    kicker: "Now hiring · one personalized AI agent, yours to name",
     title: ["Meet your first", "personalized AI agent."],
     subtitle: "And hire more.",
     body:
