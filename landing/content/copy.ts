@@ -46,7 +46,6 @@ export const copy = {
     ],
   },
 
-  marquee: ["Now hiring", "Own computer", "Lasting memory", "Specialists on call", "Seats from 1 to 100", "Sign in with Google or a wallet"],
 
   desk: {
     label: "01 · Its own desk",

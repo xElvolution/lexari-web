@@ -89,8 +89,6 @@ body { font-family: var(--font-sans); color: var(--ink); background: var(--bg); 
 .btn-line { border: 2px solid currentColor; }
 .btn-line:hover { transform: translateY(-3px); }
 
-@keyframes marquee { to { transform: translateX(-50%); } }
-.marquee { animation: marquee 32s linear infinite; }
 @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.08); } }
 .blink { animation: blink 4.2s infinite; transform-origin: center; transform-box: fill-box; }
 @keyframes look { 0%, 12% { transform: translateX(0); } 28%, 44% { transform: translateX(-7px); } 60%, 78% { transform: translateX(7px); } 92%, 100% { transform: translateX(0); } }
@@ -115,7 +113,7 @@ body { font-family: var(--font-sans); color: var(--ink); background: var(--bg); 
 .no-bar { scrollbar-width: none; } .no-bar::-webkit-scrollbar { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .marquee, .blink, .caret::after, .pop, .look { animation: none; }
+  .blink, .caret::after, .pop, .look { animation: none; }
   html { scroll-behavior: auto; }
 }
 

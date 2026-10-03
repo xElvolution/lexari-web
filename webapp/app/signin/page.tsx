@@ -21,6 +21,18 @@ import { SpecFace } from "@/components/faces";
 type Flow = null | { method: "google" } | { method: "wallet"; wallet: WalletId };
 type Phase = "connect" | "sign" | "signing" | "done" | "error";
 
+const PRIVY_ON = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+const isMobile = () => typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const isAndroid = () => typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+/** Opens this page inside the wallet app's own browser, where the wallet can connect. */
+function walletBrowse(id: WalletId) {
+  const here = encodeURIComponent(window.location.href);
+  const ref = encodeURIComponent(window.location.origin);
+  if (id === "phantom") return `https://phantom.app/ul/browse/${here}?ref=${ref}`;
+  if (id === "solflare") return `https://solflare.com/ul/v1/browse/${here}?ref=${ref}`;
+  return `https://backpack.app/ul/v1/browse/${here}?ref=${ref}`;
+}
+
 const DOWNLOAD: Record<WalletId, string> = {
   phantom: "https://phantom.app/download",
   solflare: "https://solflare.com/download",
@@ -80,14 +92,22 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
     };
     (async () => {
       const entry = walletsRef.current.find((w) => w.adapter.name === wanted.name);
-      const adapter = entry?.adapter;
-      if (!adapter) { setErr(`${wanted.name} is not available in this browser.`); setPhase("error"); return; }
-      if (!(await ready(adapter))) {
-        if (cancel) return;
-        setErr(`${wanted.name} is not installed.`);
-        setPhase("error");
-        return;
+      let adapter: SigningAdapter | undefined = entry?.adapter;
+      const injected = adapter ? await ready(adapter) : false;
+      if (cancel) return;
+      if (!injected) {
+        // Phones have no browser extensions. Android: the Mobile Wallet Adapter talks to the installed wallet app.
+        // iPhone (and Android without it): reopen this page inside the wallet app's browser.
+        const mwa = isAndroid() ? walletsRef.current.find((w) => /mobile wallet adapter/i.test(w.adapter.name))?.adapter : undefined;
+        if (mwa && (await ready(mwa))) adapter = mwa;
+        else if (isMobile()) { window.location.href = walletBrowse(wanted.id); return; }
+        else {
+          setErr(adapter ? `${wanted.name} is not installed.` : `${wanted.name} is not available in this browser.`);
+          setPhase("error");
+          return;
+        }
       }
+      if (!adapter) return;
       try {
         if (!adapter.connected) await adapter.connect();
         if (cancel) return;
@@ -205,7 +225,10 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
             <button onClick={sign} disabled={phase === "signing" || !message} className="btn btn-brand mt-4 w-full !h-12 !text-[15px] disabled:opacity-60">{phase === "signing" ? "Waiting for wallet…" : message ? "Sign message" : "Preparing…"}</button>
           </div>
         )}
-        {phase === "error" && flow.method === "wallet" && /not installed|not available/i.test(err) && (
+        {phase === "error" && flow.method === "wallet" && isMobile() && (
+          <a href={walletBrowse(flow.wallet)} className="btn btn-brand mt-5 w-full !h-12 !text-[15px]">Open in the {wallet!.name} app</a>
+        )}
+        {phase === "error" && flow.method === "wallet" && !isMobile() && /not installed|not available/i.test(err) && (
           <a href={DOWNLOAD[flow.wallet]} target="_blank" rel="noreferrer" className="btn btn-brand mt-5 w-full !h-12 !text-[15px]">Get {wallet!.name}</a>
         )}
         <p className="label mt-5 text-[9px] text-ink/55">{flow.method === "google" ? "Preview. Nothing is sent to Google." : "Solana wallet. One signature, no transaction."}</p>
@@ -220,12 +243,16 @@ export default function SignIn() {
   const router = useRouter();
   const { ready, authenticated, user, login } = usePrivy();
   const entered = useRef(false);
+  const [slow, setSlow] = useState(false);
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => { setMobile(isMobile()); if (ready || !PRIVY_ON) return; const t = setTimeout(() => setSlow(true), 12000); return () => clearTimeout(t); }, [ready]);
+  const googleNote = !PRIVY_ON ? "Sign-in by Google or email is not set up here yet. Use a wallet." : ready ? "No wallet needed. A new agent starts empty." : slow ? "Sign-in could not load. Check your connection and reload." : "Loading sign-in…";
   useEffect(() => {
     if (!ready || !authenticated || !user || entered.current) return;
     entered.current = true;
     const email = user.google?.email || user.email?.address || "";
-    const name = user.google?.name || email || "You";
-    signIn("google", undefined, user.id, name);
+    const name = user.google?.name || (email ? email.split("@")[0] : "") || "You";
+    signIn("google", undefined, user.id, user.google?.name || email || name);
     const first = name.split(" ")[0] || "";
     router.push(get().onboarded ? "/app" : `/onboarding${first ? `?name=${encodeURIComponent(first)}` : ""}`);
   }, [ready, authenticated, user, router]);
@@ -268,9 +295,9 @@ export default function SignIn() {
           <h2 data-in className="display text-[40px] sm:text-[52px]">Welcome in.</h2>
           <p data-in className="mt-2 text-[16px] text-ink/75">Pick how you want to sign in. No new password to remember.</p>
 
-          <button data-in disabled={!ready} onClick={() => login({ loginMethods: ["google"] })} className="group mt-8 flex w-full items-center gap-4 rounded-[22px] bg-ink p-2 pr-5 text-left text-[var(--bg)] shadow-[0_6px_0_#5b2bff] transition hover:-translate-y-1 hover:shadow-[0_9px_0_#5b2bff] active:scale-[.98] disabled:opacity-60">
+          <button data-in disabled={!PRIVY_ON || !ready} onClick={() => login()} className="group mt-8 flex w-full items-center gap-4 rounded-[22px] bg-ink p-2 pr-5 text-left text-[var(--bg)] shadow-[0_6px_0_#5b2bff] transition hover:-translate-y-1 hover:shadow-[0_9px_0_#5b2bff] active:scale-[.98] disabled:opacity-60">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--bg)] text-ink"><Icon name="google" size={24} /></span>
-            <span className="flex-1"><span className="block text-[17px] font-bold">Continue with Google</span><span className="block text-[13px] opacity-70">{ready ? "Your Google account. A new agent starts empty." : "Opening Google…"}</span></span>
+            <span className="flex-1"><span className="block text-[17px] font-bold">Continue with Google or email</span><span className="block text-[13px] opacity-70">{googleNote}</span></span>
             <Icon name="arrow" size={20} className="transition group-hover:translate-x-1" />
           </button>
 
@@ -283,7 +310,7 @@ export default function SignIn() {
                   <WalletGlyph id={w.id} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 text-[16px] font-bold text-ink">{w.name}</span>
-                    <span className="block truncate text-[13px] text-ink/70">{w.note}</span>
+                    <span className="block truncate text-[13px] text-ink/70">{mobile ? `Opens in the ${w.name} app.` : w.note}</span>
                   </span>
                   <Icon name="arrow" size={18} className="text-ink/60 transition group-hover:translate-x-1 group-hover:text-brand-ink" />
                 </button>

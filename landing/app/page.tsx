@@ -1,6 +1,5 @@
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
-import Marquee from "@/components/Marquee";
 import Desk from "@/components/Desk";
 import Memory from "@/components/Memory";
 import Roster from "@/components/Roster";
@@ -15,7 +14,6 @@ export default function Home() {
     <main className="overflow-x-clip">
       <Header />
       <Hero />
-      <Marquee />
       <Desk />
       <Memory />
       <Roster />
