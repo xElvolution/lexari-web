@@ -2,20 +2,21 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import type React from "react";
 import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
-import { hubReady, isCreated, isLocked, primaryOf, refreshHub, toast, type State } from "@/lib/store";
+import { isCreated, isLocked, primaryOf, refreshHub, toast, type State } from "@/lib/store";
 import {
-  MAX_LEVEL, STREAK_PAY, TIERS, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, inviteCode, levelOf, nextReset,
+  MAX_LEVEL, PERKS, STREAK_PAY, TIERS, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, inviteCode, levelOf, nextReset,
   questsView, streakOf, useHubBusy, weekStart, xpFor, type Period, type QuestView,
 } from "@/lib/hub";
 import { WEBAPP_URL } from "@shared/sites";
 import Icon from "@/components/Icon";
-import { AgentTile } from "@/components/faces";
+import { AgentTile, WhoFace } from "@/components/faces";
 import { myAgents } from "@/components/agents";
 import { openAgent, openUpgrade } from "@/components/overlays";
 import { Coin, flyCoins } from "./coin";
 import BoxModal from "./BoxModal";
-import { LevelParty } from "./level";
+
 
 /* Native phone layout for the Hub (≤430px). Same actions as the desktop Hub, compact rows and cards. */
 
@@ -31,7 +32,7 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
   const week = earnedSince(s, weekStart(now));
   const [train, setTrain] = useState(false);
   const hide = useHideBalance();
-  if (!s.live && !hubReady()) return <HubLoading />;
+  if (!s.live) return <HubLoading />; // never a fake 0 while the onchain state loads
   return (
     <div id="top" className="space-y-3 pb-2">
       <header className="flex items-end justify-between gap-3 pt-1">
@@ -99,28 +100,25 @@ function CheckInRow({ s, now }: { s: State; now: number }) {
 function BoxCard({ s, now }: { s: State; now: number }) {
   const h = hubOf(s);
   const opened = h.boxes.length > 0;
-  const won = opened ? h.ledger.find((e) => e.reason === "Mystery box")?.delta ?? 0 : 0;
+  const won = opened ? s.live?.box.coins ?? h.ledger.find((e) => e.reason === "Mystery box")?.delta ?? 0 : 0;
   const busy = useHubBusy();
-  const [shake] = useState(false);
-  const [modal, setModal] = useState<"" | "real" | "preview">("");
+  const [modal, setModal] = useState(false);
   const el = useRef<HTMLButtonElement>(null);
-  const open = () => setModal("real");
   const run = async () => {
-    if (modal === "preview") { const c = won || 60; return { ok: true, coins: c }; }
     const r = await hub.openBox(now || Date.now());
     if (r.ok) { flyCoins(el.current, r.coins); }
     return r;
   };
   return (
-    <section id="box" className="flex scroll-mt-20 flex-col rounded-[18px] bg-[#0a0a0a] p-3.5 text-white ring-1 ring-white/10">
-      <span className={`text-[26px] leading-none ${shake ? "hub-wobble-fast" : opened ? "" : "hub-wobble"}`} aria-hidden>🎁</span>
+    <section id="box" data-box-opened={opened ? "" : undefined} className="flex scroll-mt-20 flex-col rounded-[18px] bg-[#0a0a0a] p-3.5 text-white ring-1 ring-white/10">
+      <span className={`text-[26px] leading-none ${opened ? "opacity-70" : "hub-wobble"}`} aria-hidden>🎁</span>
       <div className="mt-2 text-[15px] font-bold">Mystery box</div>
-      <div className="text-[12px] leading-snug text-white/60">{opened ? `Won ${won || "?"} · next in ${countdown(nextReset("daily", now) - now)}` : "15 to 250 coins, once a day"}</div>
+      <div className="text-[12px] leading-snug text-white/60">{opened ? `Opened today${won ? ` · won ${won}` : ""}` : "15 to 250 coins, once a day"}</div>
       <div className="mt-auto pt-3">
-        {opened ? <button type="button" data-box-replay onClick={() => setModal("preview")} className={`${pill} w-full bg-white/10 text-white/80`}>Opened · replay</button>
-          : <button ref={el} type="button" data-box-card-open onClick={open} disabled={!!busy} className={`${pill} w-full bg-white text-[#0a0a0a]`}>{busy === "box" ? "Opening…" : "Open"}</button>}
+        {opened ? <span data-box-next className={`${pill} w-full bg-white/10 tabular-nums text-white/75`}>Next in {countdown(nextReset("daily", now) - now)}</span>
+          : <button ref={el} type="button" data-box-card-open onClick={() => setModal(true)} disabled={!!busy} className={`${pill} w-full bg-white text-[#0a0a0a]`}>{busy === "box" ? "Opening…" : "Open"}</button>}
       </div>
-      <BoxModal open={!!modal} preview={modal === "preview"} onOpen={run} onClose={() => setModal("")} />
+      <BoxModal open={modal} onOpen={run} onClose={() => setModal(false)} />
     </section>
   );
 }
@@ -186,66 +184,89 @@ function QuestItem({ q }: { q: QuestView }) {
   );
 }
 
-/** Level up pop-up: the agent, its level, what the next level costs, and one button (Level up / Not enough coins / Upgrade plan). */
+const BURST = ["#ffd84d", "#c9b8ff", "#ffffff", "#8f6bff", "#ff9ec7", "#7ef0c4"];
+/** Double chevron: the level-up symbol. */
+const LevelUpMark = ({ size = 18 }: { size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 13l6-6 6 6" /><path d="M6 19l6-6 6 6" /></svg>;
+
+/**
+ * Level up pop-up: a hero card with the agent's face big in the middle. It floats while it waits, bounces and smiles
+ * wider while the level-up signs and confirms, then pops with a burst when the new level lands. Cost, your coins and
+ * one button (Level up / Not enough coins / Upgrade plan / Mint ID card) underneath.
+ */
 function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
   // Only agents you made level up (hired specialists never do); your primary agent comes first.
   const primary = primaryOf(s);
   const team = myAgents(s).filter((a) => isCreated(s, a.id)).sort((a, b) => (a.id === primary ? -1 : b.id === primary ? 1 : 0));
   const [pick, setPick] = useState(primary);
-  const [party, setParty] = useState<{ id: string; level: number } | null>(null);
+  const [won, setWon] = useState<{ level: number; n: number } | null>(null);
   const agent = team.find((a) => a.id === pick) ?? team[0];
   const coins = coinsOf(s);
   const busy = useHubBusy();
   const close = useRef(onClose); close.current = onClose;
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, []);
+  useEffect(() => { setWon(null); }, [pick]);
   if (!agent) return null;
   const { level, xp } = levelOf(s, agent.id);
   const max = level >= MAX_LEVEL;
   const need = max ? 0 : xpFor(level);
-  const pct = max ? 100 : Math.round((xp / need) * 100);
+  const leveling = busy === "train";
+  const pct = max ? 100 : leveling ? 100 : Math.round((xp / need) * 100);
   const cost = Math.max(0, need - xp);
   const minted = !!(s.live?.levels.find((l) => l.slug === agent.id)?.asset || s.meta[agent.id]?.nft?.tokenId);
   const locked = isLocked(s, agent.id);
   const short = coins < cost;
+  const perk = won ? PERKS.find((p) => p.level === won.level) : undefined;
   const up = () => void hub.train(agent.id, cost).then((r) => {
     if (!r.ok) { toast({ text: r.error || "Could not level up.", face: "home" }); return; }
-    if (r.levelsGained > 0) setParty({ id: agent.id, level: r.level });
+    navigator.vibrate?.([20, 40, 30]);
+    if (r.levelsGained > 0) setWon((w) => ({ level: r.level, n: (w?.n ?? 0) + 1 }));
     else toast({ text: `${agent.name} +${cost} XP`, face: "home" });
   });
+  const face = leveling || won ? "happy" : "idle";
   return (
-    <div data-train-sheet-bg className="fixed inset-0 z-[85] flex items-end justify-center bg-black/60 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-label="Level up" data-train-sheet className="pop pb-safe-dlg w-full max-w-[460px] rounded-t-[26px] bg-card p-5 ring-1 ring-line">
+    <div data-train-sheet-bg className="fixed inset-0 z-[85] flex items-end justify-center bg-black/65 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label="Level up" data-train-sheet className="pop pb-safe-dlg w-full max-w-[460px] rounded-t-[28px] bg-card p-4 ring-1 ring-line">
         <div className="flex items-center justify-between"><h2 className="text-[1.125rem] font-bold text-ink">Level up</h2><button onClick={onClose} aria-label="Close" className="grid h-9 w-9 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={18} /></button></div>
         {team.length > 1 && (
-          <div className="no-bar -mx-5 mt-2 flex gap-2 overflow-x-auto px-5" role="radiogroup" aria-label="Agent to level up">
-            {team.map((a) => <button key={a.id} role="radio" aria-checked={a.id === agent.id} onClick={() => setPick(a.id)} className={`flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-[13px] font-bold transition ${a.id === agent.id ? "bg-grape text-white" : "bg-tint text-ink/75"}`}><AgentTile id={a.id} look={a.id === "home" ? s.agent?.look : undefined} size={26} status={false} />{a.name}</button>)}
+          <div className="no-bar -mx-4 mt-1 flex gap-2 overflow-x-auto px-4" role="radiogroup" aria-label="Agent to level up">
+            {team.map((a) => <button key={a.id} role="radio" aria-checked={a.id === agent.id} onClick={() => setPick(a.id)} className={`flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-[13px] font-bold transition ${a.id === agent.id ? "bg-grape text-white" : "bg-tint text-ink/75"}`}><AgentTile id={a.id} look={a.id === "home" ? s.agent?.look : undefined} size={26} status={false} ring={false} />{a.name}</button>)}
           </div>
         )}
-        <div className="mt-4 flex items-center gap-3">
-          <AgentTile id={agent.id} look={agent.id === "home" ? s.agent?.look : undefined} size={56} status={false} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[16px] font-bold text-ink">{agent.name}</div>
-            <div className="text-[13px] font-semibold text-brand-ink">Level {level}{max ? " · max" : ""}</div>
-            <div className="mt-1.5 flex items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-tint"><span className="block h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></span><span className="text-[11px] tabular-nums text-ink/50">{max ? "max" : `${xp}/${need} XP`}</span></div>
+        <div data-level-hero className="relative mt-3 overflow-hidden rounded-[24px] bg-[radial-gradient(120%_90%_at_50%_30%,#6a3dff_0%,#3514b0_55%,#12062e_100%)] px-4 pb-4 pt-3 text-center text-white">
+          <span className={`hub-rays pointer-events-none absolute left-1/2 top-[52%] h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 ${leveling || won ? "opacity-100" : "opacity-40"}`} style={{ background: "repeating-conic-gradient(from 0deg, rgba(255,255,255,.14) 0deg 9deg, transparent 9deg 22deg)", maskImage: "radial-gradient(circle, #000 12%, transparent 52%)", WebkitMaskImage: "radial-gradient(circle, #000 12%, transparent 52%)" }} />
+          <div className="relative flex items-center justify-center gap-2">
+            <span className={`grid h-8 w-8 place-items-center rounded-full bg-[#ffd84d] text-[#3514b0] shadow-[0_0_18px_rgba(255,216,77,.7)] ${leveling || won ? "lv-arrow" : ""}`}><LevelUpMark /></span>
+            <span key={`lv-${level}-${won?.n ?? 0}`} data-level-num className={`display text-[40px] leading-none tabular-nums ${won ? "lv-pop" : ""}`}>Level {level}</span>
+          </div>
+          <div className="relative mx-auto mt-3 grid h-[168px] w-[168px] place-items-center">
+            {won && <span key={`burst-${won.n}`} className="lv-burst pointer-events-none absolute inset-0" aria-hidden>{Array.from({ length: 18 }, (_, i) => <i key={i} style={{ background: BURST[i % BURST.length], ["--a" as string]: `${i * 20}deg`, ["--d" as string]: `${88 + (i % 3) * 18}px` } as React.CSSProperties} />)}</span>}
+            <span key={`face-${won?.n ?? 0}`} data-level-face={face} className={`grid h-[156px] w-[156px] place-items-center rounded-full bg-[#0a0a0a] ring-4 ${won ? "lv-pop ring-[#ffd84d]" : "ring-white/25"} ${leveling ? "lv-bounce" : won ? "" : "lv-float"}`}>
+              <WhoFace who={agent.id} look={agent.id === "home" ? s.agent?.look : null} size={128} animated state={face} />
+            </span>
+          </div>
+          <p className="relative mt-1 text-[16px] font-bold">{won ? `${agent.name} reached level ${won.level}!` : leveling ? `${agent.name} is levelling up…` : agent.name}</p>
+          {won && perk && <p data-level-perk className="relative mt-0.5 text-[12.5px] text-white/80">Perk unlocked: <b className="text-white">{perk.title}</b> · {perk.body}</p>}
+          <div className="relative mt-3 flex items-center gap-2">
+            <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/15"><span data-level-xp className="block h-full rounded-full bg-[linear-gradient(90deg,#ffd84d,#ffffff)] transition-[width] duration-[1200ms] ease-out" style={{ width: `${pct}%` }} /></span>
+            <span className="text-[11.5px] font-semibold tabular-nums text-white/75">{max ? "max" : `${xp}/${need} XP`}</span>
           </div>
         </div>
         {!max && (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-[14px] bg-tint px-3 py-2.5"><div className="label text-[8.5px] text-ink/50">Cost to level {level + 1}</div><div data-train-cost className="mt-0.5 flex items-center gap-1 text-[16px] font-bold tabular-nums text-ink"><Coin size={15} />{cost} coins</div></div>
-            <div className="rounded-[14px] bg-tint px-3 py-2.5"><div className="label text-[8.5px] text-ink/50">You have</div><div className="mt-0.5 flex items-center gap-1 text-[16px] font-bold tabular-nums text-ink"><Coin size={15} />{coins.toLocaleString("en-US")}</div></div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-[14px] bg-tint px-3 py-2"><div className="label text-[8.5px] text-ink/50">Cost to level {level + 1}</div><div data-train-cost className="mt-0.5 flex items-center gap-1 text-[16px] font-bold tabular-nums text-ink"><Coin size={15} />{cost} coins</div></div>
+            <div className="rounded-[14px] bg-tint px-3 py-2"><div className="label text-[8.5px] text-ink/50">You have</div><div className="mt-0.5 flex items-center gap-1 text-[16px] font-bold tabular-nums text-ink"><Coin size={15} />{coins.toLocaleString("en-US")}</div></div>
           </div>
         )}
-        <div className="mt-4">
+        <div className="mt-3">
           {max ? <button disabled className="btn btn-line btn-sm w-full text-ink">Max level</button>
             : locked ? <button data-train-upgrade onClick={() => { onClose(); openUpgrade("full"); }} className="btn btn-brand btn-sm w-full">Upgrade plan</button>
             : !minted ? <button onClick={() => { onClose(); openAgent(agent.id); }} className="btn btn-brand btn-sm w-full">Mint ID card to level up</button>
             : short ? <button data-train-short disabled className="btn btn-line btn-sm w-full text-ink/60">Not enough coins</button>
-            : <button data-train-go onClick={up} disabled={!!busy} className="btn btn-brand btn-sm w-full disabled:opacity-60">{busy === "train" ? "Levelling up…" : <>Level up · <Coin size={14} />{cost}</>}</button>}
+            : <button data-train-go onClick={up} disabled={!!busy} className="btn btn-brand btn-sm w-full disabled:opacity-60">{leveling ? "Levelling up…" : <><LevelUpMark size={15} />Level up · <Coin size={14} />{cost}</>}</button>}
           {!max && !locked && minted && short && <p className="mt-2 text-center text-[12.5px] text-ink/55">{cost - coins} more coins needed. <a href="#quests" onClick={onClose} className="font-bold text-brand-ink">Do a quest</a></p>}
           {locked && <p className="mt-2 text-center text-[12.5px] text-ink/55">{agent.name} is past your plan&apos;s seats.</p>}
         </div>
       </div>
-      {party && <LevelParty key={`${party.id}-${party.level}`} s={s} id={party.id} level={party.level} name={team.find((a) => a.id === party.id)?.name ?? "Agent"} onClose={() => setParty(null)} />}
     </div>
   );
 }
@@ -280,8 +301,9 @@ function InviteRow({ s }: { s: State }) {
 }
 
 /** Shown for the few seconds before the onchain Hub state arrives, so nobody sees a fake 0 balance or taps Check in twice. */
-function HubLoading() {
-  useEffect(() => { void refreshHub(); }, []);
+export function HubLoading() {
+  // keep trying until the onchain state arrives (a failed first load used to leave a 0 balance on screen)
+  useEffect(() => { void refreshHub(); const t = setInterval(() => void refreshHub(), 4000); return () => clearInterval(t); }, []);
   return (
     <div className="space-y-3 pb-2" aria-busy="true">
       <header className="pt-1"><p className="label text-[9.5px] text-brand-ink">Hub</p><h1 className="mt-1 text-[1.375rem] font-extrabold leading-none tracking-tight text-ink">Earn and level up</h1></header>
