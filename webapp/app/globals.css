@@ -82,13 +82,18 @@ html[data-motion="off"] :is(.hub-flame, .hub-flame-core, .hub-orbit, .hub-orbit 
 [data-tile-perk="legend"] { animation: tileGold 3.2s ease-in-out infinite; }
 @keyframes tileGlow { 0%, 100% { filter: drop-shadow(0 0 3px rgba(139, 92, 246, .55)); } 50% { filter: drop-shadow(0 0 7px rgba(168, 120, 255, .85)); } }
 @keyframes tileGold { 0%, 100% { filter: drop-shadow(0 0 3px rgba(233, 183, 58, .6)); } 50% { filter: drop-shadow(0 0 8px rgba(247, 215, 116, .9)); } }
+/* the same glow on a Team floor seat (box-shadow: the seat's own pop animation stays untouched) */
+[data-seat-perk="glow"] { animation: seatGlow 3.2s ease-in-out infinite; }
+[data-seat-perk="legend"] { animation: seatGold 3.2s ease-in-out infinite; }
+@keyframes seatGlow { 0%, 100% { box-shadow: 0 0 12px 1px rgba(139, 92, 246, .5); } 50% { box-shadow: 0 0 22px 5px rgba(168, 120, 255, .85); } }
+@keyframes seatGold { 0%, 100% { box-shadow: 0 0 12px 1px rgba(233, 183, 58, .55); } 50% { box-shadow: 0 0 24px 6px rgba(247, 215, 116, .9); } }
 /* Lv7 Holo card: a moving rainbow foil over the face panel */
 .holo-sheen {
   background: linear-gradient(115deg, transparent 20%, rgba(255, 0, 170, .28) 32%, rgba(0, 220, 255, .3) 44%, rgba(120, 255, 120, .26) 56%, rgba(255, 230, 0, .26) 66%, transparent 80%);
   background-size: 260% 260%; mix-blend-mode: screen; animation: holoMove 4.5s linear infinite;
 }
 @keyframes holoMove { 0% { background-position: 100% 0%; } 100% { background-position: -160% 100%; } }
-@media (prefers-reduced-motion: reduce) { [data-card-perk], [data-tile-perk], .holo-sheen { animation: none; } }
+@media (prefers-reduced-motion: reduce) { [data-card-perk], [data-tile-perk], [data-seat-perk], .holo-sheen { animation: none; } [data-seat-perk="glow"] { box-shadow: 0 0 16px 3px rgba(139, 92, 246, .6); } [data-seat-perk="legend"] { box-shadow: 0 0 16px 3px rgba(233, 183, 58, .65); } }
 
 /* Phone nav stability: a card that pops (scales past its box) during a page change must never widen the page.
    If it does, mobile browsers zoom the layout out for a moment and the fixed bottom nav jumps. clip keeps sticky headers working. */

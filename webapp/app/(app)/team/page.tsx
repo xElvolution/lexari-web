@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { specialistBySlug } from "@/content/appData";
 import { hirePriceLabel } from "@/lib/prices";
-import { agentName, isCreated, isLocked, primaryOf, planOf, release, seatsUsed, toast, useApp } from "@/lib/store";
+import { agentLevelOf, agentName, isCreated, isLocked, primaryOf, planOf, release, seatsUsed, toast, useApp } from "@/lib/store";
 import { PlanSummary } from "@/components/Plans";
 import Icon from "@/components/Icon";
 import { AgentFace, RingLegend, SpecFace } from "@/components/faces";
@@ -51,8 +51,11 @@ export default function TeamPage() {
       const locked = isLocked(s, a.id);
       const cls = `pop relative grid aspect-square place-items-center rounded-[22%] bg-tint ring-2 transition hover:-translate-y-0.5 ${RING[k]} ${k === "primary" ? "primary-ring [--r:22%]" : ""} ${pick === a.id ? "outline outline-2 outline-offset-2 outline-grape" : ""}`;
       const face = a.id === "home" ? <AgentFace look={s.agent?.look} size={120} track={big} className={`!h-[72%] !w-[72%] ${locked ? "opacity-40 grayscale" : ""}`} /> : <SpecFace slug={a.id} size={90} className={`!h-[72%] !w-[72%] ${locked ? "opacity-40 grayscale" : ""}`} />;
+      // Level perks on the seat: a glow from level 4 (Card glow), gold from level 10 (Legend)
+      const lv = k === "hired" ? 1 : agentLevelOf(s, a.id);
+      const glow = lv >= 10 ? "legend" : lv >= 4 ? "glow" : undefined;
       if (locked) return <button key={i} data-agent-locked={a.id} onClick={() => openUpgrade("plans")} className={`${cls} opacity-80`} style={style} title={`${a.name} · locked on ${plan.name}`} aria-label={`${a.name} is locked on your plan. Upgrade to unlock.`}>{face}<span className="absolute inset-0 grid place-items-center"><span className="grid h-7 w-7 place-items-center rounded-full bg-ink text-[var(--bg)]"><Icon name="lock" size={13} /></span></span>{num}</button>;
-      return <button key={i} {...menu.bind(a.id)} data-seat={a.id} data-ring={k} data-primary={k === "primary" ? "" : undefined} onClick={() => setPick(pick === a.id ? null : a.id)} className={cls} style={style} title={`${a.name} · seat ${i + 1}`} aria-label={`${a.name}, seat ${i + 1}${k === "primary" ? ", primary" : k === "made" ? ", made by you" : ", hired"}`}>{face}{num}</button>;
+      return <button key={i} {...menu.bind(a.id)} data-seat={a.id} data-ring={k} data-primary={k === "primary" ? "" : undefined} onClick={() => setPick(pick === a.id ? null : a.id)} className={cls} style={style} title={`${a.name} · seat ${i + 1}`} aria-label={`${a.name}, seat ${i + 1}${k === "primary" ? ", primary" : k === "made" ? ", made by you" : ", hired"}`}>{glow && <span aria-hidden data-seat-perk={glow} className="pointer-events-none absolute inset-0 rounded-[22%]" />}{face}{num}</button>;
     }
     if (i >= unlocked) return <button key={i} data-seat-locked onClick={() => openUpgrade(plan.id === "free" ? "add" : "full")} className="pop relative grid aspect-square place-items-center rounded-[22%] bg-ink/[.06] text-ink/35 transition hover:bg-tint hover:text-brand-ink" style={style} aria-label={`Seat ${i + 1} is locked. Upgrade for more seats.`} title="Locked · upgrade for more seats"><Icon name="lock" size={big ? 18 : 13} />{num}</button>;
     return <button key={i} data-seat-open onClick={() => openAdd()} className="pop relative grid aspect-square place-items-center rounded-[22%] border-2 border-dashed border-ink/25 bg-base/60 transition hover:border-grape hover:bg-tint" style={style} aria-label={`Open seat ${i + 1}. Add an agent.`}>{big && <Icon name="plus" size={18} className="text-ink/40" />}{num}</button>;
