@@ -28,14 +28,11 @@ export default function Hub() {
   if (!s.live) return <div className="mx-auto max-w-[520px] pt-6"><HubLoading /></div>;
   const ready = questsView(s, now).filter((q) => q.done && !q.claimed).length + TIERS.filter((t, i) => h.invited.length >= t.friends && !h.tiers.includes(i)).length;
   return (
-    <div id="top" className="scroll-mt-24">
+    <div id="top" className="scroll-mt-24" onClickCapture={(e) => { if ((e.target as HTMLElement).closest?.("a[href='#store']")) { e.preventDefault(); setStore(true); } }}>
       <PageHead kicker="Hub" title="Earn. Level up." body="Quests and check-ins pay coins. Spend them to train your agents and unlock perks."
         right={<div className="flex items-center gap-2"><nav aria-label="Hub sections" className="no-bar flex gap-1.5 overflow-x-auto">{JUMP.map(([href, l]) => <a key={href} href={href} className="chip shrink-0">{l}</a>)}</nav><StoreButton onOpen={() => setStore(true)} /></div>} />
       {store && <StoreSheet s={s} onClose={() => setStore(false)} />}
       <div className="mt-7 space-y-5">
-        {s.live && !s.live.program.live && (
-          <p role="status" className="rounded-[22px] bg-tint px-5 py-4 text-[14.5px] font-semibold text-ink/80 ring-1 ring-line">Rewards open soon. The Lexari program is not live on Solana yet, so check-ins, quests and level-ups can&apos;t be signed today. Your progress still counts.</p>
-        )}
         <Hero s={s} now={now} ready={ready} />
         <div className="grid gap-5 lg:grid-cols-[1.25fr_1fr]">
           <CheckIn s={s} now={now} />

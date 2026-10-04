@@ -4,7 +4,7 @@
  */
 import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
-import { agents, chainLedger, hires, jobs, memories, questEvents, referrals } from "../db/schema";
+import { agents, chainLedger, hires, hubPlayers, jobs, memories, questEvents, referrals } from "../db/schema";
 import type { QuestRule } from "./catalog";
 
 export function periodStart(period: QuestRule["period"], now = new Date()) {
@@ -60,6 +60,13 @@ export async function questProgress(userId: string, rule: QuestRule, facts: Fact
       return n(await database.select({ n: sql<number>`count(*)::int` }).from(agents).where(and(eq(agents.userId, userId), inArray(agents.kind, ["home", "custom", "hired"]))));
     case "referral":
       return qualifiedReferrals(userId);
+    case "store_buy": // Store purchases (offchain ledger rows), this week or ever
+      return n(await ledger("store_buy"));
+    case "store_style": { // wearing a chat background and a bubble style right now: one point each
+      const [p] = await database.select({ c: hubPlayers.cosmetics }).from(hubPlayers).where(eq(hubPlayers.userId, userId)).limit(1);
+      const c = (p?.c || {}) as { bg?: string | null; bubble?: string | null };
+      return (c.bg ? 1 : 0) + (c.bubble ? 1 : 0);
+    }
     case "agent":
       return n(await database.select({ n: sql<number>`count(*)::int` }).from(agents).where(eq(agents.userId, userId)));
   }

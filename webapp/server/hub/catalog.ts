@@ -6,7 +6,7 @@ export type QuestRule = {
   goal: number;
   reward: number;
   /** quest_events.kind, or a table count described in attest.ts */
-  count: "message" | "memory" | "checkin" | "hire" | "level" | "agent" | "box" | "referral" | "team" | "job";
+  count: "message" | "memory" | "checkin" | "hire" | "level" | "agent" | "box" | "referral" | "team" | "job" | "store_buy" | "store_style";
 };
 
 export const QUEST_RULES: QuestRule[] = [
@@ -18,12 +18,15 @@ export const QUEST_RULES: QuestRule[] = [
   { id: "w-chat", chainId: 102, period: "weekly", goal: 25, reward: 150, count: "message" },
   { id: "w-jobs", chainId: 103, period: "weekly", goal: 3, reward: 180, count: "job" },
   { id: "w-level", chainId: 104, period: "weekly", goal: 2, reward: 100, count: "level" },
+  { id: "w-store", chainId: 105, period: "weekly", goal: 1, reward: 60, count: "store_buy" },
   { id: "h-streak", chainId: 201, period: "hard", goal: 14, reward: 750, count: "checkin" },
   { id: "h-level", chainId: 202, period: "hard", goal: 5, reward: 600, count: "level" },
   { id: "h-memory", chainId: 203, period: "hard", goal: 30, reward: 500, count: "memory" },
   { id: "h-team", chainId: 204, period: "hard", goal: 5, reward: 900, count: "team" },
   { id: "h-invite", chainId: 205, period: "hard", goal: 5, reward: 800, count: "referral" },
   { id: "h-hire", chainId: 206, period: "hard", goal: 1, reward: 300, count: "hire" },
+  { id: "h-store", chainId: 207, period: "hard", goal: 3, reward: 250, count: "store_buy" },
+  { id: "h-style", chainId: 208, period: "hard", goal: 2, reward: 200, count: "store_style" },
 ];
 
 export const TIER_FRIENDS = [1, 3, 5, 10];

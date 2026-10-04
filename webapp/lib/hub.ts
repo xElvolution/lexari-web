@@ -118,12 +118,15 @@ export const QUESTS: Quest[] = [
   { id: "w-chat", chainId: 102, period: "weekly", title: "Chatterbox", hint: "Send 25 messages this week", goal: 25, reward: 150, icon: "chat", go: "/agents", progress: (s) => live(s, "w-chat")?.progress ?? 0 },
   { id: "w-jobs", chainId: 103, period: "weekly", title: "Delegator", hint: "Finish 3 jobs this week", goal: 3, reward: 180, icon: "jobs", go: "/agents", progress: (s) => live(s, "w-jobs")?.progress ?? 0 },
   { id: "w-level", chainId: 104, period: "weekly", title: "Coach", hint: "Level up any agent twice", goal: 2, reward: 100, icon: "spark", go: "#level", progress: (s) => live(s, "w-level")?.progress ?? 0 },
+  { id: "w-store", chainId: 105, period: "weekly", title: "Window shopper", hint: "Buy something in the Store", goal: 1, reward: 60, icon: "box", go: "#store", progress: (s) => live(s, "w-store")?.progress ?? 0 },
   { id: "h-streak", chainId: 201, period: "hard", title: "Iron streak", hint: "Check in 14 days in a row", goal: 14, reward: 750, icon: "star", go: "#checkin", progress: (s) => live(s, "h-streak")?.progress ?? 0 },
   { id: "h-level", chainId: 202, period: "hard", title: "Prodigy", hint: "Raise an agent to level 5", goal: 5, reward: 600, icon: "spark", go: "#level", progress: (s) => live(s, "h-level")?.progress ?? 0 },
   { id: "h-memory", chainId: 203, period: "hard", title: "Elephant", hint: "Keep 30 memories in the brain", goal: 30, reward: 500, icon: "memory", go: "/brain", progress: (s) => live(s, "h-memory")?.progress ?? 0 },
   { id: "h-team", chainId: 204, period: "hard", title: "Full house", hint: "Have 5 agents on your team", goal: 5, reward: 900, icon: "team", go: "/marketplace", progress: (s) => live(s, "h-team")?.progress ?? 0 },
   { id: "h-invite", chainId: 205, period: "hard", title: "Recruiter", hint: "Invite 5 friends", goal: 5, reward: 800, icon: "users", go: "#invite", progress: (s) => live(s, "h-invite")?.progress ?? 0 },
   { id: "h-hire", chainId: 206, period: "hard", title: "Talent scout", hint: "Hire a specialist from the market", goal: 1, reward: 300, icon: "market", go: "/marketplace", progress: (s) => live(s, "h-hire")?.progress ?? 0 },
+  { id: "h-store", chainId: 207, period: "hard", title: "Collector", hint: "Buy 3 Store items", goal: 3, reward: 250, icon: "box", go: "#store", progress: (s) => live(s, "h-store")?.progress ?? 0 },
+  { id: "h-style", chainId: 208, period: "hard", title: "Stylist", hint: "Apply a chat background and a bubble style", goal: 2, reward: 200, icon: "spark", go: "#store", progress: (s) => live(s, "h-style")?.progress ?? 0 },
 ];
 export type QuestView = Quest & { have: number; done: boolean; claimed: boolean; resetsAt: number };
 export function questsView(s: State, now: number): QuestView[] {

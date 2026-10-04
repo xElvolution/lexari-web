@@ -20,6 +20,7 @@ import { openAgent, openUpgrade } from "@/components/overlays";
 import { Coin, Rise, flyCoins } from "./coin";
 import BoxModal from "./BoxModal";
 import { StoreButton, StoreSheet } from "./store";
+import { useFirstN } from "./useFirst";
 
 
 /* Native phone layout for the Hub (≤430px). Same actions as the desktop Hub, compact rows and cards. */
@@ -30,7 +31,7 @@ const meta = "text-[12.5px] leading-snug text-ink/60";
 const pill = "inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-3.5 text-[13px] font-bold transition disabled:opacity-50";
 
 type SheetId = "train" | "invite" | "badges" | "store";
-const SHEET_FOR: Record<string, SheetId> = { "#level": "train", "#invite": "invite", "#achievements": "badges" };
+const SHEET_FOR: Record<string, SheetId> = { "#level": "train", "#invite": "invite", "#achievements": "badges", "#store": "store" };
 
 export default function HubPhone({ s, now }: { s: State; now: number }) {
   const h = hubOf(s);
@@ -182,6 +183,7 @@ function QuestList({ s, now }: { s: State; now: number }) {
   const [tab, setTab] = useState<Period>("daily");
   const list = all.filter((q) => q.period === tab);
   const ready = (p: Period) => all.filter((q) => q.period === p && q.done && !q.claimed).length;
+  const listRef = useFirstN<HTMLUListElement>(4, tab + list.length);
   return (
     <section id="quests" className={`${card} scroll-mt-20 p-3.5`}>
       <div className="flex items-center justify-between gap-2">
@@ -195,7 +197,8 @@ function QuestList({ s, now }: { s: State; now: number }) {
           </button>
         ))}
       </div>
-      <ul className="mt-1 divide-y divide-[var(--line)]">{list.map((q) => <QuestItem key={q.id} q={q} />)}</ul>
+      <ul ref={listRef} key={tab} data-quest-list className="mt-1 divide-y divide-[var(--line)] overscroll-contain">{list.map((q) => <QuestItem key={q.id} q={q} />)}</ul>
+      {list.length > 4 && <p className="pt-1 text-center text-[11.5px] font-semibold text-ink/45">Scroll for {list.length - 4} more</p>}
     </section>
   );
 }
