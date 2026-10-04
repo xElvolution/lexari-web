@@ -30,3 +30,12 @@
   .hub-flame, .hub-flame-core, .hub-orbit, .hub-orbit > * > *, .hub-rays, .hub-claim, .hub-shine::after, .hub-wobble, .hub-wobble-fast, .hub-float { animation: none; }
 }
 html[data-motion="off"] :is(.hub-flame, .hub-flame-core, .hub-orbit, .hub-orbit > * > *, .hub-rays, .hub-claim, .hub-wobble, .hub-wobble-fast, .hub-float), html[data-motion="off"] .hub-shine::after { animation: none; }
+
+/* wrong PIN */
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+.shake { animation: shake 0.4s ease; }
+
+/* the primary agent: a soft pulsing gold ring */
+@keyframes primary-glow { 0%, 100% { box-shadow: 0 0 0 2px #f5c542, 0 0 10px 1px rgba(245, 197, 66, 0.45); } 50% { box-shadow: 0 0 0 2.5px #ffd96a, 0 0 22px 5px rgba(245, 197, 66, 0.75); } }
+.primary-ring::before { content: ""; position: absolute; inset: -3px; border-radius: calc(var(--r, 14px) + 3px); pointer-events: none; animation: primary-glow 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .primary-ring::before { animation: none; box-shadow: 0 0 0 2px #f5c542, 0 0 12px 2px rgba(245, 197, 66, 0.5); } }

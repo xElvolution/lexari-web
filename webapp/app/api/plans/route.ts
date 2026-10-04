@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { PLAN_DAYS, PLANS } from "@/content/appData";
+import { PLAN_DAYS, PLANS, YEAR_DAYS, planPrice } from "@/content/appData";
 import { db } from "@/server/db";
 import { agentCards, hires, planPurchases } from "@/server/db/schema";
 import { recordEvent } from "@/server/events";
@@ -30,9 +30,10 @@ export const POST = withUser(async (user, req) => {
   const [c] = await database.select({ id: agentCards.id }).from(agentCards).where(eq(agentCards.payTx, body.tx)).limit(1);
   if (h || c) return jsonError(409, "That payment was already used.");
   const tx = await fetchConfirmed(body.tx);
-  const paid = verifyPayment(tx, user.wallet, "SOL", plan.lamports);
+  const paid = verifyPayment(tx, user.wallet, "SOL", planPrice(plan, body.period));
+  const days = body.period === "year" ? YEAR_DAYS : PLAN_DAYS;
   const inserted = await database.insert(planPurchases).values({
-    userId: user.userId, plan: plan.id, tx: body.tx, amount: paid.amount, payer: paid.payer, expiresAt: new Date(Date.now() + PLAN_DAYS * 86_400_000),
+    userId: user.userId, plan: plan.id, tx: body.tx, amount: paid.amount, payer: paid.payer, expiresAt: new Date(Date.now() + days * 86_400_000),
   }).onConflictDoNothing().returning({ id: planPurchases.id });
   if (!inserted.length) return jsonError(409, "That payment was already used.");
   await recordEvent(user.userId, "plan", { ref: body.tx }).catch(() => {});

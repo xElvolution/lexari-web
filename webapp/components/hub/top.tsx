@@ -1,5 +1,7 @@
 "use client";
 
+import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
+
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { toast, type State } from "@/lib/store";
@@ -33,6 +35,7 @@ export function Flame({ size = 44, lit = true }: { size?: number; lit?: boolean 
 /** Hero: animated balance, streak and this week's earnings, and the team with their levels. */
 export function Hero({ s, now, ready }: { s: State; now: number; ready: number }) {
   const coins = useCount(coinsOf(s));
+  const hide = useHideBalance();
   const h = hubOf(s);
   const streak = streakOf(s, now);
   const week = earnedSince(s, weekStart(now));
@@ -46,7 +49,8 @@ export function Hero({ s, now, ready }: { s: State; now: number; ready: number }
           <p className="label text-white/75">Your balance</p>
           <div className="mt-3 flex items-center gap-4">
             <span data-coin-target className="hub-float inline-grid"><Coin size={64} /></span>
-            <span className="display tabular-nums text-[76px] leading-none sm:text-[104px]" aria-live="polite">{coins.toLocaleString("en-US")}</span>
+            <span data-balance className="display tabular-nums text-[76px] leading-none sm:text-[104px]" aria-live="polite">{hide ? MASK : coins.toLocaleString("en-US")}</span>
+            <button data-hide-balance onClick={() => setHideBalance(!hide)} aria-label={hide ? "Show balance" : "Hide balance"} aria-pressed={hide} className="grid h-10 w-10 place-items-center rounded-full bg-white/15 hover:bg-white/25"><Icon name={hide ? "eyeoff" : "eye"} size={18} /></button>
           </div>
           <div className="mt-6 flex flex-wrap gap-2">
             <span className="flex items-center gap-2 rounded-full bg-white/15 py-1.5 pl-2 pr-3.5 text-[14px] font-bold backdrop-blur-sm"><Flame size={18} lit={streak > 0} />{streak}-day streak</span>
@@ -93,6 +97,7 @@ export function LevelBadge({ level, className = "", small = false, big = false }
 /** A balance pill that sits in the corner once the hero balance scrolls away, so coins always land somewhere. */
 export function FloatingBalance({ s }: { s: State }) {
   const coins = useCount(coinsOf(s));
+  const hide = useHideBalance();
   const [show, setShow] = useState(false);
   useEffect(() => {
     const hero = document.querySelector("[data-hub-hero]"); if (!hero) return;
@@ -102,7 +107,7 @@ export function FloatingBalance({ s }: { s: State }) {
   return (
     <div className={`fixed right-4 top-[72px] z-[60] transition-all duration-300 lg:right-8 lg:top-6 ${show ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-3 opacity-0"}`}>
       <a href="#top" className={`${show ? "flex" : "hidden"} items-center gap-2 rounded-full bg-card py-1.5 pl-1.5 pr-4 text-[15px] font-extrabold text-ink shadow-[0_10px_30px_-10px_rgba(0,0,0,.45)] ring-1 ring-line`} aria-label={`${coins} coins`}>
-        <span data-coin-target className="inline-grid"><Coin size={28} /></span><span className="tabular-nums">{coins.toLocaleString("en-US")}</span>
+        <span data-coin-target className="inline-grid"><Coin size={28} /></span><span className="tabular-nums">{hide ? MASK : coins.toLocaleString("en-US")}</span>
       </a>
     </div>
   );

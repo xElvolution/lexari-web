@@ -2,15 +2,19 @@
 
 import { specialistBySlug } from "@/content/appData";
 import { PALETTE } from "@shared/components/avatar";
+import type React from "react";
 import type { Card } from "@/lib/pay";
 
 /**
  * A payment card for one agent. Until a card is really issued this is a preview:
  * the number, expiry and CVV stay masked, so nothing made-up looks like a real card.
  */
-export default function CardVisual({ id, name, className = "", card = null }: { id: string; name: string; className?: string; card?: Card | null }) {
-  const num = card ? card.number.replace(/(.{4})/g, "$1 ").trim() : "•••• •••• •••• ••••";
-  const exp = card ? `${String(card.expMonth).padStart(2, "0")}/${String(card.expYear).slice(-2)}` : "••/••";
+export default function CardVisual({ id, name, className = "", card = null, onCopy }: { id: string; name: string; className?: string; card?: Card | null; onCopy?: (value: string, what: string) => void }) {
+  // Masked unless the full details were fetched after your PIN or wallet confirm.
+  const full = !!card?.number;
+  const num = full ? card!.number.replace(/(.{4})/g, "$1 ").trim() : card ? `•••• •••• •••• ${card.last4}` : "•••• •••• •••• ••••";
+  const exp = full ? `${String(card!.expMonth).padStart(2, "0")}/${String(card!.expYear).slice(-2)}` : "••/••";
+  const tap = (v: string, what: string) => (full && onCopy ? { role: "button" as const, tabIndex: 0, "data-copy": what, onClick: (e: React.MouseEvent) => { e.stopPropagation(); onCopy(v, what); }, className: "cursor-copy rounded-md outline-none ring-white/60 transition hover:bg-white/10 focus-visible:ring-2" } : {});
   const sp = specialistBySlug(id);
   const accent = sp ? PALETTE[sp.color].fill : "#c9b8ff";
   const bg = id === "home" ? "linear-gradient(135deg,#6a3dff 0%,#5b2bff 45%,#2a0f9a 100%)" : `radial-gradient(120% 140% at 100% 0%, color-mix(in oklab, ${accent} 55%, transparent) 0%, transparent 55%), linear-gradient(135deg,#1a1726 0%,#0a0a0a 100%)`;
@@ -27,11 +31,11 @@ export default function CardVisual({ id, name, className = "", card = null }: { 
       <div className="mt-[5%] h-[16%] w-[14%] shrink-0 rounded-md bg-[linear-gradient(135deg,#f3f0ff,#b9a6ff)] opacity-90 [box-shadow:inset_0_0_0_1px_rgba(0,0,0,.15)]" aria-hidden>
         <div className="grid h-full grid-cols-3 grid-rows-3 gap-px p-[3px] opacity-40">{Array.from({ length: 9 }).map((_, i) => <i key={i} className="rounded-[1px] border border-black/40" />)}</div>
       </div>
-      <div className="tab-num mt-[4%] whitespace-nowrap font-mono text-[clamp(12px,6.4cqw,22px)] leading-tight tracking-[0.08em] text-white/85">{num}</div>
+      <div className="mt-[4%]"><span {...tap(card?.number || "", "card number")} className={`tab-num inline-block whitespace-nowrap font-mono text-[clamp(12px,6.4cqw,22px)] leading-tight tracking-[0.08em] text-white/85 ${full && onCopy ? "-mx-1 cursor-copy rounded-md px-1 hover:bg-white/10" : ""}`}>{num}</span></div>
       <div className="mt-auto flex items-end justify-between gap-3">
-        <div className="min-w-0"><div className="label text-[7.5px] text-white/60">Card holder</div><div className="truncate font-mono text-[13px] font-semibold uppercase tracking-wider">{name}</div></div>
-        <div className="shrink-0"><div className="label text-[7.5px] text-white/60">Valid thru</div><div className="font-mono text-[13px] text-white/85">{exp}</div></div>
-        <div className="shrink-0"><div className="label text-[7.5px] text-white/60">CVV</div><div className="font-mono text-[13px] text-white/85">{card ? card.cvv : "•••"}</div></div>
+        <div className="min-w-0"><div className="label text-[7.5px] text-white/60">Card holder</div><div {...tap(name, "name")} className={`truncate font-mono text-[13px] font-semibold uppercase tracking-wider ${full && onCopy ? "cursor-copy rounded hover:bg-white/10" : ""}`}>{name}</div></div>
+        <div className="shrink-0"><div className="label text-[7.5px] text-white/60">Valid thru</div><div {...tap(exp, "expiry")} className={`font-mono text-[13px] text-white/85 ${full && onCopy ? "cursor-copy rounded hover:bg-white/10" : ""}`}>{exp}</div></div>
+        <div className="shrink-0"><div className="label text-[7.5px] text-white/60">CVV</div><div {...tap(card?.cvv || "", "CVV")} className={`font-mono text-[13px] text-white/85 ${full && onCopy ? "cursor-copy rounded hover:bg-white/10" : ""}`}>{full ? card!.cvv : "•••"}</div></div>
       </div>
       {card?.frozen && <div className="absolute inset-0 grid place-items-center bg-[#0a0a0a]/55 backdrop-blur-[2px]"><span className="label rounded-full bg-white px-3 py-1 text-[10px] text-[#0a0a0a]">Frozen</span></div>}
     </div>

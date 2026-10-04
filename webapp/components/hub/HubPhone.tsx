@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { hubReady, refreshHub, toast, type State } from "@/lib/store";
+import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
+import { hubReady, isCreated, primaryOf, refreshHub, setPrimary, toast, type State } from "@/lib/store";
 import {
   MAX_LEVEL, STREAK_PAY, TIERS, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, inviteCode, levelOf, nextReset,
   questsView, streakOf, useHubBusy, weekStart, xpFor, type Period, type QuestView,
@@ -27,6 +28,8 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
   const coins = coinsOf(s);
   const streak = streakOf(s, now);
   const week = earnedSince(s, weekStart(now));
+  const [train, setTrain] = useState(false);
+  const hide = useHideBalance();
   if (!s.live && !hubReady()) return <HubLoading />;
   return (
     <div id="top" className="space-y-3 pb-2">
@@ -37,10 +40,10 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
       {/* balance */}
       <section data-hub-hero className="relative overflow-hidden rounded-[20px] bg-grape p-4 text-white shadow-[0_14px_30px_-18px_rgba(91,43,255,.9)]">
         <span className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full border-[22px] border-white/[.07]" />
-        <p className="label text-[9px] text-white/70">Your balance</p>
+        <div className="flex items-center gap-2"><p className="label text-[9px] text-white/70">Your balance</p><button data-hide-balance onClick={() => setHideBalance(!hide)} aria-label={hide ? "Show balance" : "Hide balance"} aria-pressed={hide} className="relative grid h-6 w-6 place-items-center rounded-full bg-white/15"><Icon name={hide ? "eyeoff" : "eye"} size={13} /></button></div>
         <div className="mt-1.5 flex items-center gap-2.5">
           <span data-coin-target className="inline-grid"><Coin size={30} /></span>
-          <span className="text-[1.75rem] font-extrabold leading-none tabular-nums" aria-live="polite">{coins.toLocaleString("en-US")}</span>
+          <span data-balance className="text-[1.75rem] font-extrabold leading-none tabular-nums" aria-live="polite">{hide ? MASK : coins.toLocaleString("en-US")}</span>
           <span className="ml-auto text-right text-[12px] leading-tight text-white/75">+{week.toLocaleString("en-US")} this week<br />{h.lifetime.toLocaleString("en-US")} all time</span>
         </div>
         <div className="mt-3 flex gap-2 text-[12px] font-semibold">
@@ -52,10 +55,10 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
       <CheckInRow s={s} now={now} />
       <div className="grid grid-cols-2 gap-3">
         <BoxCard s={s} now={now} />
-        <LevelCard s={s} />
+        <LevelCard s={s} onTrain={() => { setTrain(true); setTimeout(() => document.getElementById("level")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} />
       </div>
       <QuestList s={s} now={now} />
-      <TrainList s={s} />
+      {train && <TrainList s={s} />}
       <InviteRow s={s} />
     </div>
   );
@@ -121,16 +124,14 @@ function BoxCard({ s, now }: { s: State; now: number }) {
   );
 }
 
-function LevelCard({ s }: { s: State }) {
-  const team = myAgents(s);
-  const best = team.map((a) => ({ a, l: levelOf(s, a.id) })).sort((x, y) => y.l.level - x.l.level)[0];
+function LevelCard({ s, onTrain }: { s: State; onTrain: () => void }) {
   return (
-    <a href="#level" className={`${card} flex flex-col p-3.5`}>
-      <AgentTile id={best.a.id} look={s.agent?.look} size={30} />
+    <button type="button" onClick={onTrain} data-level-card className={`${card} flex flex-col p-3.5 text-left`}>
+      <AgentTile id={primaryOf(s)} look={s.agent?.look} size={30} />
       <div className="mt-2 text-[15px] font-bold text-ink">Level up</div>
-      <div className={meta}>{best.a.name} is level {best.l.level}. Spend coins on XP.</div>
-      <span className={`${pill} mt-auto w-full bg-tint text-brand-ink`} style={{ marginTop: "auto" }}>Train agents</span>
-    </a>
+      <div className={meta}>Spend coins to level up your agent.</div>
+      <span data-train-agents className={`${pill} mt-auto w-full bg-tint text-brand-ink`} style={{ marginTop: "auto" }}>Train agents</span>
+    </button>
   );
 }
 
@@ -185,7 +186,9 @@ function QuestItem({ q }: { q: QuestView }) {
 }
 
 function TrainList({ s }: { s: State }) {
-  const team = myAgents(s);
+  // Only agents you made can level up, and only the primary one trains.
+  const team = myAgents(s).filter((a) => isCreated(s, a.id));
+  const primary = primaryOf(s);
   const coins = coinsOf(s);
   const busy = useHubBusy();
   const train = (id: string, name: string, amount: number, el: HTMLElement) => void hub.train(id, amount).then((r) => {
@@ -196,7 +199,7 @@ function TrainList({ s }: { s: State }) {
   return (
     <section id="level" className={`${card} scroll-mt-20 p-3.5`}>
       <div className="flex items-center justify-between"><h2 className={h2}>Train your agents</h2><span className="flex items-center gap-1 text-[12.5px] font-bold text-ink/70"><Coin size={13} />{coins}</span></div>
-      <p className={`${meta} mt-0.5`}>Coins become XP. Each level unlocks a perk. An agent needs its minted ID card to level up.</p>
+      <p className={`${meta} mt-0.5`}>Coins become XP for your primary agent. Each level unlocks a perk. It needs its minted ID card to level up. Hired specialists don&apos;t level up.</p>
       <ul className="mt-1 divide-y divide-[var(--line)]">
         {team.map((a) => {
           const { level, xp } = levelOf(s, a.id);
@@ -210,7 +213,8 @@ function TrainList({ s }: { s: State }) {
                 <div className="flex items-center gap-1.5"><span className="truncate text-[14.5px] font-semibold text-ink">{a.name}</span><span className="text-[11.5px] font-bold text-brand-ink">Lv {level}</span></div>
                 <div className="mt-1 flex items-center gap-2"><span className="h-1 flex-1 overflow-hidden rounded-full bg-tint"><span className="block h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></span><span className="text-[11px] tabular-nums text-ink/50">{level >= MAX_LEVEL ? "max" : `${xp}/${need}`}</span></div>
               </div>
-              {!(s.live?.levels.find((l) => l.slug === a.id)?.asset || s.meta[a.id]?.nft?.tokenId)
+              {a.id !== primary ? <button type="button" data-make-primary={a.id} onClick={() => { setPrimary(a.id); toast({ text: `${a.name} is now your primary agent`, face: "home" }); }} className={`${pill} bg-tint text-brand-ink`}>Make primary</button>
+                : !(s.live?.levels.find((l) => l.slug === a.id)?.asset || s.meta[a.id]?.nft?.tokenId)
                 ? <button type="button" onClick={() => openAgent(a.id)} className={`${pill} bg-tint text-brand-ink`}>Mint ID</button>
                 : <button type="button" disabled={!!busy || level >= MAX_LEVEL || amount <= 0} onClick={(e) => train(a.id, a.name, amount, e.currentTarget)} className={`${pill} bg-grape text-white`}>{busy === "train" ? "…" : `+${amount || 25} XP`}</button>}
             </li>

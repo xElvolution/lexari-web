@@ -47,6 +47,12 @@ export const PLANS = [
 ] as const;
 /** Paid plans last this long on devnet; pay again to renew. */
 export const PLAN_DAYS = 30;
+/** Yearly billing: pay for 10 months, get 12 (2 months free, about 17% off). */
+export const YEAR_DAYS = 365;
+export const YEAR_MONTHS_PAID = 10;
+export type Period = "month" | "year";
+export const planPrice = (p: { lamports: number }, period: Period) => (period === "year" ? p.lamports * YEAR_MONTHS_PAID : p.lamports);
+export const YEAR_SAVE_PCT = Math.round((1 - YEAR_MONTHS_PAID / 12) * 100);
 export const planById = (id: string) => PLANS.find((p) => p.id === id) ?? PLANS[0];
 export const solLabel = (lamports: number) => `${+(lamports / 1e9).toFixed(4)} SOL`;
 export type PlanId = (typeof PLANS)[number]["id"];

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { specialistBySlug } from "@/content/appData";
 import { hirePriceLabel } from "@/lib/prices";
 import { agentName, planOf, release, seatsUsed, toast, useApp } from "@/lib/store";
-import { PlansGrid } from "@/components/Plans";
+import { PlanSummary } from "@/components/Plans";
 import Icon from "@/components/Icon";
 import { AgentFace, SpecFace } from "@/components/faces";
 import { PageHead } from "@/components/ui";
@@ -79,15 +79,15 @@ export default function TeamPage() {
           <span className="label text-white/80">{plan.name} plan</span>
           <div className="mt-3 flex items-baseline gap-2"><span className="display text-[88px] leading-[0.8]">{plan.seats}</span><span className="text-white/80">{plan.seats === 1 ? "agent: your own" : "seats"}</span></div>
           <p className="mt-5 text-[16px] leading-relaxed text-white/90">{plan.id === "free" ? "Free plan includes one agent: your own. Upgrade to Pro to hire specialists from the marketplace." : `${used} of ${plan.seats} seats used. Each specialist is a one-time ${hirePriceLabel()} hire.`}</p>
-          {plan.id === "free" && <button onClick={() => openUpgrade("plans")} className="btn btn-white relative z-10 mt-5">Upgrade to Pro</button>}
+          {plan.id !== "max" && <button data-upgrade-plan onClick={() => openUpgrade("plans")} className="btn btn-white relative z-10 mt-5">Upgrade plan</button>}
           {free.length > 0 && <p className="relative z-10 mt-5 text-[13.5px] text-white/85">{free.length} paid specialist{free.length === 1 ? " is" : "s are"} off the floor. Add them back from the marketplace for free.</p>}
           <Link href="/app/marketplace" className="btn btn-white relative z-10 mt-8 lg:mt-auto">Open the marketplace</Link>
         </div>
       </div>
       <section data-rise id="plans" className="mt-8">
         <h2 className="text-[22px] font-bold tracking-tight text-ink">Plans</h2>
-        <p className="mt-0.5 text-[14px] text-ink/55">More seats for more agents. Paid in devnet SOL.</p>
-        <div className="mt-4"><PlansGrid /></div>
+        <p className="mt-0.5 text-[14px] text-ink/55">More seats for more agents. Monthly or yearly (2 months free), paid in devnet SOL.</p>
+        <div className="mt-4"><PlanSummary /></div>
       </section>
     </>
   );

@@ -14,7 +14,8 @@ import Icon from "@/components/Icon";
 import { AgentFace, AgentTile } from "@/components/faces";
 import { myAgents } from "@/components/agents";
 import { openAdd, openAgent } from "@/components/overlays";
-import { PlansGrid } from "@/components/Plans";
+import { PlanSummary } from "@/components/Plans";
+import LockSettings from "@/components/lock/LockSettings";
 
 const SECTIONS = [
   { id: "general", label: "General", icon: "settings" },
@@ -209,6 +210,7 @@ function Security({ s }: { s: State }) {
         <Row title={google ? "Google or email" : "Wallet signature"} desc={google ? "Privy checks your Google account or a one-time email code. Your Lexari wallet is created and kept by Privy." : "You sign a one-time message with your wallet. Lexari never sees your keys."} />
         <Row title="Session" desc="Sessions last up to 30 days on this device. Signing out ends it here and in your wallet." />
       </Group>
+      <Group title="App lock"><LockSettings /></Group>
       <Group title="This device">
         <Row title="Sign out" desc="Ends this session."><button onClick={() => { void signOut().then(() => router.push("/signin")); }} className={smallBtn}><Icon name="out" size={15} />Sign out</button></Row>
       </Group>
@@ -251,7 +253,7 @@ function Billing({ s }: { s: State }) {
           <p className="min-w-[180px] flex-1 text-[13.5px] text-ink/60">{p.seats === 1 ? "One agent: your own." : `${p.seats} seats.`}{p.expiresAt ? ` Paid until ${new Date(p.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}.` : ""} Specialists are a one-time {hirePriceLabel()} hire each.</p>
         </div>
       </Group>
-      <section className="mt-6"><h3 className="label mb-2 text-[9.5px] text-ink/50">All plans</h3><PlansGrid /></section>
+      <section className="mt-6"><PlanSummary /></section>
       <Group title="Payments">
         <Row title="Hires" desc={s.paid.length ? `${s.paid.length} specialist${s.paid.length === 1 ? "" : "s"} paid for. Released ones come back for free.` : "No hires yet."}><Link href="/app/wallets" className={smallBtn}>Wallet</Link></Row>
       </Group>

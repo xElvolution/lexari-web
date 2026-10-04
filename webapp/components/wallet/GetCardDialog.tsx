@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import type { State } from "@/lib/store";
+import { celebrate } from "../Celebrate";
 import { payForCard, type Card } from "@/lib/pay";
 import { cardPriceLabel } from "@/lib/prices";
 import Icon from "../Icon";
@@ -29,6 +30,7 @@ export default function GetCardDialog({ s, id, onClose }: { s: State; id: string
     setBusy(false);
     if (!r.ok) { if (!r.cancelled) setErr(r.error); return; }
     putCard(r.card); setCard(r.card); setTx(r.tx);
+    celebrate({ title: `${name}'s card is ready`, body: `Test card ending ${r.card.last4}, $${r.card.limit} a month.`, tx: r.tx, art: <div className="w-[260px]"><CardVisual id={id} name={name} card={r.card} /></div> });
   };
   return (
     <div className="fixed inset-0 z-[75] flex items-end justify-center bg-black/55 backdrop-blur-sm sm:items-center sm:p-5" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>

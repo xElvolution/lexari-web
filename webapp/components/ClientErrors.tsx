@@ -43,11 +43,15 @@ export default function ClientErrors() {
     };
     window.addEventListener("error", onErr);
     window.addEventListener("unhandledrejection", onRej);
-    // After a deploy: compare build ids when the tab comes back.
+    // After a deploy: never reload in front of you (that wiped a chat mid-reply). Note the new build, then
+    // reload quietly while the tab is in the background, and only when nothing is in flight.
+    let pending = "";
+    const busy = () => !!document.querySelector("[data-pay-sheet],[data-crop],[data-send-card] [data-send-confirm]:disabled,[role=dialog]") || (window as unknown as { __lexariBusy?: () => boolean }).__lexariBusy?.() === true
+      || !!(document.querySelector("textarea") as HTMLTextAreaElement | null)?.value;
     const check = () => {
-      if (document.hidden || !BUILD) return;
-      if (document.querySelector("[data-pay-sheet]")) return; // never in the middle of a payment
-      void fetch("/api/version", { cache: "no-store" }).then((r) => r.json()).then((v: { build?: string }) => { if (v.build && v.build !== BUILD) hardReload(`build ${BUILD} -> ${v.build}`); }).catch(() => {});
+      if (!BUILD) return;
+      if (document.hidden) { if (pending && !busy()) hardReload(`build ${BUILD} -> ${pending} (in background)`); return; }
+      void fetch("/api/version", { cache: "no-store" }).then((r) => r.json()).then((v: { build?: string }) => { if (v.build && v.build !== BUILD) pending = v.build; }).catch(() => {});
     };
     document.addEventListener("visibilitychange", check);
     const t = setInterval(check, 5 * 60_000);

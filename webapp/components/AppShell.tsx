@@ -18,6 +18,8 @@ import AddAgentDialog from "./agent/AddAgentDialog";
 import PaySheet from "./PaySheet";
 import { setSeatGate } from "./overlays";
 import UpgradeSheet from "./UpgradeSheet";
+import Celebrate from "./Celebrate";
+import AppLock from "./lock/AppLock";
 import MemoryChain from "./MemoryChain";
 
 export const NAV = [
@@ -203,6 +205,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <AddAgentDialog />
       <UpgradeSheet />
       <PaySheet />
+      <Celebrate />
+      <AppLock />
       {s.tour?.on && <Tour s={s} />}
       <MemoryChain />
       <Toaster />

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { gsap } from "gsap";
 import type { FaceState } from "@shared/components/avatar";
-import { toast, type State } from "@/lib/store";
+import { isCreated, primaryOf, toast, type State } from "@/lib/store";
 import { MAX_LEVEL, PERKS, coinsOf, hub, levelOf, xpFor, useHubBusy } from "@/lib/hub";
 import { myAgents } from "@/components/agents";
 import { WhoFace } from "@/components/faces";
@@ -17,7 +17,8 @@ const lookFor = (s: State, id: string) => (id === "home" ? s.agent?.look : null)
 
 /** Pick an agent, pour coins into it as XP, and watch it level up. */
 export default function LevelUp({ s }: { s: State }) {
-  const team = myAgents(s);
+  // Only your primary agent (one you made) levels up. Hired specialists never do.
+  const team = myAgents(s).filter((a) => a.id === primaryOf(s) && isCreated(s, a.id));
   const [pick, setPick] = useState(team[0]?.id ?? "home");
   const agent = team.find((a) => a.id === pick) ?? team[0];
   const { level, xp } = levelOf(s, agent.id);

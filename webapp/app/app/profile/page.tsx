@@ -8,6 +8,7 @@ import { shortAddr } from "@/content/appData";
 import { agentName, mediaUrl, planOf, setMedia, setPrefs, signOut, toast, updateProfile, useApp, type State } from "@/lib/store";
 import { applyTheme, onTheme, savedTheme } from "@shared/components/theme";
 import ImageCrop from "@/components/ImageCrop";
+import LockSettings from "@/components/lock/LockSettings";
 import { openAgent } from "@/components/overlays";
 import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
@@ -158,10 +159,7 @@ export default function ProfilePage() {
               ["wallet", "Wallet", s.auth?.address ? shortAddr(s.auth.address) : "Loading"],
             ]} />
           </Card>
-          <Card title="App lock">
-            <p className="mt-1 text-[14px] text-ink/65">{s.lockOn ? `On. Lexari asks for your PIN${s.biometric ? " or fingerprint" : ""} when you open it.` : "Off. Add a PIN so nobody can open Lexari on this phone without it."}</p>
-            <div className="mt-3"><Link href="/app/settings#security" data-lock-link className={pill}><Icon name="lock" size={15} />{s.lockOn ? "Manage app lock" : "Set up app lock"}</Link></div>
-          </Card>
+          <Card title="App lock"><LockSettings /></Card>
           <Card title="Session">
             <p className="mt-1 text-[14px] text-ink/65">Signing out keeps your agents, chats and Brain saved for next time.</p>
             <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => { void signOut().then(() => router.push("/signin")); }} className={pill}><Icon name="out" size={15} />Sign out</button><Link href="/app/settings#data" className={pill}>Privacy and data</Link></div>

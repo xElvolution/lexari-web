@@ -95,10 +95,11 @@ export async function payForCard(agent: string, limit: number, name = "your agen
 }
 
 export type PlanState = { id: string; name: string; seats: number; expiresAt: number | null };
-export async function payForPlan(plan: { id: string; name: string; lamports: number; seats: number }): Promise<{ ok: true; tx: string; plan: PlanState } | { ok: false; error: string; cancelled?: boolean }> {
+export async function payForPlan(plan: { id: string; name: string; lamports: number; seats: number }, period: "month" | "year" = "month"): Promise<{ ok: true; tx: string; plan: PlanState } | { ok: false; error: string; cancelled?: boolean }> {
+  const year = period === "year";
   const r = await requestPayment({
-    title: `Upgrade to ${plan.name}`, what: `${plan.seats} seats for 30 days, on devnet.`, lamports: plan.lamports,
-    record: (sig) => verifyWithRetry(() => api<{ plan: PlanState }>("/api/plans", { method: "POST", body: { plan: plan.id, tx: sig } })),
+    title: `Upgrade to ${plan.name}`, what: `${plan.seats} seats for ${year ? "a year (2 months free)" : "30 days"}, on devnet.`, lamports: year ? plan.lamports * 10 : plan.lamports,
+    record: (sig) => verifyWithRetry(() => api<{ plan: PlanState }>("/api/plans", { method: "POST", body: { plan: plan.id, tx: sig, period } })),
   });
   return r.ok ? { ok: true, tx: r.tx, plan: (r.result as { plan: PlanState }).plan } : r;
 }

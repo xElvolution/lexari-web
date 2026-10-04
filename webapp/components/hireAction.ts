@@ -7,6 +7,9 @@ import { hirePriceLabel } from "@/lib/prices";
 import { get, hire, seatsLeft, toast } from "@/lib/store";
 import { openUpgrade } from "./overlays";
 import { burst, flyToSeats } from "./fly";
+import { createElement } from "react";
+import { celebrate } from "./Celebrate";
+import { AgentTile } from "./faces";
 
 const inflight = new Set<string>();
 
@@ -26,16 +29,19 @@ async function run(slug: string, faceEl: HTMLElement | null): Promise<"ok" | "fu
   }
   if (seatsLeft(s) <= 0) { openUpgrade(s.plan === "free" ? "hire" : "full"); return "full"; }
   const before = s.paid.includes(slug);
+  let tx = "";
   if (before) {
     try { await api("/api/hires", { method: "PUT", body: { slug } }); }
     catch (e) { if ((e as { status?: number }).status === 402) { openUpgrade("hire"); return "full"; } toast({ text: friendly(e, "Could not add them back."), face: "home" }); return "unpaid"; }
   } else {
     const paid = await payForHire(slug, sp.name);
     if (!paid.ok) { if (!paid.cancelled && paid.error) toast({ text: paid.error, face: "home" }); return "unpaid"; }
+    tx = paid.tx;
   }
   const r = hire(slug);
   if (r === "ok") {
     flyToSeats(faceEl); burst(faceEl, 16);
+    if (tx) celebrate({ title: `${sp.name} joined your team`, body: `${sp.job}. Say hi in Agents.`, tx, art: createElement(AgentTile, { id: slug, look: null, size: 96, radius: 30 }), cta: { label: "Say hi", href: `/app?c=${slug}` } });
     toast({ text: before ? `${sp.name} is back on your team` : `${sp.name} joined your team · ${hirePriceLabel()}`, face: sp.seed, color: sp.color });
   } else {
     toast({ text: `${sp.name} is already on your team`, face: sp.seed, color: sp.color });

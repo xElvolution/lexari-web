@@ -39,6 +39,7 @@ export type Prefs = {
   language: string; voice: string; defaultAgent: string; memory: boolean; history: boolean; improve: boolean;
   motion: boolean; demoLabels: boolean; instructions: string; twofa: boolean; signedOut: string[]; theme?: "light" | "dark" | "system";
   notif: Record<string, boolean>;
+  primary?: string; // the agent you made that leads (and is the only one that levels up)
 };
 export type Profile = { name: string; username: string; bio: string; since: number; avatar?: number; cover?: number };
 export const DEFAULT_PREFS: Prefs = {
@@ -472,6 +473,7 @@ function speakerFor(st: State, convo: string, text: string) {
 }
 
 /** Ask the model for a reply and stream the tokens into the thread. The server saves both messages. */
+if (typeof window !== "undefined") (window as unknown as { __lexariBusy?: () => boolean }).__lexariBusy = () => queued.size > 0;
 async function replyFromModel(convo: string, userMsg: Msg) {
   if (queued.has(convo)) return "";
   const st = get();
@@ -612,10 +614,15 @@ let prefTimer: ReturnType<typeof setTimeout> | null = null;
 function savePrefs() {
   if (prefTimer) clearTimeout(prefTimer);
   prefTimer = setTimeout(() => {
-    const { language, voice, defaultAgent, memory, history, improve, motion, instructions, notif, theme } = get().prefs;
-    sync(api("/api/me", { method: "PATCH", body: { prefs: { language, voice, defaultAgent, memory, history, improve, motion, instructions: instructions.slice(0, 2000), notif, tourDone: get().tour.done, ...(theme ? { theme } : {}) } } }));
+    const { language, voice, defaultAgent, memory, history, improve, motion, instructions, notif, theme, primary } = get().prefs;
+    sync(api("/api/me", { method: "PATCH", body: { prefs: { language, voice, defaultAgent, memory, history, improve, motion, instructions: instructions.slice(0, 2000), notif, tourDone: get().tour.done, ...(theme ? { theme } : {}), ...(primary ? { primary } : {}) } } }));
   }, 500);
 }
+/** Agents you made yourself (your first agent and any you created). Hired specialists are not in here. */
+export const isCreated = (s: State, id: string) => id === "home" || s.custom.some((c) => c.id === id);
+/** The primary agent: one you made. Defaults to your first agent. */
+export const primaryOf = (s: State | null) => { const p = s?.prefs.primary; return s && p && isCreated(s, p) ? p : "home"; };
+export function setPrimary(id: string) { const s = get(); if (!s || !isCreated(s, id)) return false; setPrefs({ primary: id }); return true; }
 export function setPrefs(p: Partial<Prefs>) { set((x) => ({ ...x, prefs: { ...x.prefs, ...p } })); savePrefs(); }
 export function setNotif(k: string, v: boolean) { set((x) => ({ ...x, prefs: { ...x.prefs, notif: { ...x.prefs.notif, [k]: v } } })); savePrefs(); }
 export function updateProfile(p: Partial<Profile>) {

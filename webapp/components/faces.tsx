@@ -1,7 +1,8 @@
 "use client";
 
 import { lookVariant, type FaceState } from "@shared/components/avatar";
-import type { AgentLook } from "@/lib/store";
+import { primaryOf, useApp, type AgentLook } from "@/lib/store";
+import { usePresence } from "@/lib/presence";
 import Face from "@shared/components/Face";
 import { specialistBySlug } from "@/content/appData";
 import { tileBg } from "./agents";
@@ -25,12 +26,20 @@ export function WhoFace({ who, look, size = 40, className = "", animated = false
 }
 
 /** An agent's face on its soft colour tile. Rounded square, sized in px. */
-export function AgentTile({ id, look, size = 48, face, className = "", radius }: { id: string; look: AgentLook | undefined; size?: number; face?: number; className?: string; radius?: number }) {
+export function AgentTile({ id, look, size = 48, face, className = "", radius, status = true }: { id: string; look: AgentLook | undefined; size?: number; face?: number; className?: string; radius?: number; status?: boolean }) {
   // big tiles shrink a little on phones (--av-scale is set in mobile-compact.css)
   const big = size >= 44;
+  const s = useApp();
+  const online = usePresence();
+  const mine = !!s && (id === "home" || s.hired.includes(id) || s.custom.some((c) => c.id === id));
+  const primary = mine && primaryOf(s) === id;
+  const dot = status && mine && size >= 26 && online !== null;
+  const r = radius ?? Math.round(size * 0.32);
+  const d = Math.max(8, Math.round(size * 0.24));
   return (
-    <span className={`grid shrink-0 place-items-center ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: radius ?? Math.round(size * 0.32), background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)" }}>
+    <span data-agent-tile={id} {...(primary ? { "data-primary": "" } : {})} className={`relative grid shrink-0 place-items-center ${primary ? "primary-ring" : ""} ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: r, background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)", ["--r" as string]: `${r}px` }}>
       <span className="grid place-items-center" style={big ? { transform: "scale(var(--av-scale, 1))" } : undefined}><WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} /></span>
+      {dot && <i data-presence={online ? "online" : "offline"} aria-label={online ? "Online" : "Offline"} title={online ? "Online" : "Offline"} className={`absolute rounded-full ${online ? "bg-[#22c55e]" : "bg-[#8a8797]"}`} style={{ width: d, height: d, right: -Math.round(d * 0.15), bottom: -Math.round(d * 0.15), boxShadow: "0 0 0 2px var(--alt, var(--bg))" }} />}
     </span>
   );
 }

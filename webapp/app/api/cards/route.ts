@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { agentCards, agents, hires, planPurchases } from "@/server/db/schema";
 import { cardIssuer } from "@/server/cards/issuer";
+import { view } from "@/server/cards/view";
 import { CARD_LAMPORTS } from "@/server/config";
 import { verifyPayment } from "@/server/hires";
 import { fetchConfirmed } from "@/server/hub/confirm";
@@ -11,16 +12,10 @@ import { cardBuyBody, cardPatchBody } from "@/server/validate";
 
 export const runtime = "nodejs";
 
-type Row = typeof agentCards.$inferSelect;
-const view = (c: Row) => ({
-  agent: c.agentKey, issuer: c.issuer, test: c.issuer === "devnet-test", number: c.number, last4: c.last4,
-  expMonth: c.expMonth, expYear: c.expYear, cvv: c.cvv, limit: c.spendLimit, spent: c.spent, frozen: c.frozen, tx: c.payTx, createdAt: c.createdAt,
-});
-
 /** Your agents' cards. */
 export const GET = withUser(async (user) => {
   const rows = await db().select().from(agentCards).where(eq(agentCards.userId, user.userId));
-  return Response.json({ cards: rows.map(view), priceLamports: CARD_LAMPORTS });
+  return Response.json({ cards: rows.map((r) => view(r)), priceLamports: CARD_LAMPORTS });
 });
 
 /** Buys a card for one agent: verifies the SOL payment to the treasury on chain, then issues the card. */

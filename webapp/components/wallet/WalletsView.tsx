@@ -18,6 +18,8 @@ import { cardFor, updateCard, useCards } from "./useCards";
 import { friendly } from "@/lib/api";
 import type { Card } from "@/lib/pay";
 import { cardPriceLabel } from "@/lib/prices";
+import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
+import CardSheet from "./CardSheet";
 
 const copy = (addr: string, what: string) => { navigator.clipboard?.writeText(addr).catch(() => {}); toast({ text: `Copied ${what}` }); };
 const ago = (t: number) => { const s = Math.max(1, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`; };
@@ -34,9 +36,10 @@ function PersonalWallet({ s }: { s: State }) {
     const conn = new Connection(SOLANA_RPC, "confirmed");
     const pk = new PublicKey(addr);
     conn.getBalance(pk).then((b) => setSol((b / 1e9).toFixed(4))).catch(() => setSol("—"));
-    conn.getSignaturesForAddress(pk, { limit: 8 }).then(setTxs).catch(() => setTxs([]));
+    conn.getSignaturesForAddress(pk, { limit: 25 }).then(setTxs).catch(() => setTxs([]));
   }, [addr, n]);
   const home = myAgents(s)[0];
+  const hide = useHideBalance();
   const connected = !!bridge && bridge.publicKey.toBase58() === addr;
 
   return (
@@ -48,7 +51,7 @@ function PersonalWallet({ s }: { s: State }) {
             <div className="min-w-0 flex-1"><div className="text-[17px] font-bold">{home?.name || "Your agent"}</div><div className="text-[13px] text-white/75">{connected ? `${bridge!.name} · connected` : "Not connected on this device"}</div></div>
             <span className="label rounded-full bg-white/15 px-2.5 py-1 text-[8.5px]">{CHAIN_NAME}</span>
           </div>
-          <div className="mt-7"><div className="label text-[9px] text-white/70">SOL balance</div><div className="display tab-num mt-2 text-[56px] leading-none">{sol}</div></div>
+          <div className="mt-7"><div className="flex items-center gap-2"><span className="label text-[9px] text-white/70">SOL balance</span><button data-hide-balance onClick={() => setHideBalance(!hide)} aria-label={hide ? "Show balance" : "Hide balance"} aria-pressed={hide} className="grid h-7 w-7 place-items-center rounded-full bg-white/15 hover:bg-white/25"><Icon name={hide ? "eyeoff" : "eye"} size={14} /></button></div><div data-balance className="display tab-num mt-2 text-[56px] leading-none">{hide ? MASK : sol}</div></div>
           <div className="mt-6 flex flex-wrap items-center gap-2">
             {addr && <button onClick={() => copy(addr, "wallet address")} title={addr} className="flex min-w-0 items-center gap-2 rounded-full bg-white/15 py-2 pl-3.5 pr-4 font-mono text-[12.5px] transition hover:bg-white/25"><Icon name="wallet" size={15} /><span className="truncate">{shortAddr(addr)}</span><Icon name="copy" size={14} /></button>}
             {addr && <a href={tokenUrl(addr)} target="_blank" rel="noreferrer" className="rounded-full bg-white/15 px-4 py-2 text-[12.5px] font-semibold transition hover:bg-white/25">Explorer</a>}
@@ -58,9 +61,9 @@ function PersonalWallet({ s }: { s: State }) {
           {!connected && <p className="mt-4 text-[13px] text-white/80">{s.auth?.method === "google" ? "Your wallet loads after Google or email sign-in finishes." : "Open your wallet app or extension to sign from this device."}</p>}
         </div>
         <div className="rounded-[28px] bg-card p-5 ring-1 ring-line sm:p-6">
-          <h3 className="text-[16px] font-bold text-ink">Recent transactions</h3>
+          <div className="flex items-center justify-between"><h3 className="text-[16px] font-bold text-ink">Recent transactions</h3>{addr && !!txs?.length && <a data-view-all href={tokenUrl(addr)} target="_blank" rel="noreferrer" className="text-[13px] font-bold text-brand-ink hover:underline">View all</a>}</div>
           {txs === null ? <p className="mt-3 text-[14px] text-ink/60">Loading…</p> : !txs.length ? <p className="mt-3 text-[14px] text-ink/60">Nothing yet. A check-in on the Hub is a good first one.</p> : (
-            <ul className="mt-3 divide-y divide-[var(--line)]">
+            <ul data-tx-list className="no-bar mt-3 max-h-[312px] divide-y divide-[var(--line)] overflow-y-auto overscroll-contain [mask-image:linear-gradient(to_bottom,black_88%,transparent)]">
               {txs.map((t) => (
                 <li key={t.signature}>
                   <a href={txUrl(t.signature)} target="_blank" rel="noreferrer" className="flex items-center gap-3 py-3">
@@ -78,16 +81,27 @@ function PersonalWallet({ s }: { s: State }) {
   );
 }
 
-function OtherWallet({ s, a }: { s: State; a: MyAgent }) {
+/** A hired or created agent's money: it spends from your wallet, inside its card limit. */
+function OtherWallet({ s, a, card, onCard }: { s: State; a: MyAgent; card: Card | null; onCard: () => void }) {
+  const hide = useHideBalance();
+  const left = card ? Math.max(0, card.limit - card.spent) : 0;
   return (
-    <li className="flex items-center gap-3 rounded-[20px] bg-card p-3 ring-1 ring-line">
-      <AgentTile id={a.id} look={s.agent?.look} size={42} />
-      <div className="min-w-0 flex-1"><div className="truncate text-[15px] font-bold text-ink">{a.name}</div><div className="truncate text-[12.5px] text-ink/60">Pays with your wallet</div></div>
+    <li data-agent-wallet={a.id} className="rounded-[22px] bg-card p-4 ring-1 ring-line">
+      <div className="flex items-center gap-3">
+        <AgentTile id={a.id} look={s.agent?.look} size={44} />
+        <div className="min-w-0 flex-1"><div className="truncate text-[15.5px] font-bold text-ink">{a.name}&apos;s wallet</div><div className="truncate text-[12.5px] text-ink/60">Spends from your wallet{s.auth?.address ? ` · ${shortAddr(s.auth.address)}` : ""}</div></div>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-xl bg-tint p-2"><div className="label text-[8px] text-ink/50">Can spend</div><div className="tab-num mt-0.5 text-[15px] font-bold text-ink">{card ? (hide ? MASK : `$${left}`) : "—"}</div></div>
+        <div className="rounded-xl bg-tint p-2"><div className="label text-[8px] text-ink/50">Spent</div><div className="tab-num mt-0.5 text-[15px] font-bold text-ink">{card ? (hide ? MASK : `$${card.spent}`) : "$0"}</div></div>
+        <div className="rounded-xl bg-tint p-2"><div className="label text-[8px] text-ink/50">Card</div><div className="mt-0.5 text-[15px] font-bold text-ink">{card ? `··${card.last4}` : "None"}</div></div>
+      </div>
+      <button onClick={onCard} className="btn btn-line btn-sm mt-3 w-full text-ink">{card ? "Open card" : "Get a card"}</button>
     </li>
   );
 }
 
-function CardRow({ s, a, card, onGet }: { s: State; a: MyAgent; card: Card | null; onGet: () => void }) {
+function CardRow({ s, a, card, onGet, onOpen }: { s: State; a: MyAgent; card: Card | null; onGet: () => void; onOpen: () => void }) {
   const [busy, setBusy] = useState(false);
   const act = async (patch: { frozen?: boolean; limit?: number }, done: string) => {
     setBusy(true);
@@ -95,7 +109,7 @@ function CardRow({ s, a, card, onGet }: { s: State; a: MyAgent; card: Card | nul
   };
   return (
     <article data-rise className="grid items-center gap-4 rounded-[24px] bg-card p-4 ring-1 ring-line sm:p-5 md:grid-cols-[minmax(0,320px)_1fr]">
-      <CardVisual id={a.id} name={a.name} card={card} className={card ? "" : "opacity-90"} />
+      {card ? <button data-open-card={a.id} onClick={onOpen} aria-label={`Open ${a.name}'s card`} className="block w-full max-w-[360px] text-left transition active:scale-[.98]"><CardVisual id={a.id} name={a.name} card={card} /></button> : <CardVisual id={a.id} name={a.name} card={card} className="opacity-90" />}
       <div className="min-w-0">
         <div className="flex items-center gap-2"><h3 className="truncate text-[17px] font-bold text-ink">{a.name}</h3>
           {card ? <span className={`label rounded-full px-2 py-0.5 text-[8px] ${card.frozen ? "bg-ink/10 text-ink/70" : "bg-[#e7f8ee] text-[#137a3d]"}`}>{card.frozen ? "Frozen" : "Active"}</span>
@@ -106,7 +120,7 @@ function CardRow({ s, a, card, onGet }: { s: State; a: MyAgent; card: Card | nul
             <div className="mt-3 grid grid-cols-4 gap-1.5" role="radiogroup" aria-label={`Monthly limit for ${a.name}`}>
               {CARD_LIMITS.map((l) => <button key={l} role="radio" aria-checked={card.limit === l} disabled={busy} onClick={() => card.limit !== l && act({ limit: l }, `Limit set to $${l} a month`)} className={`rounded-xl py-1.5 text-center text-[13px] font-bold ring-1 transition ${card.limit === l ? "bg-tint text-ink ring-2 ring-grape" : "text-ink/70 ring-line hover:ring-grape/50"}`}>${l}</button>)}
             </div>
-            <button onClick={() => act({ frozen: !card.frozen }, card.frozen ? "Card unfrozen" : "Card frozen")} disabled={busy} className="btn btn-line btn-sm mt-3 text-ink disabled:opacity-60"><Icon name={card.frozen ? "check" : "x"} size={15} />{card.frozen ? "Unfreeze card" : "Freeze card"}</button>
+            <div className="mt-3 flex flex-wrap gap-2"><button onClick={onOpen} className="btn btn-brand btn-sm"><Icon name="eye" size={15} />View card</button><button onClick={() => act({ frozen: !card.frozen }, card.frozen ? "Card unfrozen" : "Card frozen")} disabled={busy} className="btn btn-line btn-sm text-ink disabled:opacity-60"><Icon name={card.frozen ? "check" : "x"} size={15} />{card.frozen ? "Unfreeze" : "Freeze"}</button></div>
           </>
         ) : (
           <>
@@ -125,6 +139,7 @@ export default function WalletsView() {
   const params = useSearchParams();
   const [tab, setTab] = useState<"wallets" | "cards">(params.get("tab") === "cards" ? "cards" : "wallets");
   const [getFor, setGetFor] = useState<string | null>(null);
+  const [openFor, setOpenFor] = useState<string | null>(null);
   const agents = myAgents(s);
   const cards = useCards();
   const go = (t: "wallets" | "cards") => { setTab(t); window.history.replaceState(null, "", t === "cards" ? "/app/wallets?tab=cards" : "/app/wallets"); };
@@ -147,15 +162,16 @@ export default function WalletsView() {
         <div className="mt-6 grid gap-6">
           <PersonalWallet s={s} />
           <section data-rise>
-            <div className="flex items-baseline justify-between gap-3"><h2 className="text-[17px] font-bold text-ink">Other agents</h2><span className="text-[12.5px] text-ink/55">Use your wallet</span></div>
-            {agents.length > 1 ? <ul className="mt-3 grid gap-2">{agents.slice(1).map((a) => <OtherWallet key={a.id} s={s} a={a} />)}</ul>
+            <div className="flex items-baseline justify-between gap-3"><h2 className="text-[17px] font-bold text-ink">Agent wallets</h2><span className="text-[12.5px] text-ink/55">Spend from your balance</span></div>
+            {agents.length > 1 ? <ul className="mt-3 grid gap-2">{agents.slice(1).map((a) => { const c = cardFor(cards, a.id); return <OtherWallet key={a.id} s={s} a={a} card={c} onCard={() => (c ? setOpenFor(a.id) : setGetFor(a.id))} />; })}</ul>
               : <p className="mt-3 text-[14px] text-ink/60">Add an agent to your team. <button onClick={() => openAdd()} className="font-bold text-brand-ink">Add an agent</button></p>}
           </section>
         </div>
       ) : (
-        <div className="mt-6 grid gap-3">{agents.map((a) => <CardRow key={a.id} s={s} a={a} card={cardFor(cards, a.id)} onGet={() => setGetFor(a.id)} />)}</div>
+        <div className="mt-6 grid gap-3">{agents.map((a) => <CardRow key={a.id} s={s} a={a} card={cardFor(cards, a.id)} onGet={() => setGetFor(a.id)} onOpen={() => setOpenFor(a.id)} />)}</div>
       )}
       {getFor && <GetCardDialog s={s} id={getFor} onClose={() => setGetFor(null)} />}
+      {openFor && cardFor(cards, openFor) && <CardSheet agent={openFor} name={agents.find((a) => a.id === openFor)?.name || "Agent"} card={cardFor(cards, openFor)!} onClose={() => setOpenFor(null)} />}
     </>
   );
 }

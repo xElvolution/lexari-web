@@ -104,6 +104,6 @@ export const cardPatchBody = z.object({
   limit: z.number().int().min(10).max(5000).optional(),
 }).strict();
 
-export const planBuyBody = z.object({ plan: z.enum(["pro", "plus", "max"]), tx: z.string().min(64).max(100) }).strict();
+export const planBuyBody = z.object({ plan: z.enum(["pro", "plus", "max"]), tx: z.string().min(64).max(100), period: z.enum(["month", "year"]).default("month") }).strict();
 export const lockBody = z.object({ pin: z.string().regex(/^[0-9]{4,6}$/, "4 to 6 digits"), current: z.string().max(6).optional() }).strict();
 export const lockCheckBody = z.object({ pin: z.string().regex(/^[0-9]{4,6}$/, "4 to 6 digits") }).strict();
