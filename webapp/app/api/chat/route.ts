@@ -9,6 +9,7 @@ import { agents, chats, jobs, messages } from "@/server/db/schema";
 import { configError, jsonError, rateLimit, readJson, toErrorResponse } from "@/server/http";
 import { chatBody } from "@/server/validate";
 import { SPECIALISTS } from "@/content/appData";
+import { desktopOn, runInDesktop, runRequests } from "@/server/desktop";
 
 export const runtime = "nodejs";
 
@@ -57,6 +58,9 @@ export async function POST(req: Request) {
     history: body.history, recall: speakerRow?.memoryOn === false ? [] : body.recall, text: body.text,
   });
 
+  const tools = desktopOn();
+  if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}` };
+
   const sent = Date.now();
   const encoder = new TextEncoder();
   const abort = new AbortController();
@@ -66,9 +70,30 @@ export async function POST(req: Request) {
       const send = (payload: unknown) => { try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)); } catch {} };
       let full = "";
       try {
+        // Stream the reply, but hold text back from the first "<" so <run> requests never reach the screen.
+        let shown = 0;
         for await (const token of streamCompletion(prompt, abort.signal)) {
           full += token;
-          send({ token });
+          const cut = tools ? (full.indexOf("<") >= 0 ? full.indexOf("<") : full.length) : full.length;
+          if (cut > shown) { send({ token: full.slice(shown, cut) }); shown = cut; }
+        }
+        const cmds = tools ? runRequests(full) : [];
+        if (cmds.length) {
+          // The agent asked to use its computer: run the commands in this person's container, then let it answer with the output.
+          const results: string[] = [];
+          for (const cmd of cmds) {
+            send({ tool: { cmd } });
+            const r = await runInDesktop(userId, cmd).catch((e: Error) => ({ code: 1, out: `could not run: ${e.message}` }));
+            results.push(`$ ${cmd}\n${r.out.slice(0, 3000)}${r.code ? `\n(exit ${r.code})` : ""}`);
+          }
+          const before = full.slice(0, full.indexOf("<run>")).trim();
+          const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Output from your computer:\n${results.join("\n\n")}\n\nNow answer the person in plain sentences. Do not write <run> again.` }];
+          let answer = "";
+          if (before && shown > 0) send({ token: "\n\n" });
+          for await (const token of streamCompletion(follow, abort.signal)) { answer += token; send({ token }); }
+          full = `${before && shown > 0 ? before + "\n\n" : ""}${answer.replace(/<run>[\s\S]*?<\/run>/g, "").trim()}`;
+        } else if (tools && shown < full.length) {
+          send({ token: full.slice(shown) });
         }
         const split = splitRemember(full);
         if (!split.reply) throw new ModelError("The agent sent an empty reply. Try again.");
@@ -108,3 +133,9 @@ async function saveTurn(userId: string, body: { convo: string; text: string; use
   ]).onConflictDoNothing();
   await database.update(chats).set({ updatedAt: new Date() }).where(eq(chats.id, chat.id));
 }
+
+const DESKTOP_HINT = [
+  "You have your own Linux computer (bash, python3, git, no internet). Files live in /home/agent and the person can watch your terminal in the Desktop view.",
+  "When the person asks you to make or change files, run code, or check something on your computer, write each shell command as <run>command</run> (at most three).",
+  "You will then get the output and must answer in plain sentences. Never pretend you ran something you did not.",
+].join(" ");

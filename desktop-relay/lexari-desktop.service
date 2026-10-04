@@ -1,0 +1,23 @@
+[Unit]
+Description=Lexari desktop relay (per-user agent containers)
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+User=lexaridesk
+Group=lexaridesk
+SupplementaryGroups=docker
+WorkingDirectory=/opt/lexari-desktop
+EnvironmentFile=/opt/lexari-desktop/env
+Environment=HOME=/opt/lexari-desktop DOCKER_CONFIG=/opt/lexari-desktop/.docker
+ExecStart=/usr/bin/node /opt/lexari-desktop/relay.mjs
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/lexari-desktop
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,1 @@
+{ "name": "lexari-desktop-relay", "private": true, "type": "module", "dependencies": { "ws": "^8.18.0", "node-pty": "^1.0.0" } }
