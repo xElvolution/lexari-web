@@ -44,7 +44,7 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
         <div className="mt-1.5 flex items-center gap-2.5">
           <span data-coin-target className="inline-grid"><Coin size={30} /></span>
           <span data-balance className="text-[1.75rem] font-extrabold leading-none tabular-nums" aria-live="polite">{hide ? MASK : coins.toLocaleString("en-US")}</span>
-          <span className="ml-auto text-right text-[12px] leading-tight text-white/75">+{week.toLocaleString("en-US")} this week<br />{h.lifetime.toLocaleString("en-US")} all time</span>
+          <span className="ml-auto text-right text-[12px] leading-tight text-white/75">+{hide ? MASK : week.toLocaleString("en-US")} this week<br />{hide ? MASK : h.lifetime.toLocaleString("en-US")} all time</span>
         </div>
         <div className="mt-3 flex gap-2 text-[12px] font-semibold">
           <span className="rounded-full bg-white/15 px-2.5 py-1">🔥 {streak}-day streak</span>

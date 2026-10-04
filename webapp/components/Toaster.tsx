@@ -25,7 +25,7 @@ function Item({ t }: { t: Toast }) {
 export default function Toaster() {
   const list = useToasts();
   return (
-    <div className="pointer-events-none fixed inset-x-3 bottom-[92px] z-[80] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:items-end lg:bottom-6">
+    <div className="pointer-events-none fixed inset-x-3 bottom-[92px] z-[115] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:items-end lg:bottom-6">
       {list.map((t) => <div key={t.id} className="w-full max-w-[420px]"><Item t={t} /></div>)}
     </div>
   );

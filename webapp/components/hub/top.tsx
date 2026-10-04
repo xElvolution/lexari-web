@@ -53,8 +53,8 @@ export function Hero({ s, now, ready }: { s: State; now: number; ready: number }
           </div>
           <div className="mt-6 flex flex-wrap gap-2">
             <span className="flex items-center gap-2 rounded-full bg-white/15 py-1.5 pl-2 pr-3.5 text-[14px] font-bold backdrop-blur-sm"><Flame size={18} lit={streak > 0} />{streak}-day streak</span>
-            <span className="rounded-full bg-white/15 px-3.5 py-1.5 text-[14px] font-bold backdrop-blur-sm">+{week.toLocaleString("en-US")} this week</span>
-            <span className="rounded-full bg-white/15 px-3.5 py-1.5 text-[14px] font-bold backdrop-blur-sm">{h.lifetime.toLocaleString("en-US")} earned all time</span>
+            <span className="rounded-full bg-white/15 px-3.5 py-1.5 text-[14px] font-bold backdrop-blur-sm">+{hide ? MASK : week.toLocaleString("en-US")} this week</span>
+            <span className="rounded-full bg-white/15 px-3.5 py-1.5 text-[14px] font-bold backdrop-blur-sm">{hide ? MASK : h.lifetime.toLocaleString("en-US")} earned all time</span>
           </div>
           <div className="mt-6 flex flex-wrap gap-2">
             <a href="#quests" className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-[15px] font-bold text-[#0a0a0a] transition hover:-translate-y-0.5">{ready > 0 ? <><span className="grid h-6 min-w-6 place-items-center rounded-full bg-grape px-1.5 text-[12px] text-white">{ready}</span>Rewards ready</> : <>See quests</>}<Icon name="arrow" size={16} /></a>
