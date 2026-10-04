@@ -18,6 +18,8 @@ export function appOrigin(): { domain: string; uri: string } | null {
 export const treasury = () => process.env.LEXARI_TREASURY || process.env.NEXT_PUBLIC_LEXARI_TREASURY || "";
 export const usdcMint = () => process.env.NEXT_PUBLIC_USDC_MINT || "";
 export const HIRE_LAMPORTS = Number(process.env.NEXT_PUBLIC_HIRE_LAMPORTS || 10_000_000);
+/** Devnet price of one agent card, paid in SOL to the treasury. */
+export const CARD_LAMPORTS = Number(process.env.NEXT_PUBLIC_CARD_LAMPORTS || 20_000_000);
 export const HIRE_USDC = Number(process.env.NEXT_PUBLIC_HIRE_USDC || 1_000_000);
 
 /** What is missing for the database-backed API. Names are logged, never sent to the browser. */

@@ -3,7 +3,7 @@
 import { Connection, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { createTransferInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 import { SOLANA_RPC } from "./nft";
-import { HIRE_LAMPORTS, HIRE_USDC, TREASURY, hireMint } from "./prices";
+import { CARD_LAMPORTS, HIRE_LAMPORTS, HIRE_USDC, TREASURY, hireMint } from "./prices";
 import { api, friendly } from "./api";
 import { get } from "./store";
 import { bridgeFor } from "./walletBridge";
@@ -19,7 +19,7 @@ async function record(slug: string, tx: string, mint: "SOL" | "USDC") {
 }
 
 export async function payForHire(slug: string): Promise<{ ok: true; tx: string; mint: "SOL" | "USDC"; price: number } | { ok: false; error: string }> {
-  if (!TREASURY) return { ok: false, error: "Hiring opens soon. Payments are not switched on yet." };
+  if (!TREASURY) return { ok: false, error: "Payments are not set up on this server." };
   const bridge = bridgeFor(get().auth?.address);
   if (!bridge) return { ok: false, error: "Connect the wallet you signed in with to hire." };
   const mint = hireMint();
@@ -48,4 +48,32 @@ export async function payForHire(slug: string): Promise<{ ok: true; tx: string; 
     const message = (error as Error).message || "The wallet did not pay.";
     return { ok: false, error: /reject|denied|cancel/i.test(message) ? "You cancelled the payment." : message.split("\n")[0].slice(0, 160) };
   }
+}
+
+export type Card = { agent: string; issuer: string; test: boolean; number: string; last4: string; expMonth: number; expYear: number; cvv: string; limit: number; spent: number; frozen: boolean; tx: string };
+
+/** Pays the card price in devnet SOL to the treasury, then asks the server to verify it and issue the card. */
+export async function payForCard(agent: string, limit: number): Promise<{ ok: true; tx: string; card: Card } | { ok: false; error: string }> {
+  if (!TREASURY) return { ok: false, error: "Payments are not set up on this server." };
+  const bridge = bridgeFor(get().auth?.address);
+  if (!bridge) return { ok: false, error: "Connect the wallet you signed in with to pay." };
+  const connection = new Connection(SOLANA_RPC, "confirmed");
+  let sig = "";
+  try {
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+    const tx = new Transaction({ feePayer: bridge.publicKey, blockhash, lastValidBlockHeight });
+    tx.add(SystemProgram.transfer({ fromPubkey: bridge.publicKey, toPubkey: new PublicKey(TREASURY), lamports: CARD_LAMPORTS }));
+    const signed = await bridge.signTransaction(tx);
+    sig = await connection.sendRawTransaction(signed.serialize());
+    const result = await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+    if (result.value.err) return { ok: false, error: "The payment failed on Solana." };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The wallet did not pay.") };
+  }
+  let last: unknown;
+  for (let i = 0; i < 4; i++) {
+    try { const r = await api<{ card: Card }>("/api/cards", { method: "POST", body: { agent, tx: sig, limit } }); return { ok: true, tx: sig, card: r.card }; }
+    catch (e) { last = e; const st = (e as { status?: number }).status; if (st && st < 500 && st !== 404) break; await new Promise((r) => setTimeout(r, 1500 * (i + 1))); }
+  }
+  return { ok: false, error: `${friendly(last, "We could not verify the payment.")} Payment ${sig.slice(0, 8)}… went through; contact support with it.` };
 }

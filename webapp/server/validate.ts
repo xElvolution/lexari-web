@@ -88,3 +88,15 @@ export const claimBody = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("tier"), tier: z.number().int().min(0).max(9) }).strict(),
 ]);
 export const signatureBody = z.object({ signature: z.string().min(64).max(100) }).strict();
+
+export const cardBuyBody = z.object({
+  agent: z.string().regex(/^[a-z0-9-]{1,40}$/),
+  tx: z.string().min(64).max(100),
+  limit: z.number().int().min(10).max(5000),
+}).strict();
+
+export const cardPatchBody = z.object({
+  agent: z.string().regex(/^[a-z0-9-]{1,40}$/),
+  frozen: z.boolean().optional(),
+  limit: z.number().int().min(10).max(5000).optional(),
+}).strict();

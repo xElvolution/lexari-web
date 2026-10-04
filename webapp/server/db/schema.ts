@@ -182,3 +182,28 @@ export const referrals = pgTable("referrals", {
   refereeId: uuid("referee_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** One virtual card per agent. issuer "devnet-test" cards are test cards; a real issuer stores its id in externalId. */
+export const agentCards = pgTable(
+  "agent_cards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    agentKey: text("agent_key").notNull(),
+    issuer: text("issuer").notNull().default("devnet-test"),
+    externalId: text("external_id"),
+    number: text("number").notNull(),
+    last4: text("last4").notNull(),
+    expMonth: integer("exp_month").notNull(),
+    expYear: integer("exp_year").notNull(),
+    cvv: text("cvv").notNull(),
+    spendLimit: integer("spend_limit").notNull().default(250),
+    spent: integer("spent").notNull().default(0),
+    frozen: boolean("frozen").notNull().default(false),
+    payTx: text("pay_tx").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("agent_cards_user_agent").on(t.userId, t.agentKey), uniqueIndex("agent_cards_pay_tx_key").on(t.payTx)],
+);

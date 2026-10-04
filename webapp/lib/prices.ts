@@ -11,3 +11,7 @@ export function hirePriceLabel() {
 }
 
 export const TREASURY = process.env.NEXT_PUBLIC_LEXARI_TREASURY || "";
+
+/** Devnet price of one agent card (SOL, to the treasury). */
+export const CARD_LAMPORTS = Number(process.env.NEXT_PUBLIC_CARD_LAMPORTS || 20_000_000);
+export const cardPriceLabel = () => `${CARD_LAMPORTS / 1e9} SOL`;

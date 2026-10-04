@@ -9,11 +9,11 @@ import { HttpError } from "./http";
 
 export type PaymentCheck = { mint: "SOL" | "USDC"; amount: number; payer: string };
 
-export function verifyPayment(tx: VersionedTransactionResponse, payer: string, mint: "SOL" | "USDC"): PaymentCheck {
+export function verifyPayment(tx: VersionedTransactionResponse, payer: string, mint: "SOL" | "USDC", minLamports = HIRE_LAMPORTS): PaymentCheck {
   const to = treasury();
-  if (!to) throw new HttpError(503, "Hiring is not open yet.");
+  if (!to) throw new HttpError(503, "Payments are not set up on this server.");
   if (tx.meta?.err) throw new HttpError(400, "That payment failed on Solana.");
-  // A hire must be paid for now: an old transfer to the treasury can't be turned into a hire later.
+  // A purchase must be paid for now: an old transfer to the treasury can't be turned into a hire or card later.
   if (!tx.blockTime || Date.now() / 1000 - tx.blockTime > 3600) throw new HttpError(400, "That payment is too old. Hire again to make a new one.");
   const msg = tx.transaction.message;
   const keys = msg.getAccountKeys({ accountKeysFromLookups: tx.meta?.loadedAddresses }).keySegments().flat().map((k) => k.toBase58());
@@ -23,7 +23,7 @@ export function verifyPayment(tx: VersionedTransactionResponse, payer: string, m
     const p = keys.indexOf(payer);
     if (i < 0 || p < 0 || !tx.meta) throw new HttpError(400, "That payment did not go to Lexari.");
     const received = tx.meta.postBalances[i] - tx.meta.preBalances[i];
-    if (received < HIRE_LAMPORTS) throw new HttpError(400, "That payment is less than the price.");
+    if (received < minLamports) throw new HttpError(400, "That payment is less than the price.");
     return { mint, amount: received, payer };
   }
   const usdc = usdcMint();
