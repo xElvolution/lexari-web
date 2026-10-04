@@ -13,12 +13,13 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 COPY image/ /opt/lexari/
 RUN chmod 755 /opt/lexari/bin/* && ln -s /opt/lexari/bin/* /usr/local/bin/ \
     && cp /opt/lexari/openbox/menu.xml /etc/xdg/openbox/menu.xml && sed -i 's|<number>4</number>|<number>1</number>|' /etc/xdg/openbox/rc.xml \
+    && sed -i 's|</applications>|<application class="*"><maximized>yes</maximized><decor>no</decor></application></applications>|' /etc/xdg/openbox/rc.xml \
     && mkdir -p /etc/xdg/tint2 && cp /opt/lexari/tint2rc /etc/xdg/tint2/tint2rc \
     && mkdir -p /usr/share/applications && cp /opt/lexari/*.desktop /usr/share/applications/ \
     && mkdir -p /run/lexari && chown agent:agent /run/lexari \
     && printf 'export PS1="\\[\\e[38;5;141m\\]agent@lexari\\[\\e[0m\\]:\\w$ "\ncd ~\n' >> /etc/skel/.bashrc
 ENV DISPLAY=:0 http_proxy=http://127.0.0.1:3128 https_proxy=http://127.0.0.1:3128 HTTP_PROXY=http://127.0.0.1:3128 HTTPS_PROXY=http://127.0.0.1:3128 no_proxy=localhost,127.0.0.1
-LABEL lexari.desktop.version="3"
+LABEL lexari.desktop.version="4"
 USER agent
 WORKDIR /home/agent
 CMD ["/opt/lexari/bin/lexari-session"]

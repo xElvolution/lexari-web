@@ -5,12 +5,11 @@
 //
 // Containers run with --network none. Each gets a bind-mounted socket dir (/run/lexari inside):
 //   proxy.sock  this relay's filtering web proxy (CONNECT + plain HTTP, ports 80/443 only, public IPs only:
-//               loopback, private, link-local, CGNAT, multicast and every address of this host are refused)
+//               loopback, private, link-local, CGNAT and multicast are refused, so nothing host-local is reachable)
 //   vnc.sock    the container's x11vnc, bridged by socat; the screen websocket is piped to it
 // So the desktop browses the public web but can never reach host-local ports, and the host firewall is untouched.
 import http from "node:http";
 import net from "node:net";
-import os from "node:os";
 import fs from "node:fs";
 import dns from "node:dns/promises";
 import crypto from "node:crypto";
@@ -20,7 +19,7 @@ import pty from "node-pty";
 
 const PORT = Number(process.env.PORT || 3295);
 const SECRET = process.env.DESKTOP_SECRET || "";
-const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:3";
+const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:4";
 const SOCKS = process.env.DESKTOP_SOCKS || "/opt/lexari-desktop/socks";
 const IDLE_MS = Number(process.env.DESKTOP_IDLE_MS || 15 * 60_000);
 if (SECRET.length < 32) { console.error("DESKTOP_SECRET missing"); process.exit(1); }
@@ -44,13 +43,14 @@ const blocked = new net.BlockList();
 for (const [a, p] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
   ["192.0.0.0", 24], ["192.0.2.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["198.51.100.0", 24], ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4]]) blocked.addSubnet(a, p, "ipv4");
 for (const [a, p] of [["::", 128], ["::1", 128], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8], ["64:ff9b::", 96], ["2001:db8::", 32]]) blocked.addSubnet(a, p, "ipv6");
-const hostIps = () => new Set(Object.values(os.networkInterfaces()).flat().map((i) => i.address));
 const OK_PORTS = new Set([80, 443]);
 const unmap = (ip) => (/^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(ip) ? ip.slice(7) : ip);
 function isBlocked(ip) {
   ip = unmap(ip);
   const fam = net.isIP(ip); if (!fam) return true;
-  return hostIps().has(ip) || blocked.check(ip, fam === 4 ? "ipv4" : "ipv6");
+  // Loopback, private, link-local and CGNAT ranges (where host-local services live) are always refused. This host's own
+  // public address is allowed because only ports 80/443 pass, and there it serves the same public sites anyone can open.
+  return blocked.check(ip, fam === 4 ? "ipv4" : "ipv6");
 }
 /** Resolve a host for the proxy: every address must be public, or the request is refused (no DNS-rebinding way in). */
 async function resolvePublic(host) {
