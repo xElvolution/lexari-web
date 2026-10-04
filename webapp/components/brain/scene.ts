@@ -17,6 +17,7 @@ export const CATS: Cat[] = [
   { id: "Habits", ring: 1, anchor: [0.05, 0.32, -0.96], dark: "#e9d5ff", light: "#7e22ce" },
   { id: "Files", ring: 0, anchor: [-0.64, -0.16, -0.08], dark: "#ffffff", light: "#0a0a0a" },
   { id: "Hired agents", ring: 2, anchor: [0, -0.46, -0.72], dark: "#c084fc", light: "#a21caf" },
+  { id: "Skills", ring: 1, anchor: [0.52, 0.5, -0.42], dark: "#7dd3fc", light: "#0369a1" },
 ];
 
 const RINGS = [

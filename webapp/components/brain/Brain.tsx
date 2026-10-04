@@ -10,7 +10,7 @@ import { friendly } from "@/lib/api";
 import { bridgeFor } from "@/lib/walletBridge";
 import { addNote, agentName, downloadFile, editNote, forgetNote, get, primaryOf, toast, unlockMemories, useApp, type Note, type State } from "@/lib/store";
 import Icon from "../Icon";
-import { AgentTile, SpecFace } from "../faces";
+import { SpecFace } from "../faces";
 import { ago } from "../ui";
 import { BrainScene, CATS } from "./scene";
 
@@ -23,6 +23,7 @@ const BLURB: Record<string, string> = {
   Habits: "Your routines and deadlines.",
   Files: "Outputs your agent saved from finished jobs.",
   "Hired agents": "Specialists working in your seats.",
+  Skills: "What this agent can do.",
 };
 
 const mineOf = (s: State, who: string) => s.memory.filter((m) => (m.agent || "home") === who);
@@ -30,15 +31,15 @@ const jobsOf = (s: State, who: string) => s.jobs.filter((j) => j.status !== "run
 function countFor(s: State, id: string, who: string) {
   if (id === "Files") return jobsOf(s, who).reduce((a, j) => a + j.files.length, 0);
   if (id === "Hired agents") return s.hired.length;
+  if (id === "Skills") return skillIds(s, who).length;
   return mineOf(s, who).filter((m) => m.tag === id).length;
 }
 /** The agents whose brain you can open: the ones you made (your personal agent first). */
 function brains(s: State) {
   return [{ id: "home", name: agentName(s) }, ...s.custom.map((c) => ({ id: c.id, name: c.name }))];
 }
-function skillsOf(s: State, who: string) {
-  const ids = who === "home" ? s.meta.home?.skills ?? ["web", "files", "code", "calendar"] : s.custom.find((c) => c.id === who)?.skills ?? [];
-  return ids.map((k) => AGENT_SKILLS.find((x) => x.id === k)?.label ?? k);
+function skillIds(s: State, who: string): string[] {
+  return who === "home" ? s.meta.home?.skills ?? ["web", "files", "code", "calendar"] : s.custom.find((c) => c.id === who)?.skills ?? [];
 }
 
 function NoteRow({ n, now }: { n: Note; now: number }) {
@@ -119,6 +120,7 @@ function Panel({ s, cat, who, whoName, onClose }: { s: State; cat: number; who: 
   const notes = mineOf(s, who).filter((m) => m.tag === id);
   const files = jobsOf(s, who).flatMap((j) => j.files.map((f) => ({ ...f, job: j.id, at: j.startedAt + j.duration })));
   const hired = SPECIALISTS.filter((sp) => s.hired.includes(sp.slug));
+  const skills = skillIds(s, who).map((k) => AGENT_SKILLS.find((x) => x.id === k) ?? { id: k, label: k, desc: "" });
   const teach = () => { const t = draft.trim(); if (!t) return; addNote(t, id as MemoryTag, "You", true, who); setDraft(""); };
 
   return (
@@ -145,6 +147,15 @@ function Panel({ s, cat, who, whoName, onClose }: { s: State; cat: number; who: 
               </li>
             ))}
           </ul>) : <p className="rounded-2xl border-2 border-dashed border-line p-5 text-center text-[14px] text-ink/70">No files yet. Finished jobs save them here.</p>)}
+        {id === "Skills" && (skills.length ? (
+          <ul data-brain-skill-list className="grid gap-2">
+            {skills.map((k) => (
+              <li key={k.id} className="flex items-center gap-3 rounded-2xl bg-alt p-3 ring-1 ring-line">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white" style={{ background: `var(--cat-${cat})` }}><Icon name="check" size={15} stroke={3} /></span>
+                <span className="min-w-0 flex-1"><span className="block font-bold leading-tight text-ink">{k.label}</span>{k.desc && <span className="block text-[13px] leading-snug text-ink/70">{k.desc}</span>}</span>
+              </li>
+            ))}
+          </ul>) : <p className="rounded-2xl border-2 border-dashed border-line p-5 text-center text-[14px] text-ink/70">{whoName} has no skills yet. Add them from its ID card.</p>)}
         {id === "Hired agents" && (hired.length ? (
           <ul className="grid gap-2">
             {hired.map((h) => (
@@ -179,10 +190,8 @@ export default function Brain() {
   const who = list.some((a) => a.id === whoRaw) ? whoRaw : "home";
   const at = list.findIndex((a) => a.id === who);
   const whoName = list[at]?.name || agentName(s);
-  const [picker, setPicker] = useState(false);
   const total = mineOf(s, who).length;
   const counts = useMemo(() => CATS.map((c) => countFor(s, c.id, who)), [s, who]);
-  const skills = skillsOf(s, who);
   const step = (d: number) => { if (list.length < 2) return; setWho(list[(at + d + list.length) % list.length].id); setFocus(-1); scene.current?.setFocus(-1); };
   const swipe = useRef<{ x: number; y: number } | null>(null);
 
@@ -233,25 +242,17 @@ export default function Brain() {
         ))}
       </div>
 
-      <div className="pointer-events-none absolute left-5 right-5 top-5 z-10 sm:left-8 sm:top-8"
+      <div data-brain-head className="pointer-events-none absolute left-5 right-5 top-5 z-10 touch-pan-y select-none sm:left-8 sm:top-8"
         onTouchStart={(e) => { const t = e.touches[0]; swipe.current = { x: t.clientX, y: t.clientY }; }}
-        onTouchEnd={(e) => { const st = swipe.current; swipe.current = null; if (!st) return; const t = e.changedTouches[0]; const dx = t.clientX - st.x, dy = t.clientY - st.y; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1); }}>
+        onTouchEnd={(e) => { const st = swipe.current; swipe.current = null; if (!st) return; const t = e.changedTouches[0]; const dx = t.clientX - st.x, dy = t.clientY - st.y; if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.3) step(dx < 0 ? 1 : -1); }}>
         <p className="label flex items-center gap-2 text-brand-ink"><i className="live-dot h-2 w-2 rounded-full bg-grape" />Memory</p>
-        <div className="pointer-events-auto relative mt-2 flex items-center gap-1.5">
-          {list.length > 1 && <button onClick={() => step(-1)} aria-label="Previous agent's brain" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-card/80 text-ink/70 ring-1 ring-line backdrop-blur hover:text-ink"><Icon name="left" size={15} /></button>}
-          <button data-brain-picker onClick={() => setPicker((p) => !p)} aria-haspopup="listbox" aria-expanded={picker} className="flex min-w-0 items-center gap-2 text-left" title="Switch agent">
-            <h1 className="display truncate text-[34px] leading-none text-ink sm:text-[56px]">{whoName}&apos;s brain</h1>
-            {list.length > 1 && <Icon name="right" size={16} className={`shrink-0 text-ink/50 transition ${picker ? "-rotate-90" : "rotate-90"}`} />}
-          </button>
-          {list.length > 1 && <button onClick={() => step(1)} aria-label="Next agent's brain" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-card/80 text-ink/70 ring-1 ring-line backdrop-blur hover:text-ink"><Icon name="right" size={15} /></button>}
-          {picker && list.length > 1 && (
-            <ul role="listbox" aria-label="Agents" data-brain-list className="pop absolute left-0 top-full z-30 mt-2 max-h-[50vh] w-[min(260px,80vw)] overflow-y-auto rounded-2xl bg-card p-1.5 shadow-[0_20px_50px_-12px_rgba(0,0,0,.5)] ring-1 ring-line">
-              {list.map((a) => <li key={a.id}><button role="option" aria-selected={a.id === who} onClick={() => { setWho(a.id); setPicker(false); setFocus(-1); scene.current?.setFocus(-1); }} className={`flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-[14px] font-semibold ${a.id === who ? "bg-tint text-ink" : "text-ink/80 hover:bg-tint"}`}><AgentTile id={a.id} look={s.agent?.look} size={30} status={false} />{a.name}{a.id === who && <Icon name="check" size={14} className="ml-auto text-brand-ink" />}</button></li>)}
-            </ul>
-          )}
+        <div className="pointer-events-auto relative mt-2 flex max-w-full w-max items-center gap-1.5 pr-4">
+          {list.length > 1 && <button onClick={() => step(-1)} aria-label="Previous agent's brain" className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink/45 hover:text-ink"><Icon name="left" size={14} /></button>}
+          <h1 key={who} className="pop display min-w-0 truncate text-[34px] leading-none text-ink sm:text-[56px]">{whoName}&apos;s brain</h1>
+          {list.length > 1 && <button onClick={() => step(1)} aria-label="Next agent's brain" className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink/45 hover:text-ink"><Icon name="right" size={14} /></button>}
         </div>
-        <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink/70"><span className="tab-num font-bold text-ink">{total}</span> memories in {CATS.length} areas{list.length > 1 && <span className="flex gap-1" aria-hidden>{list.map((a) => <i key={a.id} className={`h-1.5 rounded-full transition-all ${a.id === who ? "w-4 bg-grape" : "w-1.5 bg-ink/25"}`} />)}</span>}</p>
-        {skills.length > 0 && <div data-brain-skills className="mt-2 flex max-w-[min(520px,100%)] flex-wrap gap-1"><span className="label self-center pr-1 text-[8.5px] text-ink/50">Skills</span>{skills.slice(0, 8).map((k) => <span key={k} className="rounded-full bg-card/80 px-2 py-0.5 text-[11.5px] font-semibold text-ink/75 ring-1 ring-line backdrop-blur">{k}</span>)}</div>}
+        <p className="pointer-events-auto mt-2 flex w-max max-w-full flex-wrap items-center gap-2 py-1 pr-6 text-[14px] text-ink/70"><span className="tab-num font-bold text-ink">{total}</span> memories in {CATS.length - 1} areas{list.length > 1 && <span data-brain-dots className="flex gap-1" aria-label={`Agent ${at + 1} of ${list.length}. Swipe to switch.`}>{list.map((a) => <i key={a.id} className={`h-1.5 rounded-full transition-all ${a.id === who ? "w-4 bg-grape" : "w-1.5 bg-ink/25"}`} />)}</span>}</p>
+        {list.length > 1 && <p className="label mt-1.5 text-[8.5px] text-ink/45">Swipe to switch agent</p>}
       </div>
       <p className={`label pointer-events-none absolute inset-x-0 bottom-4 z-10 mx-auto w-max max-w-[calc(100%-2rem)] rounded-full bg-card/85 px-3.5 py-2 text-center text-[9.5px] text-ink/75 shadow-[0_8px_24px_-12px_rgba(20,0,80,.35)] ring-1 ring-line backdrop-blur-md transition-opacity sm:inset-x-auto sm:left-8 sm:mx-0 ${focus >= 0 ? "opacity-0 min-[900px]:opacity-100" : ""}`}>Drag to turn · tap a label to open it</p>
       {failed && <p className="absolute inset-x-5 top-1/2 z-10 text-center text-[15px] text-ink/70">Your browser could not draw the 3D brain. Tap a label above to open that memory area.</p>}
