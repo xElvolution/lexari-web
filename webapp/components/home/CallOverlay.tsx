@@ -2,12 +2,14 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { callTurn, logCall, setCalling, type State } from "@/lib/store";
-import { BLOCKED, ensureMic, hush, listen, ready, speakAndListen, type Feed } from "@/lib/voice";
+import { callTurn, get, logCall, setCalling, speakerFor, type State } from "@/lib/store";
+import { BLOCKED, ensureMic, hush, listen, ready, speakAndListen, transcribe, type Feed, type Transcriber } from "@/lib/voice";
 import { voiceOf } from "@/lib/voices";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
-import { convoOf, fmtSecs } from "../agents";
+import { convoOf, fmtSecs, nameOf as agentLabel } from "../agents";
+import { afterStop, isStop } from "@/lib/names";
+
 
 type Phase = "connecting" | "listening" | "hearing" | "thinking" | "speaking" | "muted" | "error";
 const LABEL: Record<Phase, string> = { connecting: "Connecting…", listening: "Listening", hearing: "Listening", thinking: "Thinking…", speaking: "Speaking", muted: "Muted", error: "" };
@@ -22,6 +24,8 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
   const [phase, setPhase] = useState<Phase>("connecting");
   const [note, setNote] = useState("");
   const [muted, setMuted] = useState(false);
+  const [speaker, setSpeaker] = useState("");
+  const nameOf = (who: string) => (who === id ? c.name : agentLabel(s, who) === "Agent" ? s.custom.find((x) => x.id === who)?.name || "Agent" : agentLabel(s, who));
   const root = useRef<HTMLDivElement>(null);
   const secsRef = useRef(0);
   const mutedRef = useRef(false);
@@ -43,8 +47,10 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
   useEffect(() => {
     let stop = false;
     let abort: AbortController | null = null;
+    let ear: Transcriber | null = null;
     // the call remembers what was said in it (and the last few chat messages), but none of it is shown in the chat
     const history: { from: string; text: string }[] = (s.threads[id] || []).filter((m) => m.text && m.id !== "hello" && m.from !== "system").slice(-8).map((m) => ({ from: m.from, text: m.text }));
+    let lastWho = c.members[0] || id;
     (async () => {
       try { await ensureMic(); } catch (e) { setNote((e as Error).message); setPhase("error"); return; }
       let quiet = 0;
@@ -67,34 +73,52 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
         if (mutedRef.current) continue;
         if (!said) { quiet++; continue; }
         quiet = 0;
+        // "stop" / "wait" on its own: stop talking and listen again. "Stop, what about X?" answers only X.
+        if (isStop(said)) { hush(); setSpeaker(""); continue; }
+        said = afterStop(said);
+        const who = speakerFor(get(), id, said, lastWho);
+        lastWho = who;
+        setSpeaker(who);
         setPhase("thinking"); setNote("");
         // stream the reply into a feed; speech starts on the first full sentence
         let text = "", done = false, failed = "";
         let wake: () => void = () => {};
         const bump = () => { const w = wake; wake = () => {}; w(); };
         const feed: Feed = { text: () => text, done: () => done, more: () => new Promise<void>((r) => { wake = r; if (done) r(); }) };
-        abort = new AbortController();
-        const turn = callTurn(id, said, history, (t) => { text = t; bump(); }, abort.signal)
-          .then((t) => { text = t || text; }, (e: Error) => { if (e.name !== "AbortError") failed = e.message || "Couldn't answer."; })
+        const mine = new AbortController();
+        abort = mine;
+        const turn = callTurn(id, said, history, (t) => { if (!mine.signal.aborted) { text = t; bump(); } }, mine.signal, who)
+          .then((t) => { if (!mine.signal.aborted) text = t || text; }, (e: Error) => { if (e.name !== "AbortError" && !mine.signal.aborted) failed = e.message || "Couldn't answer."; })
           .finally(() => { done = true; bump(); });
         history.push({ from: "you", text: said });
-        while (!done && !ready(text, false)) await feed.more();
+        // Keep listening while it thinks: if you say something new first, that becomes the turn and this answer is dropped.
+        let newer = "";
+        const replyReady = (async () => { while (!done && !ready(text, false)) await feed.more(); })();
+        while (!stop && !newer && !(done || ready(text, false))) {
+          ear = transcribe({ maxMs: 15000, onText: (t) => { if (!stop && t) setPhase("hearing"); } });
+          const r = await Promise.race([replyReady.then(() => "\u0000"), ear.done.catch(() => "")]);
+          if (r === "\u0000") { ear.abort(); ear = null; break; }
+          ear = null;
+          if (r && r.trim()) newer = r.trim();
+          else if (!stop) setPhase("thinking");
+        }
         if (stop) return;
-        if (!text.trim()) { setNote(failed || `${c.name} couldn't answer. Say it again.`); setPhase("error"); await new Promise((r) => setTimeout(r, 1200)); continue; }
-        if (mutedRef.current) { await turn; history.push({ from: id, text }); continue; }
-        next = await speakAndListen(feed, voiceOf(id), {
-          isStopped: () => stop || mutedRef.current,
+        if (newer) { mine.abort(); hush(); next = newer; continue; }
+        if (!text.trim()) { setNote(failed || `${nameOf(who)} couldn't answer. Say it again.`); setPhase("error"); await new Promise((r) => setTimeout(r, 1200)); continue; }
+        if (mutedRef.current) { await turn; history.push({ from: who, text }); continue; }
+        next = await speakAndListen(feed, voiceOf(who), {
+          isStopped: () => stop || mutedRef.current || mine.signal.aborted,
           onStart: () => { if (!stop) setPhase("speaking"); },
           onHold: () => { if (!stop) setPhase("listening"); },
           onResume: () => { if (!stop) setPhase("speaking"); },
-          onBargeIn: () => { if (!stop) setPhase("hearing"); },
+          onBargeIn: () => { if (!stop) { hush(); setPhase("hearing"); } },
         });
-        if (next) abort.abort(); // you talked over it: drop the rest of that answer
+        if (next) { mine.abort(); hush(); } // you talked over it: drop the rest of that answer, answer what you just said
         else await turn;
-        history.push({ from: id, text });
+        if (text.trim()) history.push({ from: who, text });
       }
     })();
-    return () => { stop = true; abort?.abort(); hush(); };
+    return () => { stop = true; abort?.abort(); ear?.abort(); hush(); };
   }, [id, c.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const end = () => { if (ended.current) return; ended.current = true; hush(); logCall(id, secsRef.current); onClose(); };
@@ -113,9 +137,10 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
           <div className="relative grid place-items-center">
             {talking && [0, 0.6, 1.2].map((d) => <span key={d} className="ring-out absolute inset-0 rounded-[38px] border-2 border-lilac/80" style={{ animationDelay: `${d}s`, animationDuration: "1.8s" }} />)}
             {ears && <span className="ring-out absolute inset-0 rounded-[38px] border-2 border-white/35" style={{ animationDuration: "2.6s" }} />}
-            <span className={`block transition-transform duration-300 ${talking ? "scale-[1.04]" : ""}`}>{c.group ? <GroupTile members={c.members} look={s.agent?.look} size={120} /> : <AgentTile id={id} look={s.agent?.look} size={120} radius={38} status={false} />}</span>
+            <span className={`block transition-transform duration-300 ${talking ? "scale-[1.04]" : ""}`}>{c.group && speaker && phase !== "listening" && phase !== "hearing" ? <AgentTile id={speaker} look={s.agent?.look} size={120} radius={38} status={false} /> : c.group ? <GroupTile members={c.members} look={s.agent?.look} size={120} /> : <AgentTile id={id} look={s.agent?.look} size={120} radius={38} status={false} />}</span>
           </div>
           <h2 className="display mt-7 text-[34px] leading-none">{c.name}</h2>
+          {c.group && <p data-call-speaker className="mt-2 min-h-[20px] text-[14px] font-semibold text-lilac">{speaker && (talking || phase === "thinking") ? `${nameOf(speaker)} ${talking ? "is talking" : "is thinking"}` : "Say a name to ask someone"}</p>}
           <p data-call-timer className="mt-2 font-mono text-[14px] tabular-nums text-white/70">{phase === "connecting" ? "Calling…" : fmtSecs(secs)}</p>
           <p data-call-state aria-live="polite" className={`mt-5 flex min-h-[28px] items-center gap-2 rounded-full px-3.5 py-1 text-[13.5px] font-semibold ${phase === "error" ? "max-w-[300px] text-[#ff9a9d]" : "bg-white/[.07] text-white/85"}`}>
             {phase === "thinking" && <span className="typing flex gap-1"><i /><i /><i /></span>}
