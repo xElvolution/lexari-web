@@ -7,8 +7,9 @@ import Icon from "./Icon";
  * Crop and fit a picture before it is saved: drag to move, slider to zoom. Output is a JPEG at a fixed size
  * (avatar 512×512, cover 1500×500), so the server only stores small, already-cropped images.
  */
-export default function ImageCrop({ file, aspect, out, round = false, title, onCancel, onDone }: {
+export default function ImageCrop({ file, aspect, out, round = false, title, onCancel, onDone, onPick, onRemove }: {
   file: File; aspect: number; out: [number, number]; round?: boolean; title: string; onCancel: () => void; onDone: (dataUrl: string) => Promise<void> | void;
+  /** choose a different photo */ onPick?: () => void; /** remove the current one */ onRemove?: () => void;
 }) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -69,7 +70,11 @@ export default function ImageCrop({ file, aspect, out, round = false, title, onC
         <label className="mt-4 flex items-center gap-3 text-[13px] text-ink/65"><Icon name="search" size={15} />
           <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => { const z = Number(e.target.value); setZoom(z); setPos((p) => clamp(p, z)); }} aria-label="Zoom" className="flex-1 accent-[var(--color-grape)]" />
         </label>
-        <p className="mt-1 text-[12px] text-ink/50">Drag to move. Slide to zoom.</p>
+        <div className="mt-1 flex items-center gap-3 text-[12px]">
+          <span className="text-ink/50">Drag to move. Slide to zoom.</span>
+          {onPick && <button type="button" data-crop-pick onClick={onPick} disabled={busy} className="ml-auto font-bold text-brand-ink">New photo</button>}
+          {onRemove && <button type="button" data-crop-remove onClick={onRemove} disabled={busy} className={`${onPick ? "" : "ml-auto "}font-bold text-[#e5484d]`}>Remove</button>}
+        </div>
         {err && <p role="alert" className="mt-2 text-[13px] text-[#e5484d]">{err}</p>}
         <div className="mt-4 flex gap-2"><button onClick={onCancel} disabled={busy} className="btn btn-line btn-sm text-ink">Cancel</button><button data-crop-save onClick={save} disabled={!img || busy} className="btn btn-brand btn-sm flex-1 disabled:opacity-50">{busy ? "Saving…" : "Save"}</button></div>
       </div>

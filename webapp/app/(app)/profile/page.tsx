@@ -27,7 +27,7 @@ function EditDialog({ s, onClose }: { s: State; onClose: () => void }) {
     <div className="fixed inset-0 z-[75] flex items-end justify-center bg-black/55 backdrop-blur-sm sm:items-center sm:p-5" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div role="dialog" aria-modal="true" aria-labelledby="edit-title" className="pop pb-safe-dlg w-full max-w-[460px] rounded-t-[28px] bg-card p-5 ring-1 ring-line sm:rounded-[28px] sm:p-6">
         <div className="flex items-center justify-between"><h2 id="edit-title" className="display text-[30px] text-ink">Edit profile</h2><button onClick={onClose} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={19} /></button></div>
-        <div className="mt-4 flex items-center gap-4"><Avatar p={p} name={name} size="h-16 w-16 text-[22px]" /><span className="text-[13.5px] text-ink/55">Change your picture and cover from the camera buttons on your profile.</span></div>
+        <div className="mt-4 flex items-center gap-4"><Avatar p={p} name={name} size="h-16 w-16 text-[22px]" /><span className="text-[13.5px] text-ink/55">Tap your picture or cover on your profile to change it.</span></div>
         <label className="mt-5 block"><span className="label text-[9.5px] text-ink/60">Display name</span><input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} className="field mt-1.5 !py-2.5" /></label>
         <label className="mt-3 block"><span className="label text-[9.5px] text-ink/60">Username</span>
           <span className="relative mt-1.5 block"><span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-ink/45">@</span><input value={user} onChange={(e) => setUser(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20))} className="field !py-2.5 !pl-8" /></span>
@@ -71,7 +71,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const [edit, setEdit] = useState(false);
   const [tab, setTab] = useState<Tab>("account");
-  const [crop, setCrop] = useState<{ kind: "avatar" | "cover"; file: File } | null>(null);
+  const [crop, setCrop] = useState<{ kind: "avatar" | "cover"; file: File; current?: boolean } | null>(null);
   const [theme, setTheme] = useState<"light" | "dark" | "system">("dark");
   const pick = useRef<HTMLInputElement>(null);
   const pickKind = useRef<"avatar" | "cover">("avatar");
@@ -86,25 +86,29 @@ export default function ProfilePage() {
   const uid = `lx_${(p.username + "0000").slice(0, 4)}${String(p.since).slice(-6)}`;
   const cover = mediaUrl("cover", p.cover);
   const choose = (kind: "avatar" | "cover") => { pickKind.current = kind; pick.current?.click(); };
-  const remove = async (kind: "avatar" | "cover") => { try { await setMedia(kind, null); toast({ text: kind === "avatar" ? "Picture removed" : "Cover removed" }); } catch (e) { toast({ text: (e as Error).message }); } };
+  const remove = async (kind: "avatar" | "cover") => { try { await setMedia(kind, null); setCrop(null); toast({ text: kind === "avatar" ? "Picture removed" : "Cover removed" }); } catch (e) { toast({ text: (e as Error).message }); } };
+  // Tap the picture or cover: with no image, pick one; with one, open it in the crop sheet (re-crop, pick another, or remove).
+  const tap = async (kind: "avatar" | "cover") => {
+    const url = kind === "avatar" ? mediaUrl("avatar", p.avatar) : cover;
+    if (!url) { choose(kind); return; }
+    try { const b = await (await fetch(url)).blob(); setCrop({ kind, file: new File([b], `${kind}.jpg`, { type: b.type || "image/jpeg" }), current: true }); }
+    catch { choose(kind); }
+  };
 
   return (
     <>
       <input ref={pick} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/*" hidden data-media-input onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) setCrop({ kind: pickKind.current, file: f }); }} />
       <section data-rise className="overflow-hidden rounded-[30px] bg-card ring-1 ring-line">
-        <div className="grain relative h-28 bg-[linear-gradient(120deg,#2a0f9a,#5b2bff_55%,#8f6bff)] sm:h-44">
+        <button type="button" data-cover-btn onClick={() => tap("cover")} aria-label={cover ? "Edit cover photo" : "Add a cover photo"} className="grain relative block h-28 w-full bg-[linear-gradient(120deg,#2a0f9a,#5b2bff_55%,#8f6bff)] text-left sm:h-44">
           {cover && <img data-cover src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-          <div className="absolute right-3 top-3 flex gap-1.5">
-            {cover && <button onClick={() => remove("cover")} aria-label="Remove cover" className="grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur hover:bg-black/60"><Icon name="trash" size={15} /></button>}
-            <button data-cover-btn onClick={() => choose("cover")} className="flex h-9 items-center gap-1.5 rounded-full bg-black/45 px-3 text-[13px] font-semibold text-white backdrop-blur hover:bg-black/60"><Icon name="camera" size={15} />{cover ? "Change cover" : "Add cover"}</button>
-          </div>
-        </div>
+          <span aria-hidden className="absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-full bg-black/45 text-white backdrop-blur"><Icon name="camera" size={15} /></span>
+        </button>
         <div className="px-5 pb-5 sm:px-8">
           <div className="relative z-10 -mt-10 flex flex-wrap items-end gap-3 sm:-mt-14 sm:gap-4">
-            <span className="relative rounded-full ring-[5px] ring-[var(--card)]">
+            <button type="button" data-avatar-btn onClick={() => tap("avatar")} aria-label={p.avatar ? "Edit profile picture" : "Add a profile picture"} className="relative rounded-full ring-[5px] ring-[var(--card)]">
               <Avatar p={p} size="h-20 w-20 text-[28px] sm:h-28 sm:w-28 sm:text-[34px]" />
-              <button data-avatar-btn onClick={() => choose("avatar")} aria-label="Change profile picture" className="absolute -bottom-0.5 -right-0.5 grid h-8 w-8 place-items-center rounded-full bg-grape text-white ring-[3px] ring-[var(--card)]"><Icon name="camera" size={14} /></button>
-            </span>
+              <span aria-hidden className="absolute -bottom-0.5 -right-0.5 grid h-7 w-7 place-items-center rounded-full bg-grape text-white ring-[3px] ring-[var(--card)]"><Icon name="camera" size={13} /></span>
+            </button>
             <div className="flex w-full gap-1.5 pb-1 sm:ml-auto sm:w-auto sm:gap-2">
               <button onClick={() => setEdit(true)} className="btn btn-ghost btn-sm !h-10 flex-1 whitespace-nowrap max-sm:!px-2 max-sm:!text-[13px] sm:flex-none"><Icon name="edit" size={15} />Edit profile</button>
               <button onClick={() => { void signOut().then(() => router.push("/signin")); }} className="btn btn-line btn-sm !h-10 flex-1 whitespace-nowrap text-ink max-sm:!px-2 max-sm:!text-[13px] sm:flex-none"><Icon name="out" size={15} />Sign out</button>
@@ -186,6 +190,8 @@ export default function ProfilePage() {
       {edit && <EditDialog s={s} onClose={() => setEdit(false)} />}
       {crop && <ImageCrop file={crop.file} aspect={crop.kind === "avatar" ? 1 : 3} out={crop.kind === "avatar" ? [512, 512] : [1500, 500]} round={crop.kind === "avatar"} title={crop.kind === "avatar" ? "Profile picture" : "Cover photo"}
         onCancel={() => setCrop(null)}
+        onPick={() => { const k = crop.kind; setCrop(null); choose(k); }}
+        onRemove={crop.current ? () => void remove(crop.kind) : undefined}
         onDone={async (url) => { await setMedia(crop.kind, url); setCrop(null); toast({ text: crop.kind === "avatar" ? "Picture updated" : "Cover updated" }); }} />}
     </>
   );
