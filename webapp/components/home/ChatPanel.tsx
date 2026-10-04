@@ -6,13 +6,13 @@ import { voiceOf } from "@/lib/voices";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { CHAT_SUGGESTIONS, specialistBySlug } from "@/content/appData";
-import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, toast, toggleReaction, useNow, useTyping, type Msg, type State } from "@/lib/store";
+import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, isLocked, planOf, toast, toggleReaction, useNow, useTyping, type Msg, type State } from "@/lib/store";
 import SendCard from "./SendCard";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
 import { convoOf, dayLabel, fmtSecs, nameOf, shortTime } from "../agents";
 import Composer from "./Composer";
-import { openAgent } from "../overlays";
+import { openAgent, openUpgrade } from "../overlays";
 
 function VoiceNote({ secs, mine }: { secs: number; mine: boolean }) {
   const [p, setP] = useState(-1);
@@ -328,8 +328,14 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
         </div>
       </div>
 
-      <Composer id={id} name={c.name} suggestions={suggestions} onCall={onCall} onDesktop={onDesktop} desktopOpen={desktopOpen}
-        reply={reply ? { id: reply.id, from: reply.from, text: reply.text || (reply.voice ? "Voice note" : reply.file?.name ?? "") } : null} replyName={reply ? whoName(s, reply.from) : ""} onClearReply={() => setReply(null)} />
+      {isLocked(s, id) ? (
+        <div data-chat-locked className="pb-safe border-t border-line bg-base px-4 py-3"><div className="mx-auto flex max-w-[820px] items-center gap-3 rounded-[22px] bg-card p-3 ring-1 ring-line">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-ink text-[var(--bg)]"><Icon name="lock" size={17} /></span>
+          <span className="min-w-0 flex-1 text-[13.5px] leading-snug text-ink/75"><b className="text-ink">{c.name} is locked on your {planOf(s).name} plan.</b> Your chats are kept. Upgrade to keep working together.</span>
+          <button data-upgrade-plan onClick={() => openUpgrade("plans")} className="btn btn-brand btn-sm !h-10 shrink-0">Upgrade plan</button>
+        </div></div>
+      ) : <Composer id={id} name={c.name} suggestions={suggestions} onCall={onCall} onDesktop={onDesktop} desktopOpen={desktopOpen}
+        reply={reply ? { id: reply.id, from: reply.from, text: reply.text || (reply.voice ? "Voice note" : reply.file?.name ?? "") } : null} replyName={reply ? whoName(s, reply.from) : ""} onClearReply={() => setReply(null)} />}
     </section>
   );
 }

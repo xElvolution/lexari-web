@@ -6,11 +6,12 @@ import Icon from "../Icon";
 import { AgentTile } from "../faces";
 import { myAgents, type MyAgent } from "../agents";
 import { openAdd, openAgent } from "../overlays";
+import { AgentMenu, useAgentMenu } from "./AgentMenu";
 
-function Tile({ a, s, on, onPick }: { a: MyAgent; s: State; on: boolean; onPick: (id: string) => void }) {
+function Tile({ a, s, on, onPick, menu }: { a: MyAgent; s: State; on: boolean; onPick: (id: string) => void; menu: ReturnType<ReturnType<typeof useAgentMenu>["bind"]> }) {
   const typing = useTyping(a.id);
   return (
-    <button data-tile data-tour={`tile-${a.id}`} onClick={() => (on ? openAgent(a.id) : onPick(a.id))} aria-pressed={on} title={on ? `${a.name} · tap for profile and ID card` : `${a.name} · ${a.role}`} className="group relative flex w-[76px] shrink-0 flex-col items-center gap-1.5 rounded-2xl pb-1 pt-1.5 outline-none focus-visible:bg-tint">
+    <button {...menu} data-tile data-tour={`tile-${a.id}`} onClick={() => (on ? openAgent(a.id) : onPick(a.id))} aria-pressed={on} title={on ? `${a.name} · tap for profile and ID card` : `${a.name} · ${a.role}`} className="group relative flex w-[76px] shrink-0 flex-col items-center gap-1.5 rounded-2xl pb-1 pt-1.5 outline-none focus-visible:bg-tint">
       <span className={`relative rounded-[20px] p-[3px] transition duration-200 ${on ? "bg-grape" : "bg-transparent group-hover:bg-line"}`}>
         <AgentTile id={a.id} look={s.agent?.look} size={54} className="transition duration-200 group-hover:scale-[1.04]" radius={17} />
         {on && !typing && <span aria-hidden className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-card text-brand-ink shadow ring-1 ring-line"><Icon name="idcard" size={12} /></span>}
@@ -24,6 +25,7 @@ function Tile({ a, s, on, onPick }: { a: MyAgent; s: State; on: boolean; onPick:
 /** Row of every agent on your team. Scrolls sideways (drag, swipe, wheel or arrows) and filters by name. */
 export default function AgentStrip({ s, active, onPick }: { s: State; active: string; onPick: (id: string) => void }) {
   const all = myAgents(s);
+  const menu = useAgentMenu();
   const [q, setQ] = useState("");
   const list = q.trim() ? all.filter((a) => `${a.name} ${a.role}`.toLowerCase().includes(q.trim().toLowerCase())) : all;
   const row = useRef<HTMLDivElement>(null);
@@ -60,9 +62,10 @@ export default function AgentStrip({ s, active, onPick }: { s: State; active: st
 
   return (
     <div data-tour="strip" className="flex items-center gap-2 border-b border-line px-3 py-2.5 sm:px-4">
+      <AgentMenu s={s} at={menu.at} close={menu.close} onChat={onPick} name={(id) => all.find((x) => x.id === id)?.name || id} />
       <div className="relative min-w-0 flex-1">
         <div ref={row} onScroll={measure} className="no-bar flex cursor-grab select-none items-start gap-1 overflow-x-auto scroll-smooth active:cursor-grabbing" role="list" aria-label="Your agents">
-          {list.map((a) => <Tile key={a.id} a={a} s={s} on={a.id === active} onPick={onPick} />)}
+          {list.map((a) => <Tile key={a.id} a={a} s={s} on={a.id === active} onPick={onPick} menu={menu.bind(a.id)} />)}
           {q && list.length === 0 && <p className="self-center whitespace-nowrap px-3 py-5 text-[14px] text-ink/60">No agent matches “{q}”.</p>}
         </div>
         {edge.l && <button onClick={() => nudge(-1)} aria-label="Scroll left" className="absolute left-0 top-0 z-10 hidden h-full w-14 items-center justify-start bg-gradient-to-r from-base via-base/80 to-transparent md:flex"><span className="grid h-9 w-9 place-items-center rounded-full bg-card text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="left" size={18} /></span></button>}

@@ -29,3 +29,11 @@ export async function assertSeat(userId: string) {
   }
   return plan;
 }
+
+/** Agents past your plan's seats (oldest keep their seats; your own agent always has desk one). Their data stays; they wait for an upgrade. */
+export async function lockedSlugs(userId: string, seats?: number) {
+  const n = seats ?? (await currentPlan(userId)).seats;
+  const rows = await db().select({ slug: agents.slug, at: agents.createdAt }).from(agents).where(eq(agents.userId, userId));
+  const order = rows.sort((a, b) => (a.slug === "home" ? -1 : b.slug === "home" ? 1 : a.at.getTime() - b.at.getTime()));
+  return order.slice(Math.max(1, n)).map((r) => r.slug);
+}

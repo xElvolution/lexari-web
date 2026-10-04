@@ -9,6 +9,7 @@ import { agents, chats, jobs, messages, users } from "@/server/db/schema";
 import { WALLET_HINT, checkSend, stripWalletTags, walletFacts, walletRequests, type SendReq } from "@/server/walletTools";
 import { configError, jsonError, rateLimit, readJson, toErrorResponse } from "@/server/http";
 import { chatBody } from "@/server/validate";
+import { lockedSlugs } from "@/server/plans";
 import { SPECIALISTS } from "@/content/appData";
 import { desktopOn, runInDesktop, runRequests } from "@/server/desktop";
 import { DESKTOP_MARK } from "@/server/engram/grokCli";
@@ -51,6 +52,10 @@ export async function POST(req: Request) {
   const house = SPECIALISTS.find((s) => s.slug === body.speaker);
   if (!home) return jsonError(400, "Finish setting up your agent first.");
   if (body.speaker !== "home" && !speakerRow) return jsonError(403, "That agent is not on your team.");
+  if (body.speaker !== "home") {
+    const locked = await lockedSlugs(userId).catch(() => [] as string[]);
+    if (locked.includes(body.speaker)) return jsonError(402, `${(speakerRow?.meta as { nick?: string })?.nick || speakerRow?.name || "This agent"} is locked on your plan. Upgrade to keep working with them.`);
+  }
   const speakerName = (speakerRow?.meta as { nick?: string })?.nick || speakerRow?.name || body.speaker;
   const role = speakerRow?.kind === "hired" ? house?.job || speakerRow.role : speakerRow?.role || home.role;
   const tone = speakerRow?.tone || home.tone || "short";

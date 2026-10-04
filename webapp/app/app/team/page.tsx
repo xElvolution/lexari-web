@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { specialistBySlug } from "@/content/appData";
 import { hirePriceLabel } from "@/lib/prices";
-import { agentName, planOf, release, seatsUsed, toast, useApp } from "@/lib/store";
+import { agentName, isLocked, primaryOf, planOf, release, seatsUsed, toast, useApp } from "@/lib/store";
 import { PlanSummary } from "@/components/Plans";
 import Icon from "@/components/Icon";
 import { AgentFace, SpecFace } from "@/components/faces";
@@ -45,7 +45,8 @@ export default function TeamPage() {
               const cls = `pop relative grid aspect-square place-items-center rounded-[22%] transition ${state === "home" ? "bg-grape shadow-[0_4px_0_#3514b0]" : state === "hired" ? `bg-tint ring-2 ${pick === slug ? "ring-grape" : "ring-grape/40"} hover:-translate-y-1` : "border-2 border-dashed border-ink/25 bg-base/60 hover:border-grape hover:bg-tint"}`;
               const style = { animationDelay: `${Math.min(i, 40) * 14}ms` };
               const num = big && <span className={`label absolute bottom-[8%] right-[10%] text-[9px] ${state === "home" ? "text-white/85 max-[430px]:hidden" : "text-ink/55"}`}>{String(i + 1).padStart(2, "0")}</span>;
-              if (state === "home") return <Link key={i} href="/app?c=home" className={cls} style={style} title={`${agentName(s)} · seat 01`}><AgentFace look={s.agent?.look} size={120} track={big} className="!h-[72%] !w-[72%]" />{num}</Link>;
+              if (state === "home") return <Link key={i} href="/app?c=home" data-primary={primaryOf(s) === "home" ? "" : undefined} className={`${cls} ${primaryOf(s) === "home" ? "primary-ring [--r:22%]" : ""}`} style={style} title={`${agentName(s)} · seat 01`}><AgentFace look={s.agent?.look} size={120} track={big} className="!h-[72%] !w-[72%]" />{num}</Link>;
+              if (state === "hired" && isLocked(s, slug!)) return <button key={i} data-agent-locked={slug} onClick={() => openUpgrade("plans")} className={`${cls} opacity-80`} style={style} title={`${sp?.name} · locked on ${plan.name}`} aria-label={`${sp?.name} is locked on your plan. Upgrade to unlock.`}><SpecFace slug={slug!} size={90} className="!h-[72%] !w-[72%] opacity-40 grayscale" /><span className="absolute inset-0 grid place-items-center"><span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-[var(--bg)]"><Icon name="lock" size={14} /></span></span>{num}</button>;
               if (state === "hired") return <button key={i} onClick={() => setPick(pick === slug ? null : slug!)} className={cls} style={style} title={`${sp?.name} · seat ${i + 1}`} aria-label={`${sp?.name}, seat ${i + 1}`}><SpecFace slug={slug!} size={90} className="!h-[72%] !w-[72%]" />{num}</button>;
               if (state === "locked") return <button key={i} data-seat-locked onClick={() => openUpgrade(plan.id === "free" ? "add" : "full")} className="pop relative grid aspect-square place-items-center rounded-[22%] bg-ink/[.06] text-ink/35 transition hover:bg-tint hover:text-brand-ink" style={style} aria-label={`Seat ${i + 1} is locked. Upgrade for more seats.`} title="Locked · upgrade for more seats"><Icon name="lock" size={big ? 18 : 13} />{num}</button>;
               return <button key={i} onClick={() => openAdd()} className={cls} style={style} aria-label={`Open seat ${i + 1}. Add an agent.`}>{big && <Icon name="plus" size={18} className="text-ink/40" />}{num}</button>;
