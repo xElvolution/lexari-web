@@ -14,6 +14,7 @@ type Step = {
   target?: (c: Ctx) => string; // data-tour value to spotlight. None: a centred card
   click?: string; // data-tour value whose click moves on (defaults to target)
   gone?: boolean; // also move on if the click target disappears (closed with Esc, swiped away)
+  leaveChat?: boolean; // phones: close the full-screen chat first so the bottom bar can be tapped
   only?: "desktop" | "mobile"; home?: boolean; title?: (c: Ctx) => string; text: (c: Ctx) => string; praise?: string; cta?: string;
 };
 
@@ -21,8 +22,8 @@ const STEPS: Step[] = [
   { id: "hi", action: "next", home: true, title: (c) => `Hi${c.you ? ` ${c.you}` : ""}, I'm ${c.me}.`, text: () => "Five short stops. You'll tap the real buttons.", cta: "Let's go" },
   { id: "tile", action: "click", home: true, target: (c) => `tile-${c.spec}`, text: (c) => `This row is your team. Tap ${c.specName} to open their chat.` },
   { id: "composer", action: "next", target: () => "composer", text: () => "This is where you talk. Type a message, or use the mic, the clip, or the phone." },
-  { id: "brain", action: "click", target: () => "nav-brain", text: (c) => `Tap Brain. That's what I remember about you${c.you ? `, ${c.you}` : ""}, and you can edit or delete any of it.` },
-  { id: "done", action: "next", title: (c) => `That's the tour${c.you ? `, ${c.you}` : ""}.`, text: () => "Bond, Market, Team and Wallets are in the menu. Replay this any time from Settings.", cta: "Finish" },
+  { id: "brain", action: "click", leaveChat: true, target: () => "nav-brain", text: (c) => `Tap Brain. That's what I remember about you${c.you ? `, ${c.you}` : ""}, and you can edit or delete any of it.` },
+  { id: "done", action: "next", title: (c) => `That's the tour${c.you ? `, ${c.you}` : ""}.`, text: () => "Bond, Market, Team and Wallets are in the menu. Have fun.", cta: "Finish" },
 ];
 const PRAISE = ["Nice, you're getting the hang of it!", "Perfect.", "That's it.", "Great, keep going.", "Exactly like that."];
 
@@ -72,7 +73,10 @@ export default function Tour({ s }: { s: State }) {
   };
 
   // steps that live on the Agents page bring you back there
-  useEffect(() => { if (step.home && path !== "/app") router.push("/app"); }, [step.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (step.home && path !== "/app") router.push("/app");
+    else if (step.leaveChat && !wide && new URLSearchParams(window.location.search).get("c")) router.replace("/app");
+  }, [step.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // follow the target every frame; notice when a click target disappears
   useEffect(() => {
