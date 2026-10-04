@@ -12,6 +12,7 @@ import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
 import { myAgents } from "@/components/agents";
 import { burst } from "@/components/fly";
+import { openAgent } from "@/components/overlays";
 import { Coin, flyCoins } from "./coin";
 
 /* Native phone layout for the Hub (≤430px). Same actions as the desktop Hub, compact rows and cards. */
@@ -208,7 +209,9 @@ function TrainList({ s }: { s: State }) {
                 <div className="flex items-center gap-1.5"><span className="truncate text-[14.5px] font-semibold text-ink">{a.name}</span><span className="text-[11.5px] font-bold text-brand-ink">Lv {level}</span></div>
                 <div className="mt-1 flex items-center gap-2"><span className="h-1 flex-1 overflow-hidden rounded-full bg-tint"><span className="block h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></span><span className="text-[11px] tabular-nums text-ink/50">{level >= MAX_LEVEL ? "max" : `${xp}/${need}`}</span></div>
               </div>
-              <button type="button" disabled={!!busy || level >= MAX_LEVEL || amount <= 0} onClick={(e) => train(a.id, a.name, amount, e.currentTarget)} className={`${pill} bg-grape text-white`}>{busy === "train" ? "…" : `+${amount || 25} XP`}</button>
+              {!(s.live?.levels.find((l) => l.slug === a.id)?.asset || s.meta[a.id]?.nft?.tokenId)
+                ? <button type="button" onClick={() => openAgent(a.id)} className={`${pill} bg-tint text-brand-ink`}>Mint ID</button>
+                : <button type="button" disabled={!!busy || level >= MAX_LEVEL || amount <= 0} onClick={(e) => train(a.id, a.name, amount, e.currentTarget)} className={`${pill} bg-grape text-white`}>{busy === "train" ? "…" : `+${amount || 25} XP`}</button>}
             </li>
           );
         })}

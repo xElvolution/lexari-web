@@ -48,7 +48,7 @@ export const chainHub: HubAdapter = {
     const cur = levelOf(s, agent);
     if (!r.who) return { ok: false, levelsGained: 0, level: cur.level, error: r.error };
     const asset = s.live?.levels.find((l) => l.slug === agent)?.asset || s.meta[agent]?.nft?.tokenId;
-    if (!asset) return { ok: false, levelsGained: 0, level: cur.level, error: "Mint this agent's ID card before training it." };
+    if (!asset) return { ok: false, levelsGained: 0, level: cur.level, error: "Mint this agent's ID card first. Tap the agent in chat to open its ID card." };
     if (cur.level >= MAX_LEVEL) return { ok: false, levelsGained: 0, level: cur.level, error: "This agent is already at the top level." };
     const spend = Math.min(Math.floor(amount), coinsOf(s));
     if (spend <= 0) return { ok: false, levelsGained: 0, level: cur.level, error: "Not enough coins." };
