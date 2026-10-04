@@ -1,0 +1,19 @@
+#!/bin/bash
+# Starts the desktop: web proxy bridge, X server, window manager, panel, VNC, then the browser.
+export HOME=/home/agent DISPLAY=:0
+cd "$HOME"
+[ -f "$HOME/.bashrc" ] || cp /etc/skel/.bashrc /etc/skel/.profile "$HOME/" 2>/dev/null
+grep -q agent@lexari "$HOME/.bashrc" 2>/dev/null || printf 'export PS1="\\[\\e[38;5;141m\\]agent@lexari\\[\\e[0m\\]:\\w$ "\n' >> "$HOME/.bashrc"
+[ -f "$HOME/README.txt" ] || printf "Welcome to your agent's computer.\nFiles you and your agent make live in /home/agent.\nThe browser reaches the public web through Lexari's filtered proxy.\n" > "$HOME/README.txt"
+mkdir -p /tmp/.X11-unix "$HOME/Downloads"
+rm -f /tmp/.X0-lock /run/lexari/vnc.sock
+socat TCP-LISTEN:3128,bind=127.0.0.1,fork,reuseaddr UNIX-CONNECT:/run/lexari/proxy.sock &
+Xvfb :0 -screen 0 ${LX_SCREEN:-1280x800}x24 -nolisten tcp -dpi 96 >/tmp/xvfb.log 2>&1 &
+for i in $(seq 1 50); do xdpyinfo >/dev/null 2>&1 && break; sleep 0.1; done
+hsetroot -solid '#17122b' >/dev/null 2>&1
+openbox >/tmp/openbox.log 2>&1 &
+tint2 -c /etc/xdg/tint2/tint2rc >/tmp/tint2.log 2>&1 &
+x11vnc -display :0 -localhost -rfbport 5900 -forever -shared -nopw -noxdamage -repeat -quiet -bg -o /tmp/x11vnc.log
+socat UNIX-LISTEN:/run/lexari/vnc.sock,fork,mode=666,unlink-early TCP:127.0.0.1:5900 &
+( sleep 1; browser "${LX_HOME_URL:-https://duckduckgo.com}" ) &
+wait

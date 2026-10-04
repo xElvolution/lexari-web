@@ -1,0 +1,12 @@
+#!/bin/bash
+# browse <url>: open a page in the visible browser (a new tab if the browser is already open).
+url="${1:-https://duckduckgo.com}"
+case "$url" in http://*|https://*) ;; *) url="https://$url";; esac
+if pgrep -u "$(id -u)" -x chromium >/dev/null; then
+  chromium --no-sandbox --test-type --user-data-dir="$HOME/.config/chromium" --proxy-server=http://127.0.0.1:3128 "$url" >/dev/null 2>&1 &
+else
+  setsid browser "$url" >/dev/null 2>&1 &
+fi
+sleep 2
+id=$(xdotool search --onlyvisible --class chromium 2>/dev/null | tail -1); [ -n "$id" ] && xdotool windowactivate "$id" 2>/dev/null
+echo "Opened $url in the browser."

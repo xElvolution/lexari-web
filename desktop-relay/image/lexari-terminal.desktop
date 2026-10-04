@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Terminal
+Exec=xterm -bg #0d0b14 -fg #e9e4ff -fa "DejaVu Sans Mono" -fs 11
+Icon=utilities-terminal
+Type=Application

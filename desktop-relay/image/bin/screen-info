@@ -1,0 +1,3 @@
+#!/bin/bash
+# screen-info: what is on the desktop right now (window titles), for the agent.
+for id in $(xdotool search --onlyvisible --name . 2>/dev/null); do n=$(xdotool getwindowname "$id" 2>/dev/null); [ -n "$n" ] && echo "$n"; done | sort -u | grep -v '^tint2$'

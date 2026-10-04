@@ -197,7 +197,8 @@ async function saveTurn(userId: string, body: TurnBody, speaker: string, reply: 
 
 const DESKTOP_HINT = [
   DESKTOP_MARK,
-  "You have your own Linux computer (bash, python3, git, no internet). Files live in /home/agent and the person can watch your terminal in the Desktop view.",
+  "You have your own Linux computer with a graphical desktop and a Chromium web browser (bash, python3, git, curl, xdotool; the public web is reachable through a filtered proxy). Files live in /home/agent and the person can watch your screen and terminal in the Desktop view.",
+  "To show the person a web page on your screen run <run>browse https://example.com</run>. To read a page's text yourself run <run>readpage https://example.com</run>. To see which windows are open run <run>screen-info</run>. You can click and type in the browser with xdotool (for example <run>xdotool key ctrl+l && xdotool type 'lexari.ai' && xdotool key Return</run>).",
   "When the person asks you to make or change files, run code, or check something on your computer, write each shell command as <run>command</run> (at most three).",
   "You will then get the output and must answer in plain sentences. Never pretend you ran something you did not.",
 ].join(" ");

@@ -1,24 +1,37 @@
 // Lexari desktop relay: one locked-down Docker container per user, reached only through this service.
-// Listens on 127.0.0.1 only. Browsers attach over a websocket with a short-lived ticket signed by the webapp;
-// the webapp runs agent commands and lists files with a shared secret. Runs as a dedicated user in the docker group.
+// Listens on 127.0.0.1 only. Browsers attach over a websocket with a short-lived ticket signed by the webapp
+// (terminal: /desktop/ws, screen: /desktop/ws?k=vnc); the webapp runs agent commands and lists files with a shared secret.
+// Runs as a dedicated user in the docker group.
+//
+// Containers run with --network none. Each gets a bind-mounted socket dir (/run/lexari inside):
+//   proxy.sock  this relay's filtering web proxy (CONNECT + plain HTTP, ports 80/443 only, public IPs only:
+//               loopback, private, link-local, CGNAT, multicast and every address of this host are refused)
+//   vnc.sock    the container's x11vnc, bridged by socat; the screen websocket is piped to it
+// So the desktop browses the public web but can never reach host-local ports, and the host firewall is untouched.
 import http from "node:http";
+import net from "node:net";
+import os from "node:os";
+import fs from "node:fs";
+import dns from "node:dns/promises";
 import crypto from "node:crypto";
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { WebSocketServer } from "ws";
 import pty from "node-pty";
 
 const PORT = Number(process.env.PORT || 3295);
 const SECRET = process.env.DESKTOP_SECRET || "";
-const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:1";
+const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:2";
+const SOCKS = process.env.DESKTOP_SOCKS || "/opt/lexari-desktop/socks";
 const IDLE_MS = Number(process.env.DESKTOP_IDLE_MS || 15 * 60_000);
 if (SECRET.length < 32) { console.error("DESKTOP_SECRET missing"); process.exit(1); }
 
-const LIMITS = ["--cpus", "0.5", "--memory", "512m", "--memory-swap", "512m", "--pids-limit", "256"];
-const HARDEN = ["--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only",
-  "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "--user", "1000:1000", "--ulimit", "nofile=1024:1024"];
+const LIMITS = ["--cpus", "1", "--memory", "1536m", "--memory-swap", "1536m", "--pids-limit", "768", "--shm-size", "256m"];
+const HARDEN = ["--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--init",
+  "--tmpfs", "/tmp:rw,nosuid,nodev,size=384m,mode=1777", "--user", "1000:1000", "--ulimit", "nofile=4096:4096"];
 
 const last = new Map(); // container -> last activity
-const sockets = new Map(); // user -> Set<ws>
+const sockets = new Map(); // user -> Set<ws> (terminals)
+const screens = new Map(); // user -> Set<ws> (VNC viewers)
 
 const name = (user) => `lx-${user}`;
 const okUser = (u) => typeof u === "string" && /^[a-f0-9]{32}$/.test(u);
@@ -26,14 +39,95 @@ const sh = (args, opts = {}) => new Promise((resolve) => {
   execFile("docker", args, { timeout: opts.timeout ?? 30_000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => resolve({ code: err ? (err.code ?? 1) : 0, out: String(stdout), err: String(stderr), killed: !!err?.killed }));
 });
 
+// ---- filtering web proxy (one unix socket per user) ----
+const blocked = new net.BlockList();
+for (const [a, p] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
+  ["192.0.0.0", 24], ["192.0.2.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["198.51.100.0", 24], ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4]]) blocked.addSubnet(a, p, "ipv4");
+for (const [a, p] of [["::", 128], ["::1", 128], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8], ["64:ff9b::", 96], ["2001:db8::", 32]]) blocked.addSubnet(a, p, "ipv6");
+const hostIps = () => new Set(Object.values(os.networkInterfaces()).flat().map((i) => i.address));
+const OK_PORTS = new Set([80, 443]);
+const unmap = (ip) => (/^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(ip) ? ip.slice(7) : ip);
+function isBlocked(ip) {
+  ip = unmap(ip);
+  const fam = net.isIP(ip); if (!fam) return true;
+  return hostIps().has(ip) || blocked.check(ip, fam === 4 ? "ipv4" : "ipv6");
+}
+/** Resolve a host for the proxy: every address must be public, or the request is refused (no DNS-rebinding way in). */
+async function resolvePublic(host) {
+  host = host.replace(/^\[|\]$/g, "");
+  if (!host || host.length > 253 || /^localhost$/i.test(host) || /\.(local|internal|localhost)$/i.test(host)) return null;
+  let addrs;
+  if (net.isIP(host)) addrs = [host];
+  else { try { addrs = (await dns.lookup(host, { all: true, verbatim: true })).map((a) => a.address); } catch { return null; } }
+  if (!addrs.length || addrs.some(isBlocked)) return null;
+  return addrs.find((a) => net.isIP(a) === 4) || addrs[0];
+}
+const HOP = ["connection", "keep-alive", "proxy-connection", "proxy-authorization", "proxy-authenticate", "te", "trailer", "upgrade"];
+const hopless = (h) => { const o = { ...h }; for (const k of HOP) delete o[k]; return o; };
+const proxies = new Map(); // user -> http.Server
+const open = new Map(); // user -> live upstream connections
+function startProxy(user, dir) {
+  if (proxies.has(user)) return;
+  const sock = `${dir}/proxy.sock`;
+  try { fs.unlinkSync(sock); } catch {}
+  const refuse = (res, code, why) => { try { res.writeHead(code, { "content-type": "text/plain" }); res.end(`Lexari proxy: ${why}\n`); } catch {} };
+  const busy = () => (open.get(user) || 0) >= 96;
+  const track = (s) => { open.set(user, (open.get(user) || 0) + 1); s.once("close", () => open.set(user, Math.max(0, (open.get(user) || 1) - 1))); last.set(name(user), Date.now()); };
+  const srv = http.createServer(async (req, res) => {
+    let u; try { u = new URL(req.url); } catch { return refuse(res, 400, "absolute http:// URL required"); }
+    if (u.protocol !== "http:") return refuse(res, 400, "use CONNECT for https");
+    const port = Number(u.port || 80);
+    if (!OK_PORTS.has(port)) return refuse(res, 403, "only ports 80 and 443 are allowed");
+    if (busy()) return refuse(res, 429, "too many connections");
+    const ip = await resolvePublic(u.hostname);
+    if (!ip) return refuse(res, 403, "that address is not on the public internet");
+    const headers = hopless({ ...req.headers, host: u.host });
+    const up = http.request({ host: ip, port, method: req.method, path: u.pathname + u.search, headers, setHost: false, timeout: 30_000 }, (r) => { res.writeHead(r.statusCode || 502, hopless(r.headers)); r.pipe(res); });
+    up.on("socket", track);
+    up.on("timeout", () => up.destroy()); up.on("error", () => refuse(res, 502, "upstream failed"));
+    req.pipe(up);
+  });
+  srv.on("connect", async (req, client, head) => {
+    client.on("error", () => {});
+    const m = /^(\[[0-9a-f:.]+\]|[^:]+):(\d+)$/i.exec(req.url || "");
+    const deny = (code, why) => { try { client.end(`HTTP/1.1 ${code} ${why}\r\ncontent-length: 0\r\n\r\n`); } catch {} };
+    if (!m) return deny(400, "Bad Request");
+    const port = Number(m[2]);
+    if (!OK_PORTS.has(port)) return deny(403, "Port Not Allowed");
+    if (busy()) return deny(429, "Too Many Connections");
+    const ip = await resolvePublic(m[1]);
+    if (!ip) return deny(403, "Not Public");
+    const up = net.connect({ host: ip, port, timeout: 30_000 }, () => {
+      up.setTimeout(0);
+      client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+      if (head?.length) up.write(head);
+      up.pipe(client); client.pipe(up);
+    });
+    track(up);
+    up.on("timeout", () => up.destroy());
+    up.on("error", () => deny(502, "Bad Gateway"));
+    client.on("close", () => up.destroy());
+  });
+  srv.on("clientError", (_e, s) => { try { s.destroy(); } catch {} });
+  srv.listen(sock, () => { try { fs.chmodSync(sock, 0o666); } catch {} });
+  srv.on("error", (e) => { console.error("proxy", user, e.message); proxies.delete(user); });
+  proxies.set(user, srv);
+}
+
 async function ensure(user) {
   const c = name(user);
   last.set(c, Date.now());
-  const st = await sh(["inspect", "-f", "{{.State.Running}}", c]);
-  if (st.code === 0 && st.out.trim() === "true") return c;
-  if (st.code === 0) { await sh(["start", c]); return c; }
+  const dir = `${SOCKS}/${user}`;
+  fs.mkdirSync(dir, { recursive: true }); fs.chmodSync(dir, 0o777);
+  startProxy(user, dir);
+  const st = await sh(["inspect", "-f", "{{.State.Running}} {{.Config.Image}}", c]);
+  if (st.code === 0) {
+    const [running, image] = st.out.trim().split(" ");
+    if (image === IMAGE) { if (running !== "true") await sh(["start", c]); return c; }
+    await sh(["rm", "-f", c]); // an older image: recreate (the home volume and its files stay)
+  }
   const r = await sh(["run", "-d", "--name", c, "--hostname", "lexari", "--label", "lexari.desktop=1", ...LIMITS, ...HARDEN,
-    "--restart", "no", "-v", `lxvol-${user}:/home/agent`, "-w", "/home/agent", IMAGE, "sleep", "infinity"], { timeout: 60_000 });
+    "--restart", "no", "-v", `lxvol-${user}:/home/agent`, "-v", `${dir}:/run/lexari`, "-w", "/home/agent", IMAGE], { timeout: 60_000 });
   if (r.code !== 0) throw new Error("container start failed: " + r.err.slice(0, 200));
   return c;
 }
@@ -50,12 +144,12 @@ function broadcast(user, msg) {
   for (const ws of sockets.get(user) || []) { try { ws.send(JSON.stringify(msg)); } catch {} }
 }
 
-async function execCmd(user, cmd) {
+async function execCmd(user, cmd, quiet = false) {
   const c = await ensure(user);
-  broadcast(user, { t: "agent", cmd });
-  const r = await sh(["exec", "-w", "/home/agent", c, "bash", "-lc", `timeout 20 bash -c ${JSON.stringify(cmd)}`], { timeout: 25_000 });
+  if (!quiet) broadcast(user, { t: "agent", cmd });
+  const r = await sh(["exec", "-w", "/home/agent", c, "timeout", "20", "bash", "-lc", cmd], { timeout: 25_000 });
   const out = (r.out + r.err).slice(0, 8000);
-  broadcast(user, { t: "agentOut", cmd, out, code: r.code });
+  if (!quiet) broadcast(user, { t: "agentOut", cmd, out, code: r.code });
   last.set(c, Date.now());
   return { code: r.code, out };
 }
@@ -83,7 +177,7 @@ const server = http.createServer(async (req, res) => {
     if (key.length !== SECRET.length || !crypto.timingSafeEqual(Buffer.from(key), Buffer.from(SECRET))) return send(401, { error: "unauthorized" });
     const body = await readBody(req);
     if (!okUser(body.user)) return send(400, { error: "bad user" });
-    if (req.url === "/exec" && req.method === "POST") return send(200, await execCmd(body.user, String(body.cmd || "").slice(0, 2000)));
+    if (req.url === "/exec" && req.method === "POST") return send(200, await execCmd(body.user, String(body.cmd || "").slice(0, 2000), !!body.quiet));
     if (req.url === "/files" && req.method === "POST") return send(200, await listFiles(body.user, body.path));
     if (req.url === "/read" && req.method === "POST") {
       const c = await ensure(body.user); const p = String(body.path || "");
@@ -100,8 +194,33 @@ server.on("upgrade", (req, socket, head) => {
   if (url.pathname !== "/desktop/ws") { socket.destroy(); return; }
   const user = verifyTicket(url.searchParams.get("t"));
   if (!user) { socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n"); socket.destroy(); return; }
+  if (url.searchParams.get("k") === "vnc") { vss.handleUpgrade(req, socket, head, (ws) => attachScreen(ws, user)); return; }
   wss.handleUpgrade(req, socket, head, (ws) => attach(ws, user, Number(url.searchParams.get("c")) || 80, Number(url.searchParams.get("r")) || 24));
 });
+
+// The screen: the browser's noVNC talks RFB over this websocket, piped byte for byte to the container's x11vnc.
+const vss = new WebSocketServer({ noServer: true, maxPayload: 1 << 20, handleProtocols: (p) => (p.has("binary") ? "binary" : false) });
+async function attachScreen(ws, user) {
+  let c;
+  try { c = await ensure(user); } catch (e) { ws.close(1011, "start failed"); return; }
+  const sock = `${SOCKS}/${user}/vnc.sock`;
+  let tcp = null;
+  for (let i = 0; i < 80 && ws.readyState === ws.OPEN; i++) {
+    tcp = await new Promise((resolve) => { const s = net.connect(sock); s.once("connect", () => resolve(s)); s.once("error", () => resolve(null)); });
+    if (tcp) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  if (!tcp) { try { ws.close(1011, "screen not ready"); } catch {} return; }
+  if (!screens.has(user)) screens.set(user, new Set());
+  screens.get(user).add(ws);
+  last.set(c, Date.now());
+  tcp.on("data", (d) => { last.set(c, Date.now()); if (ws.readyState === ws.OPEN) ws.send(d); });
+  tcp.on("close", () => { try { ws.close(); } catch {} });
+  tcp.on("error", () => {});
+  ws.on("message", (d) => { last.set(c, Date.now()); tcp.write(d); });
+  const ping = setInterval(() => { try { ws.ping(); } catch {} }, 25_000);
+  ws.on("close", () => { clearInterval(ping); screens.get(user)?.delete(ws); tcp.destroy(); });
+}
 
 async function attach(ws, user, cols, rows) {
   let term;
@@ -130,7 +249,7 @@ setInterval(async () => {
   const r = await sh(["ps", "--filter", "label=lexari.desktop=1", "--format", "{{.Names}}"]);
   for (const c of r.out.split("\n").filter(Boolean)) {
     const user = c.slice(3);
-    if ((sockets.get(user)?.size || 0) > 0) continue;
+    if ((sockets.get(user)?.size || 0) > 0 || (screens.get(user)?.size || 0) > 0) continue;
     if (Date.now() - (last.get(c) || 0) > IDLE_MS) { await sh(["stop", "-t", "3", c]); last.delete(c); console.log("idle stop", c); }
   }
 }, 60_000);

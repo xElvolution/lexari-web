@@ -1,0 +1,28 @@
+#!/bin/bash
+# readpage <url>: print the readable text of a page (rendered by headless Chromium, falls back to curl).
+url="$1"; [ -z "$url" ] && { echo "usage: readpage <url>"; exit 2; }
+case "$url" in http://*|https://*) ;; *) url="https://$url";; esac
+html=$(timeout 15 chromium --headless=new --no-sandbox --disable-gpu --proxy-server=http://127.0.0.1:3128 --user-data-dir=/tmp/readpage-profile \
+  --virtual-time-budget=4000 --dump-dom "$url" 2>/dev/null)
+[ -z "$html" ] && html=$(curl -sL --max-time 12 -A "Mozilla/5.0 LexariAgent" "$url")
+printf '%s' "$html" | python3 -c '
+import sys, html, re
+from html.parser import HTMLParser
+class P(HTMLParser):
+    def __init__(s): super().__init__(); s.out=[]; s.skip=0; s.title=""; s.in_title=False
+    def handle_starttag(s,t,a):
+        if t in ("script","style","noscript","svg"): s.skip+=1
+        if t=="title": s.in_title=True
+        if t in ("p","div","br","li","h1","h2","h3","h4","tr","section","article"): s.out.append("\n")
+        if t=="a":
+            h=dict(a).get("href","")
+    def handle_endtag(s,t):
+        if t in ("script","style","noscript","svg") and s.skip: s.skip-=1
+        if t=="title": s.in_title=False
+    def handle_data(s,d):
+        if s.in_title: s.title+=d
+        elif not s.skip: s.out.append(d)
+p=P(); p.feed(sys.stdin.read())
+txt=re.sub(r"[ \t]+"," ","".join(p.out)); txt=re.sub(r"\n\s*\n+","\n\n",txt).strip()
+print(("Title: "+p.title.strip()+"\n\n" if p.title.strip() else "")+txt[:6000])
+'

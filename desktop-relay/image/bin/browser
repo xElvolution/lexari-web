@@ -1,0 +1,7 @@
+#!/bin/bash
+# Chromium for the agent's desktop. The container is the sandbox (no capabilities, no network except the filtered proxy).
+mkdir -p "$HOME/.config/chromium"
+rm -f "$HOME/.config/chromium/SingletonLock" 2>/dev/null
+exec chromium --no-sandbox --test-type --no-first-run --no-default-browser-check --disable-gpu --disable-dev-shm-usage \
+  --proxy-server=http://127.0.0.1:3128 --user-data-dir="$HOME/.config/chromium" --disk-cache-dir=/tmp/chromium-cache \
+  --password-store=basic --disable-features=Translate,MediaRouter --start-maximized "$@" >/tmp/chromium.log 2>&1

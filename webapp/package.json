@@ -17,6 +17,7 @@
     "@metaplex-foundation/umi-bundle-defaults": "^1.6.0",
     "@metaplex-foundation/umi-signer-wallet-adapters": "^1.6.0",
     "@metaplex-foundation/umi-uploader-irys": "^1.6.0",
+    "@novnc/novnc": "^1.6.0",
     "@privy-io/react-auth": "^3.47.0",
     "@solana-program/memo": "^0.15.0",
     "@solana-program/system": "^0.15.0",
