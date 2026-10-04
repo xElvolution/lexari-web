@@ -186,7 +186,7 @@ function QuestItem({ q }: { q: QuestView }) {
 }
 
 function TrainList({ s }: { s: State }) {
-  // Only agents you made can level up, and only the primary one trains.
+  // Only agents you made can level up (hired specialists never do). One of them is your primary agent.
   const team = myAgents(s).filter((a) => isCreated(s, a.id));
   const primary = primaryOf(s);
   const coins = coinsOf(s);
@@ -198,7 +198,7 @@ function TrainList({ s }: { s: State }) {
   return (
     <section id="level" className={`${card} scroll-mt-20 p-3.5`}>
       <div className="flex items-center justify-between"><h2 className={h2}>Train your agents</h2><span className="flex items-center gap-1 text-[12.5px] font-bold text-ink/70"><Coin size={13} />{coins}</span></div>
-      <p className={`${meta} mt-0.5`}>Coins become XP for your primary agent. Each level unlocks a perk. It needs its minted ID card to level up. Hired specialists don&apos;t level up.</p>
+      <p className={`${meta} mt-0.5`}>Coins become XP for agents you made. Each level unlocks a perk. An agent needs its minted ID card to level up. Hired specialists don&apos;t level up.</p>
       <ul className="mt-1 divide-y divide-[var(--line)]">
         {team.map((a) => {
           const { level, xp } = levelOf(s, a.id);
@@ -209,11 +209,13 @@ function TrainList({ s }: { s: State }) {
             <li key={a.id} className="flex items-center gap-3 py-2.5">
               <AgentTile id={a.id} look={a.id === "home" ? s.agent?.look : undefined} size={34} />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5"><span className="truncate text-[14.5px] font-semibold text-ink">{a.name}</span><span className="text-[11.5px] font-bold text-brand-ink">Lv {level}</span></div>
+                <div className="flex items-center gap-1.5"><span className="truncate text-[14.5px] font-semibold text-ink">{a.name}</span><span className="text-[11.5px] font-bold text-brand-ink">Lv {level}</span>
+                  {a.id === primary ? <span data-primary-badge className="rounded-full bg-[#ffd84d]/20 px-1.5 py-px text-[10.5px] font-bold text-[#d4a000]">Primary</span>
+                    : <button type="button" data-make-primary={a.id} onClick={() => { setPrimary(a.id); toast({ text: `${a.name} is now your primary agent`, face: "home" }); }} className="rounded-full px-1.5 py-px text-[10.5px] font-bold text-brand-ink underline-offset-2 hover:underline">Make primary</button>}
+                </div>
                 <div className="mt-1 flex items-center gap-2"><span className="h-1 flex-1 overflow-hidden rounded-full bg-tint"><span className="block h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></span><span className="text-[11px] tabular-nums text-ink/50">{level >= MAX_LEVEL ? "max" : `${xp}/${need}`}</span></div>
               </div>
-              {a.id !== primary ? <button type="button" data-make-primary={a.id} onClick={() => { setPrimary(a.id); toast({ text: `${a.name} is now your primary agent`, face: "home" }); }} className={`${pill} bg-tint text-brand-ink`}>Make primary</button>
-                : !(s.live?.levels.find((l) => l.slug === a.id)?.asset || s.meta[a.id]?.nft?.tokenId)
+              {!(s.live?.levels.find((l) => l.slug === a.id)?.asset || s.meta[a.id]?.nft?.tokenId)
                 ? <button type="button" onClick={() => openAgent(a.id)} className={`${pill} bg-tint text-brand-ink`}>Mint ID</button>
                 : <button type="button" disabled={!!busy || level >= MAX_LEVEL || amount <= 0} onClick={(e) => train(a.id, a.name, amount, e.currentTarget)} className={`${pill} bg-grape text-white`}>{busy === "train" ? "…" : `+${amount || 25} XP`}</button>}
             </li>

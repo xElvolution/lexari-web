@@ -16,9 +16,9 @@ const lookFor = (s: State, id: string) => (id === "home" ? s.agent?.look : null)
 
 /** Pick an agent, pour coins into it as XP, and watch it level up. */
 export default function LevelUp({ s }: { s: State }) {
-  // Only your primary agent (one you made) levels up. Hired specialists never do.
-  const team = myAgents(s).filter((a) => a.id === primaryOf(s) && isCreated(s, a.id));
-  const [pick, setPick] = useState(team[0]?.id ?? "home");
+  // Only agents you made level up (hired specialists never do); your primary agent is picked first.
+  const team = myAgents(s).filter((a) => isCreated(s, a.id));
+  const [pick, setPick] = useState(primaryOf(s));
   const agent = team.find((a) => a.id === pick) ?? team[0];
   const { level, xp } = levelOf(s, agent.id);
   const need = level >= MAX_LEVEL ? 0 : xpFor(level);
