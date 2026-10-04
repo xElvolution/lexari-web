@@ -80,7 +80,9 @@ export async function POST(req: Request) {
   const sent = Date.now();
   const encoder = new TextEncoder();
   const abort = new AbortController();
-  req.signal.addEventListener("abort", () => abort.abort(), { once: true });
+  // Leaving or reloading the page must not lose the reply: keep generating and save it; the app picks it up on its next load.
+  // Only a hard cap stops a runaway reply.
+  const cap = setTimeout(() => abort.abort(), 180_000);
   const stream = new ReadableStream({
     async start(controller) {
       const send = (payload: unknown) => { try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)); } catch {} };
@@ -155,10 +157,11 @@ export async function POST(req: Request) {
         if (error instanceof ModelError) { console.error(`[chat] ${error.message}`); send({ error: error.friendly }); }
         else { console.error(`[chat] ${(error as Error)?.message || "failed"}`); send({ error: "Your agent couldn't reply. Try again." }); }
       } finally {
+        clearTimeout(cap);
         try { controller.close(); } catch {}
       }
     },
-    cancel() { abort.abort(); },
+    cancel() { /* the browser went away: finish and save anyway */ },
   });
   return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache, no-store", "x-accel-buffering": "no" } });
 }

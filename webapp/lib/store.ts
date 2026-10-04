@@ -232,6 +232,16 @@ function mergeThreads(local: Record<string, Msg[]>, server: Record<string, Msg[]
   }
   return out;
 }
+/** After a reload mid-reply: the server is still finishing it. Show typing and fetch again until it lands (up to ~2 min). */
+let replyPolls = 0;
+function awaitPendingReplies(st: State) {
+  const waiting = Object.entries(st.threads).filter(([k, t]) => { const last = t[t.length - 1]; return last && last.from === "you" && Date.now() - last.at < 150_000 && !queued.has(k); }).map(([k]) => k);
+  if (!waiting.length || replyPolls > 30) { if (!waiting.length) replyPolls = 0; for (const k of [...typingWho.keys()]) if (!queued.has(k) && !waiting.includes(k)) typingWho.delete(k); return; }
+  for (const k of waiting) if (!typingWho.has(k)) typingWho.set(k, k.startsWith("g-") ? "home" : k);
+  emit();
+  replyPolls++;
+  setTimeout(() => void hydrate(), 4000);
+}
 /** Reloads chats from the server without dropping anything on screen (after a failed reply). */
 export function refreshThreads() { void hydrate(); }
 /** Loads (or reloads) the account from the server. */
@@ -250,6 +260,7 @@ export function hydrate(): Promise<void> {
       loadError = "";
       emit();
       void decryptMemories(acc.user.wallet, acc.memories, false);
+      awaitPendingReplies(next);
       void refreshHub();
     } catch (e) {
       if (state?.auth && !(e instanceof ApiError && e.status === 401)) { loadError = ""; } // a blip while signed in: keep what's on screen
