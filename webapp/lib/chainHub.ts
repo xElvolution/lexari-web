@@ -1,8 +1,8 @@
 "use client";
 
-import { checkIn, claimRewardFast, levelUp, programIsLive } from "./chain";
+import { checkInFast, claimRewardFast, levelUp, programIsLive, recentBlockhash } from "./chain";
 import { friendly } from "./api";
-import { MAX_LEVEL, QUESTS, TIERS, coinsOf, levelOf, type HubAdapter } from "./hub";
+import { MAX_LEVEL, QUESTS, STREAK_PAY, TIERS, coinsOf, levelOf, type HubAdapter } from "./hub";
 import { get, hubReady, refreshHub, set, toast } from "./store";
 import { ensureBridge } from "./walletBridge";
 
@@ -16,10 +16,13 @@ async function ready() {
 }
 
 /** Show the reward now; the chain confirm and server record finish in the background (rolled back if they fail). */
-function optimistic(kind: "quest" | "box" | "tier", key: string | number, coins: number, sig: string, settled: Promise<unknown>, what: string) {
+function optimistic(kind: "quest" | "box" | "tier" | "checkin", key: string | number, coins: number, sig: string, settled: Promise<unknown>, what: string, streak = 0) {
   set((x) => {
     const live = x.live; if (!live) return x;
-    const player = live.player ? { ...live.player, coins: live.player.coins + coins, lifetime: live.player.lifetime + coins } : live.player;
+    const nowS = Math.floor(Date.now() / 1000);
+    const base = live.player ?? { coins: 0, lifetime: 0, streak: 0, checkedInToday: false, lastCheckIn: 0, referrer: null };
+    const player = kind === "checkin" ? { ...base, coins: base.coins + coins, lifetime: base.lifetime + coins, streak, checkedInToday: true, lastCheckIn: nowS }
+      : live.player ? { ...live.player, coins: live.player.coins + coins, lifetime: live.player.lifetime + coins } : live.player;
     return {
       ...x, bond: { ...x.bond, coins: (player?.coins ?? x.bond.coins) },
       live: {
@@ -27,7 +30,7 @@ function optimistic(kind: "quest" | "box" | "tier", key: string | number, coins:
         quests: kind === "quest" ? live.quests.map((q) => (q.id === key ? { ...q, claimed: true } : q)) : live.quests,
         box: kind === "box" ? { ...live.box, opened: true, coins } : live.box,
         referral: kind === "tier" ? { ...live.referral, tiers: live.referral.tiers.map((t) => (t.tier === key ? { ...t, claimed: true } : t)) } : live.referral,
-        ledger: [{ kind: kind === "quest" ? "claim_quest" : kind === "box" ? "open_box" : "claim_referral_tier", amount: coins, at: Date.now(), tx: sig, data: {} }, ...live.ledger],
+        ledger: [{ kind: kind === "quest" ? "claim_quest" : kind === "box" ? "open_box" : kind === "checkin" ? "check_in" : "claim_referral_tier", amount: coins, at: Date.now(), tx: sig, data: {} }, ...live.ledger],
       },
     };
   });
@@ -41,10 +44,14 @@ export const chainHub: HubAdapter = {
     const s = get();
     if (s.live?.player?.checkedInToday) return { ok: false, coins: 0, day: s.live.player.streak, error: "You already checked in today." };
     try {
-      const before = coinsOf(s);
-      const res = await checkIn(r.who, s.live);
-      const p = res.state.player;
-      return { ok: true, coins: Math.max(0, (p?.coins ?? 0) - before), day: p?.streak ?? 1 };
+      // the streak the program will compute: +1 after yesterday, otherwise a fresh start
+      const p = s.live?.player;
+      const today = Math.floor(Date.now() / 86_400_000);
+      const streak = p && p.lastCheckIn > 0 && Math.floor(p.lastCheckIn / 86_400) === today - 1 ? p.streak + 1 : 1;
+      const coins = STREAK_PAY[Math.min(STREAK_PAY.length, streak) - 1];
+      const res = await checkInFast(r.who, s.live);
+      optimistic("checkin", 0, coins, res.sig, res.settled, "Your check-in", streak);
+      return { ok: true, coins, day: streak };
     } catch (e) {
       void refreshHub();
       return { ok: false, coins: 0, day: 0, error: friendly(e, "Check-in failed.") };
@@ -113,4 +120,4 @@ export const chainHub: HubAdapter = {
 };
 
 // Warm the "is the program live" check so the first tap doesn't wait on it.
-if (typeof window !== "undefined") setTimeout(() => void programIsLive().catch(() => {}), 1500);
+if (typeof window !== "undefined") setTimeout(() => { void programIsLive().catch(() => {}); void recentBlockhash().catch(() => {}); }, 1500);

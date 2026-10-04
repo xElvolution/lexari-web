@@ -15,7 +15,7 @@ export type HubState = Awaited<ReturnType<typeof hubState>>;
 /** A support reset gives someone a fresh box today: their box for that day uses a second onchain slot (day + 1,000,000),
  *  since an opened box account cannot be closed. Set with prefs.boxReset = <UTC day number>. */
 export const BOX_RESET_OFFSET = 1_000_000;
-async function boxDayFor(userId: string, today: number) {
+export async function boxDayFor(userId: string, today: number) {
   const [u] = await db().select({ prefs: users.prefs }).from(users).where(eq(users.id, userId)).limit(1);
   return Number(u?.prefs?.boxReset) === today ? today + BOX_RESET_OFFSET : today;
 }

@@ -83,24 +83,50 @@ export async function claimReward(bridge: WalletBridge, req: { kind: "quest"; qu
   return { sig, coins, ...r };
 }
 
+let bhCache: { blockhash: string; lastValidBlockHeight: number; at: number } | null = null;
+/** A recent blockhash, reused for 20 s (valid for about a minute) so a tap doesn't wait on the RPC. */
+export async function recentBlockhash() {
+  if (bhCache && Date.now() - bhCache.at < 20_000) return bhCache;
+  const r = await connection().getLatestBlockhash("confirmed");
+  bhCache = { ...r, at: Date.now() };
+  return bhCache;
+}
+
+/** Sends a signed transaction, confirms it and lets the server record it: the background half of an instant claim. */
+function settle(signed: Transaction, lastValidBlockHeight: number) {
+  const conn = connection();
+  const p = (async () => {
+    const sig = await conn.sendRawTransaction(signed.serialize(), { preflightCommitment: "confirmed", maxRetries: 5 });
+    const res = await conn.confirmTransaction({ signature: sig, blockhash: signed.recentBlockhash!, lastValidBlockHeight }, "confirmed");
+    if (res.value.err) throw new Error("The claim failed on Solana.");
+    return confirmOnServer(sig);
+  })();
+  p.catch(() => {});
+  return p;
+}
+
 /**
- * Fast claim: resolves as soon as Solana accepted the transaction (preflight passed), so the app can show the
- * coins right away. `settled` confirms on chain and records it on the server in the background.
+ * Fast claim: resolves as soon as your wallet signed, so the app shows the coins right away.
+ * `settled` sends, confirms on chain and records it on the server in the background (the app rolls back if it fails).
  */
 export async function claimRewardFast(bridge: WalletBridge, req: { kind: "quest"; questId: string } | { kind: "box" } | { kind: "tier"; tier: number }) {
   const built = await api<{ tx: string; coins: number; lastValidBlockHeight: number }>("/api/hub/claim", { body: req });
   const tx = Transaction.from(Uint8Array.from(atob(built.tx), (c) => c.charCodeAt(0)));
   if (!tx.feePayer?.equals(bridge.publicKey)) throw new Error("That reward was built for another wallet.");
   const signed = await bridge.signTransaction(tx);
-  const conn = connection();
-  const sig = await conn.sendRawTransaction(signed.serialize(), { preflightCommitment: "confirmed", maxRetries: 5 });
-  const settled = (async () => {
-    const res = await conn.confirmTransaction({ signature: sig, blockhash: signed.recentBlockhash!, lastValidBlockHeight: built.lastValidBlockHeight }, "confirmed");
-    if (res.value.err) throw new Error("The claim failed on Solana.");
-    return confirmOnServer(sig);
-  })();
-  settled.catch(() => {});
-  return { sig, coins: built.coins, settled };
+  const sig = b58(signed.signature!);
+  return { sig, coins: built.coins, settled: settle(signed, built.lastValidBlockHeight) };
+}
+
+/** Instant check-in: signed with a cached blockhash, shown at once, sent and confirmed in the background. */
+export async function checkInFast(bridge: WalletBridge, live: HubState | null | undefined) {
+  const ixs: TransactionInstruction[] = [];
+  if (!live?.player) ixs.push(initPlayerIx(bridge.publicKey, live?.referrerPlayer ? new PublicKey(live.referrerPlayer) : null));
+  ixs.push(checkInIx(bridge.publicKey));
+  const { blockhash, lastValidBlockHeight } = await recentBlockhash();
+  const tx = new Transaction({ feePayer: bridge.publicKey, blockhash, lastValidBlockHeight }).add(...ixs);
+  const signed = await bridge.signTransaction(tx);
+  return { sig: b58(signed.signature!), settled: settle(signed, lastValidBlockHeight) };
 }
 
 export async function checkIn(bridge: WalletBridge, live: HubState | null | undefined) {
