@@ -18,7 +18,8 @@ export function db(): Database {
   const url = process.env.DATABASE_URL;
   if (!url) throw new DbMissingError();
   if (!cached) {
-    const sql = postgres(url, { max: 1, prepare: false });
+    // The database is a remote pooler (~100ms away): one connection serialized every parallel query, so the Hub took ~5s per call.
+    const sql = postgres(url, { max: 10, idle_timeout: 30, prepare: false });
     cached = drizzle(sql, { schema });
   }
   return cached;
