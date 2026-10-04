@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { CHAT_SUGGESTIONS, specialistBySlug } from "@/content/appData";
 import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, toast, toggleReaction, useNow, useTyping, type Msg, type State } from "@/lib/store";
+import SendCard from "./SendCard";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
 import { convoOf, dayLabel, fmtSecs, nameOf, shortTime } from "../agents";
@@ -188,14 +189,15 @@ function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
   const cls = mine ? `bg-grape text-white ${lastOfRun ? "rounded-br-md" : ""}` : `bg-card text-ink ring-1 ring-line ${lastOfRun ? "rounded-bl-md" : ""}`;
   return (
     <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`} data-msg-hold={m.id}>
-      <div ref={box} className="group/msg relative max-w-full">
+      {(m.text || m.file || m.voice) ? <div ref={box} className="group/msg relative max-w-full">
         <span aria-hidden className="pointer-events-none absolute left-0 top-1/2 grid h-9 w-9 -translate-x-[130%] -translate-y-1/2 place-items-center rounded-full bg-tint text-brand-ink" style={{ opacity: gesture.shift > 24 ? 1 : 0 }}><Icon name="reply" size={16} /></span>
         <div {...gesture.handlers} title={shortTime(m.at, now)} className={`relative select-text rounded-[20px] px-4 py-2.5 text-[15.5px] leading-snug max-[430px]:rounded-[18px] max-[430px]:px-3.5 max-[430px]:py-2 max-[430px]:leading-[1.4] ${cls} ${open ? "ring-2 ring-grape" : ""} [-webkit-touch-callout:none]`} style={{ transform: `translateX(${gesture.shift}px)`, transition: gesture.shift ? "none" : "transform .2s ease", touchAction: "pan-y" }}>
           <Body m={m} mine={mine} s={s} />
           {gesture.pop && <span className="pop pointer-events-none absolute -right-1 -top-3 text-[22px]" aria-hidden>❤️</span>}
         </div>
         <MsgMenu m={m} convo={convo} mine={mine} open={open} more={!!menu?.more} below={below} onMore={() => setMenu({ id: m.id, more: true })} onReply={() => { setMenu(null); onReply(m); }} onClose={() => setMenu(null)} />
-      </div>
+      </div> : null}
+      {m.send && <SendCard convo={convo} m={m as Msg & { send: NonNullable<Msg["send"]> }} />}
       <Pills m={m} s={s} convo={convo} mine={mine} />
     </div>
   );
@@ -288,6 +290,8 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
               const first = !prev || prev.from !== m.from || newDay;
               const lastOfRun = !next || next.from !== m.from;
               const day = newDay && now > 0 ? <div className="label my-5 text-center text-[9px] text-ink/45">{dayLabel(m.at, now)}</div> : null;
+              // The reply bubble is empty until the first words arrive; the typing dots stand in for it (one bubble, not two).
+              if (m.from !== "system" && !m.text && !m.file && !m.voice && !m.send) return null;
               if (m.from === "system") return (
                 <div key={m.id} data-msg>{day}
                   <div className="my-3 flex justify-center"><span className="flex items-center gap-2 rounded-full bg-tint px-3.5 py-1.5 text-[12.5px] font-semibold text-ink/70">{m.call && <Icon name="call" size={13} className="text-brand-ink" />}{m.call ? `Voice call · ${fmtSecs(m.call)}` : m.text}</span></div>
@@ -311,7 +315,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
                 </div>
               );
             })}
-            {typing && (
+            {typing && !(msgs.length && msgs[msgs.length - 1].from === typing && (msgs[msgs.length - 1].text || msgs[msgs.length - 1].send)) && (
               <div data-msg className="mt-3 flex items-end gap-2.5">
                 <AgentTile id={typing} look={look} size={30} radius={10} />
                 <div>

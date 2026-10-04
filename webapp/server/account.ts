@@ -50,7 +50,7 @@ export async function loadAccount(user: SessionUser) {
     })),
     chats: chatRows.map((c) => ({
       slug: c.slug, kind: c.kind, title: c.title, members: c.memberSlugs, createdAt: c.createdAt.getTime(),
-      messages: (byChat.get(c.id) || []).slice(-150).map((m) => ({ id: m.clientId || m.id, from: m.fromId, text: m.text, at: m.createdAt.getTime(), ...((m.metaJson as object) || {}) })),
+      messages: dedupe(byChat.get(c.id) || []).slice(-150).map((m) => ({ id: m.clientId || m.id, from: m.fromId, text: m.text, at: m.createdAt.getTime(), ...((m.metaJson as object) || {}) })),
     })),
     memories: memRows.map((m) => ({
       id: m.id, agent: m.agentId ? slugOf.get(m.agentId) || "home" : "home", tag: m.tag, source: m.source, ciphertext: m.ciphertext, iv: m.iv,
@@ -64,3 +64,9 @@ export async function loadAccount(user: SessionUser) {
   };
 }
 export type Account = Awaited<ReturnType<typeof loadAccount>>;
+
+/** One row per client message id (older saves could write the same message twice). */
+function dedupe<T extends { clientId: string | null; id: string }>(rows: T[]) {
+  const seen = new Set<string>();
+  return rows.filter((m) => { const k = m.clientId || m.id; if (seen.has(k)) return false; seen.add(k); return true; });
+}

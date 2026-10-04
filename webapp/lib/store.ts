@@ -26,6 +26,7 @@ export type Msg = {
   call?: number; // a call log line, length in seconds
   re?: Record<string, string[]>; // reactions: emoji → who reacted ("you" or an agent id)
   reply?: { id: string; from: string; text: string }; // the message this one answers
+  send?: { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; error?: string }; // a SOL transfer the agent prepared; only you can confirm it
 };
 /** Your own notes on any agent. Hired agents only get nick, notes and memory; the maker controls the rest. */
 export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; voice?: { name: string; pitch: number; rate: number; preset?: string }; about?: string; skills?: string[]; /** onchain ID card, once minted */ nft?: import("@/lib/nft").NftRecord };
@@ -186,7 +187,8 @@ function fromAccount(acc: Account): State {
   const threads: Record<string, Msg[]> = {};
   const groups: Group[] = [];
   for (const c of acc.chats) {
-    threads[c.slug] = c.messages.map((m) => m as Msg);
+    const seen = new Set<string>();
+    threads[c.slug] = c.messages.filter((m) => { const k = String((m as Msg).id); if (seen.has(k)) return false; seen.add(k); return true; }).map((m) => m as Msg);
     if (c.kind === "group") groups.push({ id: c.slug, name: c.title, members: c.members, at: c.createdAt });
   }
   if (agent && !(threads.home || []).length) threads.home = [hello(agent, Number(acc.user.createdAt) || Date.now())];
@@ -216,6 +218,21 @@ function fromAccount(acc: Account): State {
 }
 
 type RawMem = Account["memories"];
+/** Server threads plus any local message the server doesn't have yet. A thread is never emptied by a reload. */
+function mergeThreads(local: Record<string, Msg[]>, server: Record<string, Msg[]>) {
+  const out: Record<string, Msg[]> = { ...server };
+  for (const [k, mine] of Object.entries(local)) {
+    const theirs = server[k] || [];
+    const ids = new Set(theirs.map((m) => m.id));
+    const newest = theirs.length ? theirs[theirs.length - 1].at : 0;
+    const extra = mine.filter((m) => !ids.has(m.id) && m.id !== "hello" && (m.at >= newest - 120_000 || !theirs.length));
+    if (!extra.length) { if (!theirs.length && mine.length) out[k] = mine; continue; }
+    out[k] = [...theirs.filter((m) => m.id !== "hello" || !extra.length), ...extra].sort((a, b) => a.at - b.at).slice(-200);
+  }
+  return out;
+}
+/** Reloads chats from the server without dropping anything on screen (after a failed reply). */
+export function refreshThreads() { void hydrate(); }
 /** Loads (or reloads) the account from the server. */
 export function hydrate(): Promise<void> {
   if (loading) return loading;
@@ -223,6 +240,8 @@ export function hydrate(): Promise<void> {
     try {
       const acc = await api<Account>("/api/me");
       const next = fromAccount(acc);
+      // Never lose messages you can see: keep anything on screen the server hasn't saved yet (a reply still streaming).
+      if (state?.auth?.address && state.auth.address === next.auth?.address) next.threads = mergeThreads(state.threads, next.threads);
       // The theme you picked on another device (or before this browser's storage was cleared).
       try { const t = next.prefs.theme; if (t && !localStorage.getItem("lexari-theme")) applyTheme(t); } catch {}
       registerCustom(next.custom);
@@ -232,7 +251,8 @@ export function hydrate(): Promise<void> {
       void decryptMemories(acc.user.wallet, acc.memories, false);
       void refreshHub();
     } catch (e) {
-      if (e instanceof ApiError && (e.status === 401 || e.status === 503)) { state = { ...EMPTY }; loadError = e.status === 503 ? e.message : ""; }
+      if (state?.auth && !(e instanceof ApiError && e.status === 401)) { loadError = ""; } // a blip while signed in: keep what's on screen
+      else if (e instanceof ApiError && (e.status === 401 || e.status === 503)) { state = { ...EMPTY }; loadError = e.status === 503 ? e.message : ""; }
       else { state = state ?? { ...EMPTY }; loadError = (e as Error).message || "Could not load your account."; }
       emit();
     } finally {
@@ -468,7 +488,7 @@ async function replyFromModel(convo: string, userMsg: Msg) {
   if (userMsg.file) meta.file = userMsg.file;
   if (userMsg.voice) meta.voice = userMsg.voice;
   if (userMsg.reply) meta.reply = { ...userMsg.reply, text: userMsg.reply.text.slice(0, 300) };
-  const fail = (m: string) => { setMsg(convo, bubble, m); set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, from: "system" } : mm)) } })); return m; };
+  const fail = (m: string) => { setTimeout(refreshThreads, 1500); setMsg(convo, bubble, m); set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, from: "system" } : mm)) } })); return m; };
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
@@ -492,15 +512,16 @@ async function replyFromModel(convo: string, userMsg: Msg) {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed.startsWith("data:")) continue;
-        let payload: { token?: string; remember?: string; error?: string; done?: boolean } = {};
+        let payload: { token?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"] } = {};
         try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
         if (payload.error) return fail(payload.error);
+        if (payload.send) { const sd = payload.send; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, send: sd } : mm)) } })); }
         if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
         if (payload.remember && memoryOn) addNote(payload.remember, "About you", "Chat", true);
         if (payload.done && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
       }
     }
-    if (!full.trim()) return fail("The agent sent an empty reply.");
+    if (!full.trim() && !(get().threads[convo] || []).find((m) => m.id === bubble)?.send) return fail("The agent sent an empty reply.");
     return (get().threads[convo] || []).find((m) => m.id === bubble)?.text || full;
   } catch {
     return fail("Could not reach the agent.");

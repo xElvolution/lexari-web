@@ -52,12 +52,14 @@ export function flatten(messages: ChatMessage[]) {
   const sys = messages.filter((m) => m.role === "system").map((m) => m.content);
   // An agent with a Lexari desktop asks for shell commands with <run> tags; the server runs them in its sandbox.
   const desktop = sys.some((c) => c.includes(DESKTOP_MARK));
+  const wallet = sys.some((c) => c.includes("[lexari-wallet]"));
   const system = [
     ...sys,
     // The CLI is a coding agent at heart; inside Lexari it is only a chat partner.
     desktop
       ? "You are chatting inside the Lexari app. You have your own sandboxed Linux computer that Lexari runs for you. You cannot use your own built-in tools; the only way to use the computer is to write <run>command</run>, and Lexari runs it and shows you the output. Never mention a CLI, Grok or xAI."
       : "You are chatting inside the Lexari app on someone's phone or computer. In this chat you cannot run code, browse the web, open or edit files, or use tools, so never offer to and never mention a workspace, terminal, repository, files on this machine, Grok, xAI or a CLI. Describe what you can do in plain terms: answer questions, explain, plan, write and edit text, brainstorm, and remember what the person tells you.",
+    ...(wallet ? ["You CAN use the person's wallet, but only with the <wallet> and <send> tags described above; Lexari handles them."] : []),
   ].join("\n\n");
   const turns = messages.filter((m) => m.role !== "system");
   const last = turns.pop();
@@ -67,6 +69,7 @@ export function flatten(messages: ChatMessage[]) {
     `Person: ${last?.content ?? ""}`,
     "",
     desktop ? "Reply to the person's last message as yourself. Plain text, plus <run>…</run> lines when you need your computer. Do not use your built-in tools." : "Reply to the person's last message as yourself. Plain text only. Do not use tools.",
+    wallet ? "If they ask about their wallet, balance, address or sending SOL, use the <wallet>/<send> tags." : "",
   ].join("\n");
   return { system, prompt };
 }

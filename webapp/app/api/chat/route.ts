@@ -5,7 +5,8 @@ import { splitRemember } from "@/server/engram/hippocampus";
 import { buildPrompt } from "@/server/engram/spinal";
 import { recordEvent } from "@/server/events";
 import { db, retryRead } from "@/server/db";
-import { agents, chats, jobs, messages } from "@/server/db/schema";
+import { agents, chats, jobs, messages, users } from "@/server/db/schema";
+import { WALLET_HINT, checkSend, stripWalletTags, walletFacts, walletRequests, type SendReq } from "@/server/walletTools";
 import { configError, jsonError, rateLimit, readJson, toErrorResponse } from "@/server/http";
 import { chatBody } from "@/server/validate";
 import { SPECIALISTS } from "@/content/appData";
@@ -62,6 +63,14 @@ export async function POST(req: Request) {
 
   const tools = desktopOn();
   if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}` };
+  const [me] = await retryRead(() => database.select({ wallet: users.wallet }).from(users).where(eq(users.id, userId)).limit(1)).catch(() => []);
+  const wallet = me?.wallet || "";
+  if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${WALLET_HINT}` };
+  const hold = tools || !!wallet;
+
+  // Your message is saved before the agent starts, so it never disappears if the reply fails or the page reloads.
+  let userSaved = false;
+  try { await saveUserMsg(userId, body); userSaved = true; } catch (error) { console.error(`[chat] save user message: ${(error as Error).message}`); }
 
   const sent = Date.now();
   const encoder = new TextEncoder();
@@ -76,7 +85,7 @@ export async function POST(req: Request) {
         let shown = 0;
         for await (const token of streamCompletion(prompt, abort.signal)) {
           full += token;
-          const cut = tools ? (full.indexOf("<") >= 0 ? full.indexOf("<") : full.length) : full.length;
+          const cut = hold ? (full.indexOf("<") >= 0 ? full.indexOf("<") : full.length) : full.length;
           if (cut > shown) { send({ token: full.slice(shown, cut) }); shown = cut; }
         }
         const cmds = tools ? runRequests(full) : [];
@@ -94,13 +103,39 @@ export async function POST(req: Request) {
           if (before && shown > 0) send({ token: "\n\n" });
           for await (const token of streamCompletion(follow, abort.signal)) { answer += token; send({ token }); }
           full = `${before && shown > 0 ? before + "\n\n" : ""}${answer.replace(/<run>[\s\S]*?<\/run>/g, "").trim()}`;
+        }
+        // Wallet tags: reads are answered with real chain data; a send becomes a confirm card only you can approve.
+        let pay: SendReq | null = null;
+        if (wallet) {
+          const w = walletRequests(full);
+          if (w.reads.length) {
+            const facts = await walletFacts(wallet, w.reads);
+            const before = stripWalletTags(full.slice(0, full.search(/<wallet>/i))).trim();
+            const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Lexari wallet data:\n${facts}\n\nNow answer the person in plain sentences using this data. Do not write <wallet> again.` }];
+            let answer = "";
+            if (before && shown > 0) send({ token: "\n\n" });
+            for await (const token of streamCompletion(follow, abort.signal)) { answer += token; }
+            const clean = stripWalletTags(answer);
+            send({ token: clean });
+            full = `${before && shown > 0 ? before + "\n\n" : ""}${clean}${w.sends.length ? full.slice(full.search(/<send/i)) : ""}`;
+            shown = full.length;
+          }
+          if (w.sends.length) {
+            const c = checkSend(w.sends[0], wallet);
+            if (c.ok) { pay = c.send; send({ send: pay }); }
+            else { const note = `\n\n(I couldn't prepare that transfer: ${c.why})`; full += note; send({ token: note }); }
+          }
+          const visible = stripWalletTags(full);
+          if (visible.length > shown && !w.reads.length) send({ token: visible.slice(shown) });
+          full = visible;
+          if (!full && pay) full = `I've prepared ${pay.sol} SOL to ${pay.to.slice(0, 4)}…${pay.to.slice(-4)}. Tap Confirm to send it.`;
         } else if (tools && shown < full.length) {
           send({ token: full.slice(shown) });
         }
         const split = splitRemember(full);
         if (!split.reply) throw new ModelError("The agent sent an empty reply. Try again.");
         if (split.remember) send({ remember: split.remember });
-        await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent);
+        await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay ? { send: pay } : null, userSaved);
         await recordEvent(userId, "message", { ref: body.userMsgId });
         // A real request to a specialist or an agent you made is a job, with the reply as its output.
         if (body.speaker !== "home" && body.text.trim().length >= 12) {
@@ -123,15 +158,28 @@ export async function POST(req: Request) {
   return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache, no-store", "x-accel-buffering": "no" } });
 }
 
-async function saveTurn(userId: string, body: { convo: string; text: string; userMsgId: string; replyMsgId: string; meta: Record<string, unknown> }, speaker: string, reply: string, sent: number) {
+type TurnBody = { convo: string; text: string; userMsgId: string; replyMsgId: string; meta: Record<string, unknown> };
+async function chatRow(userId: string, convo: string, title: string) {
+  const database = db();
+  let [chat] = await database.select().from(chats).where(and(eq(chats.userId, userId), eq(chats.slug, convo))).limit(1);
+  if (!chat) [chat] = await database.insert(chats).values({ userId, kind: convo.startsWith("g-") ? "group" : "dm", slug: convo, title }).onConflictDoNothing().returning();
+  if (!chat) [chat] = await database.select().from(chats).where(and(eq(chats.userId, userId), eq(chats.slug, convo))).limit(1);
+  return chat;
+}
+async function saveUserMsg(userId: string, body: TurnBody & { speaker: string }) {
+  const chat = await retryRead(() => chatRow(userId, body.convo, body.speaker));
+  const meta = Object.keys(body.meta || {}).length ? body.meta : null;
+  await retryRead(() => db().insert(messages).values({ chatId: chat.id, fromId: "you", text: body.text, clientId: body.userMsgId, metaJson: meta, createdAt: new Date() }).onConflictDoNothing());
+}
+async function saveTurn(userId: string, body: TurnBody, speaker: string, reply: string, sent: number, replyMeta: Record<string, unknown> | null = null, userSaved = false) {
   const database = db();
   let [chat] = await database.select().from(chats).where(and(eq(chats.userId, userId), eq(chats.slug, body.convo))).limit(1);
   if (!chat) [chat] = await database.insert(chats).values({ userId, kind: body.convo.startsWith("g-") ? "group" : "dm", slug: body.convo, title: speaker }).onConflictDoNothing().returning();
   if (!chat) [chat] = await database.select().from(chats).where(and(eq(chats.userId, userId), eq(chats.slug, body.convo))).limit(1);
   const meta = Object.keys(body.meta || {}).length ? body.meta : null;
   await database.insert(messages).values([
-    { chatId: chat.id, fromId: "you", text: body.text, clientId: body.userMsgId, metaJson: meta, createdAt: new Date(sent) },
-    { chatId: chat.id, fromId: speaker, text: reply, clientId: body.replyMsgId, createdAt: new Date(Math.max(Date.now(), sent + 1)) },
+    ...(userSaved ? [] : [{ chatId: chat.id, fromId: "you", text: body.text, clientId: body.userMsgId, metaJson: meta, createdAt: new Date(sent) }]),
+    { chatId: chat.id, fromId: speaker, text: reply, clientId: body.replyMsgId, metaJson: replyMeta, createdAt: new Date(Math.max(Date.now(), sent + 1)) },
   ]).onConflictDoNothing();
   await database.update(chats).set({ updatedAt: new Date() }).where(eq(chats.id, chat.id));
 }

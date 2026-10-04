@@ -30,7 +30,15 @@ export const PATCH = withUser(async (user, req) => {
   if (body instanceof Response) return body;
   const [chat] = await db().select().from(chats).where(and(eq(chats.userId, user.userId), eq(chats.slug, body.convo))).limit(1);
   if (!chat) return jsonError(404, "There is no such chat.");
-  await db().update(messages).set({ metaJson: sql`coalesce(${messages.metaJson}, '{}'::jsonb) || ${JSON.stringify({ re: body.re })}::jsonb` })
+  if (body.re) await db().update(messages).set({ metaJson: sql`coalesce(${messages.metaJson}, '{}'::jsonb) || ${JSON.stringify({ re: body.re })}::jsonb` })
     .where(and(eq(messages.chatId, chat.id), eq(messages.clientId, body.clientId)));
+  if (body.send) {
+    const [row] = await db().select().from(messages).where(and(eq(messages.chatId, chat.id), eq(messages.clientId, body.clientId))).limit(1);
+    const cur = (row?.metaJson as { send?: { to: string; sol: number; status: string } } | null)?.send;
+    if (!row || !cur) return jsonError(404, "There is no such transfer.");
+    if (cur.status !== "pending") return jsonError(409, "That transfer was already handled.");
+    const send = { ...cur, ...body.send };
+    await db().update(messages).set({ metaJson: sql`coalesce(${messages.metaJson}, '{}'::jsonb) || ${JSON.stringify({ send })}::jsonb` }).where(eq(messages.id, row.id));
+  }
   return Response.json({ ok: true });
 });

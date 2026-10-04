@@ -52,7 +52,7 @@ function Rail({ s, path }: { s: State; path: string }) {
       </nav>
       <div className="mt-3 flex shrink-0 flex-col items-center gap-3">
         <ThemeToggle />
-        <Link href="/app/profile" data-tour="nav-profile" aria-label="Profile" title={`${s.auth?.label ?? "Profile"}`} className={`grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] ring-2 ring-offset-2 ring-offset-[var(--alt)] transition hover:scale-105 ${onProfile ? "ring-grape" : "ring-transparent"}`}>{initials(s)}</Link>
+        <Link href="/app/profile" data-tour="nav-profile" aria-label="Profile" title={`${s.auth?.label ?? "Profile"}`} className={`grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] ring-2 ring-offset-2 ring-offset-[var(--alt)] transition hover:scale-105 ${onProfile ? "ring-grape" : "ring-transparent"}`}>{s.profile?.avatar ? <img src={`/api/media/avatar?v=${s.profile.avatar}`} alt="" className="h-full w-full rounded-full object-cover" /> : initials(s)}</Link>
       </div>
     </aside>
   );
@@ -117,7 +117,7 @@ function MobileBars({ s, path }: { s: State; path: string }) {
         <Link href="/app" aria-label="Agents"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Link href="/app/profile" aria-label="Profile" className="grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)]">{initials(s)}</Link>
+          <Link href="/app/profile" aria-label="Profile" className="grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] overflow-hidden">{s.profile?.avatar ? <img src={`/api/media/avatar?v=${s.profile.avatar}`} alt="" className="h-full w-full object-cover" /> : initials(s)}</Link>
         </div>
       </header>
       <nav aria-label="App" className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-base/95 backdrop-blur-md lg:hidden">

@@ -72,7 +72,9 @@ export const groupBody = z.object({
 export const reactionBody = z.object({
   convo: z.string().min(1).max(80),
   clientId: z.string().min(4).max(40),
-  re: z.record(z.string().max(8), z.array(z.string().max(80)).max(20)),
+  re: z.record(z.string().max(8), z.array(z.string().max(80)).max(20)).optional(),
+  /** The outcome of a transfer the agent prepared (status only; amount and recipient can't change). */
+  send: z.object({ status: z.enum(["sent", "cancelled", "failed"]), sig: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{64,90}$/).optional(), error: z.string().max(200).optional() }).strict().optional(),
 }).strict();
 
 export const messageBody = z.object({
