@@ -21,6 +21,7 @@ export default function CardSheet({ agent, name, card, onClose }: { agent: strin
   const [full, setFull] = useState<Card | null>(null);
   const [left, setLeft] = useState(0);
   const [pin, setPin] = useState(false);
+  const [confirm, setConfirm] = useState(false); // no PIN set: an explicit Confirm step, then a wallet signature
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const shown = full ? { ...card, ...full, frozen: card.frozen, limit: card.limit, spent: card.spent } : card;
@@ -34,12 +35,13 @@ export default function CardSheet({ agent, name, card, onClose }: { agent: strin
   };
   const view = async () => {
     if (s.lockOn) { setPin(true); setErr(""); return; }
+    if (!confirm) { setConfirm(true); setErr(""); return; }
     setBusy(true); setErr("");
     try {
       const w = await payer(); if (!w) throw new Error("Your wallet isn't ready on this device yet.");
       const message = `Lexari: view card ${agent}\nTime: ${Date.now()}`;
       const sig = await w.signMessage(new TextEncoder().encode(message));
-      setBusy(false);
+      setBusy(false); setConfirm(false);
       await reveal({ message, signature: b64(sig) });
     } catch (e) { setBusy(false); const m = (e as Error).message || ""; setErr(/reject|cancel|denied/i.test(m) ? "You didn't confirm. The card stays hidden." : m || "Couldn't confirm."); }
   };
@@ -68,8 +70,17 @@ export default function CardSheet({ agent, name, card, onClose }: { agent: strin
             </div>
           ) : (
             <>
-              <button data-view-card onClick={() => void view()} disabled={busy} className="btn btn-brand btn-sm mt-4 w-full disabled:opacity-60"><Icon name="eye" size={16} />{busy ? "Confirm in your wallet…" : "View card"}</button>
-              <p className="mt-1.5 text-center text-[12px] text-ink/50">{s.lockOn ? "Needs your app PIN." : "Needs a quick confirm from your wallet. Set an app PIN in Settings to use that instead."}</p>
+              {confirm ? (
+                <div data-card-confirm className="mt-4 rounded-2xl bg-tint p-4 text-center">
+                  <div className="text-[15px] font-bold text-ink">Show the full card details?</div>
+                  <p className="mt-1 text-[13px] text-ink/60">The number, expiry and CVV show for 30 seconds. Make sure nobody is looking at your screen.</p>
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={() => setConfirm(false)} disabled={busy} className="btn btn-line btn-sm flex-1 text-ink">Cancel</button>
+                    <button data-card-confirm-yes onClick={() => void view()} disabled={busy} className="btn btn-brand btn-sm flex-1 disabled:opacity-60">{busy ? "Confirming…" : "Confirm"}</button>
+                  </div>
+                </div>
+              ) : <button data-view-card onClick={() => void view()} disabled={busy} className="btn btn-brand btn-sm mt-4 w-full disabled:opacity-60"><Icon name="eye" size={16} />View card</button>}
+              <p className="mt-1.5 text-center text-[12px] text-ink/50">{s.lockOn ? "Needs your app PIN." : "Needs a quick confirm. Set an app PIN in Settings to use that instead."}</p>
               {err && <p role="alert" className="mt-2 text-center text-[13px] text-[#e5484d]">{err}</p>}
             </>
           )}
