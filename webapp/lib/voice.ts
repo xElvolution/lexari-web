@@ -202,6 +202,16 @@ async function startVad(onSpeech: () => void): Promise<Vad | null> {
   };
 }
 
+/** A reply that is still streaming in: speakAndListen starts on the first full sentence and keeps going as more arrives. */
+export type Feed = { text: () => string; done: () => boolean; more: () => Promise<void> };
+/** The speakable end of a growing reply: the last sentence end (or a comma once it gets long); everything when done. */
+export function ready(t: string, done: boolean) {
+  if (done) return t.length;
+  let cut = -1; const re = /[.!?…](?=\s)|\n/g; let m: RegExpExecArray | null;
+  while ((m = re.exec(t))) cut = m.index + 1;
+  if (cut < 0 && t.length > 120) { const c = Math.max(t.lastIndexOf(", "), t.lastIndexOf("; ")); if (c > 40) cut = c + 1; }
+  return Math.max(0, cut);
+}
 /**
  * Speaks while the microphone keeps listening (barge-in, like a voice-mode call):
  * - voice activity detection stops the agent's speech the instant you start talking;
@@ -209,10 +219,12 @@ async function startVad(onSpeech: () => void): Promise<Vad | null> {
  * - if it was only a noise, the agent carries on from the word where it stopped.
  * Resolves with your words, or "" when the agent finished without being interrupted.
  */
-export function speakAndListen(text: string, v: VoiceSettings | undefined, opts: { onBargeIn?: () => void; onHold?: () => void; onResume?: () => void; onText?: (t: string) => void; isStopped?: () => boolean } = {}): Promise<string> {
-  if (typeof window === "undefined" || !window.speechSynthesis || !text.trim()) return Promise.resolve("");
+export function speakAndListen(source: string | Feed, v: VoiceSettings | undefined, opts: { onStart?: () => void; onBargeIn?: () => void; onHold?: () => void; onResume?: () => void; onText?: (t: string) => void; isStopped?: () => boolean } = {}): Promise<string> {
+  const feed: Feed = typeof source === "string" ? { text: () => source, done: () => true, more: () => Promise.resolve() } : source;
+  if (typeof window === "undefined" || !window.speechSynthesis || (feed.done() && !feed.text().trim())) return Promise.resolve("");
   window.speechSynthesis.cancel();
   return new Promise((resolve) => {
+    let text = feed.text();
     let interrupted = false, finished = false, settled = false, holding = false;
     let at = 0, from = 0, began = 0;
     let ear: Transcriber | null = null, vad: Vad | null = null;
@@ -220,7 +232,7 @@ export function speakAndListen(text: string, v: VoiceSettings | undefined, opts:
     const settle = (t: string) => { if (settled) return; settled = true; window.clearTimeout(safety); window.clearTimeout(holdTimer); vad?.stop(); vad = null; resolve(t); };
     const interrupt = () => {
       if (interrupted) return;
-      interrupted = true; holding = false; window.clearTimeout(holdTimer); window.clearTimeout(safety);
+      interrupted = true; holding = false; gen++; window.clearTimeout(holdTimer); window.clearTimeout(safety);
       window.speechSynthesis.cancel(); vad?.stop(); vad = null; opts.onBargeIn?.();
     };
     const end = () => { if (interrupted || holding || finished) return; finished = true; ear?.abort(); settle(""); };
@@ -242,22 +254,34 @@ export function speakAndListen(text: string, v: VoiceSettings | undefined, opts:
         if (!interrupted && !finished) window.setTimeout(startEar, 400);
       });
     };
+    let began0 = false;
+    let gen = 0; // each utterance gets a number so a stale onend can't move things along
     const say = (start: number) => {
-      const rest = text.slice(start);
-      if (!rest.trim()) { end(); return; }
+      if (interrupted || holding || finished || settled || opts.isStopped?.()) { if (opts.isStopped?.()) end(); return; }
+      text = feed.text();
+      const stop = ready(text, feed.done());
+      if (stop <= start || !text.slice(start, stop).trim()) {
+        if (feed.done()) { if (!text.slice(start).trim()) { end(); return; } }
+        else { void feed.more().then(() => say(start)); return; } // wait for the next sentence
+      }
+      const upto = feed.done() ? text.length : stop;
+      const chunk = text.slice(start, upto);
+      if (!chunk.trim()) { end(); return; }
       from = start; at = start; began = performance.now();
-      const u = utterance(rest, v);
+      const my = ++gen;
+      if (!began0) { began0 = true; opts.onStart?.(); }
+      const u = utterance(chunk, v);
       u.onboundary = (e) => { at = start + (e.charIndex || 0); };
-      u.onend = () => { if (!holding) end(); };
-      u.onerror = () => { if (!holding) end(); };
+      const next = () => { if (my !== gen || holding) return; gen++; window.clearTimeout(safety); if (upto >= feed.text().length && feed.done()) end(); else say(upto); };
+      u.onend = next; u.onerror = next;
       window.clearTimeout(safety);
-      safety = window.setTimeout(end, Math.min(60_000, 2000 + rest.length * 90 / (v?.rate || 1)));
+      safety = window.setTimeout(next, Math.min(60_000, 2000 + chunk.length * 90 / (v?.rate || 1)));
       window.speechSynthesis.speak(u);
     };
     // VAD heard something: stop talking now, and give speech-to-text a moment to say whether it was you.
     const hold = () => {
       if (interrupted || finished || holding || settled) return;
-      holding = true; window.speechSynthesis.cancel(); window.clearTimeout(safety);
+      holding = true; gen++; window.speechSynthesis.cancel(); window.clearTimeout(safety);
       opts.onHold?.();
       // where it stopped: the last word boundary, or an estimate from elapsed time when the voice has no boundary events
       const est = from + Math.floor(((performance.now() - began) / 1000) * 14 * (v?.rate || 1));

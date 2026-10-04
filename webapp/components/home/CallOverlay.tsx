@@ -2,110 +2,138 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { logCall, sendTo, type State } from "@/lib/store";
-import { BLOCKED, ensureMic, hush, listen, speakAndListen } from "@/lib/voice";
+import { callTurn, logCall, setCalling, type State } from "@/lib/store";
+import { BLOCKED, ensureMic, hush, listen, ready, speakAndListen, type Feed } from "@/lib/voice";
 import { voiceOf } from "@/lib/voices";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
 import { convoOf, fmtSecs } from "../agents";
 
-/** Voice call: listens through the microphone, sends what you said to the agent and reads the reply aloud, with captions. */
+type Phase = "connecting" | "listening" | "hearing" | "thinking" | "speaking" | "muted" | "error";
+const LABEL: Record<Phase, string> = { connecting: "Connecting…", listening: "Listening", hearing: "Listening", thinking: "Thinking…", speaking: "Speaking", muted: "Muted", error: "" };
+
+/**
+ * Live voice call. Nothing from the call goes into the chat thread (only a "Voice call · 2:14" line after it ends).
+ * The reply streams in and the agent starts talking on its first sentence; talk over it any time to interrupt.
+ */
 export default function CallOverlay({ s, id, onClose }: { s: State; id: string; onClose: () => void }) {
   const c = convoOf(s, id)!;
   const [secs, setSecs] = useState(0);
-  const [live, setLive] = useState(false);
+  const [phase, setPhase] = useState<Phase>("connecting");
+  const [note, setNote] = useState("");
   const [muted, setMuted] = useState(false);
-  const [speaker, setSpeaker] = useState(true);
-  const [caption, setCaption] = useState("Starting the microphone…");
-  const [thinking, setThinking] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const secsRef = useRef(0);
   const mutedRef = useRef(false);
-  const speakerRef = useRef(true);
+  const ended = useRef(false);
 
   useLayoutEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    gsap.fromTo(root.current, { opacity: 0 }, { opacity: 1, duration: 0.25 });
-    gsap.fromTo("[data-call-card]", { y: 20, opacity: 0, scale: 0.98 }, { y: 0, opacity: 1, scale: 1, duration: 0.45, ease: "power3.out" });
+    gsap.fromTo(root.current, { opacity: 0 }, { opacity: 1, duration: 0.2 });
+    gsap.fromTo("[data-call-card]", { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: "power3.out" });
   }, []);
-  const [last, setLast] = useState(""); // the agent's last answer stays on screen while it listens again
-  useEffect(() => { mutedRef.current = muted; }, [muted]);
-  useEffect(() => { speakerRef.current = speaker; if (!speaker) hush(); }, [speaker]);
-  useEffect(() => { setLive(true); }, []);
+  useEffect(() => { mutedRef.current = muted; if (muted) { hush(); setPhase("muted"); } }, [muted]);
+  useEffect(() => { setCalling(id); return () => setCalling(null); }, [id]);
   useEffect(() => {
-    if (!live) return;
+    if (phase === "connecting") return;
     const t = setInterval(() => { secsRef.current += 1; setSecs(secsRef.current); }, 1000);
     return () => clearInterval(t);
-  }, [live]);
+  }, [phase === "connecting"]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     let stop = false;
+    let abort: AbortController | null = null;
+    // the call remembers what was said in it (and the last few chat messages), but none of it is shown in the chat
+    const history: { from: string; text: string }[] = (s.threads[id] || []).filter((m) => m.text && m.id !== "hello" && m.from !== "system").slice(-8).map((m) => ({ from: m.from, text: m.text }));
     (async () => {
-      try { await ensureMic(); } catch (e) { setCaption((e as Error).message); setLive(false); return; }
+      try { await ensureMic(); } catch (e) { setNote((e as Error).message); setPhase("error"); return; }
       let quiet = 0;
       let next = ""; // words you said over the agent (barge-in) become the next turn
       while (!stop) {
-        if (mutedRef.current) { next = ""; await new Promise((r) => setTimeout(r, 400)); continue; }
-        setCaption("Listening…");
+        if (mutedRef.current) { next = ""; await new Promise((r) => setTimeout(r, 300)); continue; }
+        setPhase("listening"); setNote(quiet >= 3 ? "Say something, or tap end." : "");
         let said = next;
         next = "";
-        if (!said) try { said = await listen(9000, (t) => { if (!stop && t) setCaption(`You: ${t}`); }); }
+        if (!said) try { said = await listen(9000, (t) => { if (!stop && t && !mutedRef.current) setPhase("hearing"); }); }
         catch (e) {
           const m = (e as Error).message;
           if (stop) return;
-          setCaption(m);
-          // blocked or unsupported can't recover by retrying; a network blip can
-          if (m === BLOCKED || /can't|turned off|No microphone/.test(m)) return;
+          setNote(m); setPhase("error");
+          if (m === BLOCKED || /can't|turned off|No microphone/.test(m)) return; // can't recover by retrying
           await new Promise((r) => setTimeout(r, 1500));
           continue;
         }
         if (stop) return;
-        if (!said) { if (++quiet >= 3) setCaption("I'm listening. Say something, or tap end."); continue; }
+        if (mutedRef.current) continue;
+        if (!said) { quiet++; continue; }
         quiet = 0;
-        setCaption(`You: ${said}`);
-        setThinking(true);
-        const reply = await sendTo(id, said).catch(() => "");
-        setThinking(false);
+        setPhase("thinking"); setNote("");
+        // stream the reply into a feed; speech starts on the first full sentence
+        let text = "", done = false, failed = "";
+        let wake: () => void = () => {};
+        const bump = () => { const w = wake; wake = () => {}; w(); };
+        const feed: Feed = { text: () => text, done: () => done, more: () => new Promise<void>((r) => { wake = r; if (done) r(); }) };
+        abort = new AbortController();
+        const turn = callTurn(id, said, history, (t) => { text = t; bump(); }, abort.signal)
+          .then((t) => { text = t || text; }, (e: Error) => { if (e.name !== "AbortError") failed = e.message || "Couldn't answer."; })
+          .finally(() => { done = true; bump(); });
+        history.push({ from: "you", text: said });
+        while (!done && !ready(text, false)) await feed.more();
         if (stop) return;
-        if (!reply) { setCaption(`${c.name} couldn't answer. Try again.`); continue; }
-        setLast(`${c.name}: ${reply}`);
-        setCaption(speakerRef.current ? "Speaking… talk any time to interrupt" : "");
-        if (speakerRef.current && !mutedRef.current) {
-          next = await speakAndListen(reply, voiceOf(id), {
-            isStopped: () => stop || mutedRef.current,
-            onHold: () => { if (!stop) setCaption("Listening…"); },
-            onResume: () => { if (!stop) setCaption("Speaking… talk any time to interrupt"); },
-            onBargeIn: () => { if (!stop) setCaption("Go ahead, I'm listening…"); },
-            onText: (t) => { if (!stop && t) setCaption(`You: ${t}`); },
-          });
-        } else if (speakerRef.current) await speakAndListen(reply, voiceOf(id), { isStopped: () => true });
+        if (!text.trim()) { setNote(failed || `${c.name} couldn't answer. Say it again.`); setPhase("error"); await new Promise((r) => setTimeout(r, 1200)); continue; }
+        if (mutedRef.current) { await turn; history.push({ from: id, text }); continue; }
+        next = await speakAndListen(feed, voiceOf(id), {
+          isStopped: () => stop || mutedRef.current,
+          onStart: () => { if (!stop) setPhase("speaking"); },
+          onHold: () => { if (!stop) setPhase("listening"); },
+          onResume: () => { if (!stop) setPhase("speaking"); },
+          onBargeIn: () => { if (!stop) setPhase("hearing"); },
+        });
+        if (next) abort.abort(); // you talked over it: drop the rest of that answer
+        else await turn;
+        history.push({ from: id, text });
       }
     })();
-    return () => { stop = true; hush(); };
-  }, [id, c.name]);
-  const end = () => { hush(); logCall(id, secsRef.current); onClose(); };
+    return () => { stop = true; abort?.abort(); hush(); };
+  }, [id, c.name]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const end = () => { if (ended.current) return; ended.current = true; hush(); logCall(id, secsRef.current); onClose(); };
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") end(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const btn = (on: boolean) => `grid h-14 w-14 place-items-center rounded-full transition ${on ? "bg-white text-[#0a0a0a]" : "bg-white/10 text-white hover:bg-white/20"}`;
+  const talking = phase === "speaking";
+  const ears = phase === "listening" || phase === "hearing";
+  const label = phase === "error" ? note : LABEL[phase];
 
   return (
-    <div ref={root} role="dialog" aria-modal="true" aria-label={`Call with ${c.name}`} className="fixed inset-0 z-[80] grid place-items-center bg-[#07050e]/95 p-5 backdrop-blur-md">
-      <div className="pointer-events-none absolute left-1/2 top-[38%] h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-grape/35 blur-[120px]" />
-      <div data-call-card className="relative flex w-full max-w-[420px] flex-col items-center text-center text-white">
-        <div className="relative mt-10 grid place-items-center max-[430px]:mt-4 max-[430px]:[zoom:.72]">
-          {live && [0, 0.7, 1.4].map((d) => <span key={d} className="ring-out absolute inset-0 rounded-[40px] border-2 border-lilac/70" style={{ animationDelay: `${d}s` }} />)}
-          {!live && <span className="ring-out absolute inset-0 rounded-[40px] border-2 border-white/40" />}
-          {c.group ? <GroupTile members={c.members} look={s.agent?.look} size={132} /> : <AgentTile id={id} look={s.agent?.look} size={132} radius={40} />}
+    <div ref={root} role="dialog" aria-modal="true" aria-label={`Call with ${c.name}`} data-call data-call-phase={phase} className="fixed inset-0 z-[80] flex flex-col bg-[#07050e] text-white" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}>
+      <div className="pointer-events-none absolute left-1/2 top-[34%] h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-grape/30 blur-[110px]" />
+      <div data-call-card className="relative mx-auto flex w-full max-w-[420px] flex-1 flex-col items-center px-6 text-center">
+        <p className="mt-6 flex items-center gap-1.5 text-[12.5px] font-semibold text-white/55"><Icon name="call" size={13} />Lexari voice call</p>
+        <div className="flex flex-1 flex-col items-center justify-center pb-6">
+          <div className="relative grid place-items-center">
+            {talking && [0, 0.6, 1.2].map((d) => <span key={d} className="ring-out absolute inset-0 rounded-[38px] border-2 border-lilac/80" style={{ animationDelay: `${d}s`, animationDuration: "1.8s" }} />)}
+            {ears && <span className="ring-out absolute inset-0 rounded-[38px] border-2 border-white/35" style={{ animationDuration: "2.6s" }} />}
+            <span className={`block transition-transform duration-300 ${talking ? "scale-[1.04]" : ""}`}>{c.group ? <GroupTile members={c.members} look={s.agent?.look} size={120} /> : <AgentTile id={id} look={s.agent?.look} size={120} radius={38} status={false} />}</span>
+          </div>
+          <h2 className="display mt-7 text-[34px] leading-none">{c.name}</h2>
+          <p data-call-timer className="mt-2 font-mono text-[14px] tabular-nums text-white/70">{phase === "connecting" ? "Calling…" : fmtSecs(secs)}</p>
+          <p data-call-state aria-live="polite" className={`mt-5 flex min-h-[28px] items-center gap-2 rounded-full px-3.5 py-1 text-[13.5px] font-semibold ${phase === "error" ? "max-w-[300px] text-[#ff9a9d]" : "bg-white/[.07] text-white/85"}`}>
+            {phase === "thinking" && <span className="typing flex gap-1"><i /><i /><i /></span>}
+            {(ears || talking) && <i className={`h-2 w-2 rounded-full ${talking ? "bg-lilac" : "bg-[#22c55e]"} live-dot`} />}
+            {phase === "muted" && <Icon name="micoff" size={14} />}
+            {label}
+          </p>
+          {note && phase !== "error" && <p className="mt-2 text-[12.5px] text-white/50">{note}</p>}
         </div>
-        <h2 className="display mt-8 text-[44px] leading-none max-[430px]:mt-5">{c.name}</h2>
-        <p className="mt-3 flex items-center gap-2 font-mono text-[13px] text-white/75">{live ? <><i className="h-2 w-2 rounded-full bg-lilac live-dot" />{fmtSecs(secs)}</> : "Calling…"}</p>
-        <div className="mt-8 min-h-[72px] w-full rounded-2xl bg-white/[.06] px-5 py-4 ring-1 ring-white/10" aria-live="polite">
-          {last && <p className="mb-2 max-h-40 overflow-y-auto text-[15px] leading-snug text-white">{last}</p>}
-          <p className="text-[15px] leading-snug text-white/75">{caption}{thinking && <span className="ml-1 text-white/60">· thinking…</span>}</p>
-        </div>
-        <div className="mt-10 flex items-center gap-5">
-          <button onClick={() => setMuted((m) => !m)} aria-pressed={muted} aria-label={muted ? "Unmute" : "Mute"} className={btn(muted)}><Icon name={muted ? "micoff" : "mic"} size={22} /></button>
-          <button onClick={end} aria-label="End call" className="grid h-16 w-16 place-items-center rounded-full bg-[#f04e4e] text-white shadow-[0_10px_30px_-8px_rgba(240,78,78,.7)] transition hover:scale-105"><Icon name="hangup" size={28} /></button>
-          <button onClick={() => setSpeaker((m) => !m)} aria-pressed={speaker} aria-label="Speaker" className={btn(speaker)}><Icon name="speaker" size={22} /></button>
+        <div className="mb-6 flex items-center justify-center gap-10">
+          <span className="flex flex-col items-center gap-1.5">
+            <button onClick={() => setMuted((m) => !m)} aria-pressed={muted} aria-label={muted ? "Unmute" : "Mute"} data-call-mute className={`grid h-16 w-16 place-items-center rounded-full transition ${muted ? "bg-white text-[#0a0a0a]" : "bg-white/12 text-white hover:bg-white/20"}`}><Icon name={muted ? "micoff" : "mic"} size={24} /></button>
+            <span className="text-[11.5px] text-white/55">{muted ? "Unmute" : "Mute"}</span>
+          </span>
+          <span className="flex flex-col items-center gap-1.5">
+            <button onClick={end} aria-label="End call" data-call-end className="grid h-16 w-16 place-items-center rounded-full bg-[#f04e4e] text-white shadow-[0_10px_30px_-8px_rgba(240,78,78,.7)] transition hover:scale-105"><Icon name="hangup" size={28} /></button>
+            <span className="text-[11.5px] text-white/55">End</span>
+          </span>
         </div>
       </div>
     </div>

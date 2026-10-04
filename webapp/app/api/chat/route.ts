@@ -67,16 +67,18 @@ export async function POST(req: Request) {
     history: body.history, recall: speakerRow?.memoryOn === false ? [] : body.recall, text: body.text,
   });
 
-  const tools = desktopOn();
+  const call = body.call === true;
+  if (call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${CALL_HINT}` };
+  const tools = !call && desktopOn();
   if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}` };
-  const [me] = await retryRead(() => database.select({ wallet: users.wallet }).from(users).where(eq(users.id, userId)).limit(1)).catch(() => []);
-  const wallet = me?.wallet || "";
+  const [me] = call ? [] : await retryRead(() => database.select({ wallet: users.wallet }).from(users).where(eq(users.id, userId)).limit(1)).catch(() => []);
+  const wallet = call ? "" : me?.wallet || "";
   if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${WALLET_HINT}` };
   const hold = tools || !!wallet;
 
   // Your message is saved before the agent starts, so it never disappears if the reply fails or the page reloads.
   let userSaved = false;
-  try { await saveUserMsg(userId, body); userSaved = true; } catch (error) { console.error(`[chat] save user message: ${(error as Error).message}`); }
+  if (!call) try { await saveUserMsg(userId, body); userSaved = true; } catch (error) { console.error(`[chat] save user message: ${(error as Error).message}`); }
 
   const sent = Date.now();
   const encoder = new TextEncoder();
@@ -143,6 +145,7 @@ export async function POST(req: Request) {
         const split = splitRemember(full);
         if (!split.reply) throw new ModelError("The agent sent an empty reply. Try again.");
         if (split.remember) send({ remember: split.remember });
+        if (call) { send({ done: true }); return; } // a call is not saved as chat messages
         await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay ? { send: pay } : null, userSaved);
         await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).
@@ -194,6 +197,8 @@ async function saveTurn(userId: string, body: TurnBody, speaker: string, reply: 
   ]).onConflictDoNothing();
   await database.update(chats).set({ updatedAt: new Date() }).where(eq(chats.id, chat.id));
 }
+
+const CALL_HINT = "You are on a live voice call with the person right now. Talk like a person on the phone: answer in one to three short spoken sentences, start with the answer, no lists, markdown, emojis, links or headings. Ask at most one short question back.";
 
 const DESKTOP_HINT = [
   DESKTOP_MARK,
