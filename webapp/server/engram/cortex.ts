@@ -86,8 +86,9 @@ async function* streamApi(messages: ChatMessage[], signal?: AbortSignal): AsyncG
   }
 }
 
-export async function* streamCompletion(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
-  if (provider() === "grok-cli") yield* streamGrokCli(messages, signal);
+/** fast: a live voice call turn, where the first words matter most (Grok CLI uses GROK_CLI_CALL_MODEL, default grok-4.7-build-fast). */
+export async function* streamCompletion(messages: ChatMessage[], signal?: AbortSignal, opts: { fast?: boolean } = {}): AsyncGenerator<string> {
+  if (provider() === "grok-cli") yield* streamGrokCli(messages, signal, opts.fast ? (process.env.GROK_CLI_CALL_MODEL ?? "grok-4.7-build-fast") : undefined);
   else yield* streamApi(messages, signal);
 }
 

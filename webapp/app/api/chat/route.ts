@@ -33,9 +33,13 @@ export async function POST(req: Request) {
   if (!session) return jsonError(401, "You're signed out. Sign in again.");
   const body = await readJson(req, chatBody);
   if (body instanceof Response) return body;
+  // both limits and the agents read go out together (a call turn waits on every round trip)
+  const minePromise = retryRead(() => db().select().from(agents).where(eq(agents.userId, session.userId)));
+  minePromise.catch(() => {});
   try {
-    if (!(await rateLimit(`chat:m:${session.userId}`, PER_MINUTE))) return jsonError(429, "That's a lot of messages. Wait a minute.");
-    if (!(await rateLimit(`chat:d:${session.userId}`, PER_DAY, 86_400_000))) return jsonError(429, "You've reached today's message limit. It resets tomorrow.");
+    const [perMin, perDay] = await Promise.all([rateLimit(`chat:m:${session.userId}`, PER_MINUTE), rateLimit(`chat:d:${session.userId}`, PER_DAY, 86_400_000)]);
+    if (!perMin) return jsonError(429, "That's a lot of messages. Wait a minute.");
+    if (!perDay) return jsonError(429, "You've reached today's message limit. It resets tomorrow.");
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -47,7 +51,7 @@ export async function POST(req: Request) {
   const userId = session.userId;
   const database = db();
   let mine;
-  try { mine = await retryRead(() => database.select().from(agents).where(eq(agents.userId, userId))); } catch (error) { return toErrorResponse(error); }
+  try { mine = await minePromise; } catch (error) { return toErrorResponse(error); }
   const home = mine.find((a) => a.slug === "home");
   const speakerRow = mine.find((a) => a.slug === body.speaker);
   const house = SPECIALISTS.find((s) => s.slug === body.speaker);
@@ -93,7 +97,7 @@ export async function POST(req: Request) {
       try {
         // Stream the reply, but hold text back from the first "<" so <run> requests never reach the screen.
         let shown = 0;
-        for await (const token of streamCompletion(prompt, abort.signal)) {
+        for await (const token of streamCompletion(prompt, abort.signal, { fast: call })) {
           full += token;
           const cut = hold ? (full.indexOf("<") >= 0 ? full.indexOf("<") : full.length) : full.length;
           if (cut > shown) { send({ token: full.slice(shown, cut) }); shown = cut; }

@@ -138,8 +138,9 @@ function runRelay(cfg: ReturnType<typeof grokCliConfig>, system: string, prompt:
   return { out: sock, exited, stderr: () => stderr, killed: () => killed, kill: () => { killed = true; sock.destroy(); }, cleanup: () => {}, onLine };
 }
 
-export async function* streamGrokCli(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
-  const cfg = grokCliConfig();
+export async function* streamGrokCli(messages: ChatMessage[], signal?: AbortSignal, model?: string): AsyncGenerator<string> {
+  const cfg = { ...grokCliConfig() };
+  if (model) cfg.model = model;
   if (!cfg.ready) throw new ModelError("The agent is not connected to a model yet.", cfg.socket ? `grok-cli: relay socket ${cfg.socket} missing` : `grok-cli: no login under ${cfg.home || "(no HOME)"}/.grok`);
   await slot(cfg.concurrency);
   const { system, prompt } = flatten(messages);
