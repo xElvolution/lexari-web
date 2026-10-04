@@ -47,7 +47,8 @@
   [data-hub-hero] [data-coin-target] { zoom: .75; }
 
   /* onboarding: the badge rig is smaller on phones (zoom keeps the layout in step) */
-  .onb-badge { zoom: .82; }
+  .onb-badge { zoom: .7; }
+  input[aria-label="Agent name"] { margin-top: 1rem; }
 
   /* card radii */
   .rounded-\[34px\], .rounded-\[32px\], .rounded-\[30px\] { border-radius: 22px; }
@@ -57,3 +58,5 @@
   :root { --av-scale: .8; }
   .text-\[40px\], .text-\[42px\], .text-\[44px\] { font-size: 25px; } .text-\[48px\] { font-size: 26px; } .text-\[56px\], .text-\[60px\] { font-size: 30px; }
 }
+/* short phones: the badge shrinks more so the name box clears the sticky Continue bar on first load */
+@media (max-width: 430px) and (max-height: 800px) { .onb-badge { zoom: .56; } }
