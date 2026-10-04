@@ -71,9 +71,9 @@ export default function TeamPage() {
             <span className="label tab-num text-brand-ink">{used} of {plan.seats} seat{plan.seats === 1 ? "" : "s"}</span>
           </div>
           <RingLegend className="relative mt-3" />
-          <div ref={strip} onScroll={onScroll} data-floor-pages={pages} className="no-bar relative -mx-1 mt-4 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain">
+          <div ref={strip} onScroll={onScroll} data-floor-pages={pages} className="no-bar relative -mx-3 -mb-3 mt-1 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain py-3">
             {Array.from({ length: pages }, (_, p) => (
-              <div key={p} data-floor-page={p + 1} className="w-full shrink-0 snap-start px-1" aria-label={`Seats ${p * PAGE + 1} to ${Math.min(seats, (p + 1) * PAGE)}`}>
+              <div key={p} data-floor-page={p + 1} className="w-full shrink-0 snap-start px-3" aria-label={`Seats ${p * PAGE + 1} to ${Math.min(seats, (p + 1) * PAGE)}`}>
                 <div className={`grid gap-2 sm:gap-2.5 ${seats <= 5 ? "grid-cols-5" : "grid-cols-5 sm:grid-cols-10"}`}>
                   {Array.from({ length: Math.min(PAGE, seats - p * PAGE) }, (_, j) => seat(p * PAGE + j))}
                 </div>
