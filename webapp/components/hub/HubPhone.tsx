@@ -123,7 +123,7 @@ function CheckInRow({ s, now }: { s: State; now: number }) {
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-tint text-[20px]">🔥</span>
         <div className="min-w-0 flex-1"><div className="text-[15px] font-bold text-ink">Daily check-in</div><div className={meta}>{done ? `Done · next in ${countdown(nextReset("daily", now) - now)}` : `Day ${cur} pays ${pay} coins`}</div></div>
         {done ? <span className={`${pill} bg-tint text-ink/70`}><Icon name="check" size={14} stroke={3} />Done</span>
-          : <button ref={btn} type="button" onClick={claim} disabled={!!busy} className={`${pill} bg-grape text-white`}>{busy === "checkin" ? "Signing…" : <>Check in<span className="opacity-80">+{pay}</span></>}</button>}
+          : <button ref={btn} type="button" onClick={claim} disabled={!!busy} className={`${pill} bg-grape text-white`}>{busy === "checkin" ? "…" : <>Check in<span className="opacity-80">+{pay}</span></>}</button>}
       </div>
       <ol className="mt-3 grid grid-cols-7 gap-1" aria-label="Streak days">
         {Array.from({ length: 7 }, (_, i) => start + i).map((d) => {
@@ -250,7 +250,6 @@ function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
   // Only an action that really crosses into the next level gets the bounce and "levelling up"; a small pack just moves the bar.
   const leveling = busy === "train" && pending !== null && pending >= toNext;
   const pct = max ? 100 : Math.round((xp / need) * 100);
-  const minted = !!(s.live?.levels.find((l) => l.slug === agent.id)?.asset || s.meta[agent.id]?.nft?.tokenId);
   const locked = isLocked(s, agent.id);
   const perk = won ? PERKS.find((p) => p.level === won.level) : undefined;
   const nextPerk = PERKS.find((p) => p.level > level);
@@ -292,15 +291,14 @@ function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
         <p className="relative mt-1.5 text-[12.5px] font-semibold tabular-nums text-white/65">{max ? "Max level. A legend." : `${toNext} XP to level ${level + 1}`}</p>
         {!max && (
           <div data-train-packs className="relative mt-3 grid grid-cols-3 gap-1.5">
-            {[25, 100].map((n) => <button key={n} type="button" onClick={() => train(n)} disabled={!!busy || coins <= 0 || locked || !minted} className="flex h-12 flex-col items-center justify-center rounded-[14px] bg-white/10 text-[14px] font-bold ring-1 ring-white/15 disabled:opacity-40"><span>+{n} XP</span><span className="flex items-center gap-0.5 text-[11px] font-semibold text-white/60"><Coin size={11} />{n}</span></button>)}
-            <button type="button" data-train-go onClick={() => train(toNext)} disabled={!!busy || coins < toNext || locked || !minted} className="flex h-12 flex-col items-center justify-center rounded-[14px] bg-[#ffd84d] text-[14px] font-extrabold text-[#2a0f8f] shadow-[0_4px_0_#b8960f] disabled:opacity-45 disabled:shadow-none"><span>{leveling ? "Levelling…" : "Level up"}</span><span className="flex items-center gap-0.5 text-[11px] font-semibold text-[#2a0f8f]/70"><Coin size={11} />{toNext}</span></button>
+            {[25, 100].map((n) => <button key={n} type="button" onClick={() => train(n)} disabled={!!busy || coins <= 0 || locked} className="flex h-12 flex-col items-center justify-center rounded-[14px] bg-white/10 text-[14px] font-bold ring-1 ring-white/15 disabled:opacity-40"><span>+{n} XP</span><span className="flex items-center gap-0.5 text-[11px] font-semibold text-white/60"><Coin size={11} />{n}</span></button>)}
+            <button type="button" data-train-go onClick={() => train(toNext)} disabled={!!busy || coins < toNext || locked} className="flex h-12 flex-col items-center justify-center rounded-[14px] bg-[#ffd84d] text-[14px] font-extrabold text-[#2a0f8f] shadow-[0_4px_0_#b8960f] disabled:opacity-45 disabled:shadow-none"><span>{leveling ? "Levelling…" : "Level up"}</span><span className="flex items-center gap-0.5 text-[11px] font-semibold text-[#2a0f8f]/70"><Coin size={11} />{toNext}</span></button>
           </div>
         )}
       </div>
       {!max && (
         <div data-train-hint className="mt-2.5 text-center text-[12.5px] leading-snug text-ink/60">
           {locked ? <>{agent.name} is past your plan&apos;s seats. <button type="button" data-train-upgrade onClick={() => { onClose(); openUpgrade("full"); }} className="font-bold text-brand-ink">Upgrade plan</button></>
-            : !minted ? <>Mint {agent.name}&apos;s ID card first to spend XP. <button type="button" onClick={() => { onClose(); openAgent(agent.id); }} className="font-bold text-brand-ink">Open ID card</button></>
             : coins < toNext ? <>{toNext - coins} more coins to level up in one go. <a href="#quests" onClick={onClose} className="font-bold text-brand-ink">Find quests</a></>
             : <>Level up spends {toNext} coins and takes {agent.name} to level {level + 1}.</>}
         </div>

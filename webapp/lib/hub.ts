@@ -79,7 +79,7 @@ export function countdown(ms: number) {
 }
 
 /* ---------- selectors ---------- */
-const REASON: Record<string, string> = { check_in: "Check-in", claim_quest: "Quest", open_box: "Mystery box", level_up: "Training", claim_referral_tier: "Referral reward", init_player: "Joined the Hub" };
+const REASON: Record<string, string> = { check_in: "Check-in", claim_quest: "Quest", open_box: "Mystery box", level_up: "Training", claim_referral_tier: "Referral reward", init_player: "Joined the Hub", store_buy: "Store" };
 const EMPTY_HUB: HubData = { v: 1, claimed: [], levels: {}, invited: [], tiers: [], boxes: [], ledger: [], lifetime: 0 };
 export function hubOf(s: State): HubData {
   const l = s.live;
@@ -93,7 +93,7 @@ export function hubOf(s: State): HubData {
     invited: Array.from({ length: l.referral.friends }, (_, i) => ({ id: `f-${i}`, name: `Friend ${i + 1}`, seed: 11 + i * 17, color: ["orange", "teal", "blue", "green", "pink"][i % 5], at: 0 })),
     tiers: l.referral.tiers.filter((t) => t.claimed).map((t) => t.tier),
     boxes: l.box.opened ? [todayKey()] : [],
-    ledger: l.ledger.filter((e) => e.kind !== "init_player").map((e) => ({ at: e.at, delta: e.kind === "level_up" ? -e.amount : e.amount, reason: REASON[e.kind] || e.kind, tx: e.tx })),
+    ledger: l.ledger.filter((e) => e.kind !== "init_player").map((e) => ({ at: e.at, delta: e.kind === "level_up" || e.kind === "store_buy" ? -e.amount : e.amount, reason: REASON[e.kind] || e.kind, tx: e.tx })),
     lifetime: l.player?.lifetime ?? 0,
   };
 }
@@ -157,11 +157,12 @@ function guard<A extends unknown[], R>(key: (...a: A) => string, run: (...a: A) 
     if (busy) return idle;
     setBusy(key(...a));
     // Never spin forever: a wallet or RPC that hangs ends with a clear message after 90s.
-    const slow = new Promise<R>((res) => setTimeout(() => res({ ...(idle as object), error: "That took too long. Check your wallet and try again." } as R), 90_000));
+    const slow = new Promise<R>((res) => setTimeout(() => res({ ...(idle as object), error: "That took too long. Try again." } as R), 90_000));
     try { return await Promise.race([run(...a), slow]); } finally { setBusy(null); }
   };
 }
-const adapter = () => import("./chainHub").then((m) => m.chainHub);
+const adapter = () => import("./offHub").then((m) => m.offHub);
+if (typeof window !== "undefined") setTimeout(() => void adapter(), 800); // load it before the first tap
 const wait = { ok: false, coins: 0, error: "Finish the action in progress first." };
 
 /** Hub actions. They sign with your wallet and fail with a clear message if the program or attestor is not ready. */

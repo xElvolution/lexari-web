@@ -267,3 +267,29 @@ export const pushSubs = pgTable("push_subs", {
   auth: text("auth").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/* ---------- Hub (offchain coins and levels) ---------- */
+export const hubPlayers = pgTable("hub_players", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  coins: bigint("coins", { mode: "number" }).notNull().default(0),
+  lifetime: bigint("lifetime", { mode: "number" }).notNull().default(0),
+  streak: integer("streak").notNull().default(0),
+  lastCheckIn: bigint("last_check_in", { mode: "number" }).notNull().default(0),
+  cosmetics: jsonb("cosmetics").$type<{ owned?: string[]; bg?: string; bubble?: string }>().notNull().default({}),
+  seededFrom: text("seeded_from").notNull().default("new"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+export const hubLevels = pgTable("hub_levels", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  slug: text("slug").notNull(),
+  level: integer("level").notNull().default(1),
+  xp: integer("xp").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.slug] })]);
+export const hubClaims = pgTable("hub_claims", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  coins: integer("coins").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.key] })]);

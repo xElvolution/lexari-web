@@ -120,7 +120,7 @@ export default function Referral({ s }: { s: State }) {
                   <span className={`grid h-11 w-11 place-items-center rounded-full ring-4 ring-[#0a0a0a] transition ${got ? "bg-white text-grape" : reached ? "hub-claim bg-grape text-white" : "bg-[#262626] text-white/45"}`}>{got ? <Icon name="check" size={18} stroke={3} /> : <Icon name="box" size={19} />}</span>
                   <span className="mt-2 text-[13px] font-bold leading-tight">{t.friends} {t.friends === 1 ? "friend" : "friends"}</span>
                   <span className="mt-0.5 flex items-center gap-1 text-[12.5px] font-extrabold tabular-nums text-white/80"><Coin size={14} />{t.reward.toLocaleString("en-US")}</span>
-                  {reached && !got ? <button type="button" onClick={(e) => claim(i, e.currentTarget)} disabled={!!busy} className="mt-2 h-8 disabled:opacity-60 rounded-full bg-white px-3.5 text-[12.5px] font-extrabold text-[#0a0a0a] transition hover:-translate-y-0.5">{busy === `tier:${i}` ? "Signing…" : "Claim"}</button>
+                  {reached && !got ? <button type="button" onClick={(e) => claim(i, e.currentTarget)} disabled={!!busy} className="mt-2 h-8 disabled:opacity-60 rounded-full bg-white px-3.5 text-[12.5px] font-extrabold text-[#0a0a0a] transition hover:-translate-y-0.5">{busy === `tier:${i}` ? "…" : "Claim"}</button>
                     : <span className="mt-2 flex h-8 max-w-[84px] items-center justify-center text-center text-[11.5px] font-semibold leading-tight text-white/45">{got ? "Collected" : t.title}</span>}
                 </li>
               );

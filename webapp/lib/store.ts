@@ -382,6 +382,11 @@ export function applyHub(live: HubState, seq = nextHubSeq()) {
   const shown = withPending(live);
   set((s) => ({ ...s, live: shown, bond: { ...s.bond, coins: shown.player?.coins ?? 0 } }));
 }
+/** Changes the shown Hub state right now (an instant action); fetches started before this are ignored when they land. */
+export function patchHub(fn: (live: HubState) => HubState) {
+  hubShown = nextHubSeq();
+  set((s) => { if (!s.live) return s; const live = fn(s.live); return { ...s, live, bond: { ...s.bond, coins: live.player?.coins ?? s.bond.coins } }; });
+}
 /** A claim the app shows right away while the chain settles it. */
 export function addHubPending(p: HubPending) {
   hubPending.set(p.sig, p);

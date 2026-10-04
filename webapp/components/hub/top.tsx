@@ -165,7 +165,7 @@ export function CheckIn({ s, now }: { s: State; now: number }) {
       </ol>
       {done
         ? <p className="mt-5 flex h-12 items-center justify-center gap-2 rounded-full bg-tint text-[14.5px] font-bold text-ink"><Icon name="check" size={17} className="text-brand-ink" stroke={3} />Checked in · next in {countdown(nextReset("daily", now) - now)}</p>
-        : <button ref={btn} type="button" onClick={claim} disabled={!!busy} aria-busy={busy === "checkin"} className="hub-claim disabled:opacity-60 mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-grape text-[16px] font-extrabold text-white transition hover:-translate-y-0.5 active:translate-y-0.5">{busy === "checkin" ? "Confirm in your wallet…" : <>Check in · +{pay}<Coin size={22} /></>}</button>}
+        : <button ref={btn} type="button" onClick={claim} disabled={!!busy} aria-busy={busy === "checkin"} className="hub-claim disabled:opacity-60 mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-grape text-[16px] font-extrabold text-white transition hover:-translate-y-0.5 active:translate-y-0.5">{busy === "checkin" ? "Checking in…" : <>Check in · +{pay}<Coin size={22} /></>}</button>}
       <div className="mt-6">
         <div className="flex items-center justify-between"><span className="label text-[9.5px] text-ink/55">Last 4 weeks</span><span className="text-[12px] font-semibold text-ink/55">{grid.filter((k) => days.has(k)).length} of 28 days</span></div>
         <div className="mt-2 grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1.5">

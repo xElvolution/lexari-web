@@ -9,8 +9,9 @@ import {
 import { QUEST_RULES, periodNumber } from "./catalog";
 import { fetchMany, programStatus, utcDay } from "./chain";
 import { qualifiedReferrals, questProgress } from "./rules";
+import { offchainState } from "./offchain";
 
-export type HubState = Awaited<ReturnType<typeof hubState>>;
+export type HubState = Awaited<ReturnType<typeof offchainState>>;
 
 /** A support reset gives someone a fresh box today: their box for that day uses a second onchain slot (day + 1,000,000),
  *  since an opened box account cannot be closed. Set with prefs.boxReset = <UTC day number>. */
@@ -20,8 +21,11 @@ export async function boxDayFor(userId: string, today: number) {
   return Number(u?.prefs?.boxReset) === today ? today + BOX_RESET_OFFSET : today;
 }
 
-/** Everything the Hub shows, from chain accounts and server records. */
-export async function hubState(user: { userId: string; wallet: string; referralCode: string }) {
+/** Everything the Hub shows. Coins and levels are offchain now (database); see offchain.ts. */
+export async function hubState(user: { userId: string; wallet: string; referralCode: string }) { return offchainState(user); }
+
+/** The old chain read (kept for reference and support tooling). */
+export async function chainHubState(user: { userId: string; wallet: string; referralCode: string }) {
   const owner = new PublicKey(user.wallet);
   const player = playerPda(owner);
   const today = utcDay();
