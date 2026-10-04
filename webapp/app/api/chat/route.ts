@@ -17,6 +17,7 @@ import { lockedSlugs } from "@/server/plans";
 import { SPECIALISTS } from "@/content/appData";
 import { desktopOn, runInDesktop, runRequests } from "@/server/desktop";
 import { DESKTOP_MARK } from "@/server/engram/grokCli";
+import { CU_BUDGET_MS, computerOn, computerTask, runComputer, stripComputer } from "@/server/computer";
 import { agentLevel, takeShift } from "@/server/hub/levels";
 import { queuePriority, recallSize, shifts } from "@/lib/perks";
 
@@ -24,6 +25,7 @@ export const runtime = "nodejs";
 
 const PER_MINUTE = Number(process.env.CHAT_PER_MINUTE || 12);
 const PER_DAY = Number(process.env.CHAT_PER_DAY || 300);
+const CU_PER_HOUR = Number(process.env.CU_PER_HOUR || 10); // computer-use tasks per person per hour
 
 /** One reply from the agent, streamed as SSE. Needs a session; the agent's settings come from the database. */
 export async function POST(req: Request) {
@@ -145,7 +147,25 @@ export async function POST(req: Request) {
           const cut = hold ? (full.indexOf("<") >= 0 ? full.indexOf("<") : full.length) : full.length;
           if (cut > shown) { send({ token: full.slice(shown, cut) }); shown = cut; }
         }
-        const cmds = tools ? runRequests(full) : [];
+        // A task for the agent's computer: it looks at its screen and clicks/types step by step (server/computer.ts),
+        // with live progress ({cu}) and the screenshots it took attached to this reply ({shots}).
+        const task = tools && computerOn() ? computerTask(full) : null;
+        if (task) {
+          clearTimeout(cap);
+          const cuCap = setTimeout(() => abort.abort(), CU_BUDGET_MS + 90_000);
+          const before = stripComputer(full.slice(0, full.search(/<computer>/i))).trim();
+          const ok = await rateLimit(`cu:h:${userId}`, CU_PER_HOUR, 3_600_000).catch(() => false);
+          const r = !ok ? { text: "I've used my computer a lot this hour. Give me a bit and ask again.", shots: [] as number[] }
+            : await runComputer(userId, body.convo, body.replyMsgId, task, `The person wrote: ${body.text.slice(0, 400)}`, (p) => send({ cu: p }), abort.signal)
+              .catch((e: Error) => { console.error(`[computer] ${e.message}`); return { text: "My computer stopped responding, so I couldn't finish that. Try again in a moment.", shots: [] as number[] }; });
+          clearTimeout(cuCap);
+          if (r.shots.length) send({ shots: { id: body.replyMsgId, n: r.shots } });
+          send({ cu: null });
+          full = `${before && shown > 0 ? before + "\n\n" : ""}${r.text}`;
+          send({ token: full.slice(shown) });
+          shown = full.length;
+        }
+        const cmds = tools && !task ? runRequests(full) : [];
         if (cmds.length) {
           // The agent asked to use its computer: run the commands in this person's container, then let it answer with the output.
           const results: string[] = [];
@@ -288,5 +308,6 @@ const DESKTOP_HINT = [
   "You have your own Linux computer with a graphical desktop and a Chromium web browser (bash, python3, git, curl, xdotool; the public web is reachable through a filtered proxy). Files live in /home/agent and the person can watch your screen and terminal in the Desktop view.",
   "To show the person a web page on your screen run <run>browse https://example.com</run>. To read a page's text yourself run <run>readpage https://example.com</run>. To see which windows are open run <run>screen-info</run>. You can click and type in the browser with xdotool (for example <run>xdotool key ctrl+l && xdotool type 'lexari.ai' && xdotool key Return</run>).",
   "When the person asks you to make or change files, run code, or check something on your computer, write each shell command as <run>command</run> (at most three).",
+  "For anything you need to SEE and operate on screen (open a site and look at it, search the web and show a page, click through a site, fill in a form, send a screenshot), write one <computer>the task in a sentence, with any details the person gave</computer> instead, after a few words like \"On it.\". Lexari then lets you look at your screen and click, type and scroll step by step, and your reply gets the screenshots attached. Use <computer> rather than xdotool for this. You never enter passwords, payment details or 2FA codes; the person does that part.",
   "You will then get the output and must answer in plain sentences. Never pretend you ran something you did not.",
 ].join(" ");

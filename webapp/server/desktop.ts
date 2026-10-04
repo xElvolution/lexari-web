@@ -38,3 +38,5 @@ export const readDesktop = (userId: string, path: string) => call<{ text: string
 export function runRequests(text: string) {
   return [...text.matchAll(/<run>([\s\S]*?)<\/run>/g)].map((m) => m[1].trim()).filter(Boolean).slice(0, 3);
 }
+/** A PNG screenshot of the agent's screen (base64), taken inside the container. */
+export const shotDesktop = (userId: string) => call<{ png?: string; error?: string }>("/shot", { user: desktopUser(userId) }, 20_000);

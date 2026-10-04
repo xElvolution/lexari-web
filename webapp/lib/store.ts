@@ -20,6 +20,7 @@ import { bridgeFor, runSignOutHooks } from "./walletBridge";
 import { openNote, savedKeys, sealNote, unlock } from "./vault";
 import { addressed, addressedAll } from "./names";
 import { hasPerk, recallSize } from "./perks";
+import { computerEvent } from "./computer";
 
 export type Msg = {
   id: string; from: string; text: string; at: number; jobId?: number;
@@ -684,6 +685,7 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
           buf = lines.pop() || "";
           for (const line of lines) {
             const trimmed = line.trim();
+            if (computerEvent(convo, bubble, trimmed)) { typingWho.set(convo, speaker); continue; }
             if (!trimmed.startsWith("data:")) continue;
             let payload: { token?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"] } = {};
             try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }

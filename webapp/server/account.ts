@@ -3,6 +3,7 @@ import { db } from "./db";
 import { agents, chats, hires, jobs, memories, messages, userMedia, users } from "./db/schema";
 import type { SessionUser } from "./auth/session";
 import { currentPlan } from "./plans";
+import { shotsByReply } from "./computer";
 
 /** Everything the app needs on load. Memories stay encrypted; the browser decrypts them. */
 export async function loadAccount(user: SessionUser) {
@@ -17,7 +18,9 @@ export async function loadAccount(user: SessionUser) {
     currentPlan(user.userId),
   ]);
   const mediaRows = await database.select({ kind: userMedia.kind, at: userMedia.updatedAt }).from(userMedia).where(eq(userMedia.userId, user.userId));
-  const media = Object.fromEntries(mediaRows.map((m) => [m.kind, m.at.getTime()])) as { avatar?: number; cover?: number };
+  const media = Object.fromEntries(mediaRows.filter((m) => !m.kind.startsWith("cu:")).map((m) => [m.kind, m.at.getTime()])) as { avatar?: number; cover?: number };
+  // Screenshots your agent attached to its replies after using its computer.
+  const shots = shotsByReply(mediaRows.map((m) => m.kind));
   const chatIds = chatRows.map((c) => c.id);
   const msgRows = chatIds.length
     ? await database.select().from(messages).where(inArray(messages.chatId, chatIds)).orderBy(desc(messages.createdAt)).limit(3000)
@@ -50,7 +53,7 @@ export async function loadAccount(user: SessionUser) {
     })),
     chats: chatRows.map((c) => ({
       slug: c.slug, kind: c.kind, title: c.title, members: c.memberSlugs, createdAt: c.createdAt.getTime(),
-      messages: dedupe(byChat.get(c.id) || []).slice(-150).map((m) => ({ id: m.clientId || m.id, from: m.fromId, text: m.text, at: m.createdAt.getTime(), ...((m.metaJson as object) || {}) })),
+      messages: dedupe(byChat.get(c.id) || []).slice(-150).map((m) => ({ id: m.clientId || m.id, from: m.fromId, text: m.text, at: m.createdAt.getTime(), ...((m.metaJson as object) || {}), ...(shots.has(m.clientId || m.id) ? { shots: shots.get(m.clientId || m.id) } : {}) })),
     })),
     memories: memRows.map((m) => ({
       id: m.id, agent: m.agentId ? slugOf.get(m.agentId) || "home" : "home", tag: m.tag, source: m.source, ciphertext: m.ciphertext, iv: m.iv,

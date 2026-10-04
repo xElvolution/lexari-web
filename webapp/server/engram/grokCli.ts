@@ -58,7 +58,7 @@ export function flatten(messages: ChatMessage[]) {
     ...sys,
     // The CLI is a coding agent at heart; inside Lexari it is only a chat partner.
     desktop
-      ? "You are chatting inside the Lexari app. You have your own sandboxed Linux computer that Lexari runs for you. You cannot use your own built-in tools; the only way to use the computer is to write <run>command</run>, and Lexari runs it and shows you the output. Never mention a CLI, Grok or xAI."
+      ? "You are chatting inside the Lexari app. You have your own sandboxed Linux computer that Lexari runs for you. You cannot use your own built-in tools; the only ways to use the computer are <run>command</run> (Lexari runs it and shows you the output) and <computer>task</computer> (Lexari lets you see the screen and operate it step by step). Never mention a CLI, Grok or xAI."
       : "You are chatting inside the Lexari app on someone's phone or computer. In this chat you cannot run code, browse the web, open or edit files, or use tools, so never offer to and never mention a workspace, terminal, repository, files on this machine, Grok, xAI or a CLI. Describe what you can do in plain terms: answer questions, explain, plan, write and edit text, brainstorm, and remember what the person tells you.",
     ...(wallet ? ["You CAN use the person's wallet, but only with the <wallet> and <send> tags described above; Lexari handles them."] : []),
   ].join("\n\n");
@@ -69,7 +69,7 @@ export function flatten(messages: ChatMessage[]) {
     history ? `Conversation so far:\n${history}\n` : "",
     `Person: ${last?.content ?? ""}`,
     "",
-    desktop ? "Reply to the person's last message as yourself. Plain text, plus <run>…</run> lines when you need your computer. Do not use your built-in tools." : "Reply to the person's last message as yourself. Plain text only. Do not use tools.",
+    desktop ? "Reply to the person's last message as yourself. Plain text, plus <run>…</run> lines or one <computer>…</computer> task when you need your computer. Do not use your built-in tools." : "Reply to the person's last message as yourself. Plain text only. Do not use tools.",
     wallet ? "If they ask about their wallet, balance, address or sending SOL, use the <wallet>/<send> tags." : "",
   ].join("\n");
   return { system, prompt };
@@ -201,4 +201,51 @@ async function* runOnce(messages: ChatMessage[], signal?: AbortSignal, model?: s
     run.cleanup();
     release();
   }
+}
+
+export type VisionImage = { mime: "image/png" | "image/jpeg"; data: string };
+/** Vision is available when the CLI is reached through the relay (it passes screenshots as ACP image blocks). */
+export const visionOn = () => { const c = grokCliConfig(); return !!c.socket && c.ready; };
+
+/**
+ * One look at a screenshot: a single-turn run with the image(s) attached, returning the whole text answer.
+ * Used by the computer-use loop (server/computer.ts). Same queue as chat; "low" effort keeps each step quick.
+ */
+export async function grokVision(system: string, text: string, images: VisionImage[], signal?: AbortSignal, effort = "low"): Promise<string> {
+  const cfg = grokCliConfig();
+  if (!cfg.socket || !cfg.ready) throw new ModelError("The agent can't see its screen right now.", "grok-cli: vision needs the relay socket");
+  let last: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (signal?.aborted) throw new ModelError("Stopped.", "aborted");
+    await slot(cfg.concurrency, 1);
+    let out = "", failure = "", code: number | null = null, buf = "";
+    try {
+      await new Promise<void>((resolve) => {
+        const sock = createConnection(cfg.socket);
+        sock.setEncoding("utf8");
+        const timer = setTimeout(() => sock.destroy(), cfg.timeoutMs);
+        const stop = () => sock.destroy();
+        signal?.addEventListener("abort", stop, { once: true });
+        sock.on("connect", () => sock.write(JSON.stringify({ system, prompt: text, model: cfg.model || undefined, images, effort }) + "\n"));
+        sock.on("data", (d) => {
+          buf += String(d);
+          const lines = buf.split("\n"); buf = lines.pop() || "";
+          for (const line of lines) {
+            if (line.startsWith('{"relayExit"')) { try { const j = JSON.parse(line) as { relayExit: number; stderr?: string }; code = j.relayExit; if (j.relayExit !== 0) failure = failure || j.stderr || "relay error"; } catch {} continue; }
+            const r = textFromLine(line);
+            if (r.text) out += r.text;
+            if (r.error) failure = r.error;
+          }
+        });
+        sock.on("error", (e) => { failure = failure || `relay: ${e.message}`; });
+        sock.on("close", () => { clearTimeout(timer); signal?.removeEventListener("abort", stop); resolve(); });
+      });
+    } finally { release(); }
+    if (out.trim() && !failure) return out;
+    if (out.trim() && code === 0) return out;
+    last = new ModelError("The agent couldn't look at its screen. Try again.", `grok vision exit ${code}: ${failure.slice(0, 200)}`);
+    if (signal?.aborted || /bad|too large/.test(failure)) break;
+    await sleep(RETRY_MS[attempt] + Math.floor(Math.random() * 400), signal);
+  }
+  throw last;
 }

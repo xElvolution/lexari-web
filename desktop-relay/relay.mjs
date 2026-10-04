@@ -13,7 +13,7 @@ import net from "node:net";
 import fs from "node:fs";
 import dns from "node:dns/promises";
 import crypto from "node:crypto";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { WebSocketServer } from "ws";
 import pty from "node-pty";
 
@@ -154,6 +154,53 @@ async function execCmd(user, cmd, quiet = false) {
   return { code: r.code, out };
 }
 
+// Screenshot of the agent's screen for its computer-use loop: python3 + libX11 (already in the image) read the root
+// window with XGetImage and write a PNG, so no screenshot tool is needed in the container. Returns base64 PNG.
+const XSHOT = String.raw`import ctypes, ctypes.util, zlib, struct, sys, base64
+X = ctypes.cdll.LoadLibrary(ctypes.util.find_library("X11") or "libX11.so.6")
+class XImage(ctypes.Structure):
+    _fields_ = [("width", ctypes.c_int), ("height", ctypes.c_int), ("xoffset", ctypes.c_int), ("format", ctypes.c_int),
+                ("data", ctypes.c_void_p), ("byte_order", ctypes.c_int), ("bitmap_unit", ctypes.c_int), ("bitmap_bit_order", ctypes.c_int),
+                ("bitmap_pad", ctypes.c_int), ("depth", ctypes.c_int), ("bytes_per_line", ctypes.c_int), ("bits_per_pixel", ctypes.c_int)]
+X.XOpenDisplay.restype = ctypes.c_void_p; X.XOpenDisplay.argtypes = [ctypes.c_char_p]
+X.XDefaultRootWindow.restype = ctypes.c_ulong; X.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+X.XGetImage.restype = ctypes.POINTER(XImage)
+X.XGetImage.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int, ctypes.c_int, ctypes.c_uint, ctypes.c_uint, ctypes.c_ulong, ctypes.c_int]
+X.XDisplayWidth.argtypes = X.XDisplayHeight.argtypes = [ctypes.c_void_p, ctypes.c_int]
+d = X.XOpenDisplay(None)
+if not d: sys.exit("no display")
+w, h = X.XDisplayWidth(d, 0), X.XDisplayHeight(d, 0)
+img = X.XGetImage(d, X.XDefaultRootWindow(d), 0, 0, w, h, 0xFFFFFFFF, 2).contents
+bpl = img.bytes_per_line
+raw = ctypes.string_at(img.data, bpl * h)
+rows = []
+for y in range(h):
+    src = raw[y * bpl: y * bpl + w * 4]
+    out = bytearray(w * 3)
+    out[0::3] = src[2::4]; out[1::3] = src[1::4]; out[2::3] = src[0::4]
+    rows.append(b"\x00" + bytes(out))
+def chunk(t, b): return struct.pack(">I", len(b)) + t + b + struct.pack(">I", zlib.crc32(t + b) & 0xffffffff)
+png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(b"".join(rows), 3)) + chunk(b"IEND", b"")
+sys.stdout.write(base64.b64encode(png).decode())
+`;
+const shooting = new Set();
+async function screenshot(user) {
+  const c = await ensure(user);
+  if (shooting.has(user)) return { error: "busy" };
+  shooting.add(user);
+  try {
+    return await new Promise((resolve) => {
+      const p = spawn("docker", ["exec", "-i", c, "timeout", "10", "python3", "-"], { stdio: ["pipe", "pipe", "pipe"] });
+      let out = "", err = "";
+      const t = setTimeout(() => p.kill("SIGKILL"), 15_000);
+      p.stdout.setEncoding("utf8"); p.stdout.on("data", (d) => { if (out.length < 12_000_000) out += d; });
+      p.stderr.on("data", (d) => { if (err.length < 500) err += d; });
+      p.on("close", (code) => { clearTimeout(t); last.set(c, Date.now()); resolve(code === 0 && out ? { png: out } : { error: (err || `exit ${code}`).slice(0, 200) }); });
+      p.stdin.end(XSHOT);
+    });
+  } finally { shooting.delete(user); }
+}
+
 async function listFiles(user, path) {
   const c = await ensure(user);
   const p = String(path || "/home/agent");
@@ -178,6 +225,7 @@ const server = http.createServer(async (req, res) => {
     const body = await readBody(req);
     if (!okUser(body.user)) return send(400, { error: "bad user" });
     if (req.url === "/exec" && req.method === "POST") return send(200, await execCmd(body.user, String(body.cmd || "").slice(0, 2000), !!body.quiet));
+    if (req.url === "/shot" && req.method === "POST") return send(200, await screenshot(body.user));
     if (req.url === "/files" && req.method === "POST") return send(200, await listFiles(body.user, body.path));
     if (req.url === "/read" && req.method === "POST") {
       const c = await ensure(body.user); const p = String(body.path || "");

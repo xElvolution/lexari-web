@@ -17,6 +17,52 @@ import Composer from "./Composer";
 import { mentionParts } from "@/lib/names";
 import { CHAT_BG, MY_BUBBLE } from "@/lib/cosmetics";
 import { openAgent, openUpgrade } from "../overlays";
+import { shotUrl, stopComputer, useComputer } from "@/lib/computer";
+
+/** Screenshots the agent attached after using its computer: the last one (the final screen) large, the others small. Tap to view. */
+function Shots({ m }: { m: Msg }) {
+  const list = (m as Msg & { shots?: number[] }).shots;
+  const [big, setBig] = useState<number | null>(null);
+  if (!list?.length) return null;
+  const last = list[list.length - 1], rest = list.slice(0, -1);
+  return (
+    <div data-shots className="mt-1.5 w-[min(100%,420px)] max-w-full">
+      <button onClick={() => setBig(last)} aria-label="Open the screenshot" className="block w-full overflow-hidden rounded-[16px] bg-card ring-1 ring-line">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={shotUrl(m.id, last)} alt="Screenshot of the agent's screen" className="block h-auto w-full" loading="lazy" />
+      </button>
+      {rest.length > 0 && <div className="mt-1.5 flex gap-1.5">{rest.map((n) => (
+        <button key={n} onClick={() => setBig(n)} aria-label={`Open screenshot ${n + 1}`} className="w-[30%] overflow-hidden rounded-[10px] bg-card ring-1 ring-line">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={shotUrl(m.id, n)} alt={`Step screenshot ${n + 1}`} className="block h-auto w-full" loading="lazy" />
+        </button>
+      ))}</div>}
+      {big !== null && (
+        <div role="dialog" aria-label="Screenshot" onClick={() => setBig(null)} className="fixed inset-0 z-[80] grid place-items-center bg-black/80 p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={shotUrl(m.id, big)} alt="Screenshot of the agent's screen" className="max-h-full max-w-full rounded-[12px]" />
+          <a href={shotUrl(m.id, big)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="btn btn-sm absolute bottom-6 right-4 bg-card text-ink">Open full size</a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** "Working on your computer… step 4: Clicking Search" while the agent operates its desktop, with Watch and Stop. */
+function ComputerRow({ id, onDesktop, desktopOpen }: { id: string; onDesktop: () => void; desktopOpen: boolean }) {
+  const p = useComputer(id);
+  const [stopping, setStopping] = useState(false);
+  useEffect(() => { if (!p) setStopping(false); }, [p]);
+  if (!p) return null;
+  return (
+    <div data-computer-row className="ml-10 mt-2 flex max-w-[min(100%,460px)] items-center gap-2.5 rounded-[16px] bg-card px-3 py-2 ring-1 ring-line">
+      <span aria-hidden className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" />
+      <span className="min-w-0 flex-1 text-[13px] leading-snug text-ink/80"><b className="block text-ink">Working on your computer…</b><span className="block truncate" aria-live="polite">Step {p.step}: {p.label}</span></span>
+      {!desktopOpen && <button onClick={onDesktop} className="shrink-0 rounded-full bg-tint px-3 py-1.5 text-[12.5px] font-bold text-brand-ink">Watch</button>}
+      <button data-computer-stop disabled={stopping} onClick={() => { setStopping(true); void stopComputer(id); }} className="shrink-0 rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-bold text-[var(--bg)] disabled:opacity-50">{stopping ? "Stopping" : "Stop"}</button>
+    </div>
+  );
+}
 
 function VoiceNote({ secs, mine }: { secs: number; mine: boolean }) {
   const [p, setP] = useState(-1);
@@ -204,6 +250,7 @@ function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
         <MsgMenu m={m} convo={convo} mine={mine} open={open} more={!!menu?.more} below={below} onMore={() => setMenu({ id: m.id, more: true })} onReply={() => { setMenu(null); onReply(m); }} onClose={() => setMenu(null)} />
       </div> : null}
       {m.send && <SendCard convo={convo} m={m as Msg & { send: NonNullable<Msg["send"]> }} />}
+      <Shots m={m} />
       <Pills m={m} s={s} convo={convo} mine={mine} />
     </div>
   );
@@ -347,6 +394,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
                 </div>
               </div>
             )}
+            <ComputerRow id={id} onDesktop={onDesktop} desktopOpen={desktopOpen} />
           </div>
         </div>
       </div>
