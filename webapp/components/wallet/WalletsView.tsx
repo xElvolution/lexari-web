@@ -24,6 +24,33 @@ import CardSheet from "./CardSheet";
 const copy = (addr: string, what: string) => { navigator.clipboard?.writeText(addr).catch(() => {}); toast({ text: `Copied ${what}` }); };
 const ago = (t: number) => { const s = Math.max(1, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`; };
 
+function TxRow({ t }: { t: ConfirmedSignatureInfo }) {
+  return (
+    <li>
+      <a href={txUrl(t.signature)} target="_blank" rel="noreferrer" className="flex items-center gap-3 py-3">
+        <span className={`grid h-9 w-9 place-items-center rounded-xl ${t.err ? "bg-[#e5484d]/15 text-[#e5484d]" : "bg-tint text-ink/70"}`}><Icon name={t.err ? "x" : "check"} size={15} /></span>
+        <span className="min-w-0 flex-1"><span className="block truncate font-mono text-[13px] text-ink">{shortAddr(t.signature)}</span><span className="block text-[12px] text-ink/50">{t.blockTime ? ago(t.blockTime * 1000) : "pending"}{t.err ? " · failed" : ""}</span></span>
+        <Icon name="arrow" size={14} className="text-ink/40" />
+      </a>
+    </li>
+  );
+}
+
+/** Every recent transaction (up to 25 from the chain) in a sheet, with the explorer one tap away. */
+function AllTxs({ txs, addr, onClose }: { txs: ConfirmedSignatureInfo[]; addr: string; onClose: () => void }) {
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-5" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label="All transactions" data-all-txs className="pop pb-safe-dlg flex max-h-[88dvh] w-full max-w-[460px] flex-col rounded-t-[26px] bg-card p-5 ring-1 ring-line sm:rounded-[26px]">
+        <div className="flex items-center justify-between"><h2 className="display text-[24px] text-ink">Transactions</h2><button onClick={onClose} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={19} /></button></div>
+        <p className="mt-1 text-[13px] text-ink/55">Your latest {txs.length} on Solana devnet.</p>
+        <ul className="no-bar mt-2 min-h-0 flex-1 divide-y divide-[var(--line)] overflow-y-auto overscroll-contain">{txs.map((t) => <TxRow key={t.signature} t={t} />)}</ul>
+        <a href={tokenUrl(addr)} target="_blank" rel="noreferrer" className="mt-3 rounded-full bg-tint py-3 text-center text-[14px] font-bold text-brand-ink">Open in Solana Explorer</a>
+      </div>
+    </div>
+  );
+}
+
 /** The Solana wallet you signed in with: its devnet balance and latest transactions, read from the chain. */
 function PersonalWallet({ s }: { s: State }) {
   const bridge = useWalletBridge();
@@ -31,6 +58,7 @@ function PersonalWallet({ s }: { s: State }) {
   const [sol, setSol] = useState<string>("…");
   const [txs, setTxs] = useState<ConfirmedSignatureInfo[] | null>(null);
   const [n, setN] = useState(0);
+  const [all, setAll] = useState(false);
   useEffect(() => {
     if (!addr) return;
     const conn = new Connection(SOLANA_RPC, "confirmed");
@@ -61,22 +89,15 @@ function PersonalWallet({ s }: { s: State }) {
           {!connected && <p className="mt-4 text-[13px] text-white/80">{s.auth?.method === "google" ? "Your wallet loads after Google or email sign-in finishes." : "Open your wallet app or extension to sign from this device."}</p>}
         </div>
         <div className="rounded-[28px] bg-card p-5 ring-1 ring-line sm:p-6">
-          <div className="flex items-center justify-between"><h3 className="text-[16px] font-bold text-ink">Recent transactions</h3>{addr && !!txs?.length && <a data-view-all href={tokenUrl(addr)} target="_blank" rel="noreferrer" className="text-[13px] font-bold text-brand-ink hover:underline">View all</a>}</div>
+          <div className="flex items-center justify-between"><h3 className="text-[16px] font-bold text-ink">Recent transactions</h3>{addr && !!txs?.length && <button data-view-all onClick={() => setAll(true)} className="text-[13px] font-bold text-brand-ink hover:underline">View all</button>}</div>
           {txs === null ? <p className="mt-3 text-[14px] text-ink/60">Loading…</p> : !txs.length ? <p className="mt-3 text-[14px] text-ink/60">Nothing yet. A check-in on the Hub is a good first one.</p> : (
-            <ul data-tx-list className="no-bar mt-3 max-h-[312px] divide-y divide-[var(--line)] overflow-y-auto overscroll-contain [mask-image:linear-gradient(to_bottom,black_88%,transparent)]">
-              {txs.map((t) => (
-                <li key={t.signature}>
-                  <a href={txUrl(t.signature)} target="_blank" rel="noreferrer" className="flex items-center gap-3 py-3">
-                    <span className={`grid h-9 w-9 place-items-center rounded-xl ${t.err ? "bg-[#e5484d]/15 text-[#e5484d]" : "bg-tint text-ink/70"}`}><Icon name={t.err ? "x" : "check"} size={15} /></span>
-                    <span className="min-w-0 flex-1"><span className="block truncate font-mono text-[13px] text-ink">{shortAddr(t.signature)}</span><span className="block text-[12px] text-ink/50">{t.blockTime ? ago(t.blockTime * 1000) : "pending"}{t.err ? " · failed" : ""}</span></span>
-                    <Icon name="arrow" size={14} className="text-ink/40" />
-                  </a>
-                </li>
-              ))}
+            <ul data-tx-list className="no-bar mt-3 max-h-[250px] divide-y divide-[var(--line)] overflow-y-auto overscroll-contain [mask-image:linear-gradient(to_bottom,black_86%,transparent)]">
+              {txs.slice(0, 5).map((t) => <TxRow key={t.signature} t={t} />)}
             </ul>
           )}
         </div>
       </section>
+      {all && txs && <AllTxs txs={txs} addr={addr} onClose={() => setAll(false)} />}
     </>
   );
 }
