@@ -31,5 +31,8 @@ export function friendly(error: unknown, fallback = "Something went wrong.") {
   if (/reject|denied|cancel|declined/i.test(m)) return "You cancelled it in your wallet.";
   if (/insufficient|0x1\b|no record of a prior credit/i.test(m)) return "Not enough devnet SOL for the fee. Get some from the faucet on the Wallets page.";
   if (/blockhash|expired/i.test(m)) return "It took too long. Try again.";
+  if (/\b429\b|too many requests|rate.?limit/i.test(m)) return "Solana is busy right now. Wait a few seconds and try again.";
+  if (/failed to fetch|network ?error|fetch failed|ECONNRESET|timed? ?out/i.test(m)) return "Couldn't reach Solana. Check your connection and try again.";
+  if (/^\s*[{\[]|jsonrpc|custom program error/i.test(m)) return fallback;
   return m.split("\n")[0].slice(0, 160);
 }
