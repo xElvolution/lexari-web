@@ -1,5 +1,13 @@
 /** Store cosmetics: chat backgrounds and your bubble style. Prices match server/hub/offchain.ts (the server charges). */
 export type Cosmetic = { id: string; kind: "bg" | "bubble"; name: string; price: number };
+/**
+ * Store sections, in the order they show. To add a category: add its kind to Cosmetic["kind"], a row here,
+ * its items to STORE_ITEMS, a preview in components/hub/store.tsx, and (server) its prices in server/hub/offchain.ts STORE.
+ */
+export const STORE_CATEGORIES: { kind: Cosmetic["kind"]; title: string; sub: string }[] = [
+  { kind: "bg", title: "Chat background", sub: "Shows behind every chat." },
+  { kind: "bubble", title: "Bubble style", sub: "Your own messages wear it." },
+];
 export const STORE_ITEMS: Cosmetic[] = [
   { id: "bg-aurora", kind: "bg", name: "Aurora", price: 120 },
   { id: "bg-grid", kind: "bg", name: "Blueprint", price: 80 },

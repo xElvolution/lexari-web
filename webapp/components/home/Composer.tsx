@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { sendTo, toast, useApp } from "@/lib/store";
+import { AgentTile } from "../faces";
 import { ensureMic, transcribe, type Transcriber } from "@/lib/voice";
 import Icon from "../Icon";
 import { fmtSecs } from "../agents";
@@ -11,7 +12,8 @@ const BARS = 36;
 
 /** Message box: attach, text, voice note, call and send. Enter sends, Shift+Enter adds a line. */
 type Reply = { id: string; from: string; text: string };
-export default function Composer({ id, name, suggestions, onCall, onDesktop, desktopOpen, reply = null, replyName = "", onClearReply }: { id: string; name: string; suggestions: string[]; onCall: () => void; onDesktop: () => void; desktopOpen: boolean; reply?: Reply | null; replyName?: string; onClearReply?: () => void }) {
+export default function Composer({ id, name, members, suggestions, onCall, onDesktop, desktopOpen, reply = null, replyName = "", onClearReply }: { id: string; name: string; members?: { id: string; name: string }[]; suggestions: string[]; onCall: () => void; onDesktop: () => void; desktopOpen: boolean; reply?: Reply | null; replyName?: string; onClearReply?: () => void }) {
+  const app = useApp();
   const [text, setText] = useState("");
   const [file, setFile] = useState<{ name: string; size: string } | null>(null);
   const [rec, setRec] = useState<number | null>(null); // seconds recorded, null when not recording
@@ -59,6 +61,15 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
   function cancelVoice() { tr.current?.abort(); tr.current = null; setRec(null); setHeard(""); }
   useEffect(() => { if (reply) input.current?.focus(); }, [reply]);
   const ready = !!text.trim() || !!file;
+  // Group chats: "@" opens a picker of the members to mention.
+  const [caret, setCaret] = useState(0);
+  const q = members ? /(?:^|\s)@([\p{L}\p{N}]*)$/u.exec(text.slice(0, caret))?.[1] : undefined;
+  const matches = q === undefined || !members ? [] : members.filter((m) => m.name.toLowerCase().startsWith(q.toLowerCase()));
+  const put = (v: string, at: number) => { setText(v.slice(0, 2000)); setCaret(at); requestAnimationFrame(() => { const t = input.current; if (t) { t.focus(); t.setSelectionRange(at, at); } grow(); }); };
+  const pickMention = (m: { name: string }) => {
+    const head = text.slice(0, caret).replace(/@[\p{L}\p{N}]*$/u, `@${m.name} `);
+    put(head + text.slice(caret).replace(/^\s+/, ""), head.length);
+  };
   const iconBtn = "grid h-10 w-10 max-[430px]:h-9 max-[430px]:w-9 shrink-0 place-items-center rounded-full text-ink/70 transition hover:bg-tint hover:text-brand-ink";
 
   return (
@@ -67,6 +78,15 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
         {suggestions.length > 0 && rec === null && (
           <div className="no-bar -mx-1 mb-2.5 flex gap-2 overflow-x-auto px-1 [mask-image:linear-gradient(to_right,black_88%,transparent)]">
             {suggestions.map((c) => <button key={c} onClick={() => send(c)} className="shrink-0 rounded-full bg-tint px-3.5 py-2 text-[13px] font-semibold text-ink/80 transition hover:bg-grape hover:text-white">{c}</button>)}
+          </div>
+        )}
+        {matches.length > 0 && rec === null && (
+          <div data-mention-picker role="listbox" aria-label="Mention an agent" className="mb-2 overflow-hidden rounded-[18px] bg-card p-1 shadow-lg ring-1 ring-line">
+            {matches.map((m, i) => (
+              <button key={m.id} type="button" role="option" aria-selected={i === 0} onMouseDown={(e) => e.preventDefault()} onClick={() => pickMention(m)} className={`flex w-full items-center gap-2.5 rounded-[14px] px-2 py-1.5 text-left text-[14.5px] font-semibold text-ink ${i === 0 ? "bg-tint" : ""}`}>
+                <AgentTile id={m.id} look={m.id === "home" ? app?.agent?.look : undefined} size={28} status={false} ring={false} /><span>@{m.name}</span>
+              </button>
+            ))}
           </div>
         )}
         <div data-tour="composer" className={`rounded-[26px] max-[430px]:rounded-[22px] bg-card ring-1 transition ${rec !== null ? "ring-grape" : "ring-line focus-within:ring-2 focus-within:ring-grape"}`}>
@@ -91,7 +111,7 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
               <input ref={picker} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile({ name: f.name, size: kb(f.size) }); e.target.value = ""; }} />
               <button type="button" onClick={onDesktop} data-tour="desktop-btn" aria-pressed={desktopOpen} aria-label={`Open ${name}'s desktop`} title="Desktop" className={desktopOpen ? "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition" : iconBtn}><Icon name="monitor" size={19} /></button>
               <button type="button" onClick={() => picker.current?.click()} aria-label="Attach a file" title="Attach a file" className={iconBtn}><Icon name="clip" size={19} /></button>
-              <textarea ref={input} value={text} rows={1} onChange={(e) => { setText(e.target.value.slice(0, 2000)); grow(); }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } else if (e.key === "Escape" && reply) onClearReply?.(); }} placeholder={`Message ${name}`} aria-label={`Message ${name}`} className={`${multi ? "order-first basis-full px-3" : "flex-1 px-1.5"} max-h-40 min-h-[40px] min-w-0 resize-none bg-transparent py-2 text-[16px] leading-6 text-ink outline-none placeholder:text-ink/45`} />
+              <textarea ref={input} value={text} rows={1} onChange={(e) => { setText(e.target.value.slice(0, 2000)); setCaret(e.target.selectionStart ?? e.target.value.length); grow(); }} onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)} onKeyDown={(e) => { if (matches.length && (e.key === "Enter" || e.key === "Tab") && !e.shiftKey) { e.preventDefault(); pickMention(matches[0]); } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } else if (e.key === "Escape" && reply) onClearReply?.(); }} placeholder={`Message ${name}`} aria-label={`Message ${name}`} className={`${multi ? "order-first basis-full px-3" : "flex-1 px-1.5"} max-h-40 min-h-[40px] min-w-0 resize-none bg-transparent py-2 text-[16px] leading-6 text-ink outline-none placeholder:text-ink/45`} />
               <button type="button" onClick={() => void startVoice()} aria-label="Record a voice message" title="Voice message" className={`${iconBtn} ${multi ? "ml-auto" : ""}`}><Icon name="mic" size={19} /></button>
               <button type="button" onClick={onCall} aria-label={`Call ${name}`} title="Voice call" className={iconBtn}><Icon name="call" size={18} /></button>
               <button disabled={!ready} aria-label="Send" className="grid h-10 w-10 max-[430px]:h-9 max-[430px]:w-9 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:bg-grape-deep disabled:bg-ink/15 disabled:text-ink/40"><Icon name="send" size={18} stroke={2.4} /></button>
