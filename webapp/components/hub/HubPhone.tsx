@@ -153,7 +153,7 @@ function BoxCard({ s, now }: { s: State; now: number }) {
       <div className="mt-2 text-[15px] font-bold">Mystery box</div>
       <div className="text-[12px] leading-snug text-white/60">{opened ? `Opened today${won ? ` · won ${won}` : ""}` : "15 to 250 coins, once a day"}</div>
       <div className="mt-auto pt-3">
-        {opened ? <span data-box-next className={`${pill} w-full bg-white/10 tabular-nums text-white/75`}>Next in {countdown(nextReset("daily", now) - now)}</span>
+        {opened ? <span data-box-next className={`${pill} w-full bg-white/10 tabular-nums text-white/75`}>Next in {countdown(nextReset("daily", now) - now).replace(/ \d+s$/, "")}</span>
           : <button ref={el} type="button" data-box-card-open onClick={() => setModal(true)} disabled={!!busy} className={`${pill} w-full bg-white text-[#0a0a0a]`}>{busy === "box" ? "Opening…" : "Open"}</button>}
       </div>
       <BoxModal open={modal} onOpen={run} onClose={() => setModal(false)} />
@@ -263,7 +263,7 @@ function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
     <Sheet label="Train your agents" onClose={onClose} data="train-sheet">
       <div className="flex items-center justify-between gap-2"><p className="text-[13px] leading-snug text-ink/60">Coins become XP. Every level unlocks a perk.</p><span className="flex shrink-0 items-center gap-1 rounded-full bg-tint px-2.5 py-1 text-[12.5px] font-bold tabular-nums text-ink"><Coin size={13} />{coins.toLocaleString("en-US")}</span></div>
       {team.length > 1 && (
-        <div className="no-bar -mx-4 mt-2.5 flex gap-1.5 overflow-x-auto px-4 py-0.5" role="radiogroup" aria-label="Agent to train">
+        <div className="no-bar -mx-4 mt-1.5 flex gap-1.5 overflow-x-auto px-4 py-1.5" role="radiogroup" aria-label="Agent to train">
           {team.map((a) => <button key={a.id} role="radio" aria-checked={a.id === agent.id} onClick={() => { setPick(a.id); setWon(null); }} className={`flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-[13px] font-bold transition ${a.id === agent.id ? "bg-grape text-white" : "bg-tint text-ink/75"}`}><AgentTile id={a.id} look={a.id === "home" ? s.agent?.look : undefined} size={26} status={false} ring={false} />{a.name}<span className="opacity-70">Lv {levelOf(s, a.id).level}</span></button>)}
         </div>
       )}
