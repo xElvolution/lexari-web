@@ -14,10 +14,6 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders(true).filter((h) => h.value) }];
   },
-  // Bond was renamed to Hub
-  async redirects() {
-    return [{ source: "/app/bond", destination: "/app/hub", permanent: true }];
-  },
 };
 
 export default nextConfig;

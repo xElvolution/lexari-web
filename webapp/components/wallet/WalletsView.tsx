@@ -149,7 +149,7 @@ export default function WalletsView() {
   const [openFor, setOpenFor] = useState<string | null>(null);
   const agents = myAgents(s);
   const cards = useCards();
-  const go = (t: "wallets" | "cards") => { setTab(t); window.history.replaceState(null, "", t === "cards" ? "/app/wallets?tab=cards" : "/app/wallets"); };
+  const go = (t: "wallets" | "cards") => { setTab(t); window.history.replaceState(null, "", t === "cards" ? "/wallets?tab=cards" : "/wallets"); };
   const how = s.auth?.method === "google" ? "Your personal agent uses the wallet made for you when you signed in." : "Your personal agent uses the wallet you signed in with.";
   return (
     <>

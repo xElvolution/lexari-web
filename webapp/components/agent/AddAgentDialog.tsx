@@ -104,7 +104,7 @@ function Create() {
     const id = createAgent({ name: name.trim(), role: role.trim() || "Custom agent", about: about.trim(), template: tpl, ...look, tone, skills, memory });
     setMade(id); setPhase("done");
   };
-  const open = () => { closeAdd(); if (made) router.push(`/app?c=${made}`); };
+  const open = () => { closeAdd(); if (made) router.push(`/agents/${made}`); };
 
   if (phase === "setup") return <SetupSequence name={name.trim()} v={variant(look)} bg={look.bg} onDone={ready} />;
   if (phase === "done" && made && s.custom.some((c) => c.id === made)) return (
@@ -212,9 +212,9 @@ function Hire({ startCat }: { startCat?: string }) {
       <ul className="mt-2 space-y-2">
         {picks.map(({ a, m }, i) => (
           <li key={a.slug} className="pop flex items-center gap-3 rounded-[20px] p-2.5 ring-1 ring-line" style={{ animationDelay: `${i * 60}ms` }}>
-            <Link href={`/app/marketplace/${a.slug}`} onClick={closeAdd} className="shrink-0"><AgentTile id={a.slug} look={null} size={56} radius={18} /></Link>
+            <Link href={`/marketplace/${a.slug}`} onClick={closeAdd} className="shrink-0"><AgentTile id={a.slug} look={null} size={56} radius={18} /></Link>
             <span className="min-w-0 flex-1">
-              <Link href={`/app/marketplace/${a.slug}`} onClick={closeAdd} className="block truncate text-[15.5px] font-bold text-ink hover:text-brand-ink">{a.name} <span className="font-semibold text-ink/50">· {a.job}</span></Link>
+              <Link href={`/marketplace/${a.slug}`} onClick={closeAdd} className="block truncate text-[15.5px] font-bold text-ink hover:text-brand-ink">{a.name} <span className="font-semibold text-ink/50">· {a.job}</span></Link>
               <span className="block truncate text-[13px] text-ink/60">{a.quip}</span>
               <span className="mt-0.5 flex items-center gap-1.5 text-[12px] text-ink/60"><StarRow v={a.rating} size={11} /><span className="font-semibold">{a.rating}</span><span className="text-ink/35">·</span>{compact(m.hires)} hires<span className="text-ink/35">·</span>{m.maker}</span>
             </span>
@@ -222,7 +222,7 @@ function Hire({ startCat }: { startCat?: string }) {
           </li>
         ))}
       </ul>
-      <Link href={`/app/marketplace${cat ? `?cat=${cat}` : ""}`} onClick={closeAdd} className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-tint py-3.5 text-[14.5px] font-bold text-brand-ink transition hover:bg-grape hover:text-white">
+      <Link href={`/marketplace${cat ? `?cat=${cat}` : ""}`} onClick={closeAdd} className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-tint py-3.5 text-[14.5px] font-bold text-brand-ink transition hover:bg-grape hover:text-white">
         Browse the full marketplace{cat ? ` · ${cat}` : ""}<Icon name="arrow" size={16} />
       </Link>
     </div>

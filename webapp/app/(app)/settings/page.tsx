@@ -125,7 +125,7 @@ function Personal({ s }: { s: State }) {
       </Group>
       <Group title="Memory">
         <Row title="Memory" desc="Let agents remember useful things about you between chats."><Toggle on={s.prefs.memory} onChange={(v) => { setPrefs({ memory: v }); toast({ text: v ? "Memory is on" : "Memory is off. Nothing new will be saved." }); }} label="Memory" /></Row>
-        <Row title="Manage memory" desc={`${s.memory.length} things remembered. See, edit or forget any of them.`}><Link href="/app/memory" className={smallBtn}>Open brain</Link></Row>
+        <Row title="Manage memory" desc={`${s.memory.length} things remembered. See, edit or forget any of them.`}><Link href="/brain" className={smallBtn}>Open brain</Link></Row>
         <Row title="Replay onboarding" desc="Walk through naming and setup again."><Link href="/onboarding" className={smallBtn}>Replay</Link></Row>
       </Group>
     </>
@@ -140,14 +140,14 @@ function Agents({ s }: { s: State }) {
           <div key={a.id} className="flex items-center gap-3 py-3.5">
             <AgentTile id={a.id} look={s.agent?.look} size={44} />
             <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="truncate text-[15px] font-semibold text-ink">{a.name}</span>{s.prefs.defaultAgent === a.id && <span className="label rounded-full bg-tint px-1.5 py-0.5 text-[8px] text-brand-ink">Default</span>}</div><div className="truncate text-[13px] text-ink/55">{a.role} · seat {String(a.seat).padStart(2, "0")}{s.wallets[a.id] ? " · wallet" : ""}{s.cards[a.id] ? " · card" : ""}</div></div>
-            <Link href={`/app?c=${a.id}`} className={smallBtn}>Chat</Link>
+            <Link href={`/agents/${a.id}`} className={smallBtn}>Chat</Link>
             <button onClick={() => openAgent(a.id)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-[13.5px] font-semibold text-ink/65 hover:bg-tint hover:text-ink"><Icon name="idcard" size={15} />Edit</button>
           </div>
         ))}
       </Group>
       <Group>
         <Row title="Add an agent" desc="Create your own, or hire a specialist from the marketplace."><button onClick={() => openAdd()} className={smallBtn}>Add agent</button></Row>
-        <Row title="Your team" desc="Everyone you hired, and the specialists you can bring back for free."><Link href="/app/team" className={smallBtn}>Team</Link></Row>
+        <Row title="Your team" desc="Everyone you hired, and the specialists you can bring back for free."><Link href="/team" className={smallBtn}>Team</Link></Row>
       </Group>
     </>
   );
@@ -282,7 +282,7 @@ function Billing({ s }: { s: State }) {
       </Group>
       <section className="mt-6"><PlanSummary /></section>
       <Group title="Payments">
-        <Row title="Hires" desc={s.paid.length ? `${s.paid.length} specialist${s.paid.length === 1 ? "" : "s"} paid for. Released ones come back for free.` : "No hires yet."}><Link href="/app/wallets" className={smallBtn}>Wallet</Link></Row>
+        <Row title="Hires" desc={s.paid.length ? `${s.paid.length} specialist${s.paid.length === 1 ? "" : "s"} paid for. Released ones come back for free.` : "No hires yet."}><Link href="/wallets" className={smallBtn}>Wallet</Link></Row>
       </Group>
     </>
   );

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Lexari",
     short_name: "Lexari",
     description: "Your personal AI agent.",
-    start_url: "/app",
+    start_url: "/agents",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#5b2bff",

@@ -111,19 +111,19 @@ const live = (s: State, id: string) => s.live?.quests.find((q) => q.id === id);
 
 export const QUESTS: Quest[] = [
   { id: "d-checkin", chainId: 1, period: "daily", title: "Show up", hint: "Check in today", goal: 1, reward: 10, icon: "check", go: "#checkin", progress: (s) => live(s, "d-checkin")?.progress ?? 0 },
-  { id: "d-chat", chainId: 2, period: "daily", title: "Say hi", hint: "Send 3 messages to any agent", goal: 3, reward: 20, icon: "chat", go: "/app", progress: (s) => live(s, "d-chat")?.progress ?? 0 },
-  { id: "d-memory", chainId: 3, period: "daily", title: "Teach it something", hint: "Save 2 memories", goal: 2, reward: 25, icon: "memory", go: "/app/memory", progress: (s) => live(s, "d-memory")?.progress ?? 0 },
+  { id: "d-chat", chainId: 2, period: "daily", title: "Say hi", hint: "Send 3 messages to any agent", goal: 3, reward: 20, icon: "chat", go: "/agents", progress: (s) => live(s, "d-chat")?.progress ?? 0 },
+  { id: "d-memory", chainId: 3, period: "daily", title: "Teach it something", hint: "Save 2 memories", goal: 2, reward: 25, icon: "memory", go: "/brain", progress: (s) => live(s, "d-memory")?.progress ?? 0 },
   { id: "d-box", chainId: 4, period: "daily", title: "Lucky dip", hint: "Open today's mystery box", goal: 1, reward: 10, icon: "box", go: "#box", progress: (s) => live(s, "d-box")?.progress ?? 0 },
   { id: "w-days", chainId: 101, period: "weekly", title: "Regular", hint: "Check in on 5 days this week", goal: 5, reward: 120, icon: "check", go: "#checkin", progress: (s) => live(s, "w-days")?.progress ?? 0 },
-  { id: "w-chat", chainId: 102, period: "weekly", title: "Chatterbox", hint: "Send 25 messages this week", goal: 25, reward: 150, icon: "chat", go: "/app", progress: (s) => live(s, "w-chat")?.progress ?? 0 },
-  { id: "w-jobs", chainId: 103, period: "weekly", title: "Delegator", hint: "Finish 3 jobs this week", goal: 3, reward: 180, icon: "jobs", go: "/app", progress: (s) => live(s, "w-jobs")?.progress ?? 0 },
+  { id: "w-chat", chainId: 102, period: "weekly", title: "Chatterbox", hint: "Send 25 messages this week", goal: 25, reward: 150, icon: "chat", go: "/agents", progress: (s) => live(s, "w-chat")?.progress ?? 0 },
+  { id: "w-jobs", chainId: 103, period: "weekly", title: "Delegator", hint: "Finish 3 jobs this week", goal: 3, reward: 180, icon: "jobs", go: "/agents", progress: (s) => live(s, "w-jobs")?.progress ?? 0 },
   { id: "w-level", chainId: 104, period: "weekly", title: "Coach", hint: "Level up any agent twice", goal: 2, reward: 100, icon: "spark", go: "#level", progress: (s) => live(s, "w-level")?.progress ?? 0 },
   { id: "h-streak", chainId: 201, period: "hard", title: "Iron streak", hint: "Check in 14 days in a row", goal: 14, reward: 750, icon: "star", go: "#checkin", progress: (s) => live(s, "h-streak")?.progress ?? 0 },
   { id: "h-level", chainId: 202, period: "hard", title: "Prodigy", hint: "Raise an agent to level 5", goal: 5, reward: 600, icon: "spark", go: "#level", progress: (s) => live(s, "h-level")?.progress ?? 0 },
-  { id: "h-memory", chainId: 203, period: "hard", title: "Elephant", hint: "Keep 30 memories in the brain", goal: 30, reward: 500, icon: "memory", go: "/app/memory", progress: (s) => live(s, "h-memory")?.progress ?? 0 },
-  { id: "h-team", chainId: 204, period: "hard", title: "Full house", hint: "Have 5 agents on your team", goal: 5, reward: 900, icon: "team", go: "/app/marketplace", progress: (s) => live(s, "h-team")?.progress ?? 0 },
+  { id: "h-memory", chainId: 203, period: "hard", title: "Elephant", hint: "Keep 30 memories in the brain", goal: 30, reward: 500, icon: "memory", go: "/brain", progress: (s) => live(s, "h-memory")?.progress ?? 0 },
+  { id: "h-team", chainId: 204, period: "hard", title: "Full house", hint: "Have 5 agents on your team", goal: 5, reward: 900, icon: "team", go: "/marketplace", progress: (s) => live(s, "h-team")?.progress ?? 0 },
   { id: "h-invite", chainId: 205, period: "hard", title: "Recruiter", hint: "Invite 5 friends", goal: 5, reward: 800, icon: "users", go: "#invite", progress: (s) => live(s, "h-invite")?.progress ?? 0 },
-  { id: "h-hire", chainId: 206, period: "hard", title: "Talent scout", hint: "Hire a specialist from the market", goal: 1, reward: 300, icon: "market", go: "/app/marketplace", progress: (s) => live(s, "h-hire")?.progress ?? 0 },
+  { id: "h-hire", chainId: 206, period: "hard", title: "Talent scout", hint: "Hire a specialist from the market", goal: 1, reward: 300, icon: "market", go: "/marketplace", progress: (s) => live(s, "h-hire")?.progress ?? 0 },
 ];
 export type QuestView = Quest & { have: number; done: boolean; claimed: boolean; resetsAt: number };
 export function questsView(s: State, now: number): QuestView[] {

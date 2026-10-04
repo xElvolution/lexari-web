@@ -35,7 +35,7 @@ function Hero() {
                 <p className="mt-2 max-w-[440px] text-[14.5px] text-white/70">{a.back}</p>
                 <div className="mt-5 flex flex-wrap items-center gap-3">
                   <HireBtn a={a} size="lg" />
-                  <Link href={`/app/marketplace/${a.slug}`} className="inline-flex h-12 items-center rounded-full bg-white/15 px-6 text-[15px] font-bold backdrop-blur transition hover:bg-white/25">View listing</Link>
+                  <Link href={`/marketplace/${a.slug}`} className="inline-flex h-12 items-center rounded-full bg-white/15 px-6 text-[15px] font-bold backdrop-blur transition hover:bg-white/25">View listing</Link>
                   <span className="flex items-center gap-2 text-[13.5px] text-white/80"><span className="flex items-center gap-1 font-bold text-white">{a.rating}<Icon name="star" size={13} /></span>· {compact(m.hires)} hires · {m.cat}</span>
                 </div>
               </div>
@@ -74,7 +74,7 @@ function TopCharts() {
       <ol key={tab} className="mt-4 grid gap-x-8 sm:grid-cols-2 xl:grid-cols-3 xl:grid-flow-col xl:grid-rows-4">
         {list.map((a, k) => { const m = storeMeta(a); return (
           <li key={a.slug} className="pop" style={{ animationDelay: `${k * 30}ms` }}>
-            <Link href={`/app/marketplace/${a.slug}`} className="group flex items-center gap-3.5 border-b border-line py-3">
+            <Link href={`/marketplace/${a.slug}`} className="group flex items-center gap-3.5 border-b border-line py-3">
               <span className="display tab-num w-7 shrink-0 text-center text-[26px] text-ink/35 group-hover:text-brand-ink">{k + 1}</span>
               <AgentTile id={a.slug} look={null} size={56} radius={16} />
               <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-bold text-ink">{a.name}</span><span className="block truncate text-[12.5px] text-ink/55">{m.cat} · {m.maker}</span><span className="flex items-center gap-1.5 text-[12px] text-ink/65"><span className="flex items-center gap-0.5 font-semibold">{a.rating}<Icon name="star" size={10} className="text-brand-ink" /></span>· {compact(m.hires)}{tab === "free" && <span className="label ml-1 rounded bg-tint px-1 text-[8px] text-brand-ink">Free</span>}{tab === "rising" && <span className="ml-1 text-brand-ink">▲ {3 + ((k * 5) % 9)}</span>}</span></span>
@@ -102,7 +102,7 @@ function Picks() {
             <h3 className="display mt-2 text-[32px] leading-[.95] text-ink">{p.title}</h3>
             <p className="mt-2 max-w-[28rem] text-[14.5px] text-ink/65">{p.body}</p>
             <div className="mt-5 flex items-center gap-3">
-              <div className="flex -space-x-3">{p.who.map((w) => <Link key={w} href={`/app/marketplace/${w}`} className="transition hover:z-10 hover:-translate-y-1"><AgentTile id={w} look={null} size={52} className="ring-4 ring-[var(--card)]" /></Link>)}</div>
+              <div className="flex -space-x-3">{p.who.map((w) => <Link key={w} href={`/marketplace/${w}`} className="transition hover:z-10 hover:-translate-y-1"><AgentTile id={w} look={null} size={52} className="ring-4 ring-[var(--card)]" /></Link>)}</div>
               <span className="text-[13.5px] font-semibold text-ink/65">{p.who.map((w) => SPECIALISTS.find((x) => x.slug === w)!.name).join(", ")}</span>
             </div>
           </article>

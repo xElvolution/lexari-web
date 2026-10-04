@@ -149,7 +149,7 @@ export async function POST(req: Request) {
         await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay ? { send: pay } : null, userSaved);
         await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).
-        await notify(userId, { kind: "reply", title: speakerName || "Your agent", body: split.reply.replace(/\s+/g, " ").slice(0, 140), url: `/app?c=${encodeURIComponent(body.convo)}`, key: `reply:${body.replyMsgId}` });
+        await notify(userId, { kind: "reply", title: speakerName || "Your agent", body: split.reply.replace(/\s+/g, " ").slice(0, 140), url: `/agents/${encodeURIComponent(body.convo)}`, key: `reply:${body.replyMsgId}` });
         // A real request to a specialist or an agent you made is a job, with the reply as its output.
         if (body.speaker !== "home" && body.text.trim().length >= 12) {
           const now = new Date();

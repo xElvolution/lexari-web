@@ -41,7 +41,7 @@ async function run(slug: string, faceEl: HTMLElement | null): Promise<"ok" | "fu
   const r = hire(slug);
   if (r === "ok") {
     flyToSeats(faceEl);
-    if (tx) celebrate({ title: `${sp.name} joined your team`, body: `${sp.job}. Say hi in Agents.`, tx, art: createElement(AgentTile, { id: slug, look: null, size: 96, radius: 30 }), cta: { label: "Say hi", href: `/app?c=${slug}` } });
+    if (tx) celebrate({ title: `${sp.name} joined your team`, body: `${sp.job}. Say hi in Agents.`, tx, art: createElement(AgentTile, { id: slug, look: null, size: 96, radius: 30 }), cta: { label: "Say hi", href: `/agents/${slug}` } });
     toast({ text: before ? `${sp.name} is back on your team` : `${sp.name} joined your team · ${hirePriceLabel()}`, face: sp.seed, color: sp.color });
   } else {
     toast({ text: `${sp.name} is already on your team`, face: sp.seed, color: sp.color });

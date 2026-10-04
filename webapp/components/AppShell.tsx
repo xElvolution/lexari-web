@@ -24,20 +24,20 @@ import MemoryChain from "./MemoryChain";
 import NotifyBell from "./NotifyBell";
 
 export const NAV = [
-  { href: "/app", label: "Agents", icon: "home" },
-  { href: "/app/memory", label: "Brain", icon: "memory" },
-  { href: "/app/marketplace", label: "Market", icon: "market" },
-  { href: "/app/team", label: "Team", icon: "team" },
-  { href: "/app/hub", label: "Hub", icon: "hub" },
-  { href: "/app/wallets", label: "Wallets", icon: "wallet" },
-  { href: "/app/settings", label: "Settings", icon: "settings" },
+  { href: "/agents", label: "Agents", icon: "home" },
+  { href: "/brain", label: "Brain", icon: "memory" },
+  { href: "/marketplace", label: "Market", icon: "market" },
+  { href: "/team", label: "Team", icon: "team" },
+  { href: "/hub", label: "Hub", icon: "hub" },
+  { href: "/wallets", label: "Wallets", icon: "wallet" },
+  { href: "/settings", label: "Settings", icon: "settings" },
 ];
-const isOn = (path: string, href: string) => (href === "/app" ? path === "/app" : path.startsWith(href));
+const isOn = (path: string, href: string) => (href === "/agents" ? path === "/agents" || path.startsWith("/agents/") : path === href || path.startsWith(`${href}/`));
 const initials = (s: State) => { const n = s.profile?.name?.trim(); if (n && n !== "You") return n.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase(); return s.auth?.method === "wallet" ? (s.auth.label || "W").replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() : (s.auth?.label || "You").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase(); };
 
 /** Slim rail on desktop: icons with small labels, theme and profile at the bottom. */
 function Rail({ s, path }: { s: State; path: string }) {
-  const onProfile = path.startsWith("/app/profile");
+  const onProfile = path.startsWith("/profile");
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[84px] flex-col items-center border-r border-line bg-alt pb-4 pt-5 lg:flex">
       <Link href={LANDING_URL} aria-label="Lexari home" title="Lexari" className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-ink transition hover:scale-105"><span className="h-3.5 w-3.5 rounded-full bg-base" /></Link>
@@ -45,7 +45,7 @@ function Rail({ s, path }: { s: State; path: string }) {
         {NAV.map((n) => {
           const on = isOn(path, n.href);
           return (
-            <Link key={n.href} href={n.href} data-tour={`nav-${n.label.toLowerCase()}`} aria-current={on ? "page" : undefined} {...(n.href === "/app/team" ? { "data-seat-target": true } : {})} className={`group relative flex flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold transition ${on ? "text-ink" : "text-ink/60 hover:text-ink"}`}>
+            <Link key={n.href} href={n.href} data-tour={`nav-${n.label.toLowerCase()}`} aria-current={on ? "page" : undefined} {...(n.href === "/team" ? { "data-seat-target": true } : {})} className={`group relative flex flex-col items-center gap-1 rounded-2xl py-2.5 text-[11px] font-semibold transition ${on ? "text-ink" : "text-ink/60 hover:text-ink"}`}>
               {on && <span className="absolute -left-2 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-grape" />}
               <span className={`grid h-9 w-12 place-items-center rounded-full transition ${on ? "bg-grape text-white" : "group-hover:bg-tint"}`}><Icon name={n.icon} size={20} /></span>
               {n.label}
@@ -56,15 +56,15 @@ function Rail({ s, path }: { s: State; path: string }) {
       <div className="mt-3 flex shrink-0 flex-col items-center gap-3">
         <NotifyBell />
         <ThemeToggle />
-        <Link href="/app/profile" data-tour="nav-profile" aria-label="Profile" title={`${s.auth?.label ?? "Profile"}`} className={`grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] ring-2 ring-offset-2 ring-offset-[var(--alt)] transition hover:scale-105 ${onProfile ? "ring-grape" : "ring-transparent"}`}>{s.profile?.avatar ? <img src={`/api/media/avatar?v=${s.profile.avatar}`} alt="" className="h-full w-full rounded-full object-cover" /> : initials(s)}</Link>
+        <Link href="/profile" data-tour="nav-profile" aria-label="Profile" title={`${s.auth?.label ?? "Profile"}`} className={`grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] ring-2 ring-offset-2 ring-offset-[var(--alt)] transition hover:scale-105 ${onProfile ? "ring-grape" : "ring-transparent"}`}>{s.profile?.avatar ? <img src={`/api/media/avatar?v=${s.profile.avatar}`} alt="" className="h-full w-full rounded-full object-cover" /> : initials(s)}</Link>
       </div>
     </aside>
   );
 }
 
 type Item = { key: string; label: string; icon: string; href?: string; run?: () => void };
-const MORE_PATHS = ["/app/wallets", "/app/settings", "/app/profile", "/app/hub"];
-const PRIMARY = new Set(["/app", "/app/memory", "/app/marketplace", "/app/team"]);
+const MORE_PATHS = ["/wallets", "/settings", "/profile", "/hub"];
+const PRIMARY = new Set(["/agents", "/brain", "/marketplace", "/team"]);
 
 /** Phone header and bottom nav. "More" lifts the main items away and brings up a second row. */
 function MobileBars({ s, path }: { s: State; path: string }) {
@@ -75,10 +75,10 @@ function MobileBars({ s, path }: { s: State; path: string }) {
   const first = useRef(true);
   const primary: Item[] = [...NAV.filter((n) => PRIMARY.has(n.href)).map((n) => ({ key: n.href, label: n.label, icon: n.icon, href: n.href })), { key: "more", label: "More", icon: "more", run: () => setMore(true) }];
   const secondary: Item[] = [
-    { key: "/app/wallets", label: "Wallets", icon: "wallet", href: "/app/wallets" },
-    { key: "/app/settings", label: "Settings", icon: "settings", href: "/app/settings" },
-    { key: "/app/profile", label: "Profile", icon: "user", href: "/app/profile" },
-    { key: "/app/hub", label: "Hub", icon: "hub", href: "/app/hub" },
+    { key: "/wallets", label: "Wallets", icon: "wallet", href: "/wallets" },
+    { key: "/settings", label: "Settings", icon: "settings", href: "/settings" },
+    { key: "/profile", label: "Profile", icon: "user", href: "/profile" },
+    { key: "/hub", label: "Hub", icon: "hub", href: "/hub" },
     { key: "close", label: "Close", icon: "x", run: () => setMore(false) },
   ];
 
@@ -111,18 +111,18 @@ function MobileBars({ s, path }: { s: State; path: string }) {
     );
     const cls = "flex flex-col items-center justify-start gap-1 pt-2";
     return it.href
-      ? <Link key={it.key} data-nav-item data-tour={`nav-${it.label.toLowerCase()}`} href={it.href} aria-current={on ? "page" : undefined} {...(it.href === "/app/team" ? { "data-seat-target": true } : {})} className={cls}>{inner}</Link>
+      ? <Link key={it.key} data-nav-item data-tour={`nav-${it.label.toLowerCase()}`} href={it.href} aria-current={on ? "page" : undefined} {...(it.href === "/team" ? { "data-seat-target": true } : {})} className={cls}>{inner}</Link>
       : <button key={it.key} data-nav-item data-tour={`nav-${it.label.toLowerCase()}`} onClick={it.run} aria-expanded={it.key === "more" ? more : undefined} className={cls}>{inner}</button>;
   };
 
   return (
     <>
       <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-line bg-base/90 px-4 backdrop-blur-md lg:hidden">
-        <Link href="/app" aria-label="Agents"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
+        <Link href="/agents" aria-label="Agents"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
         <div className="flex items-center gap-2">
           <NotifyBell />
           <ThemeToggle />
-          <Link href="/app/profile" aria-label="Profile" className="grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] overflow-hidden">{s.profile?.avatar ? <img src={`/api/media/avatar?v=${s.profile.avatar}`} alt="" className="h-full w-full object-cover" /> : initials(s)}</Link>
+          <Link href="/profile" aria-label="Profile" className="grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] overflow-hidden">{s.profile?.avatar ? <img src={`/api/media/avatar?v=${s.profile.avatar}`} alt="" className="h-full w-full object-cover" /> : initials(s)}</Link>
         </div>
       </header>
       <nav aria-label="App" className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-base/95 backdrop-blur-md lg:hidden">
@@ -172,11 +172,13 @@ function Gate({ s }: { s: State }) {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const s = useApp();
   const path = usePathname();
+  // a chat opening (/agents/<id>) is the same page as the list: no remount, no scroll jump
+  const section = path.startsWith("/agents/") ? "/agents" : path;
   const main = useRef<HTMLDivElement>(null);
   const ready = !!(s && s.auth && s.onboarded && s.agent);
 
   useEffect(() => { if (!ready) return; tick(); const id = setInterval(() => tick(), 1000); return () => clearInterval(id); }, [ready]);
-  useEffect(() => { window.scrollTo(0, 0); }, [path]);
+  useEffect(() => { window.scrollTo(0, 0); }, [section]);
   useEffect(() => { setSeatGate(() => seatsLeft(get()) > 0); }, []);
   // preferences that change the whole app
   const demoOff = s?.prefs?.demoLabels === false, still = s?.prefs?.motion === false;
@@ -192,17 +194,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       gsap.from("[data-rise]", { y: 14, opacity: 0, duration: 0.5, stagger: 0.05, ease: "power2.out", clearProps: "transform,opacity" });
     }, main);
     return () => ctx.revert();
-  }, [path, ready]);
+  }, [section, ready]);
 
   if (!s) return <Loading />;
   if (!ready) return <Gate s={s} />;
-  const bleed = path === "/app" || path === "/app/memory" || path.startsWith("/app/chat");
+  const bleed = path === "/agents" || path === "/brain" || path.startsWith("/agents/");
   return (
     <div className="min-h-screen bg-base text-ink">
       <Rail s={s} path={path} />
       <MobileBars s={s} path={path} />
       <div className="lg:pl-[84px]">
-        {bleed ? <div key={path}>{children}</div> : <div ref={main} key={path} className="mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-8 sm:pt-9 lg:pb-16">{children}</div>}
+        {bleed ? <div key={section}>{children}</div> : <div ref={main} key={section} className="mx-auto max-w-[1240px] px-4 pb-32 pt-6 sm:px-8 sm:pt-9 lg:pb-16">{children}</div>}
       </div>
       <AgentPanel />
       <AddAgentDialog />

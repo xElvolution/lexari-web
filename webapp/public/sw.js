@@ -17,14 +17,14 @@ self.addEventListener("push", (event) => {
       badge: "/icon-192.png",
       tag: data.kind === "reply" ? `reply:${data.url || ""}` : data.id || undefined,
       renotify: data.kind === "reply",
-      data: { url: data.url || "/app", id: data.id },
+      data: { url: data.url || "/agents", id: data.id },
     });
   })());
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = new URL((event.notification.data && event.notification.data.url) || "/app", self.location.origin).href;
+  const url = new URL((event.notification.data && event.notification.data.url) || "/agents", self.location.origin).href;
   event.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const w of wins) {

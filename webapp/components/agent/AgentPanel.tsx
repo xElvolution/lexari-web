@@ -91,9 +91,9 @@ function Panel({ s, id }: { s: State; id: string }) {
     if (k === "custom") deleteCustom(id); else release(id);
     toast({ text: k === "custom" ? `${info.name} was deleted` : `${info.name} left seat ${String(info.desk).padStart(2, "0")}`, face: "home" });
     closeAgent();
-    if (window.location.search.includes(`c=${id}`)) router.replace("/app");
+    if (window.location.pathname === `/agents/${encodeURIComponent(id)}`) router.replace("/agents");
   };
-  const chat = () => { closeAgent(); router.push(`/app?c=${id}`); };
+  const chat = () => { closeAgent(); router.push(`/agents/${id}`); };
 
   // what the card shows while you edit
   const preview: IdInfo = tab === "edit" && k !== "hired" ? { ...info, name: name.trim() || info.name, role: k === "custom" ? role.trim() || "Custom agent" : info.role, look: k === "home" ? lookHome : info.look, bg: k === "home" ? (lookHome && typeof lookHome === "object" ? lookHome.bg : undefined) : look.bg, memory, chips: skills.length ? skills.map(skillLabel) : info.chips }

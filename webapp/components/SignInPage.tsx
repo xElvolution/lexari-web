@@ -141,7 +141,7 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
     void signIn().then(() => {
       if (cancel) return;
       const wait = Math.max(0, 1100 - (Date.now() - started));
-      setTimeout(() => { if (!cancel) router.push(get().onboarded ? "/app" : `/onboarding${name ? `?name=${encodeURIComponent(name)}` : ""}`); }, wait);
+      setTimeout(() => { if (!cancel) router.push(get().onboarded ? "/agents" : `/onboarding${name ? `?name=${encodeURIComponent(name)}` : ""}`); }, wait);
     });
     return () => { cancel = true; };
   }, [phase, router, address]);
@@ -219,7 +219,7 @@ export default function SignIn() {
         const privyToken = (await getAccessToken()) || undefined;
         await signInWithWallet(bridge, { privyToken, ...(email ? { email } : {}) });
         await signIn();
-        router.push(get().onboarded ? "/app" : `/onboarding${first ? `?name=${encodeURIComponent(first)}` : ""}`);
+        router.push(get().onboarded ? "/agents" : `/onboarding${first ? `?name=${encodeURIComponent(first)}` : ""}`);
       } catch (e) {
         entered.current = false;
         setPrivyErr(friendly(e, "Sign-in did not finish."));

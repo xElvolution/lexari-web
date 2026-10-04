@@ -138,7 +138,7 @@ function Panel({ s, cat, onClose }: { s: State; cat: number; onClose: () => void
         {id === "Hired agents" && (hired.length ? (
           <ul className="grid gap-2">
             {hired.map((h) => (
-              <li key={h.slug}><Link href={`/app/marketplace/${h.slug}`} className="flex items-center gap-3 rounded-2xl bg-alt p-2.5 ring-1 ring-line transition hover:ring-grape/50">
+              <li key={h.slug}><Link href={`/marketplace/${h.slug}`} className="flex items-center gap-3 rounded-2xl bg-alt p-2.5 ring-1 ring-line transition hover:ring-grape/50">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-tint"><SpecFace slug={h.slug} size={36} /></span>
                 <span className="min-w-0 flex-1"><span className="block font-bold text-ink">{h.name}</span><span className="block text-[13px] text-ink/70">{h.job}</span></span>
                 <Icon name="arrow" size={16} className="mr-1 text-ink/60" />

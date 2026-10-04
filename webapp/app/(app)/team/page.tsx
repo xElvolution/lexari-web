@@ -33,7 +33,7 @@ export default function TeamPage() {
 
   return (
     <>
-      <AgentMenu s={s} at={menu.at} close={menu.close} onChat={(id) => router.push(`/app?c=${id}`)} name={nameFor} />
+      <AgentMenu s={s} at={menu.at} close={menu.close} onChat={(id) => router.push(`/agents/${id}`)} name={nameFor} />
       <PageHead kicker="Team" title="Your team floor." body={`${agentName(s)} is always first. Specialists you hire from the marketplace join here.`} />
 
       <div data-rise className="mt-5 grid gap-5 lg:grid-cols-[1.5fr_.5fr]">
@@ -51,7 +51,7 @@ export default function TeamPage() {
               const cls = `pop relative grid aspect-square place-items-center rounded-[22%] transition ${state === "home" ? "bg-grape shadow-[0_4px_0_#3514b0]" : state === "hired" ? `bg-tint ring-2 ${pick === slug ? "ring-grape" : "ring-grape/40"} hover:-translate-y-1` : "border-2 border-dashed border-ink/25 bg-base/60 hover:border-grape hover:bg-tint"}`;
               const style = { animationDelay: `${Math.min(i, 40) * 14}ms` };
               const num = big && <span className={`label absolute bottom-[8%] right-[10%] text-[9px] ${state === "home" ? "text-white/85 max-[430px]:hidden" : "text-ink/55"}`}>{String(i + 1).padStart(2, "0")}</span>;
-              if (state === "home") return <Link key={i} href="/app?c=home" {...menu.bind("home")} data-primary={primaryOf(s) === "home" ? "" : undefined} className={`${cls} ${primaryOf(s) === "home" ? "primary-ring [--r:22%]" : ""}`} style={style} title={`${agentName(s)} · seat 01`}><AgentFace look={s.agent?.look} size={120} track={big} className="!h-[72%] !w-[72%]" />{num}</Link>;
+              if (state === "home") return <Link key={i} href="/agents/home" {...menu.bind("home")} data-primary={primaryOf(s) === "home" ? "" : undefined} className={`${cls} ${primaryOf(s) === "home" ? "primary-ring [--r:22%]" : ""}`} style={style} title={`${agentName(s)} · seat 01`}><AgentFace look={s.agent?.look} size={120} track={big} className="!h-[72%] !w-[72%]" />{num}</Link>;
               if (state === "hired" && isLocked(s, slug!)) return <button key={i} data-agent-locked={slug} onClick={() => openUpgrade("plans")} className={`${cls} opacity-80`} style={style} title={`${sp?.name} · locked on ${plan.name}`} aria-label={`${sp?.name} is locked on your plan. Upgrade to unlock.`}><SpecFace slug={slug!} size={90} className="!h-[72%] !w-[72%] opacity-40 grayscale" /><span className="absolute inset-0 grid place-items-center"><span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-[var(--bg)]"><Icon name="lock" size={14} /></span></span>{num}</button>;
               if (state === "hired") return <button key={i} onClick={() => setPick(pick === slug ? null : slug!)} className={cls} style={style} title={`${sp?.name} · seat ${i + 1}`} aria-label={`${sp?.name}, seat ${i + 1}`}><SpecFace slug={slug!} size={90} className="!h-[72%] !w-[72%]" />{num}</button>;
               if (state === "locked") return <button key={i} data-seat-locked onClick={() => openUpgrade(plan.id === "free" ? "add" : "full")} className="pop relative grid aspect-square place-items-center rounded-[22%] bg-ink/[.06] text-ink/35 transition hover:bg-tint hover:text-brand-ink" style={style} aria-label={`Seat ${i + 1} is locked. Upgrade for more seats.`} title="Locked · upgrade for more seats"><Icon name="lock" size={big ? 18 : 13} />{num}</button>;
@@ -62,7 +62,7 @@ export default function TeamPage() {
             <div className="pop relative mt-5 flex flex-wrap items-center gap-3 rounded-[22px] bg-ink p-3 text-[var(--bg)]">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-[var(--bg)]/10"><SpecFace slug={pick} size={40} /></span>
               <span className="min-w-0 flex-1 max-sm:basis-[calc(100%-3.75rem)]"><b className="display block text-[24px] leading-none">{sp.name}</b><span className="text-[13px] opacity-75">{sp.job} · seat {String(s.hired.indexOf(pick) + 2).padStart(2, "0")}</span></span>
-              <Link href={`/app?c=${pick}`} className="rounded-full bg-grape px-4 py-2 text-[14px] font-bold text-white">Chat</Link>
+              <Link href={`/agents/${pick}`} className="rounded-full bg-grape px-4 py-2 text-[14px] font-bold text-white">Chat</Link>
               <button onClick={() => openAgent(pick)} className="rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">ID card</button>
               <button onClick={() => { release(pick); setPick(null); toast({ text: `${sp.name} left the seat`, face: sp.seed, color: sp.color }); }} className="rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">Release</button>
             </div>
@@ -88,7 +88,7 @@ export default function TeamPage() {
           <p className="mt-5 text-[16px] leading-relaxed text-white/90">{plan.id === "free" ? "Free plan includes one agent: your own. Upgrade to Pro to hire specialists from the marketplace." : `${used} of ${plan.seats} seats used. Each specialist is a one-time ${hirePriceLabel()} hire.`}</p>
           {plan.id !== "max" && <button data-upgrade-plan onClick={() => openUpgrade("plans")} className="btn btn-white relative z-10 mt-5">Upgrade plan</button>}
           {free.length > 0 && <p className="relative z-10 mt-5 text-[13.5px] text-white/85">{free.length} paid specialist{free.length === 1 ? " is" : "s are"} off the floor. Add them back from the marketplace for free.</p>}
-          <Link href="/app/marketplace" className="btn btn-white relative z-10 mt-8 lg:mt-auto">Open the marketplace</Link>
+          <Link href="/marketplace" className="btn btn-white relative z-10 mt-8 lg:mt-auto">Open the marketplace</Link>
         </div>
       </div>
       <section data-rise id="plans" className="mt-8">

@@ -75,8 +75,8 @@ export default function Tour({ s }: { s: State }) {
 
   // steps that live on the Agents page bring you back there
   useEffect(() => {
-    if (step.home && path !== "/app") router.push("/app");
-    else if (step.leaveChat && !wide && new URLSearchParams(window.location.search).get("c")) router.replace("/app");
+    if (step.home && path !== "/agents") router.push("/agents");
+    else if (step.leaveChat && !wide && window.location.pathname.startsWith("/agents/")) router.replace("/agents");
   }, [step.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // follow the target every frame; notice when a click target disappears

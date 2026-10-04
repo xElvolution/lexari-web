@@ -143,9 +143,9 @@ export default function ProfilePage() {
               ["spark", "Member since", new Date(p.since).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
               ["list", "User ID", uid],
             ]} />
-            <div className="mt-4 flex flex-wrap gap-2"><Link href="/app/settings#billing" className={pill}>Plan and billing</Link><Link href="/app/wallets" className={pill}>Wallet</Link></div>
+            <div className="mt-4 flex flex-wrap gap-2"><Link href="/settings#billing" className={pill}>Plan and billing</Link><Link href="/wallets" className={pill}>Wallet</Link></div>
           </Card>
-          <Card title="Your agents" right={<Link href="/app/team" className="text-[13.5px] font-bold text-brand-ink hover:underline">Team</Link>}>
+          <Card title="Your agents" right={<Link href="/team" className="text-[13.5px] font-bold text-brand-ink hover:underline">Team</Link>}>
             <div className="mt-3 flex flex-wrap gap-2">
               {team.map((t) => <button key={t.id} onClick={() => openAgent(t.id)} title={`${t.name}'s ID card`} className="flex items-center gap-2 rounded-full bg-tint py-1 pl-1 pr-3.5 text-[13.5px] font-semibold text-ink transition hover:bg-grape hover:text-white"><AgentTile id={t.id} look={s.agent?.look} size={30} radius={15} />{t.name}</button>)}
             </div>
@@ -162,7 +162,7 @@ export default function ProfilePage() {
           <Card title="App lock"><LockSettings /></Card>
           <Card title="Session">
             <p className="mt-1 text-[14px] text-ink/65">Signing out keeps your agents, chats and Brain saved for next time.</p>
-            <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => { void signOut().then(() => router.push("/signin")); }} className={pill}><Icon name="out" size={15} />Sign out</button><Link href="/app/settings#data" className={pill}>Privacy and data</Link></div>
+            <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => { void signOut().then(() => router.push("/signin")); }} className={pill}><Icon name="out" size={15} />Sign out</button><Link href="/settings#data" className={pill}>Privacy and data</Link></div>
           </Card>
         </>}
         {tab === "prefs" && <>
@@ -179,7 +179,7 @@ export default function ProfilePage() {
             <div className="mt-3 flex flex-wrap gap-2">{team.slice(0, 6).map((t) => <button key={t.id} onClick={() => openAgent(t.id)} className={pill}><Icon name="speaker" size={14} />{t.name}</button>)}</div>
           </Card>
           <Card title="More settings">
-            <div className="mt-3 flex flex-wrap gap-2"><Link href="/app/settings#notifications" className={pill}>Notifications</Link><Link href="/app/settings" className={pill}>All settings</Link><Link href="/app/memory" className={pill}>{agentName(s)}&apos;s Brain</Link></div>
+            <div className="mt-3 flex flex-wrap gap-2"><Link href="/settings#notifications" className={pill}>Notifications</Link><Link href="/settings" className={pill}>All settings</Link><Link href="/brain" className={pill}>{agentName(s)}&apos;s Brain</Link></div>
           </Card>
         </>}
       </div>

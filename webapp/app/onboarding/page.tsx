@@ -87,7 +87,7 @@ export default function Onboarding() {
           ? <SetupSequence name={agentName} v={v} bg={bg} onDone={() => setFinale("done")} tone="page" />
           : <div className="rounded-[30px] bg-card p-5 ring-1 ring-line sm:p-7"><MintFinish s={s} id="home" v={v} title={`Meet ${agentName}.`}
               sub={`Its badge is printed, its computer is on and it already knows ${knownCount} ${knownCount === 1 ? "thing" : "things"} about you. Mint its ID card on chain, or do it later from its profile.`}
-              later={() => router.push("/app")} laterLabel={s.meta.home?.nft ? `Start chatting with ${agentName}` : "Later, start chatting"} /></div>}
+              later={() => router.push("/agents")} laterLabel={s.meta.home?.nft ? `Start chatting with ${agentName}` : "Later, start chatting"} /></div>}
       </div>
     </main>
   );

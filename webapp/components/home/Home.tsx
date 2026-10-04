@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { convoExists, setActive, useApp } from "@/lib/store";
 import AgentStrip from "./AgentStrip";
@@ -24,8 +24,11 @@ let pushed = false; // did we open the current chat from the list (so Back can p
 export default function Home() {
   const s = useApp()!;
   const params = useSearchParams();
+  const path = usePathname();
   const wide = useWide();
-  const q = params.get("c");
+  // a chat lives at /agents/<id>
+  const seg = path.startsWith("/agents/") ? path.slice("/agents/".length).split("/")[0] : "";
+  const q = seg ? decodeURIComponent(seg) : null;
   const fromUrl = convoExists(s, q) ? q! : null;
   const active = fromUrl ?? (convoExists(s, s.active) ? s.active : "home");
   const [pane, setPane] = useState(false);
@@ -39,9 +42,9 @@ export default function Home() {
     setActive(id);
     if (id === q) return;
     pushed = !q; // from the list on phones
-    window.history.pushState(null, "", `/app?c=${id}`);
+    window.history.pushState(null, "", `/agents/${encodeURIComponent(id)}`);
   };
-  const back = () => { if (pushed) { pushed = false; window.history.back(); } else window.history.replaceState(null, "", "/app"); };
+  const back = () => { if (pushed) { pushed = false; window.history.back(); } else window.history.replaceState(null, "", "/agents"); };
   const mobileChat = !wide && !!fromUrl;
 
   return (
@@ -69,7 +72,7 @@ export default function Home() {
       )}
       {!wide && pane && fromUrl && <div className="fixed inset-0 z-[60] bg-alt"><DesktopPane s={s} id={fromUrl} onClose={() => setPane(false)} full /></div>}
       {call && <CallOverlay s={s} id={wide ? active : fromUrl ?? active} onClose={() => setCall(false)} />}
-      {group && <GroupDialog s={s} editId={group.edit} onClose={() => setGroup(null)} onDone={(id) => { setGroup(null); if (id) open(id); else window.history.replaceState(null, "", "/app"); }} />}
+      {group && <GroupDialog s={s} editId={group.edit} onClose={() => setGroup(null)} onDone={(id) => { setGroup(null); if (id) open(id); else window.history.replaceState(null, "", "/agents"); }} />}
     </>
   );
 }

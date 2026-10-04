@@ -19,9 +19,9 @@ export function HireBtn({ a, size = "sm", faceEl }: { a: Specialist; size?: "sm"
   const me = useRef<HTMLButtonElement>(null);
   const hired = s.hired.includes(a.slug);
   const cls = size === "lg" ? "h-12 px-7 text-[16px]" : "h-8 px-4 text-[13px]";
-  if (hired) return <Link href={`/app?c=${a.slug}`} onClick={(e) => e.stopPropagation()} className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint font-bold text-brand-ink transition hover:bg-grape hover:text-white ${cls}`}>Open</Link>;
+  if (hired) return <Link href={`/agents/${a.slug}`} onClick={(e) => e.stopPropagation()} className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint font-bold text-brand-ink transition hover:bg-grape hover:text-white ${cls}`}>Open</Link>;
   return (
-    <button ref={me} onClick={(e) => { e.preventDefault(); e.stopPropagation(); void hireWithFx(a.slug, faceEl?.() ?? me.current, () => router.push("/app/team")); }} className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-grape font-bold text-white transition hover:bg-grape-deep ${cls}`}>
+    <button ref={me} onClick={(e) => { e.preventDefault(); e.stopPropagation(); void hireWithFx(a.slug, faceEl?.() ?? me.current, () => router.push("/team")); }} className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-grape font-bold text-white transition hover:bg-grape-deep ${cls}`}>
       Hire · {hirePriceLabel()}
     </button>
   );
@@ -43,7 +43,7 @@ export function AppCard({ a, wide = false, fill = false }: { a: Specialist; wide
   const m = storeMeta(a);
   const face = useRef<HTMLSpanElement>(null);
   const [flipped, setFlipped] = useState(false);
-  const href = `/app/marketplace/${a.slug}`;
+  const href = `/marketplace/${a.slug}`;
   const size = wide ? "w-[300px] sm:w-[320px]" : fill ? "w-full" : "w-[44vw] min-w-[176px] max-w-[290px] sm:w-[272px] lg:w-[248px]";
   const h = wide ? "h-[236px]" : "aspect-[4/5.3]";
   const toggle = () => setFlipped((v) => !v);

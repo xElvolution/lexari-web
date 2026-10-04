@@ -27,7 +27,7 @@ export const POST = withUser(async (user, req) => {
   const { endpoint, keys } = body.sub;
   await db().insert(pushSubs).values({ userId: user.userId, endpoint, p256dh: keys.p256dh, auth: keys.auth })
     .onConflictDoUpdate({ target: pushSubs.endpoint, set: { userId: user.userId, p256dh: keys.p256dh, auth: keys.auth } });
-  const sent = body.test ? await push(user.userId, { kind: "test", title: "Notifications are on", body: "This is how Lexari will reach you.", url: "/app" }) : 0;
+  const sent = body.test ? await push(user.userId, { kind: "test", title: "Notifications are on", body: "This is how Lexari will reach you.", url: "/agents" }) : 0;
   return Response.json({ ok: true, sent });
 });
 

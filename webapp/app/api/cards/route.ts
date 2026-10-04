@@ -42,7 +42,7 @@ export const POST = withUser(async (user, req) => {
     expMonth: issued.expMonth, expYear: issued.expYear, cvv: issued.cvv, spendLimit: body.limit, payTx: body.tx, amount: paid.amount,
   }).onConflictDoNothing().returning();
   if (!inserted.length) return jsonError(409, "That payment was already used, or this agent already has a card.");
-  await notify(user.userId, { kind: "card", title: "Your agent's card is ready", body: `Payment confirmed. Card ending ${inserted[0].last4} is active.`, url: "/app/wallets", key: `card:${body.tx}` });
+  await notify(user.userId, { kind: "card", title: "Your agent's card is ready", body: `Payment confirmed. Card ending ${inserted[0].last4} is active.`, url: "/wallets", key: `card:${body.tx}` });
   return Response.json({ card: view(inserted[0]) });
 });
 

@@ -33,15 +33,15 @@ export default function Detail({ slug }: { slug: string }) {
     return () => { t.revert(); };
   }, [slug]);
 
-  if (!a) return <Empty icon="search" title="That agent isn't on the marketplace." body="It may have been renamed. Head back to find someone else." cta={{ href: "/app/marketplace", label: "Back to marketplace" }} />;
+  if (!a) return <Empty icon="search" title="That agent isn't on the marketplace." body="It may have been renamed. Head back to find someone else." cta={{ href: "/marketplace", label: "Back to marketplace" }} />;
   const m = storeMeta(a);
   const hired = s.hired.includes(a.slug);
   const col = PALETTE[a.color].fill;
   const similar = SPECIALISTS.filter((x) => x.slug !== a.slug && storeMeta(x).cat === m.cat).concat(SPECIALISTS.filter((x) => x.slug !== a.slug)).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 8);
   const tryJob = (ex: string) => {
     void (async () => {
-      if (!hired) { const r = await hireWithFx(a.slug, face.current, () => router.push("/app/team")); if (r !== "ok") return; }
-      sendTo(a.slug, ex); router.push(`/app?c=${a.slug}`);
+      if (!hired) { const r = await hireWithFx(a.slug, face.current, () => router.push("/team")); if (r !== "ok") return; }
+      sendTo(a.slug, ex); router.push(`/agents/${a.slug}`);
     })();
   };
   const reviews = [...a.review.map((r, i) => ({ ...r, when: i ? "1 week ago" : "3 days ago" })), ...EXTRA_REVIEWS];
@@ -56,7 +56,7 @@ export default function Detail({ slug }: { slug: string }) {
   return (
     <>
       <div data-rise className="flex items-center justify-between">
-        <Link href="/app/marketplace" className="inline-flex items-center gap-2 rounded-full py-1 text-[14px] font-bold text-ink/75 hover:text-brand-ink"><Icon name="back" size={16} />Marketplace</Link>
+        <Link href="/marketplace" className="inline-flex items-center gap-2 rounded-full py-1 text-[14px] font-bold text-ink/75 hover:text-brand-ink"><Icon name="back" size={16} />Marketplace</Link>
       </div>
 
       {/* header */}
@@ -84,7 +84,7 @@ export default function Detail({ slug }: { slug: string }) {
           <div className="mt-6 flex flex-wrap items-center gap-3">
             {hired ? (
               <>
-                <Link href={`/app?c=${a.slug}`} className="inline-flex h-12 items-center gap-2 rounded-full bg-grape px-7 text-[16px] font-bold text-white hover:bg-grape-deep">Chat with {a.name}<Icon name="arrow" size={17} /></Link>
+                <Link href={`/agents/${a.slug}`} className="inline-flex h-12 items-center gap-2 rounded-full bg-grape px-7 text-[16px] font-bold text-white hover:bg-grape-deep">Chat with {a.name}<Icon name="arrow" size={17} /></Link>
                 <button onClick={() => { release(a.slug); toast({ text: `${a.name} left your team.`, face: a.seed, color: a.color }); }} className="inline-flex h-12 items-center rounded-full px-5 text-[15px] font-bold text-ink ring-1 ring-line hover:ring-grape">Release seat</button>
               </>
             ) : <HireBtn a={a} size="lg" faceEl={() => face.current} />}

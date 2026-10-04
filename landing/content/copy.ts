@@ -7,7 +7,7 @@ import { badgeCopy } from "@shared/content/badge";
 import { WEBAPP_URL } from "@shared/sites";
 
 /** The product is a separate Next.js app. These open that origin. */
-export const APP = `${WEBAPP_URL}/app`;
+export const APP = `${WEBAPP_URL}/agents`;
 export const SIGNIN = `${WEBAPP_URL}/signin`;
 
 export const copy = {

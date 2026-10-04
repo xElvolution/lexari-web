@@ -1,4 +1,6 @@
 "use client";
+
+import { modernUrl } from "@/lib/routes";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "./Icon";
@@ -24,7 +26,7 @@ export default function NotifyBell({ className = "" }: { className?: string }) {
     document.addEventListener("pointerdown", close); document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", esc); };
   }, [open]);
-  const go = (it: Notice) => { setOpen(false); if (!it.read) void markRead([it.id]); router.push(it.url || "/app"); };
+  const go = (it: Notice) => { setOpen(false); if (!it.read) void markRead([it.id]); router.push(modernUrl(it.url || "/agents")); };
   const now = Date.now();
   return (
     <div ref={box} className={`relative ${className}`}>

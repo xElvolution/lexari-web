@@ -27,7 +27,7 @@ export async function notify(userId: string, note: Note): Promise<boolean> {
   try {
     const database = db();
     const row = await database.insert(notifications).values({
-      userId, kind: note.kind, title: note.title.slice(0, 120), body: (note.body || "").slice(0, 300), url: note.url || "/app", key: note.key ?? null,
+      userId, kind: note.kind, title: note.title.slice(0, 120), body: (note.body || "").slice(0, 300), url: note.url || "/agents", key: note.key ?? null,
     }).onConflictDoNothing().returning({ id: notifications.id });
     if (!row.length) return false; // already sent this one
     const pref = PREF[note.kind];
@@ -36,7 +36,7 @@ export async function notify(userId: string, note: Note): Promise<boolean> {
       const n = (u?.prefs as { notif?: Record<string, boolean> } | undefined)?.notif;
       if (n && n[pref] === false) return true;
     }
-    void push(userId, { id: row[0].id, kind: note.kind, title: note.title, body: note.body || "", url: note.url || "/app" }).catch(() => {});
+    void push(userId, { id: row[0].id, kind: note.kind, title: note.title, body: note.body || "", url: note.url || "/agents" }).catch(() => {});
     return true;
   } catch (e) {
     console.error(`[notify] ${(e as Error)?.message || "failed"}`);
@@ -73,7 +73,7 @@ export async function questReadyCheck(userId: string, kind: string) {
       if (have < rule.goal) continue;
       await notify(userId, {
         kind: "quest", title: "Quest ready to claim", body: `${QUEST_NAMES[rule.id] || "A quest"} is done. Claim ${rule.reward} coins in the Hub.`,
-        url: "/app/hub", key: `quest:${rule.id}:${periodNumber(rule.period)}`,
+        url: "/hub", key: `quest:${rule.id}:${periodNumber(rule.period)}`,
       });
     } catch { /* best effort */ }
   }
@@ -97,7 +97,7 @@ export async function boxReminders() {
     .where(and(inArray(chainLedger.userId, ids), eq(chainLedger.kind, "open_box"), gte(chainLedger.createdAt, since)))).map((r) => r.id));
   for (const id of ids) {
     if (opened.has(id)) continue;
-    await notify(id, { kind: "box", title: "Your mystery box is ready", body: "Open today's box in the Hub for free coins.", url: "/app/hub", key: `box:${day}` });
+    await notify(id, { kind: "box", title: "Your mystery box is ready", body: "Open today's box in the Hub for free coins.", url: "/hub", key: `box:${day}` });
   }
 }
 
