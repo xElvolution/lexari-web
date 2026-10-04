@@ -71,32 +71,7 @@ export default function Referral({ s }: { s: State }) {
       <span className="pointer-events-none absolute -right-16 bottom-0 h-72 w-72 rounded-full bg-[#8f6bff]/30 blur-[90px]" />
       <div className="relative grid gap-8 p-5 sm:p-8 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center lg:gap-12">
         {/* the orbit */}
-        <div ref={orbit} className="relative mx-auto h-[290px] w-[290px] sm:h-[330px] sm:w-[330px] max-[430px]:[zoom:.78]">
-          <span className="absolute inset-[14%] rounded-full border border-dashed border-white/20" />
-          <span className="absolute inset-[30%] rounded-full bg-grape/25 blur-2xl" />
-          <span className="absolute left-1/2 top-1/2 grid h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[30px] bg-grape shadow-[0_14px_40px_-10px_rgba(91,43,255,.9)]">
-            <AgentFace look={s.agent?.look} size={86} animated state={friends.length ? "happy" : "idle"} />
-          </span>
-          <div className="hub-orbit absolute inset-0">
-            {Array.from({ length: slots }, (_, i) => {
-              const a = (i / slots) * Math.PI * 2 - Math.PI / 2, r = 36; const f = friends[i];
-              return (
-                <span key={i} data-slot={i} className="absolute" style={{ left: `${50 + r * Math.cos(a)}%`, top: `${50 + r * Math.sin(a)}%`, width: 0, height: 0 }}>
-                  <span className="absolute -left-[26px] -top-[26px] block h-[52px] w-[52px]">
-                    {f ? (
-                      <span data-friend className="relative grid h-[52px] w-[52px] place-items-center rounded-full bg-white ring-4 ring-[#0a0a0a]" title={f.name}>
-                        <Face seed={f.seed} variant={{ color: f.color as ColorKey }} size={42} />
-                        <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#0a0a0a] px-1.5 text-[10.5px] font-bold text-white/85">{f.name}</span>
-                      </span>
-                    ) : (
-                      <button type="button" onClick={() => copy("link")} aria-label="Copy your invite link" className="grid h-[52px] w-[52px] place-items-center rounded-full border-2 border-dashed border-white/30 text-white/45 transition hover:border-lilac hover:text-lilac"><Icon name="plus" size={18} /></button>
-                    )}
-                  </span>
-                </span>
-              );
-            })}
-          </div>
-        </div>
+        <Orbit s={s} orbitRef={orbit} onCopy={() => copy("link")} />
 
         <div className="min-w-0">
           <p className="label text-[10px] text-lilac">Invite friends</p>
@@ -154,5 +129,40 @@ export default function Referral({ s }: { s: State }) {
         </div>
       </div>
     </section>
+  );
+}
+
+/** The invite orbit: your agent in the middle, friends who joined around it, empty seats to fill. Shared by desktop and the phone sheet. */
+export function Orbit({ s, orbitRef, onCopy, className }: { s: State; orbitRef?: React.RefObject<HTMLDivElement | null>; onCopy: () => void; className?: string }) {
+  const friends = hubOf(s).invited;
+  const nextTier = TIERS.find((t) => friends.length < t.friends);
+  const slots = Math.min(10, Math.max(friends.length + 1, nextTier?.friends ?? friends.length, 4));
+  return (
+        <div ref={orbitRef} className={`relative mx-auto h-[290px] w-[290px] sm:h-[330px] sm:w-[330px] ${className || "max-[430px]:[zoom:.78]"}`}>
+          <span className="absolute inset-[14%] rounded-full border border-dashed border-white/20" />
+          <span className="absolute inset-[30%] rounded-full bg-grape/25 blur-2xl" />
+          <span className="absolute left-1/2 top-1/2 grid h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[30px] bg-grape shadow-[0_14px_40px_-10px_rgba(91,43,255,.9)]">
+            <AgentFace look={s.agent?.look} size={86} animated state={friends.length ? "happy" : "idle"} />
+          </span>
+          <div className="hub-orbit absolute inset-0">
+            {Array.from({ length: slots }, (_, i) => {
+              const a = (i / slots) * Math.PI * 2 - Math.PI / 2, r = 36; const f = friends[i];
+              return (
+                <span key={i} data-slot={i} className="absolute" style={{ left: `${50 + r * Math.cos(a)}%`, top: `${50 + r * Math.sin(a)}%`, width: 0, height: 0 }}>
+                  <span className="absolute -left-[26px] -top-[26px] block h-[52px] w-[52px]">
+                    {f ? (
+                      <span data-friend className="relative grid h-[52px] w-[52px] place-items-center rounded-full bg-white ring-4 ring-[#0a0a0a]" title={f.name}>
+                        <Face seed={f.seed} variant={{ color: f.color as ColorKey }} size={42} />
+                        <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#0a0a0a] px-1.5 text-[10.5px] font-bold text-white/85">{f.name}</span>
+                      </span>
+                    ) : (
+                      <button type="button" onClick={onCopy} aria-label="Copy your invite link" className="grid h-[52px] w-[52px] place-items-center rounded-full border-2 border-dashed border-white/30 text-white/45 transition hover:border-lilac hover:text-lilac"><Icon name="plus" size={18} /></button>
+                    )}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
   );
 }

@@ -14,7 +14,7 @@ import { WEBAPP_URL } from "@shared/sites";
 import Icon from "@/components/Icon";
 import { AgentTile, WhoFace } from "@/components/faces";
 import { LevelBadge } from "./top";
-import { SHARE } from "./referral";
+import { Orbit, SHARE } from "./referral";
 import { myAgents } from "@/components/agents";
 import { openAgent, openUpgrade } from "@/components/overlays";
 import { Coin, Rise, flyCoins } from "./coin";
@@ -346,38 +346,45 @@ function InviteSheet({ s, onClose }: { s: State; onClose: () => void }) {
   const busy = useHubBusy();
   const [copied, setCopied] = useState(false);
   const copy = (what: "code" | "link") => { if (navigator.clipboard?.writeText) navigator.clipboard.writeText(what === "code" ? code : link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); toast({ text: what === "code" ? `Code ${code} copied` : "Invite link copied", face: "home" }); }, () => toast({ text: "Couldn't copy. Long-press the code instead.", face: "home" })); };
-  const more = () => { if (navigator.share) navigator.share({ title: "Lexari", text: msg, url: link }).catch(() => {}); else copy("link"); };
   const friends = h.invited.length;
   const next = TIERS.find((t) => friends < t.friends);
   const claim = (i: number, el: HTMLElement) => void hub.claimTier(i).then((r) => {
     if (!r.ok) { toast({ text: r.error || "That reward is not ready.", face: "home" }); return; }
     flyCoins(el, r.coins); toast({ text: `${TIERS[i].title} · +${r.coins} coins`, face: "home" });
   });
+  const [menu, setMenu] = useState(false);
+  const share = () => { if (navigator.share) navigator.share({ title: "Lexari", text: msg, url: link }).catch(() => {}); else setMenu((m) => !m); };
   return (
     <Sheet label="Invite friends" onClose={onClose} data="invite-sheet">
-      <p className="text-[13px] leading-snug text-ink/60">Friends who join with your code and do something onchain count. {friends} joined{next ? ` · ${next.friends - friends} more for +${next.reward} coins` : " · every milestone reached"}.</p>
-      <div className="mt-3 rounded-[18px] bg-[#0a0a0a] p-3 text-white ring-1 ring-white/10">
-        <button type="button" onClick={() => copy("code")} className="w-full rounded-[14px] bg-white p-3 text-left text-[#0a0a0a]" aria-label={`Copy code ${code}`}>
-          <span className="label block text-[8.5px] text-black/50">Your code</span>
-          <span className="block break-all font-mono text-[20px] font-extrabold tracking-wider text-[#3514b0]">{code || "—"}</span>
-          <span className="mt-0.5 block break-all font-mono text-[11px] leading-snug text-black/50">{link.replace(/^https?:\/\//, "")}</span>
-        </button>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => copy("code")} className={`${pill} !h-10 bg-white/10 text-white ring-1 ring-white/15`}><Icon name="copy" size={14} />Copy code</button>
-          <button type="button" data-invite-copy onClick={() => copy("link")} className={`${pill} !h-10 ${copied ? "bg-white text-[#0a0a0a]" : "bg-grape text-white"}`}><Icon name={copied ? "check" : "copy"} size={14} />{copied ? "Copied" : "Copy link"}</button>
-        </div>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {SHARE.map((x) => <a key={x.id} href={x.href(msg, link)} target="_blank" rel="noreferrer" className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-white/10 px-3 text-[13px] font-bold ring-1 ring-white/15"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{x.glyph}</svg>{x.label}</a>)}
-          <button type="button" onClick={more} className="flex h-10 items-center justify-center gap-1.5 rounded-full bg-white/10 px-3 text-[13px] font-bold ring-1 ring-white/15"><Icon name="more" size={15} />More</button>
-        </div>
+      <div data-invite-banner className="relative overflow-hidden rounded-[22px] bg-[#0a0a0a] px-4 pb-4 pt-2 text-center text-white ring-1 ring-white/10">
+        <span className="pointer-events-none absolute -left-16 top-6 h-56 w-56 rounded-full bg-grape/50 blur-[70px]" />
+        <span className="pointer-events-none absolute -right-14 bottom-0 h-48 w-48 rounded-full bg-[#8f6bff]/30 blur-[70px]" />
+        <Orbit s={s} onCopy={() => copy("link")} className="[zoom:.72]" />
+        <p className="label relative text-[9px] text-lilac">Invite friends</p>
+        <h3 className="display relative mt-1 text-[30px] leading-[0.95]">Fill your orbit.</h3>
+        <p className="relative mx-auto mt-2 max-w-[300px] text-[13px] leading-snug text-white/70">Friends who join with your code start with 50 coins. You collect a bonus at each milestone. {friends} joined{next ? ` · ${next.friends - friends} more for +${next.reward}` : ""}.</p>
       </div>
+      <div className="mt-3 flex items-center gap-2 rounded-[16px] bg-tint p-2 pl-3.5">
+        <button type="button" onClick={() => copy("code")} className="min-w-0 flex-1 text-left" aria-label={`Copy code ${code}`}>
+          <span className="label block text-[8.5px] text-ink/50">Your code</span>
+          <span className="block font-mono text-[18px] font-extrabold tracking-wider text-brand-ink">{code || "—"}</span>
+          <span className="block break-all font-mono text-[11px] leading-snug text-ink/50">{link.replace(/^https?:\/\//, "")}</span>
+        </button>
+        <button type="button" data-invite-copy onClick={() => copy("link")} aria-label="Copy invite link" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${copied ? "bg-grape text-white" : "bg-card text-ink/75 ring-1 ring-line"}`}><Icon name={copied ? "check" : "copy"} size={16} /></button>
+      </div>
+      <button type="button" data-invite-share onClick={share} className="btn btn-brand mt-2.5 w-full"><Icon name="arrow" size={16} />Share invite</button>
+      {menu && (
+        <div data-share-menu className="mt-2 grid grid-cols-2 gap-1.5 rounded-[16px] bg-tint p-1.5">
+          {SHARE.map((x) => <a key={x.id} href={x.href(msg, link)} target="_blank" rel="noreferrer" onClick={() => setMenu(false)} className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] bg-card text-[13px] font-bold text-ink ring-1 ring-line"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{x.glyph}</svg>{x.label}</a>)}
+        </div>
+      )}
       <h3 className="mt-4 text-[15px] font-bold text-ink">Milestones</h3>
-      <ol data-invite-tiers className="mt-2 space-y-1.5">
+      <ol data-invite-tiers className="mt-2 space-y-1">
         {TIERS.map((t, i) => {
           const reached = friends >= t.friends; const got = h.tiers.includes(i);
           return (
-            <li key={t.friends} className={`flex items-center gap-3 rounded-[14px] p-2.5 ${reached && !got ? "bg-grape/10 ring-1 ring-grape" : "bg-tint"}`}>
-              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${got ? "bg-grape text-white" : reached ? "bg-grape text-white" : "bg-card text-ink/45 ring-1 ring-line"}`}>{got ? <Icon name="check" size={15} stroke={3} /> : <Icon name="box" size={15} />}</span>
+            <li key={t.friends} className={`flex items-center gap-2.5 rounded-[12px] px-2.5 py-2 ${reached && !got ? "bg-grape/10 ring-1 ring-grape" : "bg-tint"}`}>
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${got ? "bg-grape text-white" : reached ? "bg-grape text-white" : "bg-card text-ink/45 ring-1 ring-line"}`}>{got ? <Icon name="check" size={15} stroke={3} /> : <Icon name="box" size={15} />}</span>
               <span className="min-w-0 flex-1"><span className="block text-[14px] font-bold leading-tight text-ink">{t.title}</span><span className="mt-0.5 flex items-center gap-1 text-[12.5px] text-ink/60">{t.friends} {t.friends === 1 ? "friend" : "friends"} · <Coin size={11} />{t.reward.toLocaleString("en-US")}</span></span>
               {reached && !got ? <button type="button" onClick={(e) => claim(i, e.currentTarget)} disabled={!!busy} className={`${pill} bg-grape text-white`}>{busy === `tier:${i}` ? "…" : "Claim"}</button>
                 : <span className={`shrink-0 text-[12px] font-semibold ${got ? "text-brand-ink" : "text-ink/50"}`}>{got ? "Collected" : `${t.friends - friends} to go`}</span>}
