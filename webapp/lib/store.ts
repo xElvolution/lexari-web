@@ -14,6 +14,7 @@ import {
 import type { Account } from "@/server/account";
 import type { HubState } from "@/server/hub/state";
 import { ApiError, api } from "./api";
+import { applyTheme } from "@shared/components/theme";
 import { signOutSession } from "./session";
 import { bridgeFor, runSignOutHooks } from "./walletBridge";
 import { openNote, savedKeys, sealNote, unlock } from "./vault";
@@ -35,7 +36,7 @@ export type Group = { id: string; name: string; members: string[]; at: number };
 export type Card = { number: string; exp: string; cvv: string; frozen: boolean; limit: number; at: number };
 export type Prefs = {
   language: string; voice: string; defaultAgent: string; memory: boolean; history: boolean; improve: boolean;
-  motion: boolean; demoLabels: boolean; instructions: string; twofa: boolean; signedOut: string[];
+  motion: boolean; demoLabels: boolean; instructions: string; twofa: boolean; signedOut: string[]; theme?: "light" | "dark" | "system";
   notif: Record<string, boolean>;
 };
 export type Profile = { name: string; username: string; bio: string; since: number };
@@ -71,9 +72,13 @@ export type State = {
   paid: string[];
   referralCode: string;
   memoryLocked: boolean;
+  /** seats and expiry of the current plan (from the server) */
+  planInfo: { seats: number; expiresAt: number | null };
+  lockOn: boolean;
+  biometric: boolean;
 };
 
-const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null, custom: [], born: {}, meta: {}, tour: { on: false, step: 0, done: false }, bond: { days: [], coins: 0, claimed: [] }, live: null, paid: [], referralCode: "", memoryLocked: false };
+const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null, custom: [], born: {}, meta: {}, tour: { on: false, step: 0, done: false }, bond: { days: [], coins: 0, claimed: [] }, live: null, paid: [], referralCode: "", memoryLocked: false, planInfo: { seats: 1, expiresAt: null }, lockOn: false, biometric: false };
 
 let state: State | null = null;
 let loading: Promise<void> | null = null;
@@ -194,7 +199,7 @@ function fromAccount(acc: Account): State {
   }));
   return {
     ...EMPTY, auth, links: { google: acc.user.method === "google", wallet: acc.user.method === "wallet" },
-    agent, onboarded: !!home, plan: "free",
+    agent, onboarded: !!home, plan: acc.plan.id, planInfo: { seats: acc.plan.seats, expiresAt: acc.plan.expiresAt }, lockOn: acc.lockOn, biometric: acc.biometric,
     hired: acc.agents.filter((a) => a.kind === "hired").map((a) => a.slug),
     paid: acc.hires.map((h) => h.slug),
     memory, memoryLocked: memory.length > 0,
@@ -218,6 +223,8 @@ export function hydrate(): Promise<void> {
     try {
       const acc = await api<Account>("/api/me");
       const next = fromAccount(acc);
+      // The theme you picked on another device (or before this browser's storage was cleared).
+      try { const t = next.prefs.theme; if (t && !localStorage.getItem("lexari-theme")) applyTheme(t); } catch {}
       registerCustom(next.custom);
       state = next;
       loadError = "";
@@ -291,9 +298,10 @@ export function applyHub(live: HubState) {
 }
 
 /* ---------- helpers ---------- */
-/** One free plan. Hiring is paid per specialist; seats are not limited. */
-export const planOf = (_s: State) => ({ ...PLANS[0], seats: 100 });
-export const seatsLeft = (s: State) => 99 - s.hired.length;
+/** The current plan. Every agent (yours, hired, made by you) takes a seat. */
+export const planOf = (s: State) => ({ ...(PLANS.find((p) => p.id === s.plan) ?? PLANS[0]), seats: s.planInfo?.seats ?? 1, expiresAt: s.planInfo?.expiresAt ?? null });
+export const seatsUsed = (s: State) => 1 + s.hired.length + s.custom.length;
+export const seatsLeft = (s: State) => planOf(s).seats - seatsUsed(s);
 export const agentName = (s: State | null) => s?.agent?.name || "Your agent";
 export const jobNo = (id: number) => `#${String(id).padStart(3, "0")}`;
 export function progressOf(j: Job, now: number) {
@@ -355,7 +363,8 @@ export function release(slug: string) {
   set((s) => ({ ...s, hired: s.hired.filter((h) => h !== slug), groups: s.groups.map((g) => ({ ...g, members: g.members.filter((m) => m !== slug) })) }));
   sync(api(`/api/agents/${encodeURIComponent(slug)}`, { method: "DELETE" }), () => set(() => prev));
 }
-export function setPlan(_id: PlanId) { /* single free plan */ }
+/** After a verified upgrade. */
+export function setPlan(id: PlanId, seats: number, expiresAt: number | null) { set((x) => ({ ...x, plan: id, planInfo: { seats, expiresAt } })); }
 
 /* ---------- memory ---------- */
 export function addNote(text: string, tag: MemoryTag = "About you", source = "You", chain = false) {
@@ -582,8 +591,8 @@ let prefTimer: ReturnType<typeof setTimeout> | null = null;
 function savePrefs() {
   if (prefTimer) clearTimeout(prefTimer);
   prefTimer = setTimeout(() => {
-    const { language, voice, defaultAgent, memory, history, improve, motion, instructions, notif } = get().prefs;
-    sync(api("/api/me", { method: "PATCH", body: { prefs: { language, voice, defaultAgent, memory, history, improve, motion, instructions: instructions.slice(0, 2000), notif, tourDone: get().tour.done } } }));
+    const { language, voice, defaultAgent, memory, history, improve, motion, instructions, notif, theme } = get().prefs;
+    sync(api("/api/me", { method: "PATCH", body: { prefs: { language, voice, defaultAgent, memory, history, improve, motion, instructions: instructions.slice(0, 2000), notif, tourDone: get().tour.done, ...(theme ? { theme } : {}) } } }));
   }, 500);
 }
 export function setPrefs(p: Partial<Prefs>) { set((x) => ({ ...x, prefs: { ...x.prefs, ...p } })); savePrefs(); }

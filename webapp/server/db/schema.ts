@@ -1,4 +1,6 @@
-import { bigint, boolean, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, customType, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 
 /** Wallet is the account. Nonce fields are cleared after a successful sign-in. */
 export const users = pgTable("users", {
@@ -13,6 +15,10 @@ export const users = pgTable("users", {
   email: text("email"),
   profile: jsonb("profile").$type<Record<string, unknown>>().notNull().default({}),
   prefs: jsonb("prefs").$type<Record<string, unknown>>().notNull().default({}),
+  /** app lock PIN: scrypt hash "salt:hash", null when off */
+  lockHash: text("lock_hash"),
+  /** WebAuthn credential ids allowed to unlock */
+  lockCreds: jsonb("lock_creds").$type<{ id: string; at: number }[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -207,3 +213,34 @@ export const agentCards = pgTable(
   },
   (t) => [uniqueIndex("agent_cards_user_agent").on(t.userId, t.agentKey), uniqueIndex("agent_cards_pay_tx_key").on(t.payTx)],
 );
+
+/** A plan paid in devnet SOL to the treasury. Active until expiresAt. */
+export const planPurchases = pgTable("plan_purchases", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  plan: text("plan").notNull(),
+  tx: text("tx").notNull().unique(),
+  amount: bigint("amount", { mode: "number" }).notNull().default(0),
+  payer: text("payer").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+/** Devnet SOL the server sent to a person, so the per-person cap holds. */
+export const faucetGrants = pgTable("faucet_grants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  wallet: text("wallet").notNull(),
+  tx: text("tx").notNull(),
+  lamports: bigint("lamports", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Profile picture and cover photo (already cropped and resized in the browser). */
+export const userMedia = pgTable("user_media", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  mime: text("mime").notNull(),
+  data: bytea("data").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.kind] })]);

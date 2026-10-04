@@ -8,11 +8,13 @@ import {
   agentName, clearChats, deleteAccount, exportData, setActive, planOf, setNotif, setPrefs, signOut, startTour, toast, updateAgent, useApp, type State,
 } from "@/lib/store";
 import { LANDING_URL, WEBAPP_URL } from "@shared/sites";
+import { applyTheme, onTheme, savedTheme, watchSystemTheme } from "@shared/components/theme";
 import { hirePriceLabel } from "@/lib/prices";
 import Icon from "@/components/Icon";
 import { AgentFace, AgentTile } from "@/components/faces";
 import { myAgents } from "@/components/agents";
 import { openAdd, openAgent } from "@/components/overlays";
+import { PlansGrid } from "@/components/Plans";
 
 const SECTIONS = [
   { id: "general", label: "General", icon: "settings" },
@@ -59,22 +61,17 @@ const dangerBtn = "inline-flex h-10 items-center gap-2 rounded-full px-4 text-[1
 /* ---------- sections ---------- */
 function General({ s }: { s: State }) {
   const router = useRouter();
-  const [theme, setTheme] = useState<Theme>("system");
-  useEffect(() => { const t = localStorage.getItem("lexari-theme"); setTheme(t === "light" || t === "dark" ? t : "system"); }, []);
-  const applyTheme = (t: Theme) => {
-    setTheme(t);
-    const v = t === "system" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t;
-    document.documentElement.setAttribute("data-theme", v);
-    try { if (t === "system") localStorage.removeItem("lexari-theme"); else localStorage.setItem("lexari-theme", t); } catch {}
-  };
+  const [theme, setTheme] = useState<Theme>("dark");
+  useEffect(() => { setTheme(savedTheme()); watchSystemTheme(); return onTheme(setTheme); }, []);
+  const pickTheme = (t: Theme) => { applyTheme(t); setPrefs({ theme: t }); };
   const p = s.prefs;
   return (
     <>
       <Group title="Appearance">
-        <Row title="Theme" desc="Light, dark, or follow your device.">
+        <Row title="Theme" desc={theme === "system" ? "Following your device right now." : "Light, dark, or follow your device."}>
           <div className="inline-flex rounded-full bg-tint p-1" role="radiogroup" aria-label="Theme">
             {([["light", "sun", "Light"], ["dark", "moon", "Dark"], ["system", "laptop", "System"]] as const).map(([id, ic, l]) => (
-              <button key={id} role="radio" aria-checked={theme === id} onClick={() => applyTheme(id)} className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold transition ${theme === id ? "bg-card text-ink shadow-sm" : "text-ink/60 hover:text-ink"}`}><Icon name={ic} size={14} />{l}</button>
+              <button key={id} role="radio" aria-checked={theme === id} onClick={() => pickTheme(id)} className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold transition ${theme === id ? "bg-card text-ink shadow-sm" : "text-ink/60 hover:text-ink"}`}><Icon name={ic} size={14} />{l}</button>
             ))}
           </div>
         </Row>
@@ -252,13 +249,13 @@ function Billing({ s }: { s: State }) {
   const p = planOf(s);
   return (
     <>
-      <Group title="Plan">
+      <Group title="Current plan">
         <div className="flex flex-wrap items-center gap-5 py-5">
-          <div><span className="label text-[9px] text-ink/55">Current plan</span><div className="display mt-1 text-[36px] leading-none text-ink">{p.name}</div></div>
-          <p className="min-w-[180px] flex-1 text-[13.5px] text-ink/60">Your own agent is free. Each specialist is a one-time {hirePriceLabel()} payment from your wallet.</p>
-          <Link href="/app/marketplace" className={smallBtn}>Marketplace</Link>
+          <div><span className="label text-[9px] text-ink/55">Current plan</span><div data-current-plan className="display mt-1 text-[36px] leading-none text-ink">{p.name}</div></div>
+          <p className="min-w-[180px] flex-1 text-[13.5px] text-ink/60">{p.seats === 1 ? "One agent: your own." : `${p.seats} seats.`}{p.expiresAt ? ` Paid until ${new Date(p.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}.` : ""} Specialists are a one-time {hirePriceLabel()} hire each.</p>
         </div>
       </Group>
+      <section className="mt-6"><h3 className="label mb-2 text-[9.5px] text-ink/50">All plans</h3><PlansGrid /></section>
       <Group title="Payments">
         <Row title="Hires" desc={s.paid.length ? `${s.paid.length} specialist${s.paid.length === 1 ? "" : "s"} paid for. Released ones come back for free.` : "No hires yet."}><Link href="/app/wallets" className={smallBtn}>Wallet</Link></Row>
       </Group>

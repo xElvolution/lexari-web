@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Figtree, Martian_Mono } from "next/font/google";
 import "./globals.css";
 import PrivyGate from "@/components/PrivyGate";
 import SolanaProviders from "@/components/SolanaProviders";
+import ClientErrors from "@/components/ClientErrors";
 
 const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", axes: ["wdth"] });
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree" });
@@ -19,8 +20,9 @@ export const viewport: Viewport = {
   ],
 };
 
-/* Runs before first paint: saved choice wins, otherwise follow the system. No flash. */
-const themeScript = `(function(){try{var t=localStorage.getItem('lexari-theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','light')}})();`;
+/* Runs before first paint. Saved choice: "light", "dark" or "system" (follow the device). Nothing saved yet: Lexari's dark look.
+   (Following the device by default flipped people into light mode after any reload on light-mode phones.) */
+const themeScript = `(function(){var d=document.documentElement;try{var t=localStorage.getItem('lexari-theme');if(t==='system'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}else if(t!=='light'&&t!=='dark'){t='dark'}d.setAttribute('data-theme',t)}catch(e){d.setAttribute('data-theme','dark')}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -28,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body><PrivyGate><SolanaProviders>{children}</SolanaProviders></PrivyGate></body>
+      <body><ClientErrors /><PrivyGate><SolanaProviders>{children}</SolanaProviders></PrivyGate></body>
     </html>
   );
 }

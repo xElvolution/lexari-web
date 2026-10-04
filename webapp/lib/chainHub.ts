@@ -10,7 +10,7 @@ async function ready() {
   if (!get().live && !hubReady()) await refreshHub(); // never act on the empty pre-load state
   const s = get();
   if (!(await programIsLive().catch(() => false))) return { who: null, error: "Rewards open soon. The Lexari program is not live on Solana yet." };
-  const who = await ensureBridge(s.auth?.address, s.auth?.wallet);
+  const who = await ensureBridge(s.auth?.address, s.auth?.wallet, s.auth?.method === "google");
   if (!who) return { who: null, error: s.auth?.method === "google" ? "Your wallet is still loading. Try again in a moment." : "Connect the wallet you signed in with first." };
   return { who, error: "" };
 }

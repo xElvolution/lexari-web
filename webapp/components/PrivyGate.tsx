@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
-import { useCreateWallet, useWallets } from "@privy-io/react-auth/solana";
+import { defaultSolanaRpcsPlugin, useCreateWallet, useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { onSignOut, setWalletBridge } from "@/lib/walletBridge";
 import { SOLANA_CLUSTER } from "@/lib/nft";
@@ -18,6 +18,7 @@ function fromBytes<T extends Transaction | VersionedTransaction>(like: T, bytes:
 }
 
 let creating = false;
+const signArgs = (tx: Transaction | VersionedTransaction) => ({ transaction: toBytes(tx), chain: CHAIN, options: { uiOptions: { showWalletUIs: false } } }) as unknown as Parameters<ReturnType<typeof useWallets>["wallets"][number]["signTransaction"]>[0];
 
 /** Exposes the Privy (Google / email) Solana wallet to the rest of the app. Creates one if the account has none. */
 function PrivyBridge() {
@@ -39,11 +40,13 @@ function PrivyBridge() {
       source: "privy",
       name: "Lexari wallet",
       publicKey: new PublicKey(wallet.address),
-      signMessage: async (message) => (await wallet.signMessage({ message })).signature,
-      signTransaction: async (tx) => fromBytes(tx, (await wallet.signTransaction({ transaction: toBytes(tx), chain: CHAIN })).signedTransaction),
+      // Lexari shows its own payment sheet (price, balance, devnet SOL top-up), so Privy's wallet screens stay hidden:
+      // its "insufficient funds / add funds" path sent phones to an on-ramp page that can't load on devnet.
+      signMessage: async (message) => (await wallet.signMessage({ message, options: { uiOptions: { showWalletUIs: false } } } as Parameters<typeof wallet.signMessage>[0])).signature,
+      signTransaction: async (tx) => fromBytes(tx, (await wallet.signTransaction(signArgs(tx))).signedTransaction),
       signAllTransactions: async (txs) => {
         const out = [];
-        for (const tx of txs) out.push(fromBytes(tx, (await wallet.signTransaction({ transaction: toBytes(tx), chain: CHAIN })).signedTransaction));
+        for (const tx of txs) out.push(fromBytes(tx, (await wallet.signTransaction(signArgs(tx))).signedTransaction));
         return out;
       },
     }, "privy");
@@ -61,7 +64,9 @@ export default function PrivyGate({ children }: { children: React.ReactNode }) {
       config={{
         // No loginMethods here: the modal shows what the Privy dashboard enables (Google, email).
         appearance: { theme: "light", accentColor: "#5b2bff", walletChainType: "solana-only" },
-        embeddedWallets: { solana: { createOnLogin: "users-without-wallets" } },
+        embeddedWallets: { solana: { createOnLogin: "users-without-wallets" }, showWalletUIs: false },
+        // Devnet RPCs for the embedded wallet (Privy's own endpoints for this app id).
+        plugins: [defaultSolanaRpcsPlugin()],
       }}
     >
       <PrivyBridge />

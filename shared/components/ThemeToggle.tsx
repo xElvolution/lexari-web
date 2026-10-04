@@ -1,23 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { applyTheme, watchSystemTheme } from "./theme";
 
-const KEY = "lexari-theme";
-
-/** Flips data-theme on <html> and remembers the choice. Icons are swapped by CSS. */
+/** Flips between light and dark and remembers the choice. Icons are swapped by CSS. */
 export default function ThemeToggle() {
-  useEffect(() => {
-    // follow the system while the visitor has not picked a theme
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const on = (e: MediaQueryListEvent) => { if (!localStorage.getItem(KEY)) document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light"); };
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  const toggle = () => {
-    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    try { localStorage.setItem(KEY, next); } catch {}
-  };
+  useEffect(() => { watchSystemTheme(); }, []);
+  const toggle = () => applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
   return (
     <button onClick={toggle} aria-label="Switch light or dark theme" title="Switch theme" className="grid h-11 w-11 place-items-center rounded-full border-2 border-line text-ink transition hover:border-grape hover:text-brand-ink">
       <svg className="i-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>

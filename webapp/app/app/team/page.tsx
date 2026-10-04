@@ -4,19 +4,24 @@ import Link from "next/link";
 import { useState } from "react";
 import { specialistBySlug } from "@/content/appData";
 import { hirePriceLabel } from "@/lib/prices";
-import { agentName, release, toast, useApp } from "@/lib/store";
+import { agentName, planOf, release, seatsUsed, toast, useApp } from "@/lib/store";
+import { PlansGrid } from "@/components/Plans";
 import Icon from "@/components/Icon";
 import { AgentFace, SpecFace } from "@/components/faces";
 import { PageHead } from "@/components/ui";
 import { AgentTile } from "@/components/faces";
-import { openAdd, openAgent } from "@/components/overlays";
+import { openAdd, openAgent, openUpgrade } from "@/components/overlays";
 
 export default function TeamPage() {
   const s = useApp()!;
   const [pick, setPick] = useState<string | null>(null);
+  const plan = planOf(s);
   const taken = 1 + s.hired.length;
-  // the floor always shows a few open desks, in rows of five
-  const seats = Math.max(5, Math.ceil((taken + 1) / 5) * 5);
+  const used = seatsUsed(s);
+  // Desks you have (plan seats; agents you make sit in "Made by you" but count too), then locked desks up to the next row of five.
+  const open = Math.max(0, plan.seats - used);
+  const unlocked = Math.min(Math.max(plan.seats, taken), 100);
+  const seats = Math.max(5, Math.ceil(Math.min(unlocked + (plan.seats < 100 ? 1 : 0), 100) / 5) * 5);
   const big = seats <= 5;
   const cols = seats <= 20 ? "grid-cols-5" : "grid-cols-5 sm:grid-cols-10";
   const free = s.paid.filter((x) => !s.hired.includes(x));
@@ -30,18 +35,19 @@ export default function TeamPage() {
           <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:linear-gradient(var(--line)_1px,transparent_1px),linear-gradient(90deg,var(--line)_1px,transparent_1px)] [background-size:28px_28px]" />
           <div className="relative flex items-center justify-between">
             <span className="label text-ink/65">floor plan</span>
-            <span className="label tab-num text-brand-ink">{taken} on the team</span>
+            <span className="label tab-num text-brand-ink">{used} of {plan.seats} seat{plan.seats === 1 ? "" : "s"}</span>
           </div>
           <div className={`relative mt-5 grid gap-1.5 sm:gap-2.5 ${cols}`}>
             {Array.from({ length: seats }).map((_, i) => {
               const slug = i > 0 ? s.hired[i - 1] : undefined;
-              const state = i === 0 ? "home" : slug ? "hired" : "open";
+              const state = i === 0 ? "home" : slug ? "hired" : i < taken + open ? "open" : "locked";
               const sp = slug ? specialistBySlug(slug) : undefined;
               const cls = `pop relative grid aspect-square place-items-center rounded-[22%] transition ${state === "home" ? "bg-grape shadow-[0_4px_0_#3514b0]" : state === "hired" ? `bg-tint ring-2 ${pick === slug ? "ring-grape" : "ring-grape/40"} hover:-translate-y-1` : "border-2 border-dashed border-ink/25 bg-base/60 hover:border-grape hover:bg-tint"}`;
               const style = { animationDelay: `${Math.min(i, 40) * 14}ms` };
               const num = big && <span className={`label absolute bottom-[8%] right-[10%] text-[9px] ${state === "home" ? "text-white/85 max-[430px]:hidden" : "text-ink/55"}`}>{String(i + 1).padStart(2, "0")}</span>;
               if (state === "home") return <Link key={i} href="/app?c=home" className={cls} style={style} title={`${agentName(s)} · seat 01`}><AgentFace look={s.agent?.look} size={120} track={big} className="!h-[72%] !w-[72%]" />{num}</Link>;
               if (state === "hired") return <button key={i} onClick={() => setPick(pick === slug ? null : slug!)} className={cls} style={style} title={`${sp?.name} · seat ${i + 1}`} aria-label={`${sp?.name}, seat ${i + 1}`}><SpecFace slug={slug!} size={90} className="!h-[72%] !w-[72%]" />{num}</button>;
+              if (state === "locked") return <button key={i} data-seat-locked onClick={() => openUpgrade(plan.id === "free" ? "add" : "full")} className="pop relative grid aspect-square place-items-center rounded-[22%] bg-ink/[.06] text-ink/35 transition hover:bg-tint hover:text-brand-ink" style={style} aria-label={`Seat ${i + 1} is locked. Upgrade for more seats.`} title="Locked · upgrade for more seats"><Icon name="lock" size={big ? 18 : 13} />{num}</button>;
               return <button key={i} onClick={() => openAdd()} className={cls} style={style} aria-label={`Open seat ${i + 1}. Add an agent.`}>{big && <Icon name="plus" size={18} className="text-ink/40" />}{num}</button>;
             })}
           </div>
@@ -58,25 +64,31 @@ export default function TeamPage() {
             <span className="flex items-center gap-2"><i className="h-3.5 w-3.5 rounded bg-grape" />{agentName(s)}</span>
             <span className="flex items-center gap-2"><i className="h-3.5 w-3.5 rounded bg-tint ring-2 ring-grape/45" />Hired specialist</span>
             <span className="flex items-center gap-2"><i className="h-3.5 w-3.5 rounded border-2 border-dashed border-ink/30" />Open seat</span>
+            <span className="flex items-center gap-2"><i className="grid h-3.5 w-3.5 place-items-center rounded bg-ink/10"><Icon name="lock" size={9} className="text-ink/50" /></i>Locked</span>
             <button onClick={() => openAdd()} className="btn btn-brand btn-sm ml-auto"><Icon name="plus" size={16} />Add an agent</button>
           </div>
           <div className="relative mt-6 rounded-[22px] bg-tint p-4">
             <div className="flex items-center justify-between gap-3"><h3 className="text-[15px] font-bold text-ink">Made by you</h3><button onClick={() => openAdd("create")} className="flex items-center gap-1.5 text-[13.5px] font-bold text-brand-ink hover:underline"><Icon name="plus" size={14} />Create an agent</button></div>
             {s.custom.length ? (
               <div className="mt-3 flex flex-wrap gap-2">{s.custom.map((c) => <button key={c.id} onClick={() => openAgent(c.id)} className="flex items-center gap-2 rounded-full bg-card py-1 pl-1 pr-3.5 text-[14px] font-bold text-ink ring-1 ring-line transition hover:ring-grape"><AgentTile id={c.id} look={null} size={30} radius={15} />{c.name}</button>)}</div>
-            ) : <p className="mt-1 text-[13.5px] text-ink/60">Agents you create sit here. They don&apos;t take a desk.</p>}
+            ) : <p className="mt-1 text-[13.5px] text-ink/60">Agents you create sit here. Each one takes a seat.</p>}
           </div>
         </div>
 
         <div className="grain relative flex flex-col overflow-hidden rounded-[30px] bg-grape p-6 text-white sm:p-7">
-          <span className="label text-white/80">Free plan</span>
-          <div className="mt-3 flex items-baseline gap-2"><span className="display text-[88px] leading-[0.8]">{taken}</span><span className="text-white/80">{taken === 1 ? "agent" : "agents"}</span></div>
-          <p className="mt-5 text-[16px] leading-relaxed text-white/90">Your own agent is free. Each specialist is a one-time {hirePriceLabel()} payment, and seats never run out.</p>
-          <ul className="mt-5 grid gap-2.5 text-[15px]">{["Your named agent with its memory", "Hire from the marketplace", "Release and rehire for free"].map((pt) => <li key={pt} className="flex gap-2.5"><span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-white" />{pt}</li>)}</ul>
+          <span className="label text-white/80">{plan.name} plan</span>
+          <div className="mt-3 flex items-baseline gap-2"><span className="display text-[88px] leading-[0.8]">{plan.seats}</span><span className="text-white/80">{plan.seats === 1 ? "agent: your own" : "seats"}</span></div>
+          <p className="mt-5 text-[16px] leading-relaxed text-white/90">{plan.id === "free" ? "Free plan includes one agent: your own. Upgrade to Pro to hire specialists from the marketplace." : `${used} of ${plan.seats} seats used. Each specialist is a one-time ${hirePriceLabel()} hire.`}</p>
+          {plan.id === "free" && <button onClick={() => openUpgrade("plans")} className="btn btn-white relative z-10 mt-5">Upgrade to Pro</button>}
           {free.length > 0 && <p className="relative z-10 mt-5 text-[13.5px] text-white/85">{free.length} paid specialist{free.length === 1 ? " is" : "s are"} off the floor. Add them back from the marketplace for free.</p>}
           <Link href="/app/marketplace" className="btn btn-white relative z-10 mt-8 lg:mt-auto">Open the marketplace</Link>
         </div>
       </div>
+      <section data-rise id="plans" className="mt-8">
+        <h2 className="text-[22px] font-bold tracking-tight text-ink">Plans</h2>
+        <p className="mt-0.5 text-[14px] text-ink/55">More seats for more agents. Paid in devnet SOL.</p>
+        <div className="mt-4"><PlansGrid /></div>
+      </section>
     </>
   );
 }

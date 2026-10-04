@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/server/db";
-import { agentCards, agents, hires } from "@/server/db/schema";
+import { agentCards, agents, hires, planPurchases } from "@/server/db/schema";
 import { cardIssuer } from "@/server/cards/issuer";
 import { CARD_LAMPORTS } from "@/server/config";
 import { verifyPayment } from "@/server/hires";
@@ -36,7 +36,8 @@ export const POST = withUser(async (user, req) => {
   if (already) return already.payTx === body.tx ? Response.json({ card: view(already) }) : jsonError(409, "This agent already has a card.");
   const [usedCard] = await database.select({ id: agentCards.id }).from(agentCards).where(eq(agentCards.payTx, body.tx)).limit(1);
   const [usedHire] = await database.select({ id: hires.id }).from(hires).where(eq(hires.tx, body.tx)).limit(1);
-  if (usedCard || usedHire) return jsonError(409, "That payment was already used.");
+  const [usedPlan] = await database.select({ id: planPurchases.id }).from(planPurchases).where(eq(planPurchases.tx, body.tx)).limit(1);
+  if (usedCard || usedHire || usedPlan) return jsonError(409, "That payment was already used.");
   const tx = await fetchConfirmed(body.tx);
   const paid = verifyPayment(tx, user.wallet, "SOL", CARD_LAMPORTS);
   const issued = await cardIssuer().issue({ holder: body.agent, limit: body.limit });

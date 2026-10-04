@@ -23,6 +23,7 @@ export const memoryBody = z.object({
   contentHash: z.string().regex(/^[0-9a-f]{64}$/),
 }).strict();
 
+export const voiceBody = z.object({ name: z.string().max(120).default(""), pitch: z.number().min(0.5).max(2).default(1), rate: z.number().min(0.5).max(2).default(1), preset: z.string().max(20).optional() }).strict();
 const look = z.union([z.number().int(), z.null(), z.record(z.string(), z.unknown())]);
 export const agentBody = z.object({
   slug,
@@ -34,10 +35,10 @@ export const agentBody = z.object({
   skills: z.array(z.string().max(40)).max(20).default([]),
   memoryOn: z.boolean().default(true),
   look: look.optional(),
-  meta: z.object({ nick: z.string().max(40).optional(), notes: z.string().max(2000).optional(), you: z.string().max(40).optional(), color: z.string().max(20).optional() }).partial().default({}),
+  meta: z.object({ nick: z.string().max(40).optional(), notes: z.string().max(2000).optional(), you: z.string().max(40).optional(), color: z.string().max(20).optional(), voice: voiceBody.optional() }).partial().default({}),
 }).strict();
 
-export const agentNotes = z.object({ nick: z.string().max(40).optional(), notes: z.string().max(2000).optional(), memoryOn: z.boolean().optional() }).strict();
+export const agentNotes = z.object({ nick: z.string().max(40).optional(), notes: z.string().max(2000).optional(), memoryOn: z.boolean().optional(), voice: voiceBody.nullable().optional() }).strict();
 export const rehireBody = z.object({ slug: z.string().min(1).max(40) }).strict();
 
 export const hireBody = z.object({
@@ -47,7 +48,7 @@ export const hireBody = z.object({
 }).strict();
 
 export const mePatch = z.object({
-  profile: z.object({ name: z.string().max(60), username: z.string().max(30), bio: z.string().max(300) }).partial().optional(),
+  profile: z.object({ name: z.string().max(60), username: z.string().max(30), bio: z.string().max(300), coverFit: z.string().max(20) }).partial().optional(),
   prefs: z.record(z.string(), z.union([z.string().max(2000), z.boolean(), z.number(), z.array(z.string().max(80)).max(50), z.record(z.string(), z.boolean())])).optional(),
 }).strict();
 
@@ -100,3 +101,7 @@ export const cardPatchBody = z.object({
   frozen: z.boolean().optional(),
   limit: z.number().int().min(10).max(5000).optional(),
 }).strict();
+
+export const planBuyBody = z.object({ plan: z.enum(["pro", "plus", "max"]), tx: z.string().min(64).max(100) }).strict();
+export const lockBody = z.object({ pin: z.string().regex(/^[0-9]{4,6}$/, "4 to 6 digits"), current: z.string().max(6).optional() }).strict();
+export const lockCheckBody = z.object({ pin: z.string().regex(/^[0-9]{4,6}$/, "4 to 6 digits") }).strict();

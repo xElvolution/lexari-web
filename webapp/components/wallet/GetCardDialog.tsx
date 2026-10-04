@@ -25,9 +25,9 @@ export default function GetCardDialog({ s, id, onClose }: { s: State; id: string
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose, busy]);
   const buy = async () => {
     setBusy(true); setErr("");
-    const r = await payForCard(id, limit);
+    const r = await payForCard(id, limit, name);
     setBusy(false);
-    if (!r.ok) { setErr(r.error); return; }
+    if (!r.ok) { if (!r.cancelled) setErr(r.error); return; }
     putCard(r.card); setCard(r.card); setTx(r.tx);
   };
   return (
@@ -54,7 +54,7 @@ export default function GetCardDialog({ s, id, onClose }: { s: State; id: string
             <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-tint px-3.5 py-2.5 text-[13.5px]"><span className="text-ink/70">Card price</span><span className="text-right font-semibold text-ink">{cardPriceLabel()} · devnet</span></div>
             <p className="mt-3 flex gap-2 rounded-2xl bg-tint p-3 text-[12.5px] leading-snug text-ink/75"><Icon name="info" size={15} className="mt-0.5 shrink-0 text-brand-ink" />{CARD_TEST_NOTE}</p>
             {err && <p role="alert" className="mt-3 text-[13px] text-[#e5484d]">{err}</p>}
-            <button onClick={buy} disabled={busy} className="btn btn-brand btn-sm mt-4 w-full disabled:opacity-60">{busy ? "Waiting for payment…" : `Pay ${cardPriceLabel()} and get the card`}</button>
+            <button onClick={buy} disabled={busy} className="btn btn-brand btn-sm mt-4 w-full disabled:opacity-60">{busy ? "Finish the payment…" : `Get the card · ${cardPriceLabel()}`}</button>
           </>
         )}
       </div>

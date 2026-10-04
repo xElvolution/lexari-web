@@ -19,7 +19,7 @@ function Bridge() {
   useEffect(() => {
     setWalletConnector(async (preferred) => {
       // Installed only: a "loadable" wallet on a phone would leave Lexari for the wallet app mid-action.
-      const ok = (w: (typeof wallet.wallets)[number]) => w.readyState === WalletReadyState.Installed;
+      const ok = (w: (typeof wallet.wallets)[number]) => w.readyState === WalletReadyState.Installed && !/mobile wallet adapter|privy/i.test(w.adapter.name);
       const pick = wallet.wallets.find((w) => ok(w) && (!preferred || w.adapter.name.toLowerCase() === preferred.toLowerCase())) ?? wallet.wallets.find(ok);
       if (!pick) throw new Error("No Solana wallet in this browser. Open Lexari inside your wallet app.");
       if (wallet.wallet?.adapter.name !== pick.adapter.name) wallet.select(pick.adapter.name);

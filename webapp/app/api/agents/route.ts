@@ -4,6 +4,7 @@ import { agents } from "@/server/db/schema";
 import { recordEvent } from "@/server/events";
 import { jsonError, readJson } from "@/server/http";
 import { withUser } from "@/server/route";
+import { assertSeat } from "@/server/plans";
 import { agentBody } from "@/server/validate";
 
 export const runtime = "nodejs";
@@ -31,6 +32,7 @@ export const POST = withUser(async (user, req) => {
     return Response.json({ ok: true });
   }
   const count = await database.select({ id: agents.id }).from(agents).where(eq(agents.userId, user.userId));
+  if (body.kind !== "home") await assertSeat(user.userId);
   if (count.length >= 50) return jsonError(400, "You have the most agents an account can have.");
   await database.insert(agents).values({ userId: user.userId, slug: body.slug, kind: body.kind, ...values }).onConflictDoNothing();
   await recordEvent(user.userId, "agent", { ref: body.slug });

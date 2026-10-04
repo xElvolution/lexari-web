@@ -4,7 +4,8 @@ import { specialistBySlug } from "@/content/appData";
 import { api, friendly } from "@/lib/api";
 import { payForHire } from "@/lib/pay";
 import { hirePriceLabel } from "@/lib/prices";
-import { get, hire, toast } from "@/lib/store";
+import { get, hire, seatsLeft, toast } from "@/lib/store";
+import { openUpgrade } from "./overlays";
 import { burst, flyToSeats } from "./fly";
 
 const inflight = new Set<string>();
@@ -23,13 +24,14 @@ async function run(slug: string, faceEl: HTMLElement | null): Promise<"ok" | "fu
     toast({ text: `${sp.name} is already on your team`, face: sp.seed, color: sp.color });
     return "already";
   }
+  if (seatsLeft(s) <= 0) { openUpgrade(s.plan === "free" ? "hire" : "full"); return "full"; }
   const before = s.paid.includes(slug);
   if (before) {
     try { await api("/api/hires", { method: "PUT", body: { slug } }); }
-    catch (e) { toast({ text: friendly(e, "Could not add them back."), face: "home" }); return "unpaid"; }
+    catch (e) { if ((e as { status?: number }).status === 402) { openUpgrade("hire"); return "full"; } toast({ text: friendly(e, "Could not add them back."), face: "home" }); return "unpaid"; }
   } else {
-    const paid = await payForHire(slug);
-    if (!paid.ok) { toast({ text: paid.error, face: "home" }); return "unpaid"; }
+    const paid = await payForHire(slug, sp.name);
+    if (!paid.ok) { if (!paid.cancelled && paid.error) toast({ text: paid.error, face: "home" }); return "unpaid"; }
   }
   const r = hire(slug);
   if (r === "ok") {

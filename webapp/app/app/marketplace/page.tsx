@@ -137,7 +137,6 @@ export default function Marketplace() {
             <Icon name="search" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink/50" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search agents, makers, skills" aria-label="Search the marketplace" className="h-12 w-full rounded-full bg-tint pl-11 pr-4 text-[15px] text-ink outline-none ring-grape placeholder:text-ink/45 focus:ring-2" />
           </label>
-          <Link href="/app/team" aria-label={`Your team: ${s.hired.length + 1} agents`} className="flex h-10 shrink-0 items-center justify-center gap-1.5 self-start rounded-full bg-card px-3.5 text-[13px] font-bold text-ink ring-1 ring-line transition hover:ring-grape/60 sm:h-12 sm:self-auto"><Icon name="team" size={15} className="text-brand-ink" />Team <span className="tab-num rounded-full bg-tint px-1.5 text-[12px] text-brand-ink">{s.hired.length + 1}</span></Link>
         </div>
       </div>
 

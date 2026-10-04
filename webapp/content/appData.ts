@@ -40,11 +40,15 @@ export const KNOW_SUGGESTIONS = [
 
 /* ---------- plans: seats only ---------- */
 export const PLANS = [
-  { id: "free", name: "Free", seats: 1, for: "Your own agent with its computer and memory.", points: ["Your named agent", "Its own computer", "A memory that lasts"] },
-  { id: "pro", name: "Pro", seats: 5, for: "A small crew: your agent plus four specialists.", points: ["5 seats", "Hire from the marketplace", "Mention a specialist in chat"] },
-  { id: "plus", name: "Pro Plus", seats: 20, for: "A full team working on several jobs at once.", points: ["20 seats", "Team chats between agents", "Hire and build your own"] },
-  { id: "max", name: "Max", seats: 100, for: "A whole floor for big, parallel work.", points: ["100 seats", "Many team chats at once", "Same agent at desk one"] },
+  { id: "free", name: "Free", seats: 1, lamports: 0, for: "Your own agent with its computer and memory.", points: ["Your named agent", "Its own computer", "A memory that lasts"] },
+  { id: "pro", name: "Pro", seats: 5, lamports: 50_000_000, for: "A small crew: your agent plus four specialists.", points: ["5 seats", "Hire from the marketplace", "Mention a specialist in chat"] },
+  { id: "plus", name: "Pro Plus", seats: 20, lamports: 100_000_000, for: "A full team working on several jobs at once.", points: ["20 seats", "Team chats between agents", "Hire and build your own"] },
+  { id: "max", name: "Max", seats: 100, lamports: 200_000_000, for: "A whole floor for big, parallel work.", points: ["100 seats", "Many team chats at once", "Same agent at desk one"] },
 ] as const;
+/** Paid plans last this long on devnet; pay again to renew. */
+export const PLAN_DAYS = 30;
+export const planById = (id: string) => PLANS.find((p) => p.id === id) ?? PLANS[0];
+export const solLabel = (lamports: number) => `${+(lamports / 1e9).toFixed(4)} SOL`;
 export type PlanId = (typeof PLANS)[number]["id"];
 
 /* ---------- the marketplace roster ---------- */

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { PLANS } from "@/content/appData";
-import { tick, useApp, useLoadError, type State } from "@/lib/store";
+import { get, seatsLeft, tick, useApp, useLoadError, type State } from "@/lib/store";
 import { LANDING_URL } from "@shared/sites";
 import Logo from "@shared/components/Logo";
 import ThemeToggle from "@shared/components/ThemeToggle";
@@ -15,6 +15,9 @@ import Toaster from "./Toaster";
 import Tour from "./Tour";
 import AgentPanel from "./agent/AgentPanel";
 import AddAgentDialog from "./agent/AddAgentDialog";
+import PaySheet from "./PaySheet";
+import { setSeatGate } from "./overlays";
+import UpgradeSheet from "./UpgradeSheet";
 import MemoryChain from "./MemoryChain";
 
 export const NAV = [
@@ -169,6 +172,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { if (!ready) return; tick(); const id = setInterval(() => tick(), 1000); return () => clearInterval(id); }, [ready]);
   useEffect(() => { window.scrollTo(0, 0); }, [path]);
+  useEffect(() => { setSeatGate(() => seatsLeft(get()) > 0); }, []);
   // preferences that change the whole app
   const demoOff = s?.prefs?.demoLabels === false, still = s?.prefs?.motion === false;
   useEffect(() => {
@@ -197,6 +201,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       <AgentPanel />
       <AddAgentDialog />
+      <UpgradeSheet />
+      <PaySheet />
       {s.tour?.on && <Tour s={s} />}
       <MemoryChain />
       <Toaster />

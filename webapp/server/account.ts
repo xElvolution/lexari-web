@@ -2,17 +2,19 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { agents, chats, hires, jobs, memories, messages, users } from "./db/schema";
 import type { SessionUser } from "./auth/session";
+import { currentPlan } from "./plans";
 
 /** Everything the app needs on load. Memories stay encrypted; the browser decrypts them. */
 export async function loadAccount(user: SessionUser) {
   const database = db();
   const [me] = await database.select().from(users).where(eq(users.id, user.userId)).limit(1);
-  const [agentRows, chatRows, memRows, jobRows, hireRows] = await Promise.all([
+  const [agentRows, chatRows, memRows, jobRows, hireRows, plan] = await Promise.all([
     database.select().from(agents).where(eq(agents.userId, user.userId)).orderBy(asc(agents.createdAt)),
     database.select().from(chats).where(eq(chats.userId, user.userId)).orderBy(asc(chats.createdAt)),
     database.select().from(memories).where(and(eq(memories.userId, user.userId), isNull(memories.deletedAt))).orderBy(desc(memories.createdAt)).limit(500),
     database.select().from(jobs).where(eq(jobs.userId, user.userId)).orderBy(desc(jobs.createdAt)).limit(200),
     database.select({ slug: hires.slug, tx: hires.tx, createdAt: hires.createdAt }).from(hires).where(eq(hires.buyerId, user.userId)),
+    currentPlan(user.userId),
   ]);
   const chatIds = chatRows.map((c) => c.id);
   const msgRows = chatIds.length
@@ -34,6 +36,9 @@ export async function loadAccount(user: SessionUser) {
       createdAt: me?.createdAt?.getTime() ?? Date.now(),
     },
     profile: (me?.profile || {}) as Record<string, unknown>,
+    plan,
+    lockOn: !!me?.lockHash,
+    biometric: (me?.lockCreds || []).length > 0,
     prefs: (me?.prefs || {}) as Record<string, unknown>,
     agents: agentRows.map((a) => ({
       slug: a.slug, kind: a.kind, name: a.name, role: a.role, tone: a.tone, about: a.about, skills: a.skills, memoryOn: a.memoryOn,

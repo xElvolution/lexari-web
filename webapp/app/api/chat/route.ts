@@ -4,7 +4,7 @@ import { ModelError, llmConfig, streamCompletion } from "@/server/engram/cortex"
 import { splitRemember } from "@/server/engram/hippocampus";
 import { buildPrompt } from "@/server/engram/spinal";
 import { recordEvent } from "@/server/events";
-import { db } from "@/server/db";
+import { db, retryRead } from "@/server/db";
 import { agents, chats, jobs, messages } from "@/server/db/schema";
 import { configError, jsonError, rateLimit, readJson, toErrorResponse } from "@/server/http";
 import { chatBody } from "@/server/validate";
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   if (missing) return jsonError(503, missing);
   let session;
   try {
-    session = await currentSession();
+    session = await retryRead(() => currentSession());
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -43,7 +43,8 @@ export async function POST(req: Request) {
 
   const userId = session.userId;
   const database = db();
-  const mine = await database.select().from(agents).where(eq(agents.userId, userId));
+  let mine;
+  try { mine = await retryRead(() => database.select().from(agents).where(eq(agents.userId, userId))); } catch (error) { return toErrorResponse(error); }
   const home = mine.find((a) => a.slug === "home");
   const speakerRow = mine.find((a) => a.slug === body.speaker);
   const house = SPECIALISTS.find((s) => s.slug === body.speaker);
