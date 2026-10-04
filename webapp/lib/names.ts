@@ -65,6 +65,41 @@ export function addressed(text: string, names: Record<string, string[]>): string
   return (best as { id: string } | null)?.id ?? null;
 }
 
+/**
+ * Everyone the message addresses, in the order they appear: "@Name" mentions and spoken or typed names (same fuzzy rules as `addressed`).
+ * Empty when nobody is named, which means the whole group should answer.
+ */
+export function addressedAll(text: string, names: Record<string, string[]>): string[] {
+  const toks = text.toLowerCase().replace(/[^\p{L}\p{N}\s'@]/gu, " ").split(/\s+/).filter(Boolean);
+  const hits = new Map<string, number>();
+  const mark = (id: string, at: number) => { if (!hits.has(id) || hits.get(id)! > at) hits.set(id, at); };
+  toks.forEach((raw, i) => {
+    const at = raw.startsWith("@"), t = raw.replace(/^@+/, "");
+    if (!t) return;
+    let best: { id: string; score: number } | null = null;
+    for (const [id, list] of Object.entries(names)) for (const full of list) for (const part of full.toLowerCase().split(/\s+/).filter((x) => x.length >= 2)) {
+      let sc = wordScore(t, part);
+      const slot = at || i <= 1 || GREET.has(toks[i - 1] || "") || i === toks.length - 1 || /^(and|&)$/.test(toks[i - 1] || "") || /^(and|&)$/.test(toks[i + 1] || "");
+      if (sc === 1 && !slot) sc = 0;
+      if (sc && (!best || sc > best.score)) best = { id, score: sc };
+    }
+    if (best) mark((best as { id: string }).id, i);
+  });
+  return [...hits.entries()].sort((a, b) => a[1] - b[1]).map(([id]) => id);
+}
+
+/** Splits text into plain parts and "@Name" mentions of the given names, for highlighting. */
+export function mentionParts(text: string, names: string[]): { text: string; at?: boolean }[] {
+  const list = names.filter(Boolean).sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!list.length) return [{ text }];
+  const re = new RegExp(`@(?:${list.join("|")})(?![\\p{L}\\p{N}])`, "giu");
+  const out: { text: string; at?: boolean }[] = [];
+  let last = 0;
+  for (const m of text.matchAll(re)) { if (m.index! > last) out.push({ text: text.slice(last, m.index) }); out.push({ text: m[0], at: true }); last = m.index! + m[0].length; }
+  if (last < text.length) out.push({ text: text.slice(last) });
+  return out;
+}
+
 const STOP_WORDS = "stop|wait|hold on|hang on|shush|shut up|be quiet|quiet|enough|cancel|never ?mind|pause";
 /** Only a stop word ("stop", "ok wait", "hold on please"). */
 export const isStop = (t: string) => new RegExp(`^(?:(?:ok(?:ay)?|no|hey|please|just)\\s+)*(?:${STOP_WORDS})(?:\\s+(?:please|it|talking|now|there|a sec(?:ond)?|a moment))*[\\s.,!?]*$`, "i").test(t.trim());

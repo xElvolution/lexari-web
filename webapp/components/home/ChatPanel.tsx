@@ -7,12 +7,13 @@ import { voiceOf } from "@/lib/voices";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { CHAT_SUGGESTIONS, specialistBySlug } from "@/content/appData";
-import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, isLocked, planOf, toast, toggleReaction, useAgentActive, useCalling, useNow, useTyping, type Msg, type State } from "@/lib/store";
+import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, isLocked, planOf, toast, toggleReaction, isGroup, memberNames, useAgentActive, useCalling, useNow, useTyping, type Msg, type State } from "@/lib/store";
 import SendCard from "./SendCard";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
 import { convoOf, dayLabel, fmtSecs, nameOf, shortTime } from "../agents";
 import Composer from "./Composer";
+import { mentionParts } from "@/lib/names";
 import { openAgent, openUpgrade } from "../overlays";
 
 function VoiceNote({ secs, mine }: { secs: number; mine: boolean }) {
@@ -35,7 +36,8 @@ function VoiceNote({ secs, mine }: { secs: number; mine: boolean }) {
   );
 }
 
-function Body({ m, mine, s }: { m: Msg; mine: boolean; s: State }) {
+function Body({ m, mine, s, convo }: { m: Msg; mine: boolean; s: State; convo?: string }) {
+  const at = mine && convo && isGroup(convo) && m.text?.includes("@") ? Object.values(memberNames(s, convo)).flat() : null;
   return (
     <>
       {m.reply && (
@@ -50,7 +52,7 @@ function Body({ m, mine, s }: { m: Msg; mine: boolean; s: State }) {
           <span className="min-w-0"><span className="block truncate text-[14px] font-semibold">{m.file.name}</span><span className={`block text-[11.5px] ${mine ? "text-white/75" : "text-ink/55"}`}>{m.file.size}</span></span>
         </span>
       )}
-      {m.voice ? <VoiceNote secs={m.voice} mine={mine} /> : m.text && <span className="block whitespace-pre-wrap break-words">{m.text}</span>}
+      {m.voice ? <VoiceNote secs={m.voice} mine={mine} /> : m.text && <span className="block whitespace-pre-wrap break-words">{at ? mentionParts(m.text, at).map((x, i) => x.at ? <b key={i} data-mention className="rounded-md bg-white/20 px-1 font-bold">{x.text}</b> : x.text) : m.text}</span>}
     </>
   );
 }
@@ -193,7 +195,7 @@ function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
       {(m.text || m.file || m.voice) ? <div ref={box} className="group/msg relative max-w-full">
         <span aria-hidden className="pointer-events-none absolute left-0 top-1/2 grid h-9 w-9 -translate-x-[130%] -translate-y-1/2 place-items-center rounded-full bg-tint text-brand-ink" style={{ opacity: gesture.shift > 24 ? 1 : 0 }}><Icon name="reply" size={16} /></span>
         <div {...gesture.handlers} title={shortTime(m.at, now)} className={`relative select-text rounded-[20px] px-4 py-2.5 text-[15.5px] leading-snug max-[430px]:rounded-[18px] max-[430px]:px-3.5 max-[430px]:py-2 max-[430px]:leading-[1.4] ${cls} ${open ? "ring-2 ring-grape" : ""} [-webkit-touch-callout:none]`} style={{ transform: `translateX(${gesture.shift}px)`, transition: gesture.shift ? "none" : "transform .2s ease", touchAction: "pan-y" }}>
-          <Body m={m} mine={mine} s={s} />
+          <Body m={m} mine={mine} s={s} convo={convo} />
           {gesture.pop && <span className="pop pointer-events-none absolute -right-1 -top-3 text-[22px]" aria-hidden>❤️</span>}
         </div>
         <MsgMenu m={m} convo={convo} mine={mine} open={open} more={!!menu?.more} below={below} onMore={() => setMenu({ id: m.id, more: true })} onReply={() => { setMenu(null); onReply(m); }} onClose={() => setMenu(null)} />
@@ -338,7 +340,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
           <span className="min-w-0 flex-1 text-[13.5px] leading-snug text-ink/75"><b className="text-ink">{c.name} is locked on your {planOf(s).name} plan.</b> Your chats are kept. Upgrade to keep working together.</span>
           <button data-upgrade-plan onClick={() => openUpgrade("plans")} className="btn btn-brand btn-sm !h-10 shrink-0">Upgrade plan</button>
         </div></div>
-      ) : <Composer id={id} name={c.name} suggestions={suggestions} onCall={onCall} onDesktop={onDesktop} desktopOpen={desktopOpen}
+      ) : <Composer id={id} name={c.name} members={isGroup(id) ? Object.entries(memberNames(s, id)).map(([mid, n]) => ({ id: mid, name: n[0] || nameOf(s, mid) })) : undefined} suggestions={suggestions} onCall={onCall} onDesktop={onDesktop} desktopOpen={desktopOpen}
         reply={reply ? { id: reply.id, from: reply.from, text: reply.text || (reply.voice ? "Voice note" : reply.file?.name ?? "") } : null} replyName={reply ? whoName(s, reply.from) : ""} onClearReply={() => setReply(null)} />}
     </section>
   );

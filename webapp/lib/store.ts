@@ -18,7 +18,7 @@ import { applyTheme } from "@shared/components/theme";
 import { signOutSession } from "./session";
 import { bridgeFor, runSignOutHooks } from "./walletBridge";
 import { openNote, savedKeys, sealNote, unlock } from "./vault";
-import { addressed } from "./names";
+import { addressed, addressedAll } from "./names";
 
 export type Msg = {
   id: string; from: string; text: string; at: number; jobId?: number;
@@ -564,12 +564,15 @@ export function speakerFor(st: State, convo: string, text: string, fallback?: st
   if (named && g.members.includes(named)) return named;
   return fallback && g.members.includes(fallback) ? fallback : g.members[0];
 }
-/** In a group every member answers, one after another: the one you named first, then the rest in member order. */
+/**
+ * Who answers a group message: only the members you @mentioned or named (fuzzy, so "Rica" is Rika), in the order you named them.
+ * Nobody named: every member answers, one after another. Calls use the same rule.
+ */
 export function groupOrder(st: State, convo: string, text: string) {
   const g = groupOf(st, convo);
   if (!g?.members.length) return ["home"];
-  const named = addressed(text, memberNames(st, convo));
-  return named && g.members.includes(named) ? [named, ...g.members.filter((m) => m !== named)] : [...g.members];
+  const named = addressedAll(text, memberNames(st, convo)).filter((m) => g.members.includes(m));
+  return named.length ? named : [...g.members];
 }
 
 /** Ask the model for a reply and stream the tokens into the thread. The server saves both messages. */
