@@ -51,7 +51,7 @@ export async function balanceOf(address: string) {
 }
 
 /** Signs and sends one SOL transfer to the treasury and waits until it is confirmed. Returns the signature. */
-export async function sendToTreasury(bridge: WalletBridge, lamports: number, onSigned?: () => void) {
+export async function sendToTreasury(bridge: WalletBridge, lamports: number, onSigned?: () => void, onSent?: () => void) {
   const c = connection();
   const { blockhash, lastValidBlockHeight } = await c.getLatestBlockhash("confirmed");
   const tx = new Transaction({ feePayer: bridge.publicKey, blockhash, lastValidBlockHeight })
@@ -59,6 +59,7 @@ export async function sendToTreasury(bridge: WalletBridge, lamports: number, onS
   const signed = await bridge.signTransaction(tx);
   onSigned?.();
   const sig = await c.sendRawTransaction(signed.serialize());
+  onSent?.();
   const result = await c.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
   if (result.value.err) throw new Error("The payment failed on Solana.");
   return sig;

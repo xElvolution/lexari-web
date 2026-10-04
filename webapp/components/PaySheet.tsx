@@ -27,7 +27,7 @@ function Sheet() {
   const [addr, setAddr] = useState<string>("");
   const [bal, setBal] = useState<number | null>(null);
   const [faucet, setFaucet] = useState<Faucet | null>(null);
-  const [phase, setPhase] = useState<"loading" | "ready" | "funding" | "paying" | "confirming" | "verifying" | "done" | "nowallet">("loading");
+  const [phase, setPhase] = useState<"loading" | "ready" | "funding" | "paying" | "sending" | "confirming" | "verifying" | "done" | "nowallet">("loading");
   const [err, setErr] = useState("");
   const [fundTx, setFundTx] = useState("");
   const [tx, setTx] = useState("");
@@ -44,7 +44,7 @@ function Sheet() {
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape" && (phase === "ready" || phase === "nowallet")) done({ ok: false, error: "", cancelled: true }); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [phase, done]);
 
   const short_ = bal !== null && bal < need;
-  const busy = phase === "funding" || phase === "paying" || phase === "confirming" || phase === "verifying";
+  const busy = phase === "funding" || phase === "paying" || phase === "sending" || phase === "confirming" || phase === "verifying";
 
   const fund = async () => {
     setErr(""); setPhase("funding");
@@ -67,7 +67,7 @@ function Sheet() {
     if (b !== null && b < need) { setErr(`You need ${sol(need)} devnet SOL. You have ${sol(b)}.`); return; }
     setPhase("paying");
     let sig = "";
-    try { sig = await sendToTreasury(w, req.lamports, () => setPhase("confirming")); setTx(sig); }
+    try { sig = await sendToTreasury(w, req.lamports, () => setPhase("sending"), () => setPhase("confirming")); setTx(sig); }
     catch (e) { setErr(friendly(e, "The wallet did not pay.")); setPhase("ready"); return; }
     setPhase("verifying");
     try { const result = await req.record(sig); setPhase("done"); setTimeout(() => done({ ok: true, tx: sig, result }), 900); }
@@ -115,7 +115,7 @@ function Sheet() {
           </div>
         )}
 
-        {(phase === "paying" || phase === "confirming" || phase === "verifying" || phase === "done") && <PaySteps phase={phase} />}
+        {(phase === "paying" || phase === "sending" || phase === "confirming" || phase === "verifying" || phase === "done") && <PaySteps phase={phase} />}
         {err && <p role="alert" data-pay-error className="mt-3 text-[13.5px] leading-snug text-[#e5484d]">{err}</p>}
 
         {phase === "done" ? (
@@ -124,7 +124,7 @@ function Sheet() {
           <button onClick={retryVerify} className="btn btn-brand btn-sm mt-4 w-full">Try again</button>
         ) : (
           <button data-pay onClick={pay} disabled={busy || phase === "loading" || phase === "nowallet" || short_} className="btn btn-brand btn-sm mt-4 w-full disabled:opacity-50 disabled:shadow-none">
-            {phase === "paying" ? "Waiting for signature…" : phase === "confirming" ? "Confirming on Solana…" : phase === "verifying" ? "Checking the payment…" : `Pay ${sol(req.lamports)}`}
+            {phase === "paying" ? "Waiting for signature…" : phase === "sending" ? "Sending…" : phase === "confirming" ? "Confirming on Solana…" : phase === "verifying" ? "Checking the payment…" : `Pay ${sol(req.lamports)}`}
           </button>
         )}
         <p className="mt-2 text-center text-[11.5px] text-ink/45">Devnet only. No real money moves.</p>
@@ -135,13 +135,14 @@ function Sheet() {
 
 /** What's happening after Pay, so nothing looks stalled. */
 function PaySteps({ phase }: { phase: string }) {
-  const order = ["paying", "confirming", "verifying", "done"];
-  const at = order.indexOf(phase);
-  const steps = ["Waiting for signature…", "Confirming on Solana…", "Checking the payment…", "Done"];
+  // sign, send, confirm (on Solana, then our check of it), done
+  const order = ["paying", "sending", "confirming", "done"];
+  const at = order.indexOf(phase === "verifying" ? "confirming" : phase);
+  const steps = ["Sign in your wallet", "Send to Solana", phase === "verifying" ? "Confirm: checking the payment…" : "Confirm on Solana", "Done"];
   return (
     <ol data-pay-steps className="mt-4 space-y-2 rounded-2xl bg-tint p-3.5" aria-live="polite">
       {steps.map((t, i) => (
-        <li key={t} className={`flex items-center gap-2.5 text-[13.5px] font-semibold ${i <= at ? "text-ink" : "text-ink/40"}`}>
+        <li key={i} data-pay-step={order[i]} className={`flex items-center gap-2.5 text-[13.5px] font-semibold ${i <= at ? "text-ink" : "text-ink/40"}`}>
           <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${i < at || phase === "done" ? "bg-grape text-white" : i === at ? "bg-card ring-2 ring-grape" : "bg-card ring-1 ring-line"}`}>
             {i < at || phase === "done" ? <Icon name="check" size={12} stroke={3} /> : i === at ? <i className="h-3 w-3 animate-spin rounded-full border-2 border-grape border-t-transparent" /> : null}
           </span>{i === 3 && phase === "done" ? "Done" : t}
