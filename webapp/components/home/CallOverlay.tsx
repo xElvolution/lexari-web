@@ -9,7 +9,7 @@ import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
 import { convoOf, fmtSecs, nameOf as agentLabel } from "../agents";
 import { afterStop, isStop } from "@/lib/names";
-import { TurnClock, interruptedRecord } from "@/lib/callTurn";
+import { MERGE_MS, TurnClock, capSentences, interruptedRecord, maybeGreeting, mergeUtterances, stripGreeting } from "@/lib/callTurn";
 
 
 type Phase = "connecting" | "listening" | "hearing" | "thinking" | "speaking" | "muted" | "error";
@@ -58,6 +58,7 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
       try { await ensureMic(); } catch (e) { setNote((e as Error).message); setPhase("error"); return; }
       let quiet = 0;
       let next = ""; // words you said over the agent (barge-in) become the next turn
+      let answered = 0; // agent replies so far in this call: only the first may open with a greeting
       while (!stop) {
         if (mutedRef.current) { next = ""; await new Promise((r) => setTimeout(r, 300)); continue; }
         setPhase("listening"); setNote(quiet >= 3 ? "Say something, or tap end." : "");
@@ -73,6 +74,7 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
           continue;
         }
         if (stop) return;
+        const heardAt = performance.now(); // when your phrase ended
         if (mutedRef.current) continue;
         if (!said) { quiet++; continue; }
         quiet = 0;
@@ -84,7 +86,13 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
         setSpeaker(who);
         setPhase("thinking"); setNote("");
         // stream the reply into a feed; speech starts on the first full sentence
-        let text = "", done = false, failed = "";
+        let text = "", raw = "", done = false, failed = "", capped = false;
+        const firstReply = answered === 0;
+        // what gets spoken: no greeting after the first reply, and never more than two sentences
+        const shape = (t: string, fin: boolean) => {
+          if (!firstReply) { if (maybeGreeting(t, fin)) return { text: "", capped: false }; t = stripGreeting(t); }
+          return capSentences(t, 2, fin);
+        };
         let wake: () => void = () => {};
         const bump = () => { const w = wake; wake = () => {}; w(); };
         const feed: Feed = { text: () => text, done: () => done, more: () => new Promise<void>((r) => { wake = r; if (done) r(); }) };
@@ -92,17 +100,19 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
         const mine = new AbortController();
         abort = mine;
         const tid = turns.begin();
-        const live = () => turns.isLive(tid) && !mine.signal.aborted;
+        const live = () => turns.isLive(tid);
         const kill = () => { turns.kill(tid); mine.abort(); hush(); };
-        const turn = callTurn(id, said, history, (t) => { if (live()) { text = t; bump(); } }, mine.signal, who)
-          .then((t) => { if (live()) text = t || text; }, (e: Error) => { if (e.name !== "AbortError" && live()) failed = e.message || "Couldn't answer."; })
-          .finally(() => { done = true; bump(); });
+        // the second sentence ended: that's the whole spoken reply, so the stream (and the model) stops there
+        const take = (t: string, fin: boolean) => { raw = t; const v = shape(t, fin); text = v.text; if (v.capped && !fin) { capped = true; done = true; mine.abort(); } bump(); };
+        const turn = callTurn(id, said, history, (t) => { if (live() && !capped) take(t, false); }, mine.signal, who)
+          .then((t) => { if (live() && !capped) take(t || raw, true); }, (e: Error) => { if (e.name !== "AbortError" && live()) failed = e.message || "Couldn't answer."; })
+          .finally(() => { if (live() && !capped && raw) text = shape(raw, true).text; done = true; bump(); });
         history.push({ from: "you", text: said });
         // Keep listening while it thinks: if you say something new first, that becomes the turn and this answer is dropped.
-        let newer = "";
+        let newer = "", newerAt = 0;
         const replyReady = (async () => { while (!done && !ready(text, false)) await feed.more(); })();
         while (!stop && !newer && !(done || ready(text, false))) {
-          ear = transcribe({ maxMs: 15000, onText: (t) => { if (!stop && t) setPhase("hearing"); } });
+          ear = transcribe({ maxMs: 15000, onText: (t) => { if (t && !newerAt) newerAt = performance.now(); if (!stop && t) setPhase("hearing"); } });
           const r = await Promise.race([replyReady.then(() => "\u0000"), ear.done.catch(() => "")]);
           if (r === "\u0000") { ear.abort(); ear = null; break; }
           ear = null;
@@ -110,9 +120,15 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
           else if (!stop) setPhase("thinking");
         }
         if (stop) return;
-        if (newer) { kill(); history.push({ from: who, text: interruptedRecord("") }); next = newer; continue; }
+        if (newer) {
+          kill();
+          // words that started right after your phrase ended are the rest of it (phones split a phrase at short pauses)
+          if (newerAt && newerAt - heardAt <= MERGE_MS) { history.pop(); next = mergeUtterances(said, newer); }
+          else { history.push({ from: who, text: interruptedRecord("") }); next = newer; }
+          continue;
+        }
         if (!text.trim()) { setNote(failed || `${nameOf(who)} couldn't answer. Say it again.`); setPhase("error"); await new Promise((r) => setTimeout(r, 1200)); continue; }
-        if (mutedRef.current) { await turn; history.push({ from: who, text }); continue; }
+        if (mutedRef.current) { await turn; answered++; history.push({ from: who, text }); continue; }
         const heard = await speakAndListen(feed, voiceOf(who), {
           isStopped: () => stop || mutedRef.current || !live(),
           onStart: () => { if (!stop) setPhase("speaking"); },
@@ -125,12 +141,14 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
           // You talked over it: the old answer is dead. The call remembers only the words it actually said, marked as cut off,
           // and the next turn is only what you said after it stopped (nothing at all if it was just a noise).
           kill();
+          if (heard.spoken.trim()) answered++;
           history.push({ from: who, text: interruptedRecord(heard.spoken) });
           next = heard.said;
           continue;
         }
         await turn;
-        if (text.trim()) history.push({ from: who, text });
+        answered++;
+        if (text.trim()) history.push({ from: who, text }); // only what was spoken (two sentences at most)
       }
     })();
     return () => { stop = true; abort?.abort(); ear?.abort(); hush(); };

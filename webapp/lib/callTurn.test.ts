@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { throughWord, INTERRUPTED, SpeechQueue, TurnClock, afterBase, cleanBargeIn, interruptedRecord, isEcho, sentences, spokenUpTo, stripEchoPrefix } from "./callTurn";
+import { capSentences, maybeGreeting, mergeUtterances, stripGreeting, throughWord, INTERRUPTED, SpeechQueue, TurnClock, afterBase, cleanBargeIn, interruptedRecord, isEcho, sentences, spokenUpTo, stripEchoPrefix } from "./callTurn";
 
 test("a newer turn kills the old one; old ids stay dead", () => {
   const c = new TurnClock();
@@ -65,4 +65,31 @@ test("finals from before the interruption are not merged into the new utterance"
   const reply = "I'm good, and how about you?";
   assert.equal(throughWord(reply, 10), "I'm good, and");
   assert.equal(cleanBargeIn("good and okay what can we do today", "", throughWord(reply, 10), reply), "okay what can we do today");
+});
+
+test("call replies stop after two sentences", () => {
+  const t = "Pick one task. Set a 25-minute timer. Then take a break.";
+  assert.deepEqual(capSentences(t), { text: "Pick one task. Set a 25-minute timer.", capped: true });
+  assert.deepEqual(capSentences("Pick one task. Set a"), { text: "Pick one task. Set a", capped: false });
+  assert.deepEqual(capSentences("One. Two."), { text: "One. Two.", capped: false }, "mid-stream, the 2nd end may not be final");
+  assert.deepEqual(capSentences("One. Two.", 2, true), { text: "One. Two.", capped: true });
+  assert.equal(capSentences("It costs 3.5 coins. That's cheap. Want it?").text, "It costs 3.5 coins. That's cheap.");
+  assert.equal(capSentences("Wow! Really? Yes.").text, "Wow! Really?");
+});
+test("a leading greeting is dropped after the first turn", () => {
+  assert.equal(stripGreeting("Hello, Ada. We can plan your day."), "We can plan your day.");
+  assert.equal(stripGreeting("Hi there! Sure thing."), "Sure thing.");
+  assert.equal(stripGreeting("Hey Ada, we could build something."), "We could build something.");
+  assert.equal(stripGreeting("Hi, sure thing."), "Sure thing.");
+  assert.equal(stripGreeting("Hello, Ada. Good morning! Let's go."), "Let's go.");
+  assert.equal(stripGreeting("Hello, Ada."), "Hello, Ada.", "a reply that is only a greeting is kept");
+  assert.equal(stripGreeting("Highlights first: rest."), "Highlights first: rest.");
+  assert.equal(stripGreeting("Hey, that's a great question."), "That's a great question.");
+  assert.ok(maybeGreeting("Hello, A", false)); assert.ok(maybeGreeting("Hello, Ada. ", false));
+  assert.ok(!maybeGreeting("Hello, Ada. We", false)); assert.ok(!maybeGreeting("We can", false)); assert.ok(!maybeGreeting("Hello", true));
+});
+test("a phrase split across recognition sessions is merged", () => {
+  assert.equal(mergeUtterances("okay", "what can we do today"), "okay what can we do today");
+  assert.equal(mergeUtterances("okay what", "okay what can we do today"), "okay what can we do today");
+  assert.equal(mergeUtterances("", "hi"), "hi");
 });

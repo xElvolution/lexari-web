@@ -107,3 +107,42 @@ export function cleanBargeIn(full: string, base: string, spoken: string, audible
   const fresh = stripEchoPrefix(afterBase(full, base), spoken);
   return fresh && !isEcho(fresh, audible) ? fresh : "";
 }
+
+/** Call replies are spoken as at most `max` sentences. Returns the part to speak and whether the cap was reached
+ *  (a sentence end followed by a space, or the end of a finished reply), so the rest of the stream can be dropped. */
+export function capSentences(text: string, max = 2, done = false): { text: string; capped: boolean } {
+  const re = /[.!?…]+["')\]]*(?=\s)|[.!?…]+["')\]]*$/g;
+  let n = 0, m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const end = m.index + m[0].length;
+    if (end === text.length && !done) break; // could still be "3.5" or "..." mid-stream
+    if (/\d$/.test(text.slice(0, m.index)) && /^\d/.test(text.slice(end))) continue;
+    if (++n === max) return { text: text.slice(0, end).trim(), capped: end < text.trimEnd().length || done };
+  }
+  return { text, capped: false };
+}
+
+const GREETING = /^\s*(?:(?:hello|hi|hey|hiya|howdy|greetings|good\s+(?:morning|afternoon|evening)|welcome\s+back)(?:\s+(?:there|again|back))?(?:[,\s]+[\p{Lu}][\p{L}'-]*)?\s*[.!,;:—–-]+\s*)+/iu;
+const GREETING_START = /^\s*(?:hello|hi|hey|hiya|howdy|greetings|good\s+(?:morning|afternoon|evening)|welcome\s+back)\b/i;
+/** Drops an opening "Hello, Ada." / "Hi there!" / "Hey Ada," (used for every call turn after the first). */
+export function stripGreeting(text: string) {
+  const rest = text.replace(GREETING, "");
+  if (rest === text || !rest.trim()) return text;
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+/** While a streaming reply opens with a greeting word but its punctuation hasn't arrived yet, hold it back
+ *  (nothing is spoken before a sentence end anyway, so this costs no time). */
+export function maybeGreeting(text: string, done: boolean) {
+  if (done || !GREETING_START.test(text)) return false;
+  return !/[.!?…]/.test(text) || text.replace(GREETING, "").trim() === "";
+}
+
+/** Phone speech-to-text often ends a phrase at a short pause and hands the rest to the next session.
+ *  Words that start within this window of the previous phrase ending are the same utterance. */
+export const MERGE_MS = 700;
+export function mergeUtterances(a: string, b: string) {
+  const x = a.trim(), y = b.trim();
+  if (!x) return y; if (!y) return x;
+  if (y.toLowerCase().startsWith(x.toLowerCase())) return y; // the second session repeated the first part
+  return `${x} ${y}`;
+}

@@ -242,7 +242,7 @@ async function saveTurn(userId: string, body: TurnBody, speaker: string, reply: 
   await database.update(chats).set({ updatedAt: new Date() }).where(eq(chats.id, chat.id));
 }
 
-const CALL_HINT = "You are on a live voice call with the person right now. Talk like a person on the phone: answer in one or two short spoken sentences (about 30 words at most, never more than two sentences), start with the answer, no lists, markdown, emojis, links or headings. Ask at most one short question back.";
+const CALL_HINT = "You are on a live voice call with the person right now. Talk like a person on the phone: answer in one or two short spoken sentences (about 30 words at most, never more than two sentences), start with the answer, no lists, markdown, emojis, links or headings. Ask at most one short question back. You are already mid-conversation: only your very first reply on the call may greet them; after that never open with a greeting (hello, hi, hey) or their name, just answer.";
 const INTERRUPT_HINT = `The person just talked over you, so your previous reply was cut off; it is in the history only up to where it stopped, marked ${INTERRUPTED}. Do not repeat, continue or finish that reply, and don't mention being interrupted. Answer only their latest message, directly.`;
 /** True when the agent's most recent turn in the call history was cut off by the person talking over it. */
 function cutOff(history: { from: string; text: string }[]) {
