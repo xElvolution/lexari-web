@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
-import { toast, type State } from "@/lib/store";
+import { useEffect, useRef, useState } from "react";
+import { hubReady, refreshHub, toast, type State } from "@/lib/store";
 import {
   MAX_LEVEL, STREAK_PAY, TIERS, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, inviteCode, levelOf, nextReset,
   questsView, streakOf, useHubBusy, weekStart, xpFor, type Period, type QuestView,
@@ -27,6 +27,7 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
   const coins = coinsOf(s);
   const streak = streakOf(s, now);
   const week = earnedSince(s, weekStart(now));
+  if (!s.live && !hubReady()) return <HubLoading />;
   return (
     <div id="top" className="space-y-3 pb-2">
       <header className="flex items-end justify-between gap-3 pt-1">
@@ -246,5 +247,21 @@ function InviteRow({ s }: { s: State }) {
       </button>
       {claimable.map(({ t, i }) => <button key={i} type="button" disabled={!!busy} onClick={(e) => claim(i, e.currentTarget)} className={`${pill} mt-2 w-full bg-grape text-white`}>Claim {t.title} · +{t.reward}</button>)}
     </section>
+  );
+}
+
+/** Shown for the few seconds before the onchain Hub state arrives, so nobody sees a fake 0 balance or taps Check in twice. */
+function HubLoading() {
+  useEffect(() => { void refreshHub(); }, []);
+  return (
+    <div className="space-y-3 pb-2" aria-busy="true">
+      <header className="pt-1"><p className="label text-[9.5px] text-brand-ink">Hub</p><h1 className="mt-1 text-[1.375rem] font-extrabold leading-none tracking-tight text-ink">Earn and level up</h1></header>
+      <section className="relative overflow-hidden rounded-[20px] bg-grape p-4 text-white shadow-[0_14px_30px_-18px_rgba(91,43,255,.9)]">
+        <p className="label text-[9px] text-white/70">Your balance</p>
+        <div className="mt-1.5 flex items-center gap-2.5"><Coin size={30} /><span className="text-[15px] font-semibold text-white/80">Loading from Solana…</span></div>
+        <div className="mt-3 h-6 w-40 animate-pulse rounded-full bg-white/15" />
+      </section>
+      {[0, 1, 2].map((i) => <div key={i} className={`${card} h-24 animate-pulse`} />)}
+    </div>
   );
 }

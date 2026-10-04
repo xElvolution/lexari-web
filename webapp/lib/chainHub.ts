@@ -3,10 +3,11 @@
 import { checkIn, claimReward, levelUp, programIsLive } from "./chain";
 import { friendly } from "./api";
 import { MAX_LEVEL, QUESTS, TIERS, coinsOf, levelOf, type HubAdapter } from "./hub";
-import { get, refreshHub } from "./store";
+import { get, hubReady, refreshHub } from "./store";
 import { ensureBridge } from "./walletBridge";
 
 async function ready() {
+  if (!get().live && !hubReady()) await refreshHub(); // never act on the empty pre-load state
   const s = get();
   if (!(await programIsLive().catch(() => false))) return { who: null, error: "Rewards open soon. The Lexari program is not live on Solana yet." };
   const who = await ensureBridge(s.auth?.address, s.auth?.wallet);

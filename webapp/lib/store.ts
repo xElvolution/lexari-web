@@ -275,12 +275,15 @@ async function memoryKeys() {
 
 /* ---------- hub ---------- */
 let hubLoading: Promise<HubState | null> | null = null;
+let hubTried = false;
+/** True once the onchain Hub state has loaded (or failed to load) at least once. Until then the Hub shows a loading state. */
+export const hubReady = () => hubTried;
 export function refreshHub(): Promise<HubState | null> {
   if (hubLoading) return hubLoading;
   hubLoading = api<HubState>("/api/hub/state")
     .then((live) => { applyHub(live); return live; })
     .catch(() => null)
-    .finally(() => { hubLoading = null; });
+    .finally(() => { hubLoading = null; if (!hubTried) { hubTried = true; emit(); } });
   return hubLoading;
 }
 export function applyHub(live: HubState) {
