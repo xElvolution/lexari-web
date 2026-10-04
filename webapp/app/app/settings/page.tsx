@@ -79,8 +79,8 @@ function General({ s }: { s: State }) {
       </Group>
       <Group title="Language and voice">
         <Row title="Language" desc="Used for the app and your agents' replies."><Select label="Language" value={p.language} options={["English", "Français", "Español", "Português", "Deutsch", "Yorùbá", "Hausa", "Igbo"]} onChange={(v) => setPrefs({ language: v })} /></Row>
-        <Row title="Voice" desc="How agents sound on calls and in voice notes.">
-          <Select label="Voice" value={p.voice} options={["Iris", "Nova", "Orbit", "Ember", "Sage"]} onChange={(v) => setPrefs({ voice: v })} />
+        <Row title="Voices" desc="Each agent has its own voice for calls and Read aloud. Open an agent, tap Edit, then Voice.">
+          <button onClick={() => openAgent("home")} className={smallBtn}><Icon name="speaker" size={14} />{agentName(s)}&apos;s voice</button>
         </Row>
       </Group>
       <Group title="Chats">

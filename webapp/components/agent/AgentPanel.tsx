@@ -1,5 +1,8 @@
 "use client";
 
+import VoicePicker, { type AgentVoice } from "./VoicePicker";
+import { voiceOf } from "@/lib/voices";
+
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
@@ -71,6 +74,7 @@ function Panel({ s, id }: { s: State; id: string }) {
   const [nick, setNick] = useState(s.meta[id]?.nick ?? "");
   const [notes, setNotes] = useState(s.meta[id]?.notes ?? "");
   const [confirm, setConfirm] = useState(false);
+  const [voice, setVoice] = useState<AgentVoice>(() => { const v = s.meta[id]?.voice ?? voiceOf(id); return { name: v.name || "", pitch: v.pitch ?? 1, rate: v.rate ?? 1, preset: (v as AgentVoice).preset }; });
 
   const save = () => {
     if (k === "home") {
@@ -80,6 +84,7 @@ function Panel({ s, id }: { s: State; id: string }) {
     } else if (k === "custom") {
       updateCustom(id, { name: name.trim() || c!.name, role: role.trim(), about: about.trim(), tone, skills, memory, ...look });
     } else setMeta(id, { nick: nick.trim(), notes: notes.trim(), memory });
+    setMeta(id, { voice });
     toast({ text: `Saved. ${k === "hired" ? nick.trim() || sp?.name : name.trim() || info.name} is up to date.`, face: k === "home" ? "home" : sp?.seed, color: sp?.color });
   };
   const remove = () => {
@@ -161,6 +166,7 @@ function Panel({ s, id }: { s: State; id: string }) {
                     <div><span className="label text-[9.5px] text-ink/60">Skills</span><div className="mt-1.5"><SkillPicker skills={skills} onChange={setSkills} /></div></div>
                   </>
                 )}
+                <VoicePicker value={voice} onChange={setVoice} name={k === "hired" ? nick.trim() || sp?.name || info.name : name.trim() || info.name} />
                 <div className="flex items-center gap-3 rounded-2xl bg-card p-3.5 ring-1 ring-line">
                   <span className="min-w-0 flex-1"><span className="block text-[14px] font-bold text-ink">Memory</span><span className="block text-[12.5px] text-ink/60">{memory ? "Remembers what you tell it." : "Starts fresh every chat."}</span></span>
                   <Toggle on={memory} onChange={setMemory} label="Memory" />

@@ -1,5 +1,8 @@
 "use client";
 
+import { speak } from "@/lib/voice";
+import { voiceOf } from "@/lib/voices";
+
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { CHAT_SUGGESTIONS, specialistBySlug } from "@/content/appData";
@@ -91,6 +94,7 @@ function MsgMenu({ m, convo, mine, open, more, below, onMore, onReply, onClose }
           </div>
           <div className={`mt-1.5 flex gap-1 ${mine ? "justify-end" : ""}`}>
             <button role="menuitem" onClick={onReply} className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13.5px] font-bold text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="reply" size={15} />Reply</button>
+            {!mine && m.text && m.from !== "system" && <button role="menuitem" data-read-aloud onClick={() => { void speak(m.text, voiceOf(m.from)); onClose(); }} className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13.5px] font-bold text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="speaker" size={15} />Read aloud</button>}
             {(m.text || m.file) && <button role="menuitem" onClick={copy} className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13.5px] font-bold text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="copy" size={15} />Copy</button>}
           </div>
         </div>

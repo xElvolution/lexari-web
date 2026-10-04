@@ -50,9 +50,35 @@ function recError(code: string) {
 
 export type Transcriber = { stop: () => Promise<string>; abort: () => void; done: Promise<string> };
 
+/** One recognition session: ends after a phrase (or silence). onText gets final + interim for this session. */
+function session(Speech: new () => Rec, onText: (t: string) => void, maxMs: number) {
+  const rec = new Speech();
+  rec.lang = navigator.language || "en-US";
+  rec.interimResults = true;
+  // Single-phrase sessions everywhere: Android Chrome's continuous mode stops on silence anyway and repeats results.
+  rec.continuous = false;
+  let final = "", interim = "", failed: Error | null = null, heardAny = false;
+  const timer = window.setTimeout(() => { try { rec.stop(); } catch { /* ended */ } }, maxMs);
+  const done = new Promise<{ text: string; error: Error | null; heardAny: boolean }>((resolve) => {
+    rec.onresult = (ev) => {
+      interim = "";
+      final = "";
+      for (let i = 0; i < ev.results.length; i++) { const r = ev.results[i]; if (r.isFinal) final += r[0].transcript; else interim += r[0].transcript; }
+      heardAny = true;
+      onText((final + interim).trim());
+    };
+    rec.onerror = (ev) => { if (ev.error === "no-speech" || ev.error === "aborted") return; failed = new Error(recError(ev.error)); };
+    rec.onend = () => { window.clearTimeout(timer); resolve({ text: (final + interim).trim(), error: failed, heardAny }); };
+  });
+  try { rec.start(); } catch { window.clearTimeout(timer); return { rec, done: Promise.resolve({ text: "", error: new Error("The microphone is already in use."), heardAny: false }) }; }
+  return { rec, done };
+}
+
 /**
- * Starts transcribing. onText gets the running transcript (final + interim).
- * continuous: keeps listening until stop() (voice notes); otherwise ends after one phrase (calls).
+ * Starts transcribing. onText gets the running transcript.
+ * continuous: keeps listening until stop() or abort(), restarting the recognizer whenever the browser ends it
+ * (silence, a pause, the phone's own time limit), so a voice note records until you tap Send or Cancel.
+ * Otherwise it ends after one phrase (calls).
  */
 export function transcribe(opts: { onText?: (t: string) => void; continuous?: boolean; maxMs?: number } = {}): Transcriber {
   const Speech = Ctor();
@@ -61,41 +87,38 @@ export function transcribe(opts: { onText?: (t: string) => void; continuous?: bo
     err.catch(() => {});
     return { stop: () => err, abort: () => {}, done: err };
   }
-  const rec = new Speech();
-  rec.lang = navigator.language || "en-US";
-  rec.interimResults = true;
-  rec.continuous = !!opts.continuous;
-  let final = "";
-  let interim = "";
-  let failed: Error | null = null;
-  let resolveDone!: (t: string) => void;
-  let rejectDone!: (e: Error) => void;
+  const until = Date.now() + (opts.maxMs ?? (opts.continuous ? 5 * 60_000 : 120_000));
+  let committed = "";
+  let current: Rec | null = null;
+  let stopping = false, aborted = false;
+  let resolveDone!: (t: string) => void, rejectDone!: (e: Error) => void;
   const done = new Promise<string>((res, rej) => { resolveDone = res; rejectDone = rej; });
   done.catch(() => {});
-  const timer = window.setTimeout(() => { try { rec.stop(); } catch { /* ended */ } }, opts.maxMs ?? 120_000);
-  rec.onresult = (ev) => {
-    interim = "";
-    for (let i = ev.resultIndex; i < ev.results.length; i++) {
-      const r = ev.results[i];
-      if (r.isFinal) final += r[0].transcript; else interim += r[0].transcript;
+  const join = (a: string, b: string) => (a && b ? `${a} ${b}` : a || b).trim();
+  (async () => {
+    let fails = 0;
+    while (true) {
+      const left = until - Date.now();
+      if (left <= 0) break;
+      const one = session(Speech, (t) => opts.onText?.(join(committed, t)), Math.min(left, 60_000));
+      current = one.rec;
+      const r = await one.done;
+      current = null;
+      if (aborted) return;
+      committed = join(committed, r.text);
+      if (r.error) {
+        // blocked / unsupported can't recover; anything else gets a few quick retries
+        if (r.error.message === BLOCKED || /turned off|support/.test(r.error.message) || ++fails > 3) { if (!committed) { rejectDone(r.error); return; } break; }
+        await new Promise((x) => setTimeout(x, 300));
+      } else fails = 0;
+      if (!opts.continuous || stopping) break;
     }
-    opts.onText?.((final + interim).trim());
-  };
-  rec.onerror = (ev) => {
-    // silence and our own stop/abort are not errors
-    if (ev.error === "no-speech" || ev.error === "aborted") return;
-    failed = new Error(recError(ev.error));
-  };
-  rec.onend = () => {
-    window.clearTimeout(timer);
-    const text = (final + interim).trim();
-    if (failed && !text) rejectDone(failed); else resolveDone(text);
-  };
-  try { rec.start(); } catch { window.clearTimeout(timer); rejectDone(new Error("The microphone is already in use.")); }
+    resolveDone(committed);
+  })();
   return {
     done,
-    stop: () => { try { rec.stop(); } catch { /* ended */ } return done; },
-    abort: () => { try { rec.abort(); } catch { /* ended */ } },
+    stop: () => { stopping = true; try { current?.stop(); } catch { /* ended */ } return done; },
+    abort: () => { aborted = true; try { current?.abort(); } catch { /* ended */ } resolveDone(""); },
   };
 }
 
@@ -104,17 +127,82 @@ export function listen(ms = 9000, onText?: (t: string) => void): Promise<string>
   return transcribe({ onText, maxMs: ms }).done;
 }
 
+export type VoiceSettings = { name?: string; pitch?: number; rate?: number };
+let voicesCache: SpeechSynthesisVoice[] = [];
+/** The browser's voices (they load late on some phones). */
+export function voices(): Promise<SpeechSynthesisVoice[]> {
+  if (typeof window === "undefined" || !window.speechSynthesis) return Promise.resolve([]);
+  const now = window.speechSynthesis.getVoices();
+  if (now.length) { voicesCache = now; return Promise.resolve(now); }
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1500);
+    window.speechSynthesis.addEventListener("voiceschanged", () => { clearTimeout(t); voicesCache = window.speechSynthesis.getVoices(); resolve(voicesCache); }, { once: true });
+  });
+}
+function utterance(text: string, v?: VoiceSettings) {
+  const utter = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, "").slice(0, 1200));
+  utter.lang = navigator.language || "en-US";
+  if (v?.name) { const hit = (voicesCache.length ? voicesCache : window.speechSynthesis.getVoices()).find((x) => x.name === v.name); if (hit) { utter.voice = hit; utter.lang = hit.lang; } }
+  if (v?.pitch) utter.pitch = v.pitch;
+  if (v?.rate) utter.rate = v.rate;
+  return utter;
+}
+
 /** Speak a reply out loud; resolves when it finishes (or right away if speech is unavailable). */
-export function speak(text: string): Promise<void> {
+export function speak(text: string, v?: VoiceSettings): Promise<void> {
   if (typeof window === "undefined" || !window.speechSynthesis || !text.trim()) return Promise.resolve();
   window.speechSynthesis.cancel();
   return new Promise((resolve) => {
-    const utter = new SpeechSynthesisUtterance(text.replace(/[*_`#>]/g, "").slice(0, 1200));
-    utter.lang = navigator.language || "en-US";
+    const utter = utterance(text, v);
     const end = () => resolve();
     utter.onend = end; utter.onerror = end;
-    window.setTimeout(end, Math.min(60_000, 2000 + text.length * 90));
+    window.setTimeout(end, Math.min(60_000, 2000 + text.length * 90 / (v?.rate || 1)));
     window.speechSynthesis.speak(utter);
+  });
+}
+
+const words = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s']/gu, " ").split(/\s+/).filter(Boolean);
+/** True when what the mic heard is mostly the agent's own words coming out of the speaker. */
+export function isEcho(heard: string, spoken: string) {
+  const h = words(heard); if (!h.length) return true;
+  const said = new Set(words(spoken));
+  return h.filter((w) => said.has(w)).length / h.length >= 0.6;
+}
+
+/**
+ * Speaks while the microphone keeps listening (barge-in). As soon as you start talking (and it isn't the
+ * agent's own voice echoing back) speech stops and what you say becomes the next turn.
+ * Resolves with your words, or "" when the agent finished without being interrupted.
+ */
+export function speakAndListen(text: string, v: VoiceSettings | undefined, opts: { onBargeIn?: () => void; onText?: (t: string) => void; isStopped?: () => boolean } = {}): Promise<string> {
+  if (typeof window === "undefined" || !window.speechSynthesis || !text.trim()) return Promise.resolve("");
+  window.speechSynthesis.cancel();
+  return new Promise((resolve) => {
+    let interrupted = false, finished = false, settled = false;
+    const settle = (t: string) => { if (!settled) { settled = true; resolve(t); } };
+    let ear: Transcriber | null = null;
+    const startEar = () => {
+      if (finished || interrupted || opts.isStopped?.()) return;
+      ear = transcribe({
+        maxMs: 60_000,
+        onText: (t) => {
+          if (finished && !interrupted) return;
+          if (!interrupted && t && !isEcho(t, text)) { interrupted = true; window.speechSynthesis.cancel(); opts.onBargeIn?.(); }
+          if (interrupted) opts.onText?.(t);
+        },
+      });
+      void ear.done.then((t) => {
+        if (interrupted) { settle(t && !isEcho(t, text) ? t : ""); return; }
+        if (!finished) startEar(); // a phrase of echo or silence ended: keep listening while it speaks
+      }, () => { if (!interrupted && !finished) setTimeout(startEar, 400); });
+    };
+    const utter = utterance(text, v);
+    const end = () => { if (interrupted) return; finished = true; ear?.abort(); settle(""); };
+    utter.onend = end; utter.onerror = end;
+    window.setTimeout(end, Math.min(60_000, 2000 + text.length * 90 / (v?.rate || 1)));
+    window.speechSynthesis.speak(utter);
+    // give the speaker a moment to start so the first syllables aren't taken as you talking
+    setTimeout(startEar, 350);
   });
 }
 

@@ -28,7 +28,7 @@ export type Msg = {
   reply?: { id: string; from: string; text: string }; // the message this one answers
 };
 /** Your own notes on any agent. Hired agents only get nick, notes and memory; the maker controls the rest. */
-export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; about?: string; skills?: string[]; /** onchain ID card, once minted */ nft?: import("@/lib/nft").NftRecord };
+export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; voice?: { name: string; pitch: number; rate: number; preset?: string }; about?: string; skills?: string[]; /** onchain ID card, once minted */ nft?: import("@/lib/nft").NftRecord };
 export type Tour = { on: boolean; step: number; done: boolean };
 /** Coins (from the onchain Player account) and check-in days. */
 export type BondLog = { days: string[]; coins: number; claimed: string[] };
@@ -176,10 +176,10 @@ function fromAccount(acc: Account): State {
   const meta: Record<string, AgentMeta> = {};
   const born: Record<string, number> = {};
   for (const a of acc.agents) {
-    const m = a.meta as { nick?: string; notes?: string; mintTx?: string; dna?: string };
+    const m = a.meta as { nick?: string; notes?: string; mintTx?: string; dna?: string; voice?: AgentMeta["voice"] };
     born[a.slug] = a.createdAt;
     meta[a.slug] = {
-      nick: m.nick, notes: m.notes, memory: a.memoryOn,
+      nick: m.nick, notes: m.notes, memory: a.memoryOn, voice: m.voice,
       ...(a.asset ? { nft: { tokenId: a.asset, tx: m.mintTx || "", dna: m.dna || "", name: a.name, role: a.role, owner: acc.user.wallet, at: a.mintedAt ?? a.createdAt, registered: true } } : {}),
     };
   }
@@ -656,6 +656,7 @@ export function setMeta(id: string, p: AgentMeta) {
   if (p.nick !== undefined) body.nick = p.nick.slice(0, 40);
   if (p.notes !== undefined) body.notes = p.notes.slice(0, 2000);
   if (p.memory !== undefined) body.memoryOn = p.memory;
+  if (p.voice !== undefined) body.voice = p.voice;
   if (Object.keys(body).length) sync(api(`/api/agents/${encodeURIComponent(id)}`, { method: "PATCH", body }));
 }
 

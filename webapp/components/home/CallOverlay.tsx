@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { logCall, sendTo, type State } from "@/lib/store";
-import { BLOCKED, ensureMic, hush, listen, speak } from "@/lib/voice";
+import { BLOCKED, ensureMic, hush, listen, speakAndListen } from "@/lib/voice";
+import { voiceOf } from "@/lib/voices";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
 import { convoOf, fmtSecs } from "../agents";
@@ -41,11 +42,13 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
     (async () => {
       try { await ensureMic(); } catch (e) { setCaption((e as Error).message); setLive(false); return; }
       let quiet = 0;
+      let next = ""; // words you said over the agent (barge-in) become the next turn
       while (!stop) {
-        if (mutedRef.current) { await new Promise((r) => setTimeout(r, 400)); continue; }
+        if (mutedRef.current) { next = ""; await new Promise((r) => setTimeout(r, 400)); continue; }
         setCaption("Listening…");
-        let said = "";
-        try { said = await listen(9000, (t) => { if (!stop && t) setCaption(`You: ${t}`); }); }
+        let said = next;
+        next = "";
+        if (!said) try { said = await listen(9000, (t) => { if (!stop && t) setCaption(`You: ${t}`); }); }
         catch (e) {
           const m = (e as Error).message;
           if (stop) return;
@@ -65,8 +68,14 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
         if (stop) return;
         if (!reply) { setCaption(`${c.name} couldn't answer. Try again.`); continue; }
         setLast(`${c.name}: ${reply}`);
-        setCaption(speakerRef.current ? "Speaking…" : "");
-        if (speakerRef.current) await speak(reply);
+        setCaption(speakerRef.current ? "Speaking… talk any time to interrupt" : "");
+        if (speakerRef.current && !mutedRef.current) {
+          next = await speakAndListen(reply, voiceOf(id), {
+            isStopped: () => stop || mutedRef.current,
+            onBargeIn: () => { if (!stop) setCaption("Go ahead, I'm listening…"); },
+            onText: (t) => { if (!stop && t) setCaption(`You: ${t}`); },
+          });
+        } else if (speakerRef.current) await speakAndListen(reply, voiceOf(id), { isStopped: () => true });
       }
     })();
     return () => { stop = true; hush(); };

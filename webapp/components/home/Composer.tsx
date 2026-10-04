@@ -23,7 +23,7 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
   useEffect(() => { if (window.matchMedia("(min-width: 1024px)").matches) input.current?.focus(); }, [id]);
   useEffect(() => {
     if (rec === null) return;
-    const t = setInterval(() => setRec((r) => (r === null ? r : Math.min(120, r + 0.1))), 100);
+    const t = setInterval(() => setRec((r) => (r === null ? r : Math.min(300, r + 0.1))), 100);
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") cancelVoice(); };
     window.addEventListener("keydown", esc);
     return () => { clearInterval(t); window.removeEventListener("keydown", esc); };
@@ -97,11 +97,12 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
             <div className="flex items-center gap-2 p-1.5" role="status" aria-label="Recording a voice message">
               <button onClick={cancelVoice} aria-label="Cancel recording" title="Cancel" className={iconBtn}><Icon name="trash" size={18} /></button>
               <span className="flex items-center gap-2 pl-1"><i className="h-2.5 w-2.5 rounded-full bg-grape live-dot" /><span className="tab-num w-10 font-mono text-[13px] font-semibold text-ink">{fmtSecs(rec)}</span></span>
-              {heard ? <span className="min-w-0 flex-1 truncate text-[14px] text-ink/80" aria-live="polite">{heard}</span> : (
-              <span className="flex h-10 min-w-0 flex-1 items-center gap-[3px] overflow-hidden" aria-hidden>
+              {/* Keeps recording through pauses until you tap ✓ or the bin; the words appear in the box afterwards. */}
+              <span data-recording className="flex h-10 min-w-0 flex-1 items-center gap-[3px] overflow-hidden" aria-hidden>
                 {Array.from({ length: BARS }).map((_, i) => <i key={i} className="wave w-[3px] shrink-0 rounded-full bg-brand-ink" style={{ animationDelay: `${(i * 97) % 900}ms`, height: `${30 + ((i * 37) % 60)}%` }} />)}
-              </span>)}
-              <button onClick={() => void finishVoice()} aria-label="Done recording, check the text" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:bg-grape-deep"><Icon name="check" size={18} stroke={2.6} /></button>
+              </span>
+              <span className="sr-only">{heard ? "Hearing you" : "Listening"}</span>
+              <button onClick={() => void finishVoice()} aria-label="Done recording, check the text" title="Done" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:bg-grape-deep"><Icon name="check" size={18} stroke={2.6} /></button>
             </div>
           )}
         </div>
