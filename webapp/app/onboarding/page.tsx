@@ -136,7 +136,7 @@ export default function Onboarding() {
           {step === 0 && (
             <div data-step>
               <p className="label text-brand-ink">Step 1 of 4 · name</p>
-              <h1 className="display mt-3 text-[clamp(27px,7.8vw,40px)] sm:text-[76px]">What should we call your agent?</h1>
+              <h1 className="display mt-3 text-[clamp(24px,6.8vw,40px)] sm:text-[76px]">What should we call your agent?</h1>
               <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Type a name on its badge, or here. It sits at desk one on your team and keeps this name.</p>
               <input value={name} onChange={(e) => setName(e.target.value.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 12))} placeholder="Name your agent" aria-label="Agent name" className="field mt-7 !h-16 max-w-md !rounded-2xl !text-[22px] display !font-extrabold" />
               <div className="mt-4 flex flex-wrap gap-2">{NAMES.map((n) => <button key={n} onClick={() => setName(n)} aria-pressed={name === n} className="chip">{n}</button>)}</div>
@@ -145,7 +145,7 @@ export default function Onboarding() {
           {step === 1 && (
             <div data-step>
               <p className="label text-brand-ink">Step 2 of 4 · look</p>
-              <h1 className="display mt-3 text-[clamp(27px,7.8vw,40px)] sm:text-[76px]">Pick a face for {shown}.</h1>
+              <h1 className="display mt-3 text-[clamp(24px,6.8vw,40px)] sm:text-[76px]">Pick a face for {shown}.</h1>
               <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Every face is generated. The badge updates as you pick.</p>
               <div className="mt-7 grid max-w-[560px] grid-cols-4 gap-2 sm:grid-cols-6 sm:gap-2.5">
                 {LOOKS.map((l) => {
@@ -167,7 +167,7 @@ export default function Onboarding() {
           {step === 2 && (
             <div data-step>
               <p className="label text-brand-ink">Step 3 of 4 · about you</p>
-              <h1 className="display mt-3 text-[clamp(27px,7.8vw,40px)] sm:text-[72px]">What should {shown} know?</h1>
+              <h1 className="display mt-3 text-[clamp(24px,6.8vw,40px)] sm:text-[72px]">What should {shown} know?</h1>
               <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">These become its first memories. You can edit or forget any of them later in its brain.</p>
               <div className="mt-7 grid max-w-[560px] gap-6">
                 <label className="block"><span className="label text-[10px] text-ink/70">Your first name</span><input value={you} onChange={(e) => setYou(e.target.value.slice(0, 20))} placeholder="Ada" className="field mt-2" /></label>
@@ -184,7 +184,7 @@ export default function Onboarding() {
           {step === 3 && (
             <div data-step>
               <p className="label text-brand-ink">Step 4 of 4 · first day</p>
-              <h1 className="display mt-3 text-[clamp(32px,9.5vw,48px)] sm:text-[96px]">Meet {shown}.</h1>
+              <h1 className="display mt-3 text-[clamp(28px,8vw,48px)] sm:text-[96px]">Meet {shown}.</h1>
               <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Its badge is printed, its computer is on and it already knows {knows.length + (you ? 1 : 0)} things about you. Say hi and start chatting.</p>
               <ul className="mt-7 grid max-w-[520px] gap-2.5">
                 {[["desk", "Its own computer", "A terminal, a browser and a folder of files"], ["memory", "A brain that keeps", `${knows.length + (you ? 1 : 0)} memories filed on day one`], ["team", "Seats for specialists", "Hire from the marketplace when the work grows"]].map(([i, h, t]) => (
