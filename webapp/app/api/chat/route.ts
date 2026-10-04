@@ -8,6 +8,7 @@ import { recordEvent } from "@/server/events";
 import { db, retryRead } from "@/server/db";
 import { agents, chats, jobs, messages, users } from "@/server/db/schema";
 import { WALLET_HINT, checkSend, stripWalletTags, walletFacts, walletRequests, type SendReq } from "@/server/walletTools";
+import { FUND_HINT, fundRequest, hireWallet, stripFundTags } from "@/server/hireWallet";
 import { configError, jsonError, rateLimit, readJson, toErrorResponse } from "@/server/http";
 import { chatBody } from "@/server/validate";
 import { lockedSlugs } from "@/server/plans";
@@ -91,7 +92,10 @@ export async function POST(req: Request) {
   if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}` };
   const [me] = call ? [] : await retryRead(() => database.select({ wallet: users.wallet }).from(users).where(eq(users.id, userId)).limit(1)).catch(() => []);
   const wallet = call ? "" : me?.wallet || "";
-  if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${WALLET_HINT}` };
+  // Your agents can use your wallet (with a confirm card). A hired specialist never touches it: it has its own task
+  // wallet and asks you to fund it for a task.
+  const hiredSpeaker = speakerRow?.kind === "hired";
+  if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${hiredSpeaker ? FUND_HINT(speakerName) : WALLET_HINT}` };
   const hold = tools || !!wallet;
 
   // Your message is saved before the agent starts, so it never disappears if the reply fails or the page reloads.
@@ -136,7 +140,17 @@ export async function POST(req: Request) {
         }
         // Wallet tags: reads are answered with real chain data; a send becomes a confirm card only you can approve.
         let pay: SendReq | null = null;
-        if (wallet) {
+        if (wallet && hiredSpeaker) {
+          const f = fundRequest(full);
+          const visible = stripFundTags(stripWalletTags(full));
+          if (visible.length > shown) send({ token: visible.slice(shown) });
+          full = visible;
+          if (f) {
+            pay = { to: hireWallet(userId, speakerRow!.slug).publicKey.toBase58(), sol: f.sol, status: "pending", kind: "fund", agent: speakerRow!.slug, reason: f.reason };
+            send({ send: pay });
+            if (!full) full = `I need ${f.sol} SOL${f.reason ? ` for ${f.reason}` : ""}. Tap Confirm to fund my task wallet; anything I don't use comes back to you.`;
+          }
+        } else if (wallet) {
           const w = walletRequests(full);
           if (w.reads.length) {
             const facts = await walletFacts(wallet, w.reads);

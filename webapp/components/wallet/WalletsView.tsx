@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Connection, PublicKey, type ConfirmedSignatureInfo } from "@solana/web3.js";
 import { CHAIN_NAME, SOLANA_CLUSTER, SOLANA_RPC, tokenUrl, txUrl } from "@/lib/nft";
 import { shortAddr } from "@/content/appData";
-import { toast, useApp, type State } from "@/lib/store";
+import { isCreated, toast, useApp, type State } from "@/lib/store";
 import { useWalletBridge } from "@/lib/walletBridge";
 import Icon from "../Icon";
 import { AgentTile } from "../faces";
@@ -99,7 +99,7 @@ function PersonalWallet({ s }: { s: State }) {
   );
 }
 
-/** A hired or created agent's money: it spends from your wallet, inside its card limit. */
+/** An agent you made: it spends from your wallet, inside its card limit. */
 function OtherWallet({ s, a, card, onCard }: { s: State; a: MyAgent; card: Card | null; onCard: () => void }) {
   const hide = useHideBalance();
   const left = card ? Math.max(0, card.limit - card.spent) : 0;
@@ -147,7 +147,8 @@ export default function WalletsView() {
   const [tab, setTab] = useState<"wallets" | "cards">(params.get("tab") === "cards" ? "cards" : "wallets");
   const [getFor, setGetFor] = useState<string | null>(null);
   const [openFor, setOpenFor] = useState<string | null>(null);
-  const agents = myAgents(s);
+  // Wallets and cards belong to the agents you made. A hired specialist has its own task wallet (see its profile).
+  const agents = myAgents(s).filter((a) => isCreated(s, a.id));
   const cards = useCards();
   const go = (t: "wallets" | "cards") => { setTab(t); window.history.replaceState(null, "", t === "cards" ? "/wallets?tab=cards" : "/wallets"); };
   const how = s.auth?.method === "google" ? "Your personal agent uses the wallet made for you when you signed in." : "Your personal agent uses the wallet you signed in with.";
@@ -169,9 +170,10 @@ export default function WalletsView() {
         <div className="mt-6 grid gap-6">
           <PersonalWallet s={s} />
           <section data-rise>
-            <div className="flex items-baseline justify-between gap-3"><h2 className="text-[17px] font-bold text-ink">Agent wallets</h2><span className="text-[12.5px] text-ink/55">Spend from your balance</span></div>
+            <div className="flex items-baseline justify-between gap-3"><h2 className="text-[17px] font-bold text-ink">Agent wallets</h2><span className="text-[12.5px] text-ink/55">Agents you made</span></div>
             {agents.length > 1 ? <ul className="mt-3 grid gap-2">{agents.slice(1).map((a) => { const c = cardFor(cards, a.id); return <OtherWallet key={a.id} s={s} a={a} card={c} onCard={() => (c ? setOpenFor(a.id) : setGetFor(a.id))} />; })}</ul>
-              : <p className="mt-3 text-[14px] text-ink/60">Add an agent to your team. <button onClick={() => openAdd()} className="font-bold text-brand-ink">Add an agent</button></p>}
+              : <p className="mt-3 text-[14px] text-ink/60">Agents you make get a wallet here. <button onClick={() => openAdd("create")} className="font-bold text-brand-ink">Create an agent</button></p>}
+            {s.hired.length > 0 && <p data-hired-wallet-note className="mt-3 text-[12.5px] leading-snug text-ink/55">Hired specialists don&apos;t use your wallet. Each has its own task wallet and asks you in chat when a task needs funds.</p>}
           </section>
         </div>
       ) : (

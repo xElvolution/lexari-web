@@ -27,7 +27,7 @@ export type Msg = {
   call?: number; // a call log line, length in seconds
   re?: Record<string, string[]>; // reactions: emoji → who reacted ("you" or an agent id)
   reply?: { id: string; from: string; text: string }; // the message this one answers
-  send?: { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; error?: string }; // a SOL transfer the agent prepared; only you can confirm it
+  send?: { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; error?: string; kind?: "fund"; agent?: string; reason?: string; returned?: { sig: string; sol: number } }; // a SOL transfer the agent prepared; only you can confirm it
 };
 /** Your own notes on any agent. Hired agents only get nick, notes and memory; the maker controls the rest. */
 export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; voice?: { name: string; pitch: number; rate: number; preset?: string }; about?: string; skills?: string[]; /** onchain ID card, once minted */ nft?: import("@/lib/nft").NftRecord };

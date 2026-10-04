@@ -24,7 +24,9 @@ export const POST = withUser(async (user, req) => {
   const body = await readJson(req, cardBuyBody);
   if (body instanceof Response) return body;
   const database = db();
-  if (body.agent !== "home" && !body.agent.startsWith("c-")) {
+  // Cards are for agents you made (your personal agent and the ones you created). Hired specialists use their own task wallet.
+  if (body.agent !== "home" && !body.agent.startsWith("c-")) return jsonError(403, "Hired agents can't get a card. They ask you to fund their own task wallet when a task needs money.");
+  if (body.agent !== "home") {
     const [own] = await database.select({ id: agents.id }).from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, body.agent))).limit(1);
     if (!own) return jsonError(404, "That agent is not on your team.");
   }
