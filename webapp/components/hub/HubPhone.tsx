@@ -108,7 +108,23 @@ function CheckInRow({ s, now }: { s: State; now: number }) {
           return <li key={d} className={`rounded-[9px] py-1 text-center ${got ? "bg-grape text-white" : d === cur ? "bg-tint text-ink ring-1 ring-grape" : "bg-tint text-ink/55"}`}><div className="text-[9.5px] font-bold uppercase">D{d}</div><div className="text-[11.5px] font-extrabold tabular-nums">{STREAK_PAY[Math.min(STREAK_PAY.length, d) - 1]}</div></li>;
         })}
       </ol>
+      <CheckInGrid s={s} now={now} />
     </section>
+  );
+}
+
+/** The last 4 weeks of check-ins as a compact strip (same data as the desktop grid). */
+function CheckInGrid({ s, now }: { s: State; now: number }) {
+  const key = (t: number) => new Date(t).toISOString().slice(0, 10);
+  const days = new Set((s.live?.ledger || []).filter((e) => e.kind === "check_in").map((e) => key(e.at)));
+  const grid = Array.from({ length: 28 }, (_, i) => key(now - (27 - i) * 864e5));
+  return (
+    <div data-checkin-grid className="mt-3">
+      <div className="flex items-center justify-between"><span className="label text-[8.5px] text-ink/55">Last 4 weeks</span><span className="text-[11px] font-semibold text-ink/55">{grid.filter((k) => days.has(k)).length} of 28 days</span></div>
+      <div className="mt-1.5 grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1">
+        {grid.map((k) => <span key={k} title={k} className={`aspect-square rounded-[4px] ${days.has(k) ? "bg-grape" : "bg-tint"} ${k === key(now) ? "ring-1 ring-grape" : ""}`} />)}
+      </div>
+    </div>
   );
 }
 
@@ -171,12 +187,14 @@ function TrainSection({ s, onSheet }: { s: State; onSheet: (id: string, won?: nu
         <span className="min-w-0 flex-1"><span className="block truncate text-[14.5px] font-bold">{agent.name}</span><span className="mt-1 flex items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15"><span className="block h-full rounded-full bg-[linear-gradient(90deg,#c9b8ff,#5b2bff)]" style={{ width: `${pct}%` }} /></span><span className="text-[11px] tabular-nums text-white/65">{max ? "max" : `${xp}/${need}`}</span></span></span>
         <Icon name="right" size={16} className="shrink-0 text-white/50" />
       </button>
-      {!max && (minted ? (
+      {!max && (
         <div data-train-packs className="mt-2 grid grid-cols-3 gap-1.5">
           {[25, 100].map((n) => <button key={n} type="button" onClick={() => pack(n)} disabled={!!busy || coins <= 0} className="flex h-11 flex-col items-center justify-center rounded-[12px] bg-tint text-[13px] font-bold text-ink disabled:opacity-45"><span>+{n} XP</span><span className="flex items-center gap-0.5 text-[10.5px] font-semibold text-ink/55"><Coin size={10} />{n}</span></button>)}
           <button type="button" data-train-open onClick={() => onSheet(agent.id)} disabled={!!busy} className="flex h-11 flex-col items-center justify-center rounded-[12px] bg-grape text-[13px] font-extrabold text-white disabled:opacity-45"><span>Level up</span><span className="flex items-center gap-0.5 text-[10.5px] font-semibold text-white/75"><Coin size={10} />{toNext}</span></button>
         </div>
-      ) : <button type="button" onClick={() => openAgent(agent.id)} className={`${pill} mt-2 w-full bg-grape text-white`}>Mint ID card to level up</button>)}
+      )}
+      {!max && (minted ? (coins < toNext && <p className="mt-1.5 text-center text-[11.5px] text-ink/55">{toNext - coins} more coins to reach Lv {level + 1}. <a href="#quests" className="font-bold text-brand-ink">Find quests</a></p>)
+        : <button type="button" onClick={() => openAgent(agent.id)} className="mt-1.5 w-full text-center text-[11.5px] font-semibold text-ink/55">Mint {agent.name}&apos;s ID card first to spend XP. <span className="font-bold text-brand-ink">Open ID card</span></button>)}
       <div className="mt-3 flex items-baseline justify-between"><h3 className="text-[13.5px] font-bold text-ink">Perks</h3>{nextPerk && <span className="text-[11.5px] font-semibold text-ink/55">Next: {nextPerk.title} at Lv {nextPerk.level}</span>}</div>
       <ol data-perks className="mt-1.5 space-y-1">
         {perks.map((p) => { const got = level >= p.level; return (
