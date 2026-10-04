@@ -13,10 +13,12 @@ import { PROGRAM_ID, STREAK_PAY, TIER_REWARD, decodePlayer, playerPda, agentPda,
 import { connection, fetchMany } from "./chain";
 
 export async function fetchConfirmed(signature: string, tries = 10): Promise<VersionedTransactionResponse> {
-  for (let i = 0; i < tries; i++) {
+  // Poll fast first (the client already saw it confirmed, so it usually lands within a second), same ~15s budget overall.
+  const waits = [300, 400, 500, 700, 1000, 1500, 1500, 2000, 2500, 3000, 3000, 3000];
+  for (let i = 0; i < Math.max(tries, waits.length); i++) {
     const tx = await connection().getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
     if (tx) return tx;
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, waits[i] ?? 1500));
   }
   throw new HttpError(404, "That transaction is not confirmed yet. Try again in a moment.");
 }
