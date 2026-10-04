@@ -52,7 +52,6 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
     if (!said) { toast({ text: "I didn't catch anything. Try again a little closer to the mic." }); return; }
     setText((cur) => (cur.trim() ? `${cur.trim()} ${said}` : said).slice(0, 2000));
     requestAnimationFrame(() => { grow(); input.current?.focus(); });
-    toast({ text: "Check the text, then tap send." });
   };
   function cancelVoice() { tr.current?.abort(); tr.current = null; setRec(null); setHeard(""); }
   useEffect(() => { if (reply) input.current?.focus(); }, [reply]);
@@ -106,7 +105,7 @@ export default function Composer({ id, name, suggestions, onCall, onDesktop, des
             </div>
           )}
         </div>
-        <p className="label mt-2 text-center text-[8.5px] text-ink/45"><span className="hidden sm:inline">Enter to send · Shift+Enter for a new line</span><span className="sm:hidden">Enter to send</span></p>
+        <p className="label mt-2 hidden text-center text-[8.5px] text-ink/45 sm:block">Enter to send · Shift+Enter for a new line</p>
       </div>
     </div>
   );

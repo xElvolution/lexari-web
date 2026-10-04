@@ -20,8 +20,7 @@ export default function AgentIdCard({ info, flipped: controlled, onFlip, faceEl 
   const desk = `Desk ${String(info.desk).padStart(2, "0")}`;
   return (
     <div className="sway relative mx-auto flex w-fit flex-col items-center" style={{ transformOrigin: "50% 0%" }}>
-      <div className="strap h-[42px] w-[26px] rounded-b-sm shadow-[4px_0_0_rgba(0,0,0,.12)]"><div className="flex h-full items-center justify-center overflow-hidden"><span className="label rotate-90 whitespace-nowrap text-[7px] font-bold text-white/85">lexari</span></div></div>
-      <div className="relative z-10 -mt-1 h-6 w-11 rounded-md bg-gradient-to-b from-[#f2f2f2] to-[#a3a3a3] shadow-[inset_0_-2px_0_rgba(0,0,0,.2)]"><span className="absolute left-1/2 top-1/2 h-2 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/40" /></div>
+      <div className="relative z-10 h-6 w-11 rounded-md bg-gradient-to-b from-[#f2f2f2] to-[#a3a3a3] shadow-[inset_0_-2px_0_rgba(0,0,0,.2)]"><span className="absolute left-1/2 top-1/2 h-2 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/40" /></div>
       <div
         role="button" tabIndex={0} aria-pressed={flipped} data-tour="id-card"
         aria-label={flipped ? `${info.name}'s ID card, back. Press to see the front.` : `${info.name}'s ID card. Press to flip.`}

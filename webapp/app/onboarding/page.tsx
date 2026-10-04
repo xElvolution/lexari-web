@@ -76,6 +76,7 @@ export default function Onboarding() {
   };
   const v = lookVariant(look); const bg = look && typeof look === "object" ? look.bg : undefined;
   const agentName = name.trim() || "Juniper";
+  const knownCount = knows.length + (you ? 1 : 0);
 
   if (finale !== "none" && s?.agent) return (
     <main className="relative grid min-h-[100svh] place-items-center overflow-x-clip bg-base px-5 py-10 text-ink">
@@ -85,7 +86,7 @@ export default function Onboarding() {
         {finale === "setup"
           ? <SetupSequence name={agentName} v={v} bg={bg} onDone={() => setFinale("done")} tone="page" />
           : <div className="rounded-[30px] bg-card p-5 ring-1 ring-line sm:p-7"><MintFinish s={s} id="home" v={v} title={`Meet ${agentName}.`}
-              sub={`Its badge is printed, its computer is on and it already knows ${knows.length + (you ? 1 : 0)} things about you. Mint its ID card on chain, or do it later from its profile.`}
+              sub={`Its badge is printed, its computer is on and it already knows ${knownCount} ${knownCount === 1 ? "thing" : "things"} about you. Mint its ID card on chain, or do it later from its profile.`}
               later={() => router.push("/app")} laterLabel={s.meta.home?.nft ? `Start chatting with ${agentName}` : "Later, start chatting"} /></div>}
       </div>
     </main>
@@ -185,7 +186,7 @@ export default function Onboarding() {
             <div data-step>
               <p className="label text-brand-ink">Step 4 of 4 · first day</p>
               <h1 className="display mt-3 text-[clamp(28px,8vw,48px)] sm:text-[96px]">Meet {shown}.</h1>
-              <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Its badge is printed, its computer is on and it already knows {knows.length + (you ? 1 : 0)} things about you. Say hi and start chatting.</p>
+              <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Its badge is printed, its computer is on and it already knows {knownCount} {knownCount === 1 ? "thing" : "things"} about you. Say hi and start chatting.</p>
               <ul className="mt-7 grid max-w-[520px] gap-2.5">
                 {[["desk", "Its own computer", "A terminal, a browser and a folder of files"], ["memory", "A brain that keeps", `${knows.length + (you ? 1 : 0)} memories filed on day one`], ["team", "Seats for specialists", "Hire from the marketplace when the work grows"]].map(([i, h, t]) => (
                   <li key={h} className="flex items-center gap-4 rounded-[20px] bg-card p-3.5 ring-1 ring-line"><span className="grid h-11 w-11 place-items-center rounded-xl bg-grape text-white"><Icon name={i} size={21} /></span><span><b className="block text-ink">{h}</b><span className="text-[14px] text-ink/70">{t}</span></span></li>

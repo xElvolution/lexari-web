@@ -46,7 +46,7 @@ const DOWNLOAD: Record<WalletId, string> = {
 const WALLET_ICON: Record<WalletId, string> = { phantom: "/wallets/phantom.svg", solflare: "/wallets/solflare.svg", backpack: "/wallets/backpack.png" };
 function WalletGlyph({ id }: { id: WalletId }) {
   return (
-    <span className={`grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl ${id === "backpack" ? "bg-white ring-1 ring-black/10" : ""}`}>
+    <span className={`relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl ${id === "backpack" ? "bg-white ring-1 ring-black/10" : ""}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={WALLET_ICON[id]} alt="" width={44} height={44} className={id === "backpack" ? "h-8 w-8" : "h-11 w-11"} />
     </span>

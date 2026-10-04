@@ -42,7 +42,7 @@ export async function ensureMic(): Promise<void> {
 function recError(code: string) {
   if (code === "not-allowed") return BLOCKED;
   if (code === "service-not-allowed") return "Speech-to-text is turned off in this browser. Type the message instead.";
-  if (code === "audio-capture") return "No microphone was found on this device.";
+  if (code === "audio-capture") return "Speech-to-text couldn't hear the microphone. Check no other app is using it, then try again.";
   if (code === "network") return "Speech-to-text needs a connection. Check your internet and try again.";
   if (code === "language-not-supported") return "Speech-to-text doesn't support this language here.";
   return "Speech-to-text stopped. Try again.";

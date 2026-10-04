@@ -75,7 +75,7 @@ export default function ProfilePage() {
             <h1 className="display text-[40px] leading-none text-ink sm:text-[48px]">{p.name}</h1>
             <span className="label rounded-full bg-grape px-2.5 py-1 text-[9px] text-white">{plan.name}</span>
           </div>
-          <p className="mt-1.5 text-[15px] font-semibold text-ink/55">@{p.username}</p>
+          {p.username ? <p className="mt-1.5 text-[15px] font-semibold text-ink/55">@{p.username}</p> : <button type="button" onClick={() => setEdit(true)} className="mt-1.5 text-[14px] font-semibold text-brand-ink">Add a username</button>}
           {p.bio && <p className="mt-3 max-w-[40rem] text-[15.5px] text-ink/75">{p.bio}</p>}
           <div className="mt-5 flex flex-wrap gap-6 text-[14px]">
             <span><b className="text-ink">{team.length}</b> <span className="text-ink/60">agents</span></span>
@@ -111,7 +111,7 @@ export default function ProfilePage() {
           </section>
           <section data-rise className="rounded-[26px] bg-card p-5 ring-1 ring-line sm:p-6">
             <div className="flex items-center justify-between"><h2 className="text-[17px] font-bold text-ink">What they know about you</h2><Link href="/app/memory" className="text-[13.5px] font-bold text-brand-ink hover:underline">Brain</Link></div>
-            <ul className="mt-3 space-y-2">{about.length ? about.map((m) => <li key={m.id} className="flex items-start gap-2.5 text-[14.5px] text-ink/80"><i className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-grape" />{m.text}</li>) : <li className="text-[14.5px] text-ink/60">Nothing yet. Tell {agentName(s)} something with “remember…”.</li>}</ul>
+            <ul className="mt-3 space-y-2">{about.length ? about.map((m) => <li key={m.id} className="flex items-start gap-2.5 text-[14.5px] text-ink/80"><i className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-grape" />{m.text || <span className="text-ink/50">Encrypted. Open it in Brain to read.</span>}</li>) : <li className="text-[14.5px] text-ink/60">Nothing yet. Tell {agentName(s)} something with “remember…”.</li>}</ul>
           </section>
           <section data-rise className="grid gap-3">
             <Link href="/app/wallets" className="rounded-[22px] bg-card p-4 ring-1 ring-line transition hover:ring-grape/60"><Icon name="wallet" size={20} className="text-brand-ink" /><div className="mt-2 text-[15px] font-bold text-ink">Lexari wallet</div><div className="text-[13px] text-ink/55">{s.auth?.address ? shortAddr(s.auth.address) : "Balances and activity"}</div></Link>

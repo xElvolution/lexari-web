@@ -27,7 +27,7 @@ export const NAV = [
   { href: "/app/settings", label: "Settings", icon: "settings" },
 ];
 const isOn = (path: string, href: string) => (href === "/app" ? path === "/app" : path.startsWith(href));
-const initials = (s: State) => (s.auth?.method === "wallet" ? (s.auth.label || "W").replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() : (s.auth?.label || "You").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase());
+const initials = (s: State) => { const n = s.profile?.name?.trim(); if (n && n !== "You") return n.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase(); return s.auth?.method === "wallet" ? (s.auth.label || "W").replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() : (s.auth?.label || "You").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase(); };
 
 /** Slim rail on desktop: icons with small labels, theme and profile at the bottom. */
 function Rail({ s, path }: { s: State; path: string }) {

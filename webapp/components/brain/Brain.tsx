@@ -148,7 +148,7 @@ function Panel({ s, cat, onClose }: { s: State; cat: number; onClose: () => void
       </div>
       {EDITABLE.has(id) && (
         <form onSubmit={(e) => { e.preventDefault(); teach(); }} className="flex gap-2 border-t border-line p-3">
-          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Teach ${agentName(s)} about ${id.toLowerCase()}`} className="field !h-11 !rounded-full !py-0 !text-[15px]" aria-label="New memory" maxLength={120} />
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={id === "About you" ? `Tell ${agentName(s)} about you` : `Add to ${id.toLowerCase()}`} className="field !h-11 !rounded-full !py-0 !text-[15px]" aria-label="New memory" maxLength={120} />
           <button disabled={!draft.trim()} aria-label="Remember this" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:scale-105 disabled:opacity-40"><Icon name="plus" size={18} /></button>
         </form>
       )}

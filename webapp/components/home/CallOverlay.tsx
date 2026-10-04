@@ -27,6 +27,7 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
     gsap.fromTo(root.current, { opacity: 0 }, { opacity: 1, duration: 0.25 });
     gsap.fromTo("[data-call-card]", { y: 20, opacity: 0, scale: 0.98 }, { y: 0, opacity: 1, scale: 1, duration: 0.45, ease: "power3.out" });
   }, []);
+  const [last, setLast] = useState(""); // the agent's last answer stays on screen while it listens again
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { speakerRef.current = speaker; if (!speaker) hush(); }, [speaker]);
   useEffect(() => { setLive(true); }, []);
@@ -63,7 +64,8 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
         setThinking(false);
         if (stop) return;
         if (!reply) { setCaption(`${c.name} couldn't answer. Try again.`); continue; }
-        setCaption(`${c.name}: ${reply}`);
+        setLast(`${c.name}: ${reply}`);
+        setCaption(speakerRef.current ? "Speaking…" : "");
         if (speakerRef.current) await speak(reply);
       }
     })();
@@ -86,7 +88,8 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
         <h2 className="display mt-8 text-[44px] leading-none max-[430px]:mt-5">{c.name}</h2>
         <p className="mt-3 flex items-center gap-2 font-mono text-[13px] text-white/75">{live ? <><i className="h-2 w-2 rounded-full bg-lilac live-dot" />{fmtSecs(secs)}</> : "Calling…"}</p>
         <div className="mt-8 min-h-[72px] w-full rounded-2xl bg-white/[.06] px-5 py-4 ring-1 ring-white/10" aria-live="polite">
-          <p className="text-[16px] leading-snug text-white/90">{caption}{thinking && <span className="ml-1 text-white/60">· thinking…</span>}</p>
+          {last && <p className="mb-2 max-h-40 overflow-y-auto text-[15px] leading-snug text-white">{last}</p>}
+          <p className="text-[15px] leading-snug text-white/75">{caption}{thinking && <span className="ml-1 text-white/60">· thinking…</span>}</p>
         </div>
         <div className="mt-10 flex items-center gap-5">
           <button onClick={() => setMuted((m) => !m)} aria-pressed={muted} aria-label={muted ? "Unmute" : "Mute"} className={btn(muted)}><Icon name={muted ? "micoff" : "mic"} size={22} /></button>

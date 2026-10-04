@@ -48,7 +48,7 @@ export default function TeamPage() {
           {pick && (() => { const sp = specialistBySlug(pick)!; return (
             <div className="pop relative mt-5 flex flex-wrap items-center gap-3 rounded-[22px] bg-ink p-3 text-[var(--bg)]">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-[var(--bg)]/10"><SpecFace slug={pick} size={40} /></span>
-              <span className="min-w-0 flex-1"><b className="display block text-[24px] leading-none">{sp.name}</b><span className="text-[13px] opacity-75">{sp.job} · seat {String(s.hired.indexOf(pick) + 2).padStart(2, "0")}</span></span>
+              <span className="min-w-0 flex-1 max-sm:basis-[calc(100%-3.75rem)]"><b className="display block text-[24px] leading-none">{sp.name}</b><span className="text-[13px] opacity-75">{sp.job} · seat {String(s.hired.indexOf(pick) + 2).padStart(2, "0")}</span></span>
               <Link href={`/app?c=${pick}`} className="rounded-full bg-grape px-4 py-2 text-[14px] font-bold text-white">Chat</Link>
               <button onClick={() => openAgent(pick)} className="rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">ID card</button>
               <button onClick={() => { release(pick); setPick(null); toast({ text: `${sp.name} left the seat`, face: sp.seed, color: sp.color }); }} className="rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">Release</button>

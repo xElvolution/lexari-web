@@ -56,7 +56,7 @@ export default function Tour({ s }: { s: State }) {
   const step = steps[Math.min(i, steps.length - 1)];
   const [prevClick, setPrevClick] = useState(false);
   const spec = useMemo(() => myAgents(s).find((a) => a.id !== "home" && a.id !== s.active)?.id ?? "home", [s.tour.on]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ctx: Ctx = { me: nameOf(s, "home"), you: s.agent?.you || s.profile?.name?.split(" ")[0] || "", spec, specName: nameOf(s, spec) };
+  const ctx: Ctx = { me: nameOf(s, "home"), you: s.agent?.you || (s.profile?.name && s.profile.name !== "You" ? s.profile.name.split(" ")[0] : ""), spec, specName: nameOf(s, spec) };
   const tKey = step.target?.(ctx), cKey = step.action === "click" ? step.click ?? tKey : undefined;
   const [rect, setRect] = useState<R | null>(null);
   const [missing, setMissing] = useState(false);
