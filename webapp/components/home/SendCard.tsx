@@ -5,7 +5,7 @@ import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { api } from "@/lib/api";
 import { connection, payer, PAY_BUFFER } from "@/lib/pay";
 import { txUrl } from "@/lib/nft";
-import { get, set, useApp, type Msg } from "@/lib/store";
+import { ackTx, get, logTx, refreshReceipts, set, useApp, type Msg } from "@/lib/store";
 import { nameOf } from "../agents";
 import Icon from "../Icon";
 
@@ -21,8 +21,16 @@ export default function SendCard({ convo, m }: { convo: string; m: Msg & { send:
     const { status, sig, error } = { ...sd, ...patch };
     if (status !== "pending") void api("/api/messages", { method: "PATCH", body: { convo, clientId: m.id, send: { status, ...(sig ? { sig } : {}), ...(error ? { error: error.slice(0, 200) } : {}) } } }).catch(() => {});
   };
+  // Every outcome becomes a receipt in the chat (checked on chain by the server), then the agent follows up on it.
+  const kind = sd.kind === "fund" ? "fund" as const : "send" as const;
+  const receipt = async (status: "pending" | "confirmed" | "failed" | "cancelled", sig?: string, error?: string, ack = true) => {
+    const label = sd.kind === "fund" && sd.agent ? `${nameOf(get(), sd.agent)}'s task wallet` : undefined;
+    const r = await logTx(convo, { id: m.id, kind, status, sol: sd.sol, to: sd.to, ...(sig ? { sig } : {}), ...(error ? { error } : {}), ...(sd.agent ? { agent: sd.agent } : {}), ...(label ? { label } : {}) });
+    if (ack && r) void ackTx(convo, `tx-${m.id}`, m.from);
+  };
   const confirm = async () => {
     setErr(""); setBusy("sign");
+    let sent = "";
     try {
       const w = await payer();
       if (!w) throw new Error("Your wallet isn't ready on this device yet. Try again in a moment.");
@@ -35,13 +43,17 @@ export default function SendCard({ convo, m }: { convo: string; m: Msg & { send:
       const signed = await w.signTransaction(tx);
       setBusy("confirm");
       const sig = await c.sendRawTransaction(signed.serialize());
+      sent = sig;
+      void receipt("pending", sig, undefined, false);
       const r = await c.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
       if (r.value.err) throw new Error("The transfer failed on Solana.");
       update({ status: "sent", sig });
+      await receipt("confirmed", sig);
     } catch (e) {
       const msg = (e as Error).message || "The transfer didn't go through.";
-      if (/reject|cancel|denied|closed/i.test(msg)) setErr("You didn't approve it. Nothing was sent.");
-      else setErr(msg);
+      if (/reject|cancel|denied|closed/i.test(msg) && !sent) { setErr("You didn't approve it. Nothing was sent."); void receipt("cancelled", undefined, "You didn't approve it in your wallet."); }
+      else if (sent && /expired|timeout|not confirmed/i.test(msg)) { update({ status: "sent", sig: sent }); void receipt("pending", sent).then(() => refreshReceipts(convo)); }
+      else { setErr(msg); if (sent) update({ status: "failed", sig: sent }); void receipt("failed", sent || undefined, msg.slice(0, 200)); }
     } finally { setBusy(""); }
   };
   const done = sd.status !== "pending";
@@ -53,8 +65,9 @@ export default function SendCard({ convo, m }: { convo: string; m: Msg & { send:
   const giveBack = async () => {
     setBack("busy"); setErr("");
     try {
-      const r = await api<{ sig: string | null; sol: number }>("/api/hires/wallet", { body: { slug: sd.agent, action: "return", convo, clientId: m.id } });
+      const r = await api<{ sig: string | null; sol: number; receipt?: string | null }>("/api/hires/wallet", { body: { slug: sd.agent, action: "return", convo, clientId: m.id } });
       if (!r.sig) setErr("Nothing left to send back.");
+      if (r.receipt) { await refreshReceipts(convo); void ackTx(convo, r.receipt, m.from); }
       set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === m.id && mm.send ? { ...mm, send: { ...mm.send, returned: { sig: r.sig || "", sol: r.sol } } } : mm)) } }));
     } catch (e) { setErr((e as Error).message || "Couldn't send it back."); }
     finally { setBack(""); }
@@ -75,7 +88,7 @@ export default function SendCard({ convo, m }: { convo: string; m: Msg & { send:
       {err && !done && <p role="alert" className="mt-2 text-[12.5px] text-[#e5484d]">{err}</p>}
       {!done && (
         <div className="mt-3 flex gap-2">
-          <button onClick={() => update({ status: "cancelled" })} disabled={!!busy} className="btn btn-line btn-sm !h-9 text-ink">Cancel</button>
+          <button onClick={() => { update({ status: "cancelled" }); void receipt("cancelled"); }} disabled={!!busy} className="btn btn-line btn-sm !h-9 text-ink">Cancel</button>
           <button data-send-confirm onClick={() => void confirm()} disabled={!!busy} className="btn btn-brand btn-sm !h-9 flex-1 disabled:opacity-60">{busy === "sign" ? "Approve in wallet…" : busy === "confirm" ? "Sending…" : `Confirm ${sd.sol} SOL`}</button>
         </div>
       )}

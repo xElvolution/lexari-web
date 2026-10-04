@@ -67,6 +67,10 @@ export const chatBody = z.object({
   follow: z.boolean().optional(),
   /** what other group members already answered to this message */
   peers: z.array(z.object({ from: z.string().max(80), text: z.string().max(1200) })).max(12).optional(),
+  /** a transaction receipt just landed in this chat: the agent follows up on it (no message from the person) */
+  event: z.object({ tx: z.string().regex(/^tx-[A-Za-z0-9_-]{4,37}$/) }).strict().optional(),
+  /** the person's time zone (IANA), so "today" and times in the wallet history are theirs */
+  tz: z.string().max(64).regex(/^[A-Za-z0-9_+\-/]+$/).optional(),
 }).strict();
 
 export const groupBody = z.object({

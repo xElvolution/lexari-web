@@ -5,7 +5,7 @@ import { Connection, PublicKey, SystemProgram, Transaction } from "@solana/web3.
 import { SOLANA_RPC } from "./nft";
 import { CARD_LAMPORTS, HIRE_LAMPORTS, TREASURY } from "./prices";
 import { api, friendly } from "./api";
-import { get } from "./store";
+import { ackTx, get, logTx } from "./store";
 import { ensureBridge, type WalletBridge } from "./walletBridge";
 
 /** Network fee plus what Solana keeps in an account (rent), so a payment never fails for "insufficient funds for rent". */
@@ -17,6 +17,8 @@ export type PayRequest = {
   lamports: number;
   /** Server verification after the payment confirmed. Throw to show the error in the sheet. */
   record: (sig: string) => Promise<unknown>;
+  /** The receipt this payment writes into a chat (the agent then follows up there). */
+  receipt?: { convo: string; kind: "hire" | "plan" | "card"; label: string; speaker?: string };
 };
 export type PayResult = { ok: true; tx: string; result: unknown } | { ok: false; error: string; cancelled?: boolean };
 
@@ -32,9 +34,25 @@ export function requestPayment(req: PayRequest): Promise<PayResult> {
   if (!TREASURY) return Promise.resolve({ ok: false, error: "Payments are not set up on this server." });
   if (open) open.done({ ok: false, error: "", cancelled: true });
   return new Promise((resolve) => {
-    open = { req, done: (r) => { open = null; emit(); resolve(r); } };
+    open = { req, done: (r) => { open = null; emit(); resolve(r); receiptFor(req, r); } };
     emit();
   });
+}
+
+/** A payment's outcome as a receipt in the chat it's about; confirmed and failed ones get the agent's follow-up. */
+function receiptFor(req: PayRequest, r: PayResult) {
+  const rc = req.receipt;
+  if (!rc) return;
+  if (!r.ok && r.cancelled && rc.kind === "hire") return; // closing a hire sheet: that agent's chat isn't on your team
+  const sol = req.lamports / 1e9;
+  const id = r.ok ? `pay-${r.tx.slice(0, 32)}` : `pay-${Math.random().toString(36).slice(2, 12)}`;
+  const status = r.ok ? "confirmed" as const : r.cancelled ? "cancelled" as const : "failed" as const;
+  void (async () => {
+    // a hire's chat only works once the hire is saved: wait a beat so the store has it
+    await new Promise((x) => setTimeout(x, r.ok ? 900 : 0));
+    const t = await logTx(rc.convo, { id, kind: rc.kind, status, sol, ...(TREASURY ? { to: TREASURY } : {}), ...(r.ok ? { sig: r.tx } : {}), ...(!r.ok && r.error ? { error: r.error.slice(0, 200) } : {}), label: rc.label });
+    if (t && status !== "cancelled") void ackTx(rc.convo, `tx-${id}`, rc.speaker);
+  })();
 }
 
 export const connection = () => new Connection(SOLANA_RPC, "confirmed");
@@ -79,7 +97,7 @@ export async function verifyWithRetry<T>(run: () => Promise<T>) {
 
 export async function payForHire(slug: string, name: string): Promise<{ ok: true; tx: string; mint: "SOL"; price: number } | { ok: false; error: string; cancelled?: boolean }> {
   const r = await requestPayment({
-    title: `Hire ${name}`, what: "One-time hire. Release and rehire for free.", lamports: HIRE_LAMPORTS,
+    title: `Hire ${name}`, what: "One-time hire. Release and rehire for free.", lamports: HIRE_LAMPORTS, receipt: { convo: slug, kind: "hire", label: `hiring ${name}`, speaker: slug },
     record: (sig) => verifyWithRetry(() => api("/api/hires", { method: "POST", body: { slug, tx: sig, mint: "SOL" } })),
   });
   return r.ok ? { ok: true, tx: r.tx, mint: "SOL", price: HIRE_LAMPORTS } : r;
@@ -90,7 +108,7 @@ export type Card = { agent: string; issuer: string; test: boolean; number: strin
 /** Pays the card price in devnet SOL to the treasury, then the server verifies it and issues the card. */
 export async function payForCard(agent: string, limit: number, name = "your agent"): Promise<{ ok: true; tx: string; card: Card } | { ok: false; error: string; cancelled?: boolean }> {
   const r = await requestPayment({
-    title: `A card for ${name}`, what: `Virtual test card, $${limit} a month limit.`, lamports: CARD_LAMPORTS,
+    title: `A card for ${name}`, what: `Virtual test card, $${limit} a month limit.`, lamports: CARD_LAMPORTS, receipt: { convo: agent, kind: "card", label: `${name}'s $${limit}/month card`, speaker: agent },
     record: (sig) => verifyWithRetry(() => api<{ card: Card }>("/api/cards", { method: "POST", body: { agent, tx: sig, limit } })),
   });
   return r.ok ? { ok: true, tx: r.tx, card: (r.result as { card: Card }).card } : r;
@@ -100,7 +118,7 @@ export type PlanState = { id: string; name: string; seats: number; expiresAt: nu
 export async function payForPlan(plan: { id: string; name: string; lamports: number; seats: number }, period: "month" | "year" = "month"): Promise<{ ok: true; tx: string; plan: PlanState } | { ok: false; error: string; cancelled?: boolean }> {
   const year = period === "year";
   const r = await requestPayment({
-    title: `Upgrade to ${plan.name}`, what: `${plan.seats} seats for ${year ? "a year (2 months free)" : "30 days"}, on devnet.`, lamports: year ? plan.lamports * 10 : plan.lamports,
+    title: `Upgrade to ${plan.name}`, what: `${plan.seats} seats for ${year ? "a year (2 months free)" : "30 days"}, on devnet.`, lamports: year ? plan.lamports * 10 : plan.lamports, receipt: { convo: "home", kind: "plan", label: `the ${plan.name} plan (${year ? "a year" : "30 days"})`, speaker: "home" },
     record: (sig) => verifyWithRetry(() => api<{ plan: PlanState }>("/api/plans", { method: "POST", body: { plan: plan.id, tx: sig, period } })),
   });
   return r.ok ? { ok: true, tx: r.tx, plan: (r.result as { plan: PlanState }).plan } : r;

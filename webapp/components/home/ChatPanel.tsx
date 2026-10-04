@@ -7,8 +7,9 @@ import { voiceOf } from "@/lib/voices";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { CHAT_SUGGESTIONS, specialistBySlug } from "@/content/appData";
-import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, isLocked, planOf, toast, toggleReaction, isGroup, memberNames, useAgentActive, useCalling, useNow, useTyping, type Msg, type State } from "@/lib/store";
+import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, isLocked, planOf, toast, toggleReaction, isGroup, refreshReceipts, memberNames, useAgentActive, useCalling, useNow, useTyping, type Msg, type State } from "@/lib/store";
 import SendCard from "./SendCard";
+import TxReceipt from "./TxReceipt";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
 import { convoOf, dayLabel, fmtSecs, nameOf, shortTime } from "../agents";
@@ -238,6 +239,19 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
   }, [menu]);
 
   useEffect(() => { ensureReplies(); }, []);
+  // Receipts update live while a transfer is pending; SOL that arrives from elsewhere shows up while the chat is open.
+  const pendingTx = msgs.some((m) => m.tx?.status === "pending");
+  useEffect(() => {
+    let stop = false, n = 0;
+    const tick = async () => {
+      if (stop) return;
+      if (document.visibilityState === "visible") await refreshReceipts(id, n % 3 === 0);
+      n++;
+      if (!stop) t = setTimeout(tick, pendingTx ? 3000 : 10_000);
+    };
+    let t = setTimeout(tick, pendingTx ? 1500 : 300);
+    return () => { stop = true; clearTimeout(t); };
+  }, [id, pendingTx]);
   useLayoutEffect(() => {
     const el = scroller.current; if (!el) return;
     el.scrollTop = el.scrollHeight; seen.current = (s.threads[id] || []).length;
@@ -300,6 +314,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
               const day = newDay && now > 0 ? <div className="label my-5 text-center text-[9px] text-ink/45">{dayLabel(m.at, now)}</div> : null;
               // The reply bubble is empty until the first words arrive; the typing dots stand in for it (one bubble, not two).
               if (m.from !== "system" && !m.text && !m.file && !m.voice && !m.send) return null;
+              if (m.from === "system" && m.tx) return <div key={m.id} id={`m-${m.id}`} data-msg>{day}<TxReceipt tx={m.tx} /></div>;
               if (m.from === "system") return (
                 <div key={m.id} data-msg>{day}
                   <div className="my-3 flex justify-center"><span className="flex items-center gap-2 rounded-full bg-tint px-3.5 py-1.5 text-[12.5px] font-semibold text-ink/70">{m.call && <Icon name="call" size={13} className="text-brand-ink" />}{m.call ? `Voice call · ${fmtSecs(m.call)}` : m.text}</span></div>

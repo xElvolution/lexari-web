@@ -7,8 +7,9 @@ import { splitRemember } from "@/server/engram/hippocampus";
 import { buildPrompt } from "@/server/engram/spinal";
 import { recordEvent } from "@/server/events";
 import { db, retryRead } from "@/server/db";
-import { agents, chats, jobs, messages, users } from "@/server/db/schema";
+import { agents, chats, jobs, messages } from "@/server/db/schema";
 import { WALLET_HINT, checkSend, stripWalletTags, walletFacts, walletRequests, type SendReq } from "@/server/walletTools";
+import { historyBlock, readTx, settleTx, walletHistory, type TxEvent } from "@/server/txlog";
 import { FUND_HINT, fundRequest, hireWallet, stripFundTags } from "@/server/hireWallet";
 import { configError, jsonError, rateLimit, readJson, toErrorResponse } from "@/server/http";
 import { chatBody } from "@/server/validate";
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
   minePromise.catch(() => {});
   try {
     // Every member of a group answers the same message: only the first answer counts against the per-minute limit.
-    const groupFollow = body.follow === true && body.convo.startsWith("g-") && !body.call;
+    const groupFollow = (body.follow === true && body.convo.startsWith("g-") && !body.call) || !!body.event;
     const [perMin, perDay] = await Promise.all([groupFollow ? Promise.resolve(true) : rateLimit(`chat:m:${session.userId}`, PER_MINUTE), rateLimit(`chat:d:${session.userId}`, PER_DAY, 86_400_000)]);
     if (!perMin) return jsonError(429, "That's a lot of messages. Wait a minute.");
     if (!perDay) return jsonError(429, "You've reached today's message limit. It resets tomorrow.");
@@ -96,16 +97,29 @@ export async function POST(req: Request) {
   if (call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${CALL_HINT}${cutOff(body.history) ? `\n${INTERRUPT_HINT}` : ""}` };
   const tools = !call && desktopOn();
   if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}` };
-  const [me] = call ? [] : await retryRead(() => database.select({ wallet: users.wallet }).from(users).where(eq(users.id, userId)).limit(1)).catch(() => []);
-  const wallet = call ? "" : me?.wallet || "";
+  const event = !call && body.event ? body.event : null;
+  // The wallet tools (send, read) are for chat turns; every turn (calls too) reads the wallet history below.
+  const owner = session.wallet || "";
+  const wallet = call ? "" : owner;
   // Your agents can use your wallet (with a confirm card). A hired specialist never touches it: it has its own task
   // wallet and asks you to fund it for a task.
   const hiredSpeaker = speakerRow?.kind === "hired";
   if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${hiredSpeaker ? FUND_HINT(speakerName) : WALLET_HINT}` };
   const hold = tools || !!wallet;
+  const tz = body.tz || "UTC";
+  // Transaction memory: your recent transactions (receipts in chats plus the chain) on every chat and call turn.
+  // A call never waits long for it (whatever is cached is used).
+  let receipt: TxEvent | null = null;
+  if (event) receipt = await settleTx(userId, body.convo, event.tx.replace(/^tx-/, ""), owner, 40_000).catch(() => readTx(userId, body.convo, event.tx.replace(/^tx-/, "")).catch(() => null));
+  if (event && !receipt) return jsonError(404, "There is no such transaction.");
+  if (owner) {
+    const snap = await walletHistory(userId, owner, call ? 300 : 3500).catch(() => null);
+    if (snap) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${historyBlock(snap, owner, tz)}` };
+  }
+  if (event && receipt) prompt[prompt.length - 1] = { role: "user", content: eventPrompt(receipt) };
 
   // Your message is saved before the agent starts, so it never disappears if the reply fails or the page reloads.
-  let userSaved = body.follow === true; // a later group member answers a message the first one already saved
+  let userSaved = body.follow === true || !!event; // a later group member answers a message the first one already saved
   if (!call && !userSaved) try { await saveUserMsg(userId, body); userSaved = true; } catch (error) { console.error(`[chat] save user message: ${(error as Error).message}`); }
 
   const sent = Date.now();
@@ -150,7 +164,7 @@ export async function POST(req: Request) {
         // Wallet tags: reads are answered with real chain data; a send becomes a confirm card only you can approve.
         let pay: SendReq | null = null;
         if (wallet && hiredSpeaker) {
-          const f = fundRequest(full);
+          const f = event ? null : fundRequest(full);
           const visible = stripFundTags(stripWalletTags(full));
           if (visible.length > shown) send({ token: visible.slice(shown) });
           full = visible;
@@ -173,6 +187,7 @@ export async function POST(req: Request) {
             full = `${before && shown > 0 ? before + "\n\n" : ""}${clean}${w.sends.length ? full.slice(full.search(/<send/i)) : ""}`;
             shown = full.length;
           }
+          if (event) w.sends = [];
           if (w.sends.length) {
             const c = checkSend(w.sends[0], wallet);
             if (c.ok) { pay = c.send; send({ send: pay }); }
@@ -189,12 +204,12 @@ export async function POST(req: Request) {
         if (!split.reply) throw new ModelError("The agent sent an empty reply. Try again.");
         if (split.remember) send({ remember: split.remember });
         if (call) { send({ done: true }); return; } // a call is not saved as chat messages
-        await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay ? { send: pay } : null, userSaved);
-        if (!body.follow) await recordEvent(userId, "message", { ref: body.userMsgId });
+        await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay ? { send: pay } : event ? { about: event.tx } : null, userSaved);
+        if (!body.follow && !event) await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).
         await notify(userId, { kind: "reply", title: speakerName || "Your agent", body: split.reply.replace(/\s+/g, " ").slice(0, 140), url: `/agents/${encodeURIComponent(body.convo)}`, key: `reply:${body.replyMsgId}` });
         // A real request to a specialist or an agent you made is a job, with the reply as its output.
-        if (body.speaker !== "home" && body.text.trim().length >= 12 && !body.follow) {
+        if (body.speaker !== "home" && body.text.trim().length >= 12 && !body.follow && !event) {
           const now = new Date();
           await database.insert(jobs).values({
             userId, agentId: speakerRow?.id, assignee: body.speaker, prompt: body.text.slice(0, 2000), status: "done",
@@ -240,6 +255,24 @@ async function saveTurn(userId: string, body: TurnBody, speaker: string, reply: 
     { chatId: chat.id, fromId: speaker, text: reply, clientId: body.replyMsgId, metaJson: replyMeta, createdAt: new Date(Math.max(Date.now(), sent + 1)) },
   ]).onConflictDoNothing();
   await database.update(chats).set({ updatedAt: new Date() }).where(eq(chats.id, chat.id));
+}
+
+const sh = (a?: string) => (a ? `${a.slice(0, 4)}…${a.slice(-4)}` : "");
+const amt = (n: number) => `${+n.toFixed(6)} SOL`;
+/** What the agent is told when a receipt lands (in place of a message from the person). */
+function eventPrompt(e: TxEvent) {
+  const what: Record<string, string> = {
+    send: `a transfer of ${amt(e.sol)} to ${sh(e.to)} that you prepared`, fund: `funding ${amt(e.sol)} into ${e.label || "a hired agent's task wallet"} (${sh(e.to)})`,
+    return: `returning ${amt(e.sol)} of leftover SOL from ${e.label?.replace(/^you \(from (.*)\)$/, "$1") || "the task wallet"} to the person's wallet`,
+    hire: `a hire payment of ${amt(e.sol)}`, plan: `a plan payment of ${amt(e.sol)}${e.label ? ` (${e.label})` : ""}`, card: `a card payment of ${amt(e.sol)}${e.label ? ` (${e.label})` : ""}`,
+    mint: `minting the agent's ID card on chain${e.sol ? ` (it cost ${amt(e.sol)})` : ""}`, incoming: `${amt(e.sol)} arriving from ${e.label || sh(e.from)}`,
+  };
+  const status = e.status === "confirmed" ? "It CONFIRMED on Solana devnet." : e.status === "failed" ? `It FAILED${e.error ? `: ${e.error}` : ""}. Nothing moved except perhaps a network fee.` : e.status === "cancelled" ? "The person CANCELLED it. Nothing was sent." : "It was sent but is still PENDING confirmation.";
+  const bal = e.balance !== undefined && e.balance >= 0 ? ` The person's wallet balance is now ${amt(e.balance)}.` : "";
+  return [
+    `[Lexari event, not a message from the person] The Confirm card in this chat just finished: ${what[e.kind] || e.kind}. ${status}${e.sig ? ` Signature ${sh(e.sig)}.` : ""}${e.fee ? ` Network fee ${amt(e.fee)}.` : ""}${bal}`,
+    "Reply to the person in one or two short, natural sentences acknowledging exactly this result (amount, short address, devnet status" + (bal ? ", new balance" : "") + "). If it failed or was cancelled, say so plainly and offer to try again. No tags, no links, no lists, and do not say REMEMBER.",
+  ].join("\n");
 }
 
 const CALL_HINT = "You are on a live voice call with the person right now. Talk like a person on the phone: answer in one or two short spoken sentences (about 30 words at most, never more than two sentences), start with the answer, no lists, markdown, emojis, links or headings. Ask at most one short question back. You are already mid-conversation: only your very first reply on the call may greet them; after that never open with a greeting (hello, hi, hey) or their name, just answer.";

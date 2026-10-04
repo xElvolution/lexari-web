@@ -7,7 +7,7 @@ import { WalletReadyState } from "@solana/wallet-adapter-base";
 import Face from "@shared/components/Face";
 import type { Variant } from "@shared/components/avatar";
 import Icon from "../Icon";
-import { setMeta, toast, type State } from "@/lib/store";
+import { ackTx, get, logTx, setMeta, toast, type State } from "@/lib/store";
 import { createElement } from "react";
 import { celebrate } from "../Celebrate";
 import { AgentTile } from "../faces";
@@ -84,6 +84,7 @@ export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID c
         setTx(next.tx);
         setPhase("idle");
         onMinted?.();
+        mintReceipt("confirmed", next.tx);
         celebrate({ confetti: true, title: `${nm} is on Solana`, body: "Your agent's ID card was minted as an NFT. It's yours forever.", tx: next.tx, art: createElement(AgentTile, { id, look: id === "home" ? s.agent?.look : null, size: 96, radius: 30 }) });
       } else {
         const res = await updateCard({ bridge, asset: rec!.tokenId, name: nm, role: rl, dna, svg: faceSvg(face) });
@@ -93,7 +94,16 @@ export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID c
         setPhase("idle");
         toast({ text: `${nm}'s card is updated on Solana.`, face: "home" });
       }
-    } catch (e) { fail(e); }
+    } catch (e) {
+      if (kind === "mint") { const m = (e as Error)?.message || ""; mintReceipt(/reject|cancel|denied|closed/i.test(m) ? "cancelled" : "failed", undefined, friendly(e)); }
+      fail(e);
+    }
+  };
+  // A mint's outcome is a receipt in this agent's chat; once you're set up, the agent follows up on it.
+  const mintReceipt = (status: "confirmed" | "failed" | "cancelled", sig?: string, error?: string) => {
+    const rid = sig ? `mint-${sig.slice(0, 30)}` : `mint-${Math.random().toString(36).slice(2, 12)}`;
+    void logTx(id, { id: rid, kind: "mint", status, sol: 0, ...(sig ? { sig } : {}), ...(error ? { error: error.slice(0, 200) } : {}), label: `${nm}'s ID card` })
+      .then((t) => { if (t && get().onboarded && status !== "cancelled") void ackTx(id, `tx-${rid}`, id); });
   };
 
   const busy = phase === "connecting" || phase === "signing" || phase === "pending";

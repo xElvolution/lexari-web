@@ -1,9 +1,10 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { agents, chats, messages } from "@/server/db/schema";
-import { hireWalletInfo, returnLeftover } from "@/server/hireWallet";
+import { hireWallet, hireWalletInfo, returnLeftover } from "@/server/hireWallet";
 import { jsonError, rateLimit } from "@/server/http";
 import { withUser } from "@/server/route";
+import { recordTx, settleTx } from "@/server/txlog";
 
 export const runtime = "nodejs";
 
@@ -41,8 +42,18 @@ export const POST = withUser(async (user, req) => {
         }
       }
     }
+    // A receipt in the chat (the funding card's chat, else the agent's own chat), so you and the agent see it went through.
+    if (r.sig) {
+      const convo = typeof body.convo === "string" && body.convo ? body.convo.slice(0, 80) : slug;
+      const id = `ret-${(typeof body.clientId === "string" && /^[A-Za-z0-9_-]{4,30}$/.test(body.clientId) ? body.clientId : r.sig.slice(0, 30))}`;
+      const [a] = await db().select({ name: agents.name, meta: agents.meta }).from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, slug))).limit(1);
+      const nm = (a?.meta as { nick?: string } | null)?.nick || a?.name || slug;
+      await recordTx(user.userId, convo, { id, kind: "return", status: "confirmed", sol: r.lamports / 1e9, at: Date.now(), from: hireWallet(user.userId, slug).publicKey.toBase58(), to: user.wallet, sig: r.sig, agent: slug, label: `you (from ${nm}'s task wallet)` }).catch(() => null);
+      await settleTx(user.userId, convo, id, user.wallet, 8000).catch(() => null);
+      (r as { receipt?: string }).receipt = `tx-${id}`;
+    }
     const info = await hireWalletInfo(user.userId, slug);
-    return Response.json({ ok: true, sig: r.sig, sol: r.lamports / 1e9, address: info.address, balance: info.sol });
+    return Response.json({ ok: true, sig: r.sig, sol: r.lamports / 1e9, address: info.address, balance: info.sol, receipt: (r as { receipt?: string }).receipt || null });
   } catch (e) {
     console.error(`[hire-wallet] return failed: ${(e as Error).message.slice(0, 200)}`);
     return jsonError(502, "The leftover couldn't be sent back right now. Try again in a minute.");

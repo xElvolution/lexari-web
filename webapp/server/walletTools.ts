@@ -11,7 +11,7 @@ export const WALLET_HINT = [
   "write <wallet>balance</wallet> to read the balance, <wallet>address</wallet> to get the address,",
   `and <send to="ADDRESS" sol="AMOUNT"/> to prepare a SOL transfer (at most ${MAX_SEND_SOL} SOL).`,
   "A send is never automatic: Lexari shows the person a confirm card with the amount and recipient, and only they can tap Confirm.",
-  "So after a send tag, say you've prepared it and they need to confirm. Never say SOL was sent. Never invent an address; ask for one if missing.",
+  "So after a send tag, say you've prepared it and they need to confirm. Never say SOL was sent until Lexari tells you the result (a Lexari event, or the wallet activity list below). Never invent an address; ask for one if missing.",
 ].join(" ");
 
 export type SendReq = { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; /** a hired agent asking you to fund its task wallet */ kind?: "fund"; agent?: string; reason?: string };

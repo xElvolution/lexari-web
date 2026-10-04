@@ -29,7 +29,12 @@ export type Msg = {
   re?: Record<string, string[]>; // reactions: emoji → who reacted ("you" or an agent id)
   reply?: { id: string; from: string; text: string }; // the message this one answers
   send?: { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; error?: string; kind?: "fund"; agent?: string; reason?: string; returned?: { sig: string; sol: number } }; // a SOL transfer the agent prepared; only you can confirm it
+  tx?: TxReceipt; // a receipt row: what happened to a Confirm card (or SOL that arrived)
+  about?: string; // an agent's follow-up on a receipt (its id)
 };
+export type TxKind = "send" | "fund" | "return" | "hire" | "plan" | "card" | "mint" | "incoming";
+export type TxStatus = "pending" | "confirmed" | "failed" | "cancelled";
+export type TxReceipt = { id: string; kind: TxKind; status: TxStatus; sol: number; at: number; to?: string; from?: string; sig?: string; url?: string; error?: string; agent?: string; label?: string; fee?: number; balance?: number };
 /** Your own notes on any agent. Hired agents only get nick, notes and memory; the maker controls the rest. */
 export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; voice?: { name: string; pitch: number; rate: number; preset?: string }; about?: string; skills?: string[]; /** onchain ID card, once minted */ nft?: import("@/lib/nft").NftRecord };
 export type Tour = { on: boolean; step: number; done: boolean };
@@ -623,7 +628,8 @@ export function recallFor(st: State, speaker: string) {
   const open = st.memory.filter((n) => !n.locked && n.text);
   const owner = (n: Note) => n.agent || "home";
   const mentor = (a: string) => a !== speaker && recallLevel(agentLevelOf(st, a)).mentor;
-  const rank = (n: Note) => (owner(n) === speaker ? 0 : mentor(owner(n)) ? 1 : 2);
+  // Transaction notes (source "Wallet") only fill slots left over: the agent reads its wallet history on every turn anyway.
+  const rank = (n: Note) => (owner(n) === speaker ? 0 : mentor(owner(n)) ? 1 : 2) + (n.source === "Wallet" ? 3 : 0);
   const max = recallLevel(agentLevelOf(st, speaker)).size;
   return open.map((n, i) => ({ n, i })).sort((a, b) => rank(a.n) - rank(b.n) || a.i - b.i).slice(0, max)
     .map(({ n }) => ({ tag: n.tag.slice(0, 40), text: n.text.slice(0, 240) }));
@@ -631,7 +637,8 @@ export function recallFor(st: State, speaker: string) {
 const recallLevel = (lv: number) => ({ size: recallSize(lv), mentor: hasPerk(lv, "mentor") });
 
 const TRANSIENT = /busy|could not answer|did not answer|couldn't reply|could not reach|try again/i;
-async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: string, follow: boolean, peers: { from: string; text: string }[]): Promise<{ bubble: string; text: string }> {
+const tzName = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; } };
+async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: string, follow: boolean, peers: { from: string; text: string }[], event?: string): Promise<{ bubble: string; text: string }> {
   const st = get();
   typingWho.set(convo, speaker); emit();
   const bubble = pushAfter(convo, afterId, { from: speaker, text: "" });
@@ -639,7 +646,7 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
   const history = (upto >= 0 ? all.slice(0, upto) : all).filter((m) => m.id !== userMsg.id && m.id !== "hello" && m.text && m.from !== "system").slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) }));
   const memoryOn = st.prefs.memory !== false && st.meta[speaker]?.memory !== false;
   const recall = memoryOn ? recallFor(st, speaker) : [];
-  const text = userMsg.text || (userMsg.voice ? `Voice note, ${userMsg.voice} seconds.` : userMsg.file ? `Attachment: ${userMsg.file.name}` : "");
+  const text = event ? "(transaction update)" : userMsg.text || (userMsg.voice ? `Voice note, ${userMsg.voice} seconds.` : userMsg.file ? `Attachment: ${userMsg.file.name}` : "");
   const meta: Record<string, unknown> = {};
   if (userMsg.file) meta.file = userMsg.file;
   if (userMsg.voice) meta.voice = userMsg.voice;
@@ -658,7 +665,7 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history, recall, userMsgId: userMsg.id, replyMsgId: bubble, meta, ...(follow ? { follow: true } : {}), ...(peers.length ? { peers: peers.slice(-8) } : {}) }),
+        body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history, recall, userMsgId: userMsg.id, replyMsgId: bubble, meta, tz: tzName(), ...(follow ? { follow: true } : {}), ...(peers.length ? { peers: peers.slice(-8) } : {}), ...(event ? { event: { tx: event } } : {}) }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
@@ -684,7 +691,8 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
             if (payload.send) { const sd = payload.send; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, send: sd } : mm)) } })); }
             if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
             if (payload.remember && memoryOn) addNote(payload.remember, "About you", "Chat", true, isCustom(speaker) ? speaker : "home");
-            if (payload.done && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
+            if (payload.done && event) set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, about: event } : mm)) } }));
+            if (payload.done && !event && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
             // You saw this reply arrive, so it doesn't need to sit in the bell.
             if (payload.done && document.visibilityState === "visible") void api("/api/notifications", { method: "POST", body: { keys: [`reply:${bubble}`] } }).catch(() => {});
           }
@@ -734,7 +742,7 @@ export async function callTurn(convo: string, text: string, history: { from: str
   const recall = memoryOn ? recallFor(st, speaker) : [];
   const res = await fetch("/api/chat", {
     method: "POST", signal, headers: { "content-type": "application/json" },
-    body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history: history.slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) })), recall, userMsgId: uid(), replyMsgId: uid(), meta: {}, call: true }),
+    body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history: history.slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) })), recall, userMsgId: uid(), replyMsgId: uid(), meta: {}, call: true, tz: tzName() }),
   });
   if (!res.ok || !res.body) { const d = await res.json().catch(() => ({})); throw new Error(typeof d.error === "string" ? d.error : "The agent could not answer."); }
   const reader = res.body.getReader(); const dec = new TextDecoder();
@@ -777,6 +785,90 @@ export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voic
   return run;
 }
 const chains = new Map<string, Promise<string>>();
+
+/* ---------- transactions: receipts in the chat, followed until final, and the agent's follow-up ---------- */
+const txRank: Record<TxStatus, number> = { pending: 0, cancelled: 1, failed: 1, confirmed: 2 };
+const noted = new Set<string>();
+const shortA = (a?: string) => (a ? `${a.slice(0, 4)}…${a.slice(-4)}` : "");
+/** Adds or updates a receipt row (kept in time order; a confirmed one never goes back). Returns the previous status. */
+function upsertReceipt(convo: string, mid: string, tx: TxReceipt, at?: number): TxStatus | null {
+  let before: TxStatus | null = null;
+  set((x) => {
+    const list = [...(x.threads[convo] || [])];
+    const i = list.findIndex((m) => m.id === mid);
+    if (i >= 0) {
+      const cur = list[i].tx; before = cur?.status ?? null;
+      const next = { ...cur, ...tx, ...(cur && txRank[cur.status] > txRank[tx.status] && cur.status === "confirmed" ? { status: cur.status } : {}) } as TxReceipt;
+      list[i] = { ...list[i], tx: next };
+    } else {
+      const m: Msg = { id: mid, from: "system", text: "", at: at ?? Date.now(), tx };
+      const j = list.findIndex((mm) => mm.at > m.at);
+      if (j < 0) list.push(m); else list.splice(j, 0, m);
+    }
+    return { ...x, threads: { ...x.threads, [convo]: list.slice(-200) } };
+  });
+  return before;
+}
+/** A notable confirmed transaction goes into the agent's memory (once). */
+function noteTx(convo: string, t: TxReceipt) {
+  if (t.status !== "confirmed" || !t.sig || noted.has(t.sig)) return;
+  noted.add(t.sig);
+  const st = get();
+  if (st.prefs.memory === false) return;
+  const day = new Date(t.at).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  const amt = `${+t.sol.toFixed(6)} SOL`;
+  const what: Record<TxKind, string> = {
+    send: `Sent ${amt} to ${shortA(t.to)}`, fund: `Funded ${t.label || "a hired agent"} with ${amt}`, return: `Got ${amt} back from ${t.label?.replace(/^you \(from (.*)\)$/, "$1") || "a task wallet"}`,
+    hire: `Paid ${amt} to hire ${t.label || t.agent || "an agent"}`, plan: `Paid ${amt} for ${t.label || "a plan"}`, card: `Paid ${amt} for ${t.label || "an agent card"}`, mint: `Minted ${t.label || "an agent ID card"} on chain`, incoming: `Received ${amt} from ${t.label || shortA(t.from)}`,
+  };
+  const agent = isGroup(convo) ? "home" : isCustom(convo) ? convo : "home";
+  addNote(`${what[t.kind]} on ${day} (devnet, tx ${shortA(t.sig)})`, "Habits", "Wallet", false, agent);
+}
+export type TxInput = { id: string; kind: Exclude<TxKind, "incoming" | "return">; status: TxStatus; sol: number; to?: string; sig?: string; error?: string; agent?: string; label?: string };
+/** Writes a Confirm card's outcome into the chat as a receipt (the server checks it on chain). */
+export async function logTx(convo: string, ev: TxInput): Promise<TxReceipt | null> {
+  const mid = `tx-${ev.id}`;
+  upsertReceipt(convo, mid, { ...ev, at: Date.now(), ...(ev.sig ? { url: `https://explorer.solana.com/tx/${ev.sig}?cluster=devnet` } : {}) } as TxReceipt);
+  try {
+    const r = await api<{ tx: TxReceipt }>("/api/tx", { body: { convo, ...ev, ...(ev.error ? { error: ev.error.slice(0, 200) } : {}) } });
+    upsertReceipt(convo, mid, r.tx);
+    if (r.tx.status === "confirmed") noteTx(convo, r.tx);
+    return r.tx;
+  } catch { return null; }
+}
+/** Refreshes this chat's receipts (live status) and, with scan, picks up SOL that arrived from elsewhere. */
+export async function refreshReceipts(convo: string, scan = false) {
+  let r: { receipts: { id: string; at: number; tx: TxReceipt }[] };
+  try { r = await api(`/api/tx?convo=${encodeURIComponent(convo)}${scan ? "&scan=1" : ""}`); } catch { return; }
+  for (const x of r.receipts.slice().reverse()) {
+    const before = upsertReceipt(convo, x.id, x.tx, x.at);
+    const fresh = before === null && Date.now() - x.tx.at < 15 * 60_000;
+    if (x.tx.status === "confirmed" && (before === "pending" || fresh)) noteTx(convo, x.tx);
+    if (x.tx.kind === "incoming" && fresh && hydrated) toast({ text: `Received ${+x.tx.sol.toFixed(6)} SOL${x.tx.label ? ` from ${x.tx.label}` : ""}`, face: "home" });
+  }
+  hydrated = true;
+}
+let hydrated = false;
+/** The agent follows up on a receipt in its own words (it reads the confirmed on-chain result and your new balance). */
+export function ackTx(convo: string, receiptId: string, speaker?: string) {
+  const st = get();
+  const g = isGroup(convo) ? groupOf(st, convo) : null;
+  const who = g ? (speaker && g.members.includes(speaker) ? speaker : g.members[0] || "home") : convo;
+  const prev = chains.get(convo) ?? Promise.resolve("");
+  const run = prev.catch(() => "").then(async () => {
+    const msg = (get().threads[convo] || []).find((m) => m.id === receiptId);
+    if (!msg || queued.has(convo)) return "";
+    queued.add(convo);
+    try {
+      const r = await oneReply(convo, msg, who, receiptId, false, [], receiptId);
+      void refreshReceipts(convo);
+      return r.text;
+    } finally { typingWho.delete(convo); queued.delete(convo); emit(); }
+  });
+  chains.set(convo, run);
+  void run.finally(() => { if (chains.get(convo) === run) chains.delete(convo); });
+  return run;
+}
 
 /* ---------- reactions ---------- */
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎉", "👀", "🔥"];

@@ -34,6 +34,8 @@ function b58encode(bytes: Uint8Array) {
   for (const b of bytes) { if (b !== 0) break; out = "1" + out; }
   return out;
 }
+/** The faucet wallet's public address (so a top-up shows as "Lexari faucet" in your wallet history). */
+export const faucetAddress = () => faucetKey()?.publicKey.toBase58() || "";
 export const faucetOn = () => cluster() === "devnet" && !!faucetKey();
 
 export async function granted(userId: string, wallet: string) {
