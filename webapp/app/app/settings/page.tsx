@@ -16,6 +16,7 @@ import { myAgents } from "@/components/agents";
 import { openAdd, openAgent } from "@/components/overlays";
 import { PlanSummary } from "@/components/Plans";
 import LockSettings from "@/components/lock/LockSettings";
+import { disablePush, enablePush, pushOnHere, pushPermission } from "@/lib/notifications";
 
 const SECTIONS = [
   { id: "general", label: "General", icon: "settings" },
@@ -161,9 +162,35 @@ const NOTIFS: [string, string, string][] = [
   ["digest", "Weekly email digest", "A short summary of what your team did."],
   ["product", "Product news", "New features and agents. Rarely."],
 ];
+function DevicePush() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { void pushOnHere().then(setOn); }, []);
+  const perm = pushPermission();
+  const flip = async (v: boolean) => {
+    setBusy(true);
+    try {
+      if (v) { const r = await enablePush(true); setOn(r.ok); toast({ text: r.ok ? "Notifications are on. A test one is on its way." : r.why || "Couldn't turn on notifications" }); }
+      else { await disablePush(); setOn(false); toast({ text: "Notifications are off for this device" }); }
+    } finally { setBusy(false); }
+  };
+  const desc = perm === "unsupported" ? "This browser can't show notifications. On iPhone, add Lexari to your Home Screen first."
+    : perm === "denied" ? "Blocked in your browser. Allow notifications for app.lexari.ai in site settings, then come back."
+    : "Get replies, quest rewards, your daily box and payment updates even when Lexari is closed.";
+  return (
+    <Group title="This device">
+      <Row title="Push notifications" desc={desc}>
+        {perm === "unsupported" || perm === "denied" ? <span className="text-[12px] font-semibold text-ink/45">Off</span>
+          : <span data-push-toggle className={busy ? "pointer-events-none opacity-60" : ""}><Toggle on={!!on} onChange={(v) => void flip(v)} label="Push notifications" /></span>}
+      </Row>
+    </Group>
+  );
+}
+
 function Notifications({ s }: { s: State }) {
   return (
     <>
+      <DevicePush />
       <Group title="Push and in-app">{NOTIFS.slice(0, 5).map(([k, t, d]) => <Row key={k} title={t} desc={d}><Toggle on={!!s.prefs.notif[k]} onChange={(v) => setNotif(k, v)} label={t} /></Row>)}</Group>
       <Group title="Email">{NOTIFS.slice(5).map(([k, t, d]) => <Row key={k} title={t} desc={d}><Toggle on={!!s.prefs.notif[k]} onChange={(v) => setNotif(k, v)} label={t} /></Row>)}</Group>
     </>

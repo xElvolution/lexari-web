@@ -1,3 +1,4 @@
+import { notify } from "@/server/notify";
 import { eq } from "drizzle-orm";
 import { PLAN_DAYS, PLANS, YEAR_DAYS, planPrice } from "@/content/appData";
 import { db } from "@/server/db";
@@ -37,5 +38,6 @@ export const POST = withUser(async (user, req) => {
   }).onConflictDoNothing().returning({ id: planPurchases.id });
   if (!inserted.length) return jsonError(409, "That payment was already used.");
   await recordEvent(user.userId, "plan", { ref: body.tx }).catch(() => {});
+  await notify(user.userId, { kind: "payment", title: `Payment confirmed: ${plan.name}`, body: `You're on ${plan.name} for ${body.period === "year" ? "a year" : "a month"}. Enjoy the extra agents.`, url: "/app/settings", key: `plan:${body.tx}` });
   return Response.json({ plan: await currentPlan(user.userId) });
 });

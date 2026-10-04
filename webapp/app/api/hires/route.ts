@@ -1,3 +1,4 @@
+import { notify } from "@/server/notify";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { agents, hires, planPurchases } from "@/server/db/schema";
@@ -46,5 +47,6 @@ export const POST = withUser(async (user, req) => {
   const [have] = await database.select().from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, sp.slug))).limit(1);
   if (!have) await database.insert(agents).values({ userId: user.userId, slug: sp.slug, kind: "hired", name: sp.name, role: sp.job, tone: "" }).onConflictDoNothing();
   await recordEvent(user.userId, "hire", { ref: body.tx });
+  await notify(user.userId, { kind: "hire", title: `${sp.name} joined your team`, body: `Payment confirmed. Say hi to ${sp.name}, your new ${sp.job.toLowerCase()}.`, url: `/app?c=${sp.slug}`, key: `hire:${body.tx}` });
   return Response.json({ ok: true });
 });

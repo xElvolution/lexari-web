@@ -535,6 +535,8 @@ async function replyFromModel(convo: string, userMsg: Msg) {
         if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
         if (payload.remember && memoryOn) addNote(payload.remember, "About you", "Chat", true);
         if (payload.done && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
+        // You saw this reply arrive, so it doesn't need to sit in the bell.
+        if (payload.done && document.visibilityState === "visible") void api("/api/notifications", { method: "POST", body: { keys: [`reply:${bubble}`] } }).catch(() => {});
       }
     }
     if (!full.trim() && !(get().threads[convo] || []).find((m) => m.id === bubble)?.send) return fail("The agent sent an empty reply.");

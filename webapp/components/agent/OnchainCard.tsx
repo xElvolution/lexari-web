@@ -8,6 +8,9 @@ import Face from "@shared/components/Face";
 import type { Variant } from "@shared/components/avatar";
 import Icon from "../Icon";
 import { setMeta, toast, type State } from "@/lib/store";
+import { createElement } from "react";
+import { celebrate } from "../Celebrate";
+import { AgentTile } from "../faces";
 import { useWalletBridge } from "@/lib/walletBridge";
 import { friendly } from "@/lib/api";
 import { CHAIN_NAME, SOLANA_RPC, cleanName, cleanRole, faceDna, faceFragment, faceSvg, tokenUrl, txUrl, type NftRecord } from "@/lib/nft";
@@ -81,7 +84,7 @@ export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID c
         setTx(next.tx);
         setPhase("idle");
         onMinted?.();
-        toast({ text: `${nm}'s ID card is on Solana.`, face: "home" });
+        celebrate({ title: `${nm} is on Solana`, body: "Your agent's ID card was minted as an NFT. It's yours forever.", tx: next.tx, art: createElement(AgentTile, { id, look: id === "home" ? s.agent?.look : null, size: 96, radius: 30 }) });
       } else {
         const res = await updateCard({ bridge, asset: rec!.tokenId, name: nm, role: rl, dna, svg: faceSvg(face) });
         const next: NftRecord = { ...rec!, tx: res.tx, dna, name: nm, role: rl, owner: publicKey.toBase58(), at: Date.now(), uri: res.uri, registered: true };

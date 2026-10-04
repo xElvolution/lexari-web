@@ -21,6 +21,7 @@ import UpgradeSheet from "./UpgradeSheet";
 import Celebrate from "./Celebrate";
 import AppLock from "./lock/AppLock";
 import MemoryChain from "./MemoryChain";
+import NotifyBell from "./NotifyBell";
 
 export const NAV = [
   { href: "/app", label: "Agents", icon: "home" },
@@ -53,6 +54,7 @@ function Rail({ s, path }: { s: State; path: string }) {
         })}
       </nav>
       <div className="mt-3 flex shrink-0 flex-col items-center gap-3">
+        <NotifyBell />
         <ThemeToggle />
         <Link href="/app/profile" data-tour="nav-profile" aria-label="Profile" title={`${s.auth?.label ?? "Profile"}`} className={`grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] ring-2 ring-offset-2 ring-offset-[var(--alt)] transition hover:scale-105 ${onProfile ? "ring-grape" : "ring-transparent"}`}>{s.profile?.avatar ? <img src={`/api/media/avatar?v=${s.profile.avatar}`} alt="" className="h-full w-full rounded-full object-cover" /> : initials(s)}</Link>
       </div>
@@ -118,6 +120,7 @@ function MobileBars({ s, path }: { s: State; path: string }) {
       <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-line bg-base/90 px-4 backdrop-blur-md lg:hidden">
         <Link href="/app" aria-label="Agents"><span className="inline-block origin-left scale-90"><Logo /></span></Link>
         <div className="flex items-center gap-2">
+          <NotifyBell />
           <ThemeToggle />
           <Link href="/app/profile" aria-label="Profile" className="grid h-11 w-11 place-items-center rounded-full bg-ink text-[13px] font-bold text-[var(--bg)] overflow-hidden">{s.profile?.avatar ? <img src={`/api/media/avatar?v=${s.profile.avatar}`} alt="" className="h-full w-full object-cover" /> : initials(s)}</Link>
         </div>
