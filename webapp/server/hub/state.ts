@@ -12,16 +12,25 @@ import { qualifiedReferrals, questProgress } from "./rules";
 
 export type HubState = Awaited<ReturnType<typeof hubState>>;
 
+/** A support reset gives someone a fresh box today: their box for that day uses a second onchain slot (day + 1,000,000),
+ *  since an opened box account cannot be closed. Set with prefs.boxReset = <UTC day number>. */
+export const BOX_RESET_OFFSET = 1_000_000;
+async function boxDayFor(userId: string, today: number) {
+  const [u] = await db().select({ prefs: users.prefs }).from(users).where(eq(users.id, userId)).limit(1);
+  return Number(u?.prefs?.boxReset) === today ? today + BOX_RESET_OFFSET : today;
+}
+
 /** Everything the Hub shows, from chain accounts and server records. */
 export async function hubState(user: { userId: string; wallet: string; referralCode: string }) {
   const owner = new PublicKey(user.wallet);
   const player = playerPda(owner);
   const today = utcDay();
+  const boxDay = await boxDayFor(user.userId, today);
   const rows = await db().select().from(agents).where(and(eq(agents.userId, user.userId), isNotNull(agents.asset)));
   const minted = rows.filter((a) => a.asset).map((a) => ({ slug: a.slug, name: a.name, asset: new PublicKey(a.asset!) }));
   const quests = QUEST_RULES.map((rule) => ({ rule, period: periodNumber(rule.period), pda: questClaimPda(player, rule.chainId, periodNumber(rule.period)) }));
   const tiers = TIER_FRIENDS.map((_, i) => tierClaimPda(player, i));
-  const box = boxClaimPda(player, today);
+  const box = boxClaimPda(player, boxDay);
   const keys = [player, box, ...quests.map((q) => q.pda), ...tiers, ...minted.map((a) => levelPda(agentPda(a.asset))), ...minted.map((a) => a.asset)];
   const [status, accts] = await Promise.all([programStatus(), fetchMany(keys)]);
   const raw = accts.get(player.toBase58());
@@ -47,7 +56,7 @@ export async function hubState(user: { userId: string; wallet: string; referralC
     claimed: !!accts.get(q.pda.toBase58()),
   })));
 
-  const boxRow = await db().select().from(progressTable).where(and(eq(progressTable.userId, user.userId), eq(progressTable.questId, "box"), eq(progressTable.periodKey, String(today)))).limit(1);
+  const boxRow = await db().select().from(progressTable).where(and(eq(progressTable.userId, user.userId), eq(progressTable.questId, "box"), eq(progressTable.periodKey, String(boxDay)))).limit(1);
   const ledgerRows = await db().select({ kind: chainLedger.kind, amount: chainLedger.amount, data: chainLedger.data, at: chainLedger.createdAt, signature: chainLedger.signature })
     .from(chainLedger).where(eq(chainLedger.userId, user.userId)).orderBy(desc(chainLedger.createdAt)).limit(60);
   const [{ n: claimedTotal }] = await db().select({ n: sql<number>`count(*)::int` }).from(chainLedger).where(and(eq(chainLedger.userId, user.userId), eq(chainLedger.kind, "claim_quest")));
@@ -58,7 +67,7 @@ export async function hubState(user: { userId: string; wallet: string; referralC
     player: p ? { coins: p.coins, lifetime: p.lifetime, streak, checkedInToday, lastCheckIn: p.lastCheckIn, referrer: p.referrer } : null,
     levels,
     quests: questsOut,
-    box: { day: today, opened: !!accts.get(box.toBase58()), coins: boxRow[0] && accts.get(box.toBase58()) ? boxRow[0].count : null },
+    box: { day: boxDay, opened: !!accts.get(box.toBase58()), coins: boxRow[0] && accts.get(box.toBase58()) ? boxRow[0].count : null },
     referral: {
       code: user.referralCode,
       friends,
