@@ -29,6 +29,7 @@ async function call<T>(path: string, body: Record<string, unknown>, ms = 30_000)
 export const runInDesktop = (userId: string, cmd: string) => call<{ code: number; out: string }>("/exec", { user: desktopUser(userId), cmd });
 /** Single-quote a string for bash. */
 export const shq = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
+export const runQuiet = (userId: string, cmd: string) => call<{ code: number; out: string }>("/exec", { user: desktopUser(userId), cmd, quiet: true });
 export const openInDesktop = (userId: string, url: string) => call<{ code: number; out: string }>("/exec", { user: desktopUser(userId), cmd: `browse ${shq(url)}`, quiet: true });
 export const listDesktop = (userId: string, path?: string) => call<{ path: string; entries: { name: string; dir: boolean; size: number; mtime: number }[] }>("/files", { user: desktopUser(userId), path });
 export const readDesktop = (userId: string, path: string) => call<{ text: string; code: number }>("/read", { user: desktopUser(userId), path });

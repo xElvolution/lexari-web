@@ -13,8 +13,9 @@ const sym = (ch: string) => { const c = ch.codePointAt(0) || 0; return c < 0x100
 
 /**
  * The desktop's screen: a noVNC view of the container's X display (Openbox + Chromium), over the ticketed websocket.
- * Phone: Fit shows the whole 1280x800 screen; Zoom shows it 1:1 and you drag to pan. An address bar opens pages in the
- * desktop's browser, and a keyboard bar types into whatever has focus (phones have no physical keys for the canvas).
+ * The remote screen resizes to fit this view (a phone gets a phone-sized desktop, so pages render like a phone browser);
+ * "Full desktop" switches it to 1280x800 scaled down. An address bar opens pages in the desktop's browser, and a
+ * keyboard bar types into whatever has focus (phones have no physical keys for the canvas).
  */
 export default function DesktopScreen({ active, onStatus }: { active: boolean; onStatus?: (s: Status) => void }) {
   const host = useRef<HTMLDivElement>(null);
@@ -22,7 +23,7 @@ export default function DesktopScreen({ active, onStatus }: { active: boolean; o
   const [status, setStatus] = useState<Status>("connecting");
   const [err, setErr] = useState("");
   const [gen, setGen] = useState(0);
-  const [zoom, setZoom] = useState(false);
+  const [big, setBig] = useState(false);
   const [url, setUrl] = useState("");
   const [opening, setOpening] = useState(false);
   const [kbd, setKbd] = useState(false);
@@ -42,7 +43,7 @@ export default function DesktopScreen({ active, onStatus }: { active: boolean; o
       if (disposed || !host.current) return;
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const rfb = new RFB(host.current, `${proto}://${location.host}${t.path}?k=vnc&t=${encodeURIComponent(t.ticket)}`, { wsProtocols: ["binary"], shared: true });
-      rfb.scaleViewport = true; rfb.resizeSession = false; rfb.background = "#0d0b14"; rfb.qualityLevel = 6; rfb.compressionLevel = 4; rfb.showDotCursor = true;
+      rfb.scaleViewport = true; rfb.resizeSession = true; rfb.background = "#0d0b14"; rfb.qualityLevel = 6; rfb.compressionLevel = 4; rfb.showDotCursor = true;
       rfb.addEventListener("connect", () => { if (!disposed) set("live"); });
       rfb.addEventListener("disconnect", (e) => {
         rfbRef.current = null;
@@ -56,9 +57,10 @@ export default function DesktopScreen({ active, onStatus }: { active: boolean; o
   }, [gen, started]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const r = rfbRef.current; if (!r) return;
-    r.scaleViewport = !zoom; r.clipViewport = zoom; r.dragViewport = zoom;
-  }, [zoom, status]);
+    const r = rfbRef.current; if (!r || status !== "live") return;
+    r.resizeSession = !big;
+    if (big) void api("/api/desktop/open", { body: { size: "desktop" } }).catch(() => {});
+  }, [big, status]);
 
   const go = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -87,7 +89,7 @@ export default function DesktopScreen({ active, onStatus }: { active: boolean; o
         <button type="submit" disabled={opening || !url.trim()} className="h-9 shrink-0 rounded-full bg-grape px-3.5 text-[13px] font-bold text-white disabled:opacity-50">{opening ? "…" : "Go"}</button>
       </form>
       <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => e.preventDefault()}>
-        <div ref={host} data-screen className="absolute inset-0 [&>div]:!bg-transparent" style={{ touchAction: zoom ? "none" : "manipulation" }} />
+        <div ref={host} data-screen className="absolute inset-0 [&>div]:!bg-transparent" style={{ touchAction: "manipulation" }} />
         {status !== "live" && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center">
             <div>
@@ -108,10 +110,10 @@ export default function DesktopScreen({ active, onStatus }: { active: boolean; o
         </form>
       )}
       <div className="flex items-center gap-1.5 border-t border-white/10 px-2.5 py-2">
-        <button onClick={() => setZoom((z) => !z)} className="h-8 rounded-full bg-white/10 px-3 text-[12.5px] font-bold text-white">{zoom ? "Fit screen" : "Zoom 1:1"}</button>
+        <button onClick={() => setBig((z) => !z)} aria-pressed={big} className="h-8 rounded-full bg-white/10 px-3 text-[12.5px] font-bold text-white">{big ? "Fit to screen" : "Full desktop"}</button>
         <button onClick={() => setKbd((k) => !k)} aria-pressed={kbd} className={`h-8 rounded-full px-3 text-[12.5px] font-bold ${kbd ? "bg-grape text-white" : "bg-white/10 text-white"}`}>Keyboard</button>
         <button onClick={focusAddress} disabled={status !== "live"} className="h-8 rounded-full bg-white/10 px-3 text-[12.5px] font-bold text-white disabled:opacity-40">Address bar</button>
-        <span className="ml-auto text-[11.5px] text-white/45">{zoom ? "Drag to move" : "Tap to click"}</span>
+        <span className="ml-auto text-[11.5px] text-white/45 max-[360px]:hidden">Tap to click</span>
       </div>
     </div>
   );

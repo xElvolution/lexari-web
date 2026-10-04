@@ -20,7 +20,7 @@ import pty from "node-pty";
 
 const PORT = Number(process.env.PORT || 3295);
 const SECRET = process.env.DESKTOP_SECRET || "";
-const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:2";
+const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:3";
 const SOCKS = process.env.DESKTOP_SOCKS || "/opt/lexari-desktop/socks";
 const IDLE_MS = Number(process.env.DESKTOP_IDLE_MS || 15 * 60_000);
 if (SECRET.length < 32) { console.error("DESKTOP_SECRET missing"); process.exit(1); }
