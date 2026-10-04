@@ -238,6 +238,7 @@ function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
   const [pick, setPick] = useState(primary);
   const [won, setWon] = useState<{ level: number; n: number } | null>(null);
   const [rises, setRises] = useState<{ k: number; t: string }[]>([]);
+  const [pending, setPending] = useState<number | null>(null);
   const agent = team.find((a) => a.id === pick) ?? team[0];
   const coins = coinsOf(s);
   const busy = useHubBusy();
@@ -245,19 +246,20 @@ function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
   const { level, xp } = levelOf(s, agent.id);
   const max = level >= MAX_LEVEL;
   const need = max ? 0 : xpFor(level);
-  const leveling = busy === "train";
-  const pct = max ? 100 : Math.round((xp / need) * 100);
   const toNext = Math.max(0, need - xp);
+  // Only an action that really crosses into the next level gets the bounce and "levelling up"; a small pack just moves the bar.
+  const leveling = busy === "train" && pending !== null && pending >= toNext;
+  const pct = max ? 100 : Math.round((xp / need) * 100);
   const minted = !!(s.live?.levels.find((l) => l.slug === agent.id)?.asset || s.meta[agent.id]?.nft?.tokenId);
   const locked = isLocked(s, agent.id);
   const perk = won ? PERKS.find((p) => p.level === won.level) : undefined;
   const nextPerk = PERKS.find((p) => p.level > level);
-  const train = (n: number) => void hub.train(agent.id, n).then((r) => {
+  const train = (n: number) => { setPending(n); setWon(null); void hub.train(agent.id, n).finally(() => setPending(null)).then((r) => {
     if (!r.ok) { toast({ text: r.error || "Not enough coins. Do a quest first.", face: "home" }); return; }
     const k = Date.now(); setRises((x) => [...x.slice(-2), { k, t: `+${Math.min(n, coins)} XP` }]);
     setTimeout(() => setRises((x) => x.filter((y) => y.k !== k)), 1200);
     if (r.levelsGained > 0) { navigator.vibrate?.([20, 40, 30]); setWon((w) => ({ level: r.level, n: (w?.n ?? 0) + 1 })); }
-  });
+  }); };
   const face = leveling || won ? "happy" : "idle";
   return (
     <Sheet label="Train your agents" onClose={onClose} data="train-sheet">
@@ -284,7 +286,7 @@ function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
         <p className="relative mt-2 text-[16px] font-bold leading-tight">{won ? `${agent.name} reached level ${won.level}!` : leveling ? `${agent.name} is levelling up…` : agent.name}</p>
         {won && perk && <p data-level-perk className="relative mt-0.5 text-[12.5px] leading-snug text-white/80">Perk unlocked: <b className="text-white">{perk.title}</b> · {perk.body}</p>}
         <div className="relative mt-2.5 flex items-center gap-2">
-          <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/15"><span data-level-xp className="block h-full rounded-full bg-[linear-gradient(90deg,#ffd84d,#ffffff)] transition-[width] duration-700 ease-out" style={{ width: `${leveling ? 100 : pct}%` }} /></span>
+          <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/15"><span data-level-xp className="block h-full rounded-full bg-[linear-gradient(90deg,#ffd84d,#ffffff)] transition-[width] duration-700 ease-out" style={{ width: `${pct}%` }} /></span>
           <span className="shrink-0 text-[11.5px] font-semibold tabular-nums text-white/75">{max ? "max" : `${xp}/${need} XP`}</span>
         </div>
         <p className="relative mt-1.5 text-[12.5px] font-semibold tabular-nums text-white/65">{max ? "Max level. A legend." : `${toNext} XP to level ${level + 1}`}</p>
