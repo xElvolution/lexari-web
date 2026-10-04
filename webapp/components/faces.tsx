@@ -1,7 +1,7 @@
 "use client";
 
 import { lookVariant, type FaceState } from "@shared/components/avatar";
-import { isLocked, primaryOf, useAgentActive, useApp, type AgentLook } from "@/lib/store";
+import { agentLevelOf, isLocked, primaryOf, useAgentActive, useApp, type AgentLook } from "@/lib/store";
 import { usePresence } from "@/lib/presence";
 import Face from "@shared/components/Face";
 import { specialistBySlug } from "@/content/appData";
@@ -42,7 +42,7 @@ export function AgentTile({ id, look, size = 48, face, className = "", radius, s
   const r = radius ?? Math.round(size * 0.32);
   const d = Math.max(8, Math.round(size * 0.24));
   // Level perks: a glow from level 4 (Card glow), gold from level 10 (Legend)
-  const lv = mine && size >= 26 && s ? s.hub?.levels?.[id]?.level ?? 1 : 1;
+  const lv = mine && size >= 26 && s ? agentLevelOf(s, id) : 1;
   const perk = lv >= 10 ? "legend" : lv >= 4 ? "glow" : undefined;
   return (
     <span data-agent-tile={id} data-tile-perk={perk} {...(primary ? { "data-primary": "" } : {})} data-ring={kind ? kind.replace("-ring", "") : undefined} className={`relative grid shrink-0 place-items-center ${primary ? "primary-ring" : kind} ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: r, background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)", ["--r" as string]: `${r}px` }}>

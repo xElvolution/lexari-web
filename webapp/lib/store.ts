@@ -614,7 +614,7 @@ async function replyFromModel(convo: string, userMsg: Msg) {
 }
 
 /** An agent's level from the Hub state (1 if it never trained). */
-export function agentLevelOf(st: State, agent: string) { return st.hub?.levels?.[agent]?.level ?? 1; }
+export function agentLevelOf(st: State, agent: string) { return st.live?.levels.find((l) => l.slug === agent)?.level ?? 1; }
 /**
  * The notes an agent reads before replying: its own first, then notes from any Mentor (level 9+) agent,
  * then the rest. Bigger memory (level 3) reads 20 instead of 8.
