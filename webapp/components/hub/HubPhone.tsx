@@ -59,11 +59,11 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
           {ready > 0 ? <a href="#quests" className="rounded-full bg-white px-2.5 py-1 text-[#3514b0]">{ready} reward{ready === 1 ? "" : "s"} ready</a> : <a href="#quests" className="rounded-full bg-white/15 px-2.5 py-1">See quests</a>}
           <a href="#level" className="rounded-full bg-white/15 px-2.5 py-1">Level up</a>
         </div>
-        <ul data-hub-team className="no-bar -mx-1 mt-3 flex gap-2 overflow-x-auto px-1" aria-label="Your team">
+        <ul data-hub-team className="no-bar -mx-1 mt-3 flex gap-3 overflow-x-auto px-1 pb-2 pr-3" aria-label="Your team">
           {myAgents(s).filter((a) => isCreated(s, a.id)).slice(0, 8).map((a) => (
             <li key={a.id} className="relative shrink-0">
               <span className="grid h-11 w-11 place-items-center rounded-[14px] bg-[#0a0a0a] ring-1 ring-white/15"><WhoFace who={a.id} look={a.id === "home" ? s.agent?.look : null} size={36} /></span>
-              <LevelBadge level={levelOf(s, a.id).level} small className="absolute -bottom-1.5 -right-1.5 !h-[22px] !w-[22px] [&_svg]:!h-[22px] [&_svg]:!w-[22px] [&>span]:!text-[10px]" />
+              <LevelBadge level={levelOf(s, a.id).level} small className="absolute -bottom-1.5 -right-2" />
             </li>
           ))}
         </ul>
