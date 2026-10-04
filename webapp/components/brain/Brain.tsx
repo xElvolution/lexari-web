@@ -4,13 +4,13 @@ import Link from "next/link";
 import { openAdd } from "../overlays";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { SPECIALISTS, type MemoryTag } from "@/content/appData";
+import { AGENT_SKILLS, SPECIALISTS, type MemoryTag } from "@/content/appData";
 import { eraseMemory } from "@/lib/chain";
 import { friendly } from "@/lib/api";
 import { bridgeFor } from "@/lib/walletBridge";
-import { addNote, agentName, downloadFile, editNote, forgetNote, get, toast, unlockMemories, useApp, type Note, type State } from "@/lib/store";
+import { addNote, agentName, downloadFile, editNote, forgetNote, get, primaryOf, toast, unlockMemories, useApp, type Note, type State } from "@/lib/store";
 import Icon from "../Icon";
-import { SpecFace } from "../faces";
+import { AgentTile, SpecFace } from "../faces";
 import { ago } from "../ui";
 import { BrainScene, CATS } from "./scene";
 
@@ -25,10 +25,20 @@ const BLURB: Record<string, string> = {
   "Hired agents": "Specialists working in your seats.",
 };
 
-function countFor(s: State, id: string) {
-  if (id === "Files") return s.jobs.filter((j) => j.status !== "running").reduce((a, j) => a + j.files.length, 0);
+const mineOf = (s: State, who: string) => s.memory.filter((m) => (m.agent || "home") === who);
+const jobsOf = (s: State, who: string) => s.jobs.filter((j) => j.status !== "running" && (j.assignee || "home") === who);
+function countFor(s: State, id: string, who: string) {
+  if (id === "Files") return jobsOf(s, who).reduce((a, j) => a + j.files.length, 0);
   if (id === "Hired agents") return s.hired.length;
-  return s.memory.filter((m) => m.tag === id).length;
+  return mineOf(s, who).filter((m) => m.tag === id).length;
+}
+/** The agents whose brain you can open: the ones you made (your personal agent first). */
+function brains(s: State) {
+  return [{ id: "home", name: agentName(s) }, ...s.custom.map((c) => ({ id: c.id, name: c.name }))];
+}
+function skillsOf(s: State, who: string) {
+  const ids = who === "home" ? s.meta.home?.skills ?? ["web", "files", "code", "calendar"] : s.custom.find((c) => c.id === who)?.skills ?? [];
+  return ids.map((k) => AGENT_SKILLS.find((x) => x.id === k)?.label ?? k);
 }
 
 function NoteRow({ n, now }: { n: Note; now: number }) {
@@ -94,7 +104,7 @@ function NoteRow({ n, now }: { n: Note; now: number }) {
   );
 }
 
-function Panel({ s, cat, onClose }: { s: State; cat: number; onClose: () => void }) {
+function Panel({ s, cat, who, whoName, onClose }: { s: State; cat: number; who: string; whoName: string; onClose: () => void }) {
   const c = CATS[cat]; const id = c.id;
   const el = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState("");
@@ -106,10 +116,10 @@ function Panel({ s, cat, onClose }: { s: State; cat: number; onClose: () => void
     gsap.fromTo(el.current, wide ? { x: 50, opacity: 0 } : { y: 60, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: 0.55, ease: "back.out(1.4)" });
     gsap.from(el.current.querySelectorAll("li"), { y: 14, opacity: 0, stagger: 0.04, duration: 0.4, delay: 0.12, ease: "power2.out", clearProps: "all" });
   }, [cat]);
-  const notes = s.memory.filter((m) => m.tag === id);
-  const files = s.jobs.filter((j) => j.status !== "running").flatMap((j) => j.files.map((f) => ({ ...f, job: j.id, at: j.startedAt + j.duration })));
+  const notes = mineOf(s, who).filter((m) => m.tag === id);
+  const files = jobsOf(s, who).flatMap((j) => j.files.map((f) => ({ ...f, job: j.id, at: j.startedAt + j.duration })));
   const hired = SPECIALISTS.filter((sp) => s.hired.includes(sp.slug));
-  const teach = () => { const t = draft.trim(); if (!t) return; addNote(t, id as MemoryTag, "You", true); setDraft(""); };
+  const teach = () => { const t = draft.trim(); if (!t) return; addNote(t, id as MemoryTag, "You", true, who); setDraft(""); };
 
   return (
     <div ref={el} role="dialog" aria-label={`${id} memories`} className="absolute inset-x-3 bottom-3 z-20 flex max-h-[64%] flex-col rounded-[26px] bg-card/90 shadow-[0_30px_80px_-30px_rgba(20,0,80,.6)] ring-1 ring-line backdrop-blur-xl min-[900px]:inset-x-auto min-[900px]:bottom-5 min-[900px]:right-5 min-[900px]:top-5 min-[900px]:max-h-none min-[900px]:w-[400px]">
@@ -124,7 +134,7 @@ function Panel({ s, cat, onClose }: { s: State; cat: number; onClose: () => void
       <div className="no-bar min-h-0 flex-1 overflow-y-auto p-4">
         {s.memoryLocked && EDITABLE.has(id) && notes.some((n) => n.locked) && <button onClick={() => void unlockMemories()} className="mb-2 flex w-full items-center justify-between gap-2 rounded-2xl bg-tint px-3.5 py-2.5 text-left text-[13px] text-ink/75"><span>These are encrypted on this device.</span><span className="font-bold text-brand-ink">Open</span></button>}
         {EDITABLE.has(id) && (notes.length ? <ul className="grid gap-2">{notes.map((n) => <NoteRow key={n.id} n={n} now={now} />)}</ul>
-          : <p className="rounded-2xl border-2 border-dashed border-line p-5 text-center text-[14px] text-ink/70">Nothing here yet. Teach {agentName(s)} something below.</p>)}
+          : <p className="rounded-2xl border-2 border-dashed border-line p-5 text-center text-[14px] text-ink/70">Nothing here yet. Teach {whoName} something below.</p>)}
         {id === "Files" && (files.length ? (
           <ul className="grid gap-2">
             {files.map((f) => (
@@ -148,7 +158,7 @@ function Panel({ s, cat, onClose }: { s: State; cat: number; onClose: () => void
       </div>
       {EDITABLE.has(id) && (
         <form onSubmit={(e) => { e.preventDefault(); teach(); }} className="flex gap-2 border-t border-line p-3">
-          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={id === "About you" ? `Tell ${agentName(s)} about you` : `Add to ${id.toLowerCase()}`} className="field !h-11 !rounded-full !py-0 !text-[15px]" aria-label="New memory" maxLength={120} />
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={id === "About you" ? `Tell ${whoName} about you` : `Add to ${id.toLowerCase()}`} className="field !h-11 !rounded-full !py-0 !text-[15px]" aria-label="New memory" maxLength={120} />
           <button disabled={!draft.trim()} aria-label="Remember this" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:scale-105 disabled:opacity-40"><Icon name="plus" size={18} /></button>
         </form>
       )}
@@ -164,8 +174,17 @@ export default function Brain() {
   const [focus, setFocus] = useState(-1);
   const [failed, setFailed] = useState(false);
   const seen = useRef<Set<string> | null>(null);
-  const total = s.memory.length;
-  const counts = useMemo(() => CATS.map((c) => countFor(s, c.id)), [s]);
+  const list = brains(s);
+  const [whoRaw, setWho] = useState(() => primaryOf(s));
+  const who = list.some((a) => a.id === whoRaw) ? whoRaw : "home";
+  const at = list.findIndex((a) => a.id === who);
+  const whoName = list[at]?.name || agentName(s);
+  const [picker, setPicker] = useState(false);
+  const total = mineOf(s, who).length;
+  const counts = useMemo(() => CATS.map((c) => countFor(s, c.id, who)), [s, who]);
+  const skills = skillsOf(s, who);
+  const step = (d: number) => { if (list.length < 2) return; setWho(list[(at + d + list.length) % list.length].id); setFocus(-1); scene.current?.setFocus(-1); };
+  const swipe = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const h = host.current; if (!h) return;
@@ -194,7 +213,7 @@ export default function Brain() {
   return (
     <section className="brain-stage relative h-[calc(100svh-132px-env(safe-area-inset-bottom))] min-h-[480px] overflow-hidden lg:h-[100svh]" style={Object.fromEntries(CATS.map((c, i) => [`--cat-${i}`, `var(--cat-${i}-v)`])) as React.CSSProperties}>
       <style>{`:root,[data-theme="light"]{${CATS.map((c, i) => `--cat-${i}-v:${c.light}`).join(";")}}[data-theme="dark"]{${CATS.map((c, i) => `--cat-${i}-v:${c.dark}`).join(";")}}`}</style>
-      <div ref={host} className="absolute inset-0" aria-label={`${agentName(s)}'s brain. Drag to turn it.`} role="img">
+      <div ref={host} className="absolute inset-0" aria-label={`${whoName}'s brain. Drag to turn it.`} role="img">
         {CATS.map((c, i) => (
           <button
             key={c.id}
@@ -214,14 +233,29 @@ export default function Brain() {
         ))}
       </div>
 
-      <div className="pointer-events-none absolute left-5 top-5 z-10 sm:left-8 sm:top-8">
+      <div className="pointer-events-none absolute left-5 right-5 top-5 z-10 sm:left-8 sm:top-8"
+        onTouchStart={(e) => { const t = e.touches[0]; swipe.current = { x: t.clientX, y: t.clientY }; }}
+        onTouchEnd={(e) => { const st = swipe.current; swipe.current = null; if (!st) return; const t = e.changedTouches[0]; const dx = t.clientX - st.x, dy = t.clientY - st.y; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1); }}>
         <p className="label flex items-center gap-2 text-brand-ink"><i className="live-dot h-2 w-2 rounded-full bg-grape" />Memory</p>
-        <h1 className="display mt-2 text-[40px] text-ink sm:text-[60px]">{agentName(s)}&apos;s brain</h1>
-        <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink/70"><span className="tab-num font-bold text-ink">{total}</span> memories in {CATS.length} areas</p>
+        <div className="pointer-events-auto relative mt-2 flex items-center gap-1.5">
+          {list.length > 1 && <button onClick={() => step(-1)} aria-label="Previous agent's brain" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-card/80 text-ink/70 ring-1 ring-line backdrop-blur hover:text-ink"><Icon name="left" size={15} /></button>}
+          <button data-brain-picker onClick={() => setPicker((p) => !p)} aria-haspopup="listbox" aria-expanded={picker} className="flex min-w-0 items-center gap-2 text-left" title="Switch agent">
+            <h1 className="display truncate text-[34px] leading-none text-ink sm:text-[56px]">{whoName}&apos;s brain</h1>
+            {list.length > 1 && <Icon name="right" size={16} className={`shrink-0 text-ink/50 transition ${picker ? "-rotate-90" : "rotate-90"}`} />}
+          </button>
+          {list.length > 1 && <button onClick={() => step(1)} aria-label="Next agent's brain" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-card/80 text-ink/70 ring-1 ring-line backdrop-blur hover:text-ink"><Icon name="right" size={15} /></button>}
+          {picker && list.length > 1 && (
+            <ul role="listbox" aria-label="Agents" data-brain-list className="pop absolute left-0 top-full z-30 mt-2 max-h-[50vh] w-[min(260px,80vw)] overflow-y-auto rounded-2xl bg-card p-1.5 shadow-[0_20px_50px_-12px_rgba(0,0,0,.5)] ring-1 ring-line">
+              {list.map((a) => <li key={a.id}><button role="option" aria-selected={a.id === who} onClick={() => { setWho(a.id); setPicker(false); setFocus(-1); scene.current?.setFocus(-1); }} className={`flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-[14px] font-semibold ${a.id === who ? "bg-tint text-ink" : "text-ink/80 hover:bg-tint"}`}><AgentTile id={a.id} look={s.agent?.look} size={30} status={false} />{a.name}{a.id === who && <Icon name="check" size={14} className="ml-auto text-brand-ink" />}</button></li>)}
+            </ul>
+          )}
+        </div>
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink/70"><span className="tab-num font-bold text-ink">{total}</span> memories in {CATS.length} areas{list.length > 1 && <span className="flex gap-1" aria-hidden>{list.map((a) => <i key={a.id} className={`h-1.5 rounded-full transition-all ${a.id === who ? "w-4 bg-grape" : "w-1.5 bg-ink/25"}`} />)}</span>}</p>
+        {skills.length > 0 && <div data-brain-skills className="mt-2 flex max-w-[min(520px,100%)] flex-wrap gap-1"><span className="label self-center pr-1 text-[8.5px] text-ink/50">Skills</span>{skills.slice(0, 8).map((k) => <span key={k} className="rounded-full bg-card/80 px-2 py-0.5 text-[11.5px] font-semibold text-ink/75 ring-1 ring-line backdrop-blur">{k}</span>)}</div>}
       </div>
       <p className={`label pointer-events-none absolute inset-x-0 bottom-4 z-10 mx-auto w-max max-w-[calc(100%-2rem)] rounded-full bg-card/85 px-3.5 py-2 text-center text-[9.5px] text-ink/75 shadow-[0_8px_24px_-12px_rgba(20,0,80,.35)] ring-1 ring-line backdrop-blur-md transition-opacity sm:inset-x-auto sm:left-8 sm:mx-0 ${focus >= 0 ? "opacity-0 min-[900px]:opacity-100" : ""}`}>Drag to turn · tap a label to open it</p>
       {failed && <p className="absolute inset-x-5 top-1/2 z-10 text-center text-[15px] text-ink/70">Your browser could not draw the 3D brain. Tap a label above to open that memory area.</p>}
-      {focus >= 0 && <Panel s={s} cat={focus} onClose={close} />}
+      {focus >= 0 && <Panel s={s} cat={focus} who={who} whoName={whoName} onClose={close} />}
     </section>
   );
 }
