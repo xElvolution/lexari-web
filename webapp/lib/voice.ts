@@ -2,6 +2,9 @@
 
 /* Voice: microphone permission, speech-to-text with the browser's SpeechRecognition, and text-to-speech with SpeechSynthesis. */
 
+import { SpeechQueue, TurnClock, afterBase, cleanBargeIn, isEcho, sentences, spokenUpTo, throughWord, type Sentence } from "./callTurn";
+export { isEcho };
+
 type RecResult = { isFinal: boolean; 0: { transcript: string } };
 type Rec = {
   lang: string;
@@ -51,7 +54,7 @@ function recError(code: string) {
 export type Transcriber = { stop: () => Promise<string>; abort: () => void; done: Promise<string> };
 
 /** One recognition session: ends after a phrase (or silence). onText gets final + interim for this session. */
-function session(Speech: new () => Rec, onText: (t: string) => void, maxMs: number) {
+function session(Speech: new () => Rec, onText: (t: string, final: string) => void, maxMs: number) {
   const rec = new Speech();
   rec.lang = navigator.language || "en-US";
   rec.interimResults = true;
@@ -65,7 +68,7 @@ function session(Speech: new () => Rec, onText: (t: string) => void, maxMs: numb
       final = "";
       for (let i = 0; i < ev.results.length; i++) { const r = ev.results[i]; if (r.isFinal) final += r[0].transcript; else interim += r[0].transcript; }
       heardAny = true;
-      onText((final + interim).trim());
+      onText((final + interim).trim(), final.trim());
     };
     rec.onerror = (ev) => { if (ev.error === "no-speech" || ev.error === "aborted") return; failed = new Error(recError(ev.error)); };
     rec.onend = () => { window.clearTimeout(timer); resolve({ text: (final + interim).trim(), error: failed, heardAny }); };
@@ -80,7 +83,7 @@ function session(Speech: new () => Rec, onText: (t: string) => void, maxMs: numb
  * (silence, a pause, the phone's own time limit), so a voice note records until you tap Send or Cancel.
  * Otherwise it ends after one phrase (calls).
  */
-export function transcribe(opts: { onText?: (t: string) => void; continuous?: boolean; maxMs?: number } = {}): Transcriber {
+export function transcribe(opts: { onText?: (t: string, final: string) => void; continuous?: boolean; maxMs?: number } = {}): Transcriber {
   const Speech = Ctor();
   if (!Speech) {
     const err = Promise.reject(new Error("This browser can't turn speech into text. Use Chrome or Safari, or type the message."));
@@ -100,7 +103,7 @@ export function transcribe(opts: { onText?: (t: string) => void; continuous?: bo
     while (true) {
       const left = until - Date.now();
       if (left <= 0) break;
-      const one = session(Speech, (t) => opts.onText?.(join(committed, t)), Math.min(left, 60_000));
+      const one = session(Speech, (t, f) => opts.onText?.(join(committed, t), join(committed, f)), Math.min(left, 60_000));
       current = one.rec;
       const r = await one.done;
       current = null;
@@ -161,13 +164,6 @@ export function speak(text: string, v?: VoiceSettings): Promise<void> {
   });
 }
 
-const words = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s']/gu, " ").split(/\s+/).filter(Boolean);
-/** True when what the mic heard is mostly the agent's own words coming out of the speaker. */
-export function isEcho(heard: string, spoken: string) {
-  const h = words(heard); if (!h.length) return true;
-  const said = new Set(words(spoken));
-  return h.filter((w) => said.has(w)).length / h.length >= 0.6;
-}
 
 /** Voice activity detection on the microphone: fires when someone starts talking. Calibrates to the room and to the
  *  agent's own voice leaking from the speaker during its first ~0.6 s, so the speaker alone doesn't trip it. */
@@ -212,87 +208,119 @@ export function ready(t: string, done: boolean) {
   if (cut < 0 && t.length > 120) { const c = Math.max(t.lastIndexOf(", "), t.lastIndexOf("; ")); if (c > 40) cut = c + 1; }
   return Math.max(0, cut);
 }
+/** How a spoken reply ended. said: what you said over it ("" if nothing). spoken: the part of the reply actually heard. */
+export type Heard = { said: string; interrupted: boolean; spoken: string };
 /**
  * Speaks while the microphone keeps listening (barge-in, like a voice-mode call):
- * - voice activity detection stops the agent's speech the instant you start talking;
- * - speech-to-text confirms it was you (not the agent's own voice echoing back) and keeps listening until you finish;
- * - if it was only a noise, the agent carries on from the word where it stopped.
- * Resolves with your words, or "" when the agent finished without being interrupted.
+ * - the reply is cut into sentences that go through a queue tagged with a turn id;
+ * - voice activity detection (or your words) stops speech the instant you start talking and empties the queue;
+ * - words you say are your new turn (the old answer is never resumed); results heard before you started are left out;
+ * - only a noise with no recognised words at all lets the agent carry on from the word where it stopped.
  */
-export function speakAndListen(source: string | Feed, v: VoiceSettings | undefined, opts: { onStart?: () => void; onBargeIn?: () => void; onHold?: () => void; onResume?: () => void; onText?: (t: string) => void; isStopped?: () => boolean } = {}): Promise<string> {
+export function speakAndListen(source: string | Feed, v: VoiceSettings | undefined, opts: { onStart?: () => void; onBargeIn?: () => void; onHold?: () => void; onResume?: () => void; onText?: (t: string) => void; isStopped?: () => boolean } = {}): Promise<Heard> {
   const feed: Feed = typeof source === "string" ? { text: () => source, done: () => true, more: () => Promise.resolve() } : source;
-  if (typeof window === "undefined" || !window.speechSynthesis || (feed.done() && !feed.text().trim())) return Promise.resolve("");
+  if (typeof window === "undefined" || !window.speechSynthesis || (feed.done() && !feed.text().trim())) return Promise.resolve({ said: "", interrupted: false, spoken: "" });
   window.speechSynthesis.cancel();
   return new Promise((resolve) => {
+    const clock = new TurnClock();
+    const queue = new SpeechQueue(clock);
+    let seg = clock.begin(); // a resume after a noise starts a new segment; holding or interrupting kills the old one
     let text = feed.text();
-    let interrupted = false, finished = false, settled = false, holding = false;
-    let at = 0, from = 0, began = 0;
+    let queued = 0, spokenEnd = 0, cut = -1, heardTo = 0; // cut: where speech stopped when you talked; heardTo: end of the last sentence started
+    let cur: Sentence | null = null, at = 0, began = 0, waiting = false, started = false;
+    let interrupted = false, finished = false, settled = false, holding = false, heardInHold = false;
     let ear: Transcriber | null = null, vad: Vad | null = null;
+    // per recognition session: its final results, and (once you interrupt) the finals from before that moment
+    let earState: { fin: string; base: string | null } = { fin: "", base: null };
     let safety = 0, holdTimer = 0;
-    const settle = (t: string) => { if (settled) return; settled = true; window.clearTimeout(safety); window.clearTimeout(holdTimer); vad?.stop(); vad = null; resolve(t); };
+    const spokenAt = () => (cur ? spokenUpTo(text, cur, at, performance.now() - began, v?.rate || 1) : spokenEnd);
+    const spokenText = () => text.slice(0, cut >= 0 ? cut : spokenEnd);
+    const audible = () => text.slice(0, Math.max(heardTo, spokenEnd)); // what the mic could have picked up from the speaker
+    const settle = (said: string) => {
+      if (settled) return; settled = true;
+      window.clearTimeout(safety); window.clearTimeout(holdTimer); vad?.stop(); vad = null; clock.kill(); queue.clear();
+      resolve({ said, interrupted, spoken: interrupted ? spokenText() : text });
+    };
+    /** Silence now: kill the segment, empty the queue, cancel the voice. A late onend from the cancelled sentence is ignored. */
+    const silence = () => { clock.kill(seg); queue.clear(); cur = null; window.clearTimeout(safety); window.speechSynthesis.cancel(); };
     const interrupt = () => {
-      if (interrupted) return;
-      interrupted = true; holding = false; gen++; window.clearTimeout(holdTimer); window.clearTimeout(safety);
-      window.speechSynthesis.cancel(); vad?.stop(); vad = null; opts.onBargeIn?.();
+      if (interrupted || settled) return;
+      if (!holding) { cut = spokenAt(); if (earState.base === null) earState.base = earState.fin; }
+      interrupted = true; holding = false; window.clearTimeout(holdTimer);
+      silence(); vad?.stop(); vad = null; opts.onBargeIn?.();
     };
-    const end = () => { if (interrupted || holding || finished) return; finished = true; ear?.abort(); settle(""); };
-    const startEar = () => {
-      if (finished || interrupted || settled || opts.isStopped?.()) return;
-      ear = transcribe({
-        maxMs: 60_000,
-        onText: (t) => {
-          if (finished && !interrupted) return;
-          if (!interrupted && t && !isEcho(t, text)) interrupt();
-          if (interrupted) opts.onText?.(t);
-        },
-      });
-      void ear.done.then((t) => {
-        if (interrupted) { settle(t && !isEcho(t, text) ? t : ""); return; }
-        if (!finished) startEar(); // a phrase of echo or silence ended: keep listening while it speaks
-      }, () => {
-        if (vad) { vad.stop(); vad = null; vadOff = true; } // the mic can't be shared here: rely on words only
-        if (!interrupted && !finished) window.setTimeout(startEar, 400);
-      });
-    };
-    let began0 = false;
-    let gen = 0; // each utterance gets a number so a stale onend can't move things along
-    const say = (start: number) => {
-      if (interrupted || holding || finished || settled || opts.isStopped?.()) { if (opts.isStopped?.()) end(); return; }
+    const end = () => { if (interrupted || holding || finished || settled) return; finished = true; ear?.abort(); settle(""); };
+    const stopped = () => { if (opts.isStopped?.()) { silence(); finished = true; ear?.abort(); settle(""); return true; } return false; };
+    const pump = () => {
+      if (interrupted || holding || finished || settled || stopped()) return;
       text = feed.text();
-      const stop = ready(text, feed.done());
-      if (stop <= start || !text.slice(start, stop).trim()) {
-        if (feed.done()) { if (!text.slice(start).trim()) { end(); return; } }
-        else { void feed.more().then(() => say(start)); return; } // wait for the next sentence
-      }
-      const upto = feed.done() ? text.length : stop;
-      const chunk = text.slice(start, upto);
-      if (!chunk.trim()) { end(); return; }
-      from = start; at = start; began = performance.now();
-      const my = ++gen;
-      if (!began0) { began0 = true; opts.onStart?.(); }
-      const u = utterance(chunk, v);
-      u.onboundary = (e) => { at = start + (e.charIndex || 0); };
-      const next = () => { if (my !== gen || holding) return; gen++; window.clearTimeout(safety); if (upto >= feed.text().length && feed.done()) end(); else say(upto); };
-      u.onend = next; u.onerror = next;
+      const upto = ready(text, feed.done());
+      if (upto > queued) { for (const x of sentences(text, queued, upto, seg)) queue.push(x); queued = upto; }
+      if (cur) return;
+      const s = queue.next();
+      if (s) { speakOne(s); return; }
+      if (feed.done()) { end(); return; }
+      if (!waiting) { waiting = true; void feed.more().then(() => { waiting = false; pump(); }); }
+    };
+    const speakOne = (s: Sentence) => {
+      cur = s; at = s.start; began = performance.now(); heardTo = Math.max(heardTo, s.end);
+      if (!started) { started = true; opts.onStart?.(); }
+      const u = utterance(s.text, v);
+      u.onboundary = (e) => { if (cur === s) at = s.start + (e.charIndex || 0); };
+      const fin = () => { if (cur !== s || !clock.isLive(s.turn)) return; cur = null; spokenEnd = s.end; window.clearTimeout(safety); pump(); };
+      u.onend = fin; u.onerror = fin;
       window.clearTimeout(safety);
-      safety = window.setTimeout(next, Math.min(60_000, 2000 + chunk.length * 90 / (v?.rate || 1)));
+      safety = window.setTimeout(fin, Math.min(60_000, 2000 + s.text.length * 90 / (v?.rate || 1)));
       window.speechSynthesis.speak(u);
     };
-    // VAD heard something: stop talking now, and give speech-to-text a moment to say whether it was you.
+    const startEar = () => {
+      if (finished || settled || (!interrupted && opts.isStopped?.())) return;
+      // a session started after you began talking has nothing from before it
+      const st = { fin: "", base: holding || interrupted ? "" : null as string | null };
+      earState = st;
+      const me = transcribe({
+        maxMs: 60_000,
+        onText: (t, f) => {
+          if (settled || (finished && !interrupted)) return;
+          const prev = st.fin; st.fin = f;
+          if (interrupted) { opts.onText?.(afterBase(t, st.base ?? "")); return; }
+          const fresh = afterBase(t, st.base ?? prev);
+          if (!fresh) return;
+          if (holding) heardInHold = true; // words after the voice stopped: never resume the old answer
+          if (!isEcho(fresh, audible())) { if (st.base === null) st.base = prev; interrupt(); opts.onText?.(afterBase(t, st.base)); }
+        },
+      });
+      ear = me;
+      void me.done.then((t) => {
+        if (settled || ear !== me) return;
+        if (interrupted) { settle(cleanBargeIn(t, st.base ?? "", throughWord(text, Math.max(0, cut)), audible())); return; }
+        if (!finished) startEar(); // a phrase of echo or silence ended: keep listening while it speaks (or while held)
+      }, () => {
+        if (vad) { vad.stop(); vad = null; vadOff = true; } // the mic can't be shared here: rely on words only
+        if (interrupted) { settle(""); return; }
+        if (!finished) window.setTimeout(startEar, 400);
+      });
+    };
+    // VAD heard something: stop talking now and empty the queue, then give speech-to-text a moment to say whether it was you.
     const hold = () => {
       if (interrupted || finished || holding || settled) return;
-      holding = true; gen++; window.speechSynthesis.cancel(); window.clearTimeout(safety);
+      cut = spokenAt();
+      holding = true; heardInHold = false;
+      if (earState.base === null) earState.base = earState.fin; // finals before this moment are not part of what you say
+      silence();
       opts.onHold?.();
-      // where it stopped: the last word boundary, or an estimate from elapsed time when the voice has no boundary events
-      const est = from + Math.floor(((performance.now() - began) / 1000) * 14 * (v?.rate || 1));
-      let resumeAt = at > from ? at : Math.min(text.length, est);
-      while (resumeAt > from && /\S/.test(text[resumeAt - 1] || "")) resumeAt--;
       holdTimer = window.setTimeout(() => {
         if (interrupted || settled) return;
-        holding = false; vad?.desensitize(); opts.onResume?.(); say(resumeAt); // only a noise or the speaker's echo
-      }, 1700);
+        // any recognised words since it stopped (even if they looked like echo) mean someone talked: don't resume
+        if (heardInHold) { interrupt(); if (!ear) settle(""); return; }
+        // only a noise: carry on from the word where it stopped (never from the start)
+        holding = false; vad?.desensitize(); opts.onResume?.();
+        seg = clock.begin(); queued = cut; spokenEnd = cut; cut = -1;
+        earState.base = null;
+        pump();
+      }, 2200);
     };
-    say(0);
+    pump();
     // give the speaker a moment to start so the first syllables aren't taken as you talking
     window.setTimeout(startEar, 350);
     void startVad(hold).then((x) => { if (settled || interrupted || finished) x?.stop(); else vad = x; });

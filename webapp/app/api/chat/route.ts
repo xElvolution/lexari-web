@@ -1,3 +1,4 @@
+import { INTERRUPTED } from "@/lib/callTurn";
 import { notify } from "@/server/notify";
 import { and, eq } from "drizzle-orm";
 import { currentSession } from "@/server/auth/session";
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
   prompt[0] = { ...prompt[0], content: `${prompt[0].content}\nYour name is ${speakerName}. When the person says your name (even misspelled by speech-to-text), they mean you.${isGroupChat && members.length ? ` You are in a group chat with ${members.join(", ")}${body.call ? " on a group voice call" : ""}. Every member answers in turn in their own voice. Only speak as yourself, never write lines for the others, and don't prefix your reply with your name.` : ""}` };
 
   const call = body.call === true;
-  if (call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${CALL_HINT}` };
+  if (call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${CALL_HINT}${cutOff(body.history) ? `\n${INTERRUPT_HINT}` : ""}` };
   const tools = !call && desktopOn();
   if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}` };
   const [me] = call ? [] : await retryRead(() => database.select({ wallet: users.wallet }).from(users).where(eq(users.id, userId)).limit(1)).catch(() => []);
@@ -241,7 +242,13 @@ async function saveTurn(userId: string, body: TurnBody, speaker: string, reply: 
   await database.update(chats).set({ updatedAt: new Date() }).where(eq(chats.id, chat.id));
 }
 
-const CALL_HINT = "You are on a live voice call with the person right now. Talk like a person on the phone: answer in one to three short spoken sentences, start with the answer, no lists, markdown, emojis, links or headings. Ask at most one short question back.";
+const CALL_HINT = "You are on a live voice call with the person right now. Talk like a person on the phone: answer in one or two short spoken sentences, start with the answer, no lists, markdown, emojis, links or headings. Ask at most one short question back.";
+const INTERRUPT_HINT = `The person just talked over you, so your previous reply was cut off; it is in the history only up to where it stopped, marked ${INTERRUPTED}. Do not repeat, continue or finish that reply, and don't mention being interrupted. Answer only their latest message, directly.`;
+/** True when the agent's most recent turn in the call history was cut off by the person talking over it. */
+function cutOff(history: { from: string; text: string }[]) {
+  for (let i = history.length - 1; i >= 0; i--) if (history[i].from !== "you") return history[i].text.includes(INTERRUPTED);
+  return false;
+}
 
 const DESKTOP_HINT = [
   DESKTOP_MARK,

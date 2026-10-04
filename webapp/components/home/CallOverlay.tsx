@@ -9,6 +9,7 @@ import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
 import { convoOf, fmtSecs, nameOf as agentLabel } from "../agents";
 import { afterStop, isStop } from "@/lib/names";
+import { TurnClock, interruptedRecord } from "@/lib/callTurn";
 
 
 type Phase = "connecting" | "listening" | "hearing" | "thinking" | "speaking" | "muted" | "error";
@@ -48,6 +49,8 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
     let stop = false;
     let abort: AbortController | null = null;
     let ear: Transcriber | null = null;
+    // one live turn at a time: a newer turn (or talking over the agent) kills the old id, and its late stream is dropped
+    const turns = new TurnClock();
     // the call remembers what was said in it (and the last few chat messages), but none of it is shown in the chat
     const history: { from: string; text: string }[] = (s.threads[id] || []).filter((m) => m.text && m.id !== "hello" && m.from !== "system").slice(-8).map((m) => ({ from: m.from, text: m.text }));
     let lastWho = c.members[0] || id;
@@ -85,10 +88,14 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
         let wake: () => void = () => {};
         const bump = () => { const w = wake; wake = () => {}; w(); };
         const feed: Feed = { text: () => text, done: () => done, more: () => new Promise<void>((r) => { wake = r; if (done) r(); }) };
+        abort?.abort(); // never two answers in flight
         const mine = new AbortController();
         abort = mine;
-        const turn = callTurn(id, said, history, (t) => { if (!mine.signal.aborted) { text = t; bump(); } }, mine.signal, who)
-          .then((t) => { if (!mine.signal.aborted) text = t || text; }, (e: Error) => { if (e.name !== "AbortError" && !mine.signal.aborted) failed = e.message || "Couldn't answer."; })
+        const tid = turns.begin();
+        const live = () => turns.isLive(tid) && !mine.signal.aborted;
+        const kill = () => { turns.kill(tid); mine.abort(); hush(); };
+        const turn = callTurn(id, said, history, (t) => { if (live()) { text = t; bump(); } }, mine.signal, who)
+          .then((t) => { if (live()) text = t || text; }, (e: Error) => { if (e.name !== "AbortError" && live()) failed = e.message || "Couldn't answer."; })
           .finally(() => { done = true; bump(); });
         history.push({ from: "you", text: said });
         // Keep listening while it thinks: if you say something new first, that becomes the turn and this answer is dropped.
@@ -103,18 +110,26 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
           else if (!stop) setPhase("thinking");
         }
         if (stop) return;
-        if (newer) { mine.abort(); hush(); next = newer; continue; }
+        if (newer) { kill(); history.push({ from: who, text: interruptedRecord("") }); next = newer; continue; }
         if (!text.trim()) { setNote(failed || `${nameOf(who)} couldn't answer. Say it again.`); setPhase("error"); await new Promise((r) => setTimeout(r, 1200)); continue; }
         if (mutedRef.current) { await turn; history.push({ from: who, text }); continue; }
-        next = await speakAndListen(feed, voiceOf(who), {
-          isStopped: () => stop || mutedRef.current || mine.signal.aborted,
+        const heard = await speakAndListen(feed, voiceOf(who), {
+          isStopped: () => stop || mutedRef.current || !live(),
           onStart: () => { if (!stop) setPhase("speaking"); },
           onHold: () => { if (!stop) setPhase("listening"); },
           onResume: () => { if (!stop) setPhase("speaking"); },
-          onBargeIn: () => { if (!stop) { hush(); setPhase("hearing"); } },
+          onBargeIn: () => { kill(); if (!stop) setPhase("hearing"); }, // stop the old answer for good, request included
         });
-        if (next) { mine.abort(); hush(); } // you talked over it: drop the rest of that answer, answer what you just said
-        else await turn;
+        if (stop) return;
+        if (heard.interrupted) {
+          // You talked over it: the old answer is dead. The call remembers only the words it actually said, marked as cut off,
+          // and the next turn is only what you said after it stopped (nothing at all if it was just a noise).
+          kill();
+          history.push({ from: who, text: interruptedRecord(heard.spoken) });
+          next = heard.said;
+          continue;
+        }
+        await turn;
         if (text.trim()) history.push({ from: who, text });
       }
     })();
