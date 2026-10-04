@@ -565,14 +565,20 @@ export function speakerFor(st: State, convo: string, text: string, fallback?: st
   return fallback && g.members.includes(fallback) ? fallback : g.members[0];
 }
 /**
- * Who answers a group message: only the members you @mentioned or named (fuzzy, so "Rica" is Rika), in the order you named them.
- * Nobody named: every member answers, one after another. Calls use the same rule.
+ * Who answers a group message. A reply to an agent's bubble goes only to that agent. Otherwise only the members you
+ * @mentioned or named (fuzzy, so "Rica" is Rika), in the order you named them. Nobody named: the agent who spoke
+ * last in this chat answers, else your primary agent.
  */
-export function groupOrder(st: State, convo: string, text: string) {
+export function groupOrder(st: State, convo: string, text: string, reply?: { from: string } | null) {
   const g = groupOf(st, convo);
   if (!g?.members.length) return ["home"];
+  if (reply && g.members.includes(reply.from)) return [reply.from];
   const named = addressedAll(text, memberNames(st, convo)).filter((m) => g.members.includes(m));
-  return named.length ? named : [...g.members];
+  if (named.length) return named;
+  const last = [...(st.threads[convo] || [])].reverse().find((m) => g.members.includes(m.from))?.from;
+  if (last) return [last];
+  const primary = primaryOf(st);
+  return [g.members.includes(primary) ? primary : g.members[0]];
 }
 
 /** Ask the model for a reply and stream the tokens into the thread. The server saves both messages. */
@@ -584,7 +590,7 @@ async function replyFromModel(convo: string, userMsg: Msg) {
   queued.add(convo);
   try {
     // A group: each member answers in its own bubble and voice, in turn (one model run at a time keeps the queue short).
-    const order = isGroup(convo) ? groupOrder(st, convo, userMsg.text) : [convo];
+    const order = isGroup(convo) ? groupOrder(st, convo, userMsg.text, userMsg.reply) : [convo];
     let after = userMsg.id, last = "";
     const peers: { from: string; text: string }[] = [];
     for (let i = 0; i < order.length; i++) {

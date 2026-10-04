@@ -340,7 +340,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
           <span className="min-w-0 flex-1 text-[13.5px] leading-snug text-ink/75"><b className="text-ink">{c.name} is locked on your {planOf(s).name} plan.</b> Your chats are kept. Upgrade to keep working together.</span>
           <button data-upgrade-plan onClick={() => openUpgrade("plans")} className="btn btn-brand btn-sm !h-10 shrink-0">Upgrade plan</button>
         </div></div>
-      ) : <Composer id={id} name={c.name} members={isGroup(id) ? Object.entries(memberNames(s, id)).map(([mid, n]) => ({ id: mid, name: n[0] || nameOf(s, mid) })) : undefined} suggestions={suggestions} onCall={onCall} onDesktop={onDesktop} desktopOpen={desktopOpen}
+      ) : <Composer id={id} name={c.name} suggestions={suggestions} onCall={onCall} onDesktop={onDesktop} desktopOpen={desktopOpen}
         reply={reply ? { id: reply.id, from: reply.from, text: reply.text || (reply.voice ? "Voice note" : reply.file?.name ?? "") } : null} replyName={reply ? whoName(s, reply.from) : ""} onClearReply={() => setReply(null)} />}
     </section>
   );
