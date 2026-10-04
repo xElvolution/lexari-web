@@ -14,6 +14,7 @@ import { AgentTile, GroupTile } from "../faces";
 import { convoOf, dayLabel, fmtSecs, nameOf, shortTime } from "../agents";
 import Composer from "./Composer";
 import { mentionParts } from "@/lib/names";
+import { CHAT_BG, MY_BUBBLE } from "@/lib/cosmetics";
 import { openAgent, openUpgrade } from "../overlays";
 
 function VoiceNote({ secs, mine }: { secs: number; mine: boolean }) {
@@ -189,7 +190,8 @@ function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
     onReply: () => { setMenu(null); onReply(m); },
     onLike: () => toggleReaction(convo, m.id, "❤️"),
   });
-  const cls = mine ? `bg-grape text-white ${lastOfRun ? "rounded-br-md" : ""}` : `bg-card text-ink ring-1 ring-line ${lastOfRun ? "rounded-bl-md" : ""}`;
+  const myStyle = mine ? MY_BUBBLE[s.live?.cosmetics?.bubble || ""] : undefined;
+  const cls = mine ? `${myStyle || "bg-grape text-white"} ${lastOfRun ? "rounded-br-md" : ""}` : `bg-card text-ink ring-1 ring-line ${lastOfRun ? "rounded-bl-md" : ""}`;
   return (
     <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`} data-msg-hold={m.id}>
       {(m.text || m.file || m.voice) ? <div ref={box} className="group/msg relative max-w-full">
@@ -280,7 +282,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
         {c.group && <button onClick={onEditGroup} aria-label="Edit group" title="Edit group" className="grid h-10 w-10 place-items-center rounded-full text-ink/75 transition hover:bg-tint hover:text-brand-ink"><Icon name="users" size={19} /></button>}
       </header>
 
-      <div ref={scroller} className="no-bar min-h-0 flex-1 overflow-y-auto" aria-live="polite">
+      <div ref={scroller} data-chat-bg={s.live?.cosmetics?.bg || undefined} className="no-bar min-h-0 flex-1 overflow-y-auto" style={CHAT_BG[s.live?.cosmetics?.bg || ""]} aria-live="polite">
         <div className="mx-auto flex min-h-full max-w-[820px] flex-col px-4 py-6 sm:px-6 max-[430px]:px-3 max-[430px]:py-4">
           {msgs.length === 0 && (
             <div className="m-auto max-w-sm text-center">

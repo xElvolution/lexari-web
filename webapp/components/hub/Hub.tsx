@@ -10,6 +10,8 @@ import Quests from "./quests";
 import LevelUp from "./level";
 import Referral from "./referral";
 import { Achievements } from "./board";
+import { useState } from "react";
+import { StoreButton, StoreSheet } from "./store";
 
 const JUMP = [["#checkin", "Check in"], ["#quests", "Quests"], ["#level", "Level up"], ["#invite", "Invite"]] as const;
 
@@ -19,6 +21,7 @@ export default function Hub() {
   const tick = useNow(1000);
   const now = tick || Date.now();
   const h = hubOf(s);
+  const [store, setStore] = useState(false);
   useEffect(() => { void refreshHub(); }, []);
   const phone = useSyncExternalStore((f) => { const m = window.matchMedia("(max-width: 430px)"); m.addEventListener("change", f); return () => m.removeEventListener("change", f); }, () => window.matchMedia("(max-width: 430px)").matches, () => false);
   if (phone) return <><HubPhone s={s} now={now} /><FloatingBalance s={s} /></>;
@@ -27,7 +30,8 @@ export default function Hub() {
   return (
     <div id="top" className="scroll-mt-24">
       <PageHead kicker="Hub" title="Earn. Level up." body="Quests and check-ins pay coins. Spend them to train your agents and unlock perks."
-        right={<nav aria-label="Hub sections" className="no-bar flex gap-1.5 overflow-x-auto">{JUMP.map(([href, l]) => <a key={href} href={href} className="chip shrink-0">{l}</a>)}</nav>} />
+        right={<div className="flex items-center gap-2"><nav aria-label="Hub sections" className="no-bar flex gap-1.5 overflow-x-auto">{JUMP.map(([href, l]) => <a key={href} href={href} className="chip shrink-0">{l}</a>)}</nav><StoreButton onOpen={() => setStore(true)} /></div>} />
+      {store && <StoreSheet s={s} onClose={() => setStore(false)} />}
       <div className="mt-7 space-y-5">
         {s.live && !s.live.program.live && (
           <p role="status" className="rounded-[22px] bg-tint px-5 py-4 text-[14.5px] font-semibold text-ink/80 ring-1 ring-line">Rewards open soon. The Lexari program is not live on Solana yet, so check-ins, quests and level-ups can&apos;t be signed today. Your progress still counts.</p>

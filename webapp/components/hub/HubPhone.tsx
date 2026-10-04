@@ -19,6 +19,7 @@ import { myAgents } from "@/components/agents";
 import { openAgent, openUpgrade } from "@/components/overlays";
 import { Coin, Rise, flyCoins } from "./coin";
 import BoxModal from "./BoxModal";
+import { StoreButton, StoreSheet } from "./store";
 
 
 /* Native phone layout for the Hub (≤430px). Same actions as the desktop Hub, compact rows and cards. */
@@ -28,7 +29,7 @@ const h2 = "text-[1.0625rem] font-bold leading-tight text-ink";
 const meta = "text-[12.5px] leading-snug text-ink/60";
 const pill = "inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-3.5 text-[13px] font-bold transition disabled:opacity-50";
 
-type SheetId = "train" | "invite" | "badges";
+type SheetId = "train" | "invite" | "badges" | "store";
 const SHEET_FOR: Record<string, SheetId> = { "#level": "train", "#invite": "invite", "#achievements": "badges" };
 
 export default function HubPhone({ s, now }: { s: State; now: number }) {
@@ -49,6 +50,7 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
     <div id="top" className="space-y-3 pb-2" onClickCapture={onLink}>
       <header className="flex items-end justify-between gap-3 pt-1">
         <div><p className="label text-[9.5px] text-brand-ink">Hub</p><h1 className="mt-1 text-[1.375rem] font-extrabold leading-none tracking-tight text-ink">Earn and level up</h1></div>
+        <StoreButton onOpen={() => setSheet("store")} />
       </header>
 
       {/* balance */}
@@ -79,6 +81,7 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
       </div>
       {sheet === "train" && <TrainSheet s={s} onClose={() => setSheet(null)} />}
       {sheet === "invite" && <InviteSheet s={s} onClose={() => setSheet(null)} />}
+      {sheet === "store" && <StoreSheet s={s} onClose={() => setSheet(null)} />}
       {sheet === "badges" && <AchievementsSheet s={s} now={now} onClose={() => setSheet(null)} />}
     </div>
   );
