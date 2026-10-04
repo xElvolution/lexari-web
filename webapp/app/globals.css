@@ -39,3 +39,10 @@ html[data-motion="off"] :is(.hub-flame, .hub-flame-core, .hub-orbit, .hub-orbit 
 @keyframes primary-glow { 0%, 100% { box-shadow: 0 0 0 2px #f5c542, 0 0 10px 1px rgba(245, 197, 66, 0.45); } 50% { box-shadow: 0 0 0 2.5px #ffd96a, 0 0 22px 5px rgba(245, 197, 66, 0.75); } }
 .primary-ring::before { content: ""; position: absolute; inset: -3px; border-radius: calc(var(--r, 14px) + 3px); pointer-events: none; animation: primary-glow 2.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .primary-ring::before { animation: none; box-shadow: 0 0 0 2px #f5c542, 0 0 12px 2px rgba(245, 197, 66, 0.5); } }
+
+/* mystery box (placeholder motion until the reference style lands) */
+@keyframes box-bounce { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-14px) scale(1.04, 0.97); } }
+@keyframes box-shake { 0%, 100% { transform: rotate(0) scale(1.05); } 15% { transform: rotate(-12deg) scale(1.08); } 30% { transform: rotate(10deg) scale(1.1); } 45% { transform: rotate(-9deg) scale(1.12); } 60% { transform: rotate(8deg) scale(1.14); } 75% { transform: rotate(-5deg) scale(1.16); } }
+.box-bounce { display: inline-block; animation: box-bounce 1.3s ease-in-out infinite; }
+.box-shake { display: inline-block; animation: box-shake 0.45s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .box-bounce, .box-shake { animation: none; } }

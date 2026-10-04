@@ -1,9 +1,9 @@
 "use client";
 
-import { checkIn, claimReward, levelUp, programIsLive } from "./chain";
+import { checkIn, claimRewardFast, levelUp, programIsLive } from "./chain";
 import { friendly } from "./api";
 import { MAX_LEVEL, QUESTS, TIERS, coinsOf, levelOf, type HubAdapter } from "./hub";
-import { get, hubReady, refreshHub } from "./store";
+import { get, hubReady, refreshHub, set, toast } from "./store";
 import { ensureBridge } from "./walletBridge";
 
 async function ready() {
@@ -13,6 +13,25 @@ async function ready() {
   const who = await ensureBridge(s.auth?.address, s.auth?.wallet, s.auth?.method === "google");
   if (!who) return { who: null, error: s.auth?.method === "google" ? "Your wallet is still loading. Try again in a moment." : "Connect the wallet you signed in with first." };
   return { who, error: "" };
+}
+
+/** Show the reward now; the chain confirm and server record finish in the background (rolled back if they fail). */
+function optimistic(kind: "quest" | "box" | "tier", key: string | number, coins: number, sig: string, settled: Promise<unknown>, what: string) {
+  set((x) => {
+    const live = x.live; if (!live) return x;
+    const player = live.player ? { ...live.player, coins: live.player.coins + coins, lifetime: live.player.lifetime + coins } : live.player;
+    return {
+      ...x, bond: { ...x.bond, coins: (player?.coins ?? x.bond.coins) },
+      live: {
+        ...live, player,
+        quests: kind === "quest" ? live.quests.map((q) => (q.id === key ? { ...q, claimed: true } : q)) : live.quests,
+        box: kind === "box" ? { ...live.box, opened: true, coins } : live.box,
+        referral: kind === "tier" ? { ...live.referral, tiers: live.referral.tiers.map((t) => (t.tier === key ? { ...t, claimed: true } : t)) } : live.referral,
+        ledger: [{ kind: kind === "quest" ? "claim_quest" : kind === "box" ? "open_box" : "claim_referral_tier", amount: coins, at: Date.now(), tx: sig, data: {} }, ...live.ledger],
+      },
+    };
+  });
+  settled.catch((e) => { void refreshHub(); toast({ text: friendly(e, `${what} didn't go through on Solana. Your coins were not added.`), face: "home" }); });
 }
 
 export const chainHub: HubAdapter = {
@@ -36,7 +55,8 @@ export const chainHub: HubAdapter = {
     if (!r.who) return { ok: false, coins: 0, error: r.error };
     if (!QUESTS.some((q) => q.id === id)) return { ok: false, coins: 0, error: "Unknown quest." };
     try {
-      const res = await claimReward(r.who, { kind: "quest", questId: id });
+      const res = await claimRewardFast(r.who, { kind: "quest", questId: id });
+      optimistic("quest", id, res.coins, res.sig, res.settled, "That claim");
       return { ok: true, coins: res.coins };
     } catch (e) {
       void refreshHub();
@@ -67,7 +87,8 @@ export const chainHub: HubAdapter = {
     if (!r.who) return { ok: false, coins: 0, error: r.error };
     if (!TIERS[i]) return { ok: false, coins: 0, error: "Unknown tier." };
     try {
-      const res = await claimReward(r.who, { kind: "tier", tier: i });
+      const res = await claimRewardFast(r.who, { kind: "tier", tier: i });
+      optimistic("tier", i, res.coins, res.sig, res.settled, "That reward");
       return { ok: true, coins: res.coins };
     } catch (e) {
       void refreshHub();
@@ -78,7 +99,8 @@ export const chainHub: HubAdapter = {
     const r = await ready();
     if (!r.who) return { ok: false, coins: 0, error: r.error };
     try {
-      const res = await claimReward(r.who, { kind: "box" });
+      const res = await claimRewardFast(r.who, { kind: "box" });
+      optimistic("box", 0, res.coins, res.sig, res.settled, "The box");
       return { ok: true, coins: res.coins };
     } catch (e) {
       void refreshHub();
@@ -89,3 +111,6 @@ export const chainHub: HubAdapter = {
     throw new Error("Friends join when they sign up with your invite link.");
   },
 };
+
+// Warm the "is the program live" check so the first tap doesn't wait on it.
+if (typeof window !== "undefined") setTimeout(() => void programIsLive().catch(() => {}), 1500);

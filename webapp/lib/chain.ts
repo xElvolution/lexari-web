@@ -78,13 +78,29 @@ export async function sendAndRecord(bridge: WalletBridge, ixs: TransactionInstru
 
 /** A reward the server checked and co-signed (quest, box, referral tier). Your wallet signs and pays the fee. */
 export async function claimReward(bridge: WalletBridge, req: { kind: "quest"; questId: string } | { kind: "box" } | { kind: "tier"; tier: number }) {
+  const { sig, coins, settled } = await claimRewardFast(bridge, req);
+  const r = await settled;
+  return { sig, coins, ...r };
+}
+
+/**
+ * Fast claim: resolves as soon as Solana accepted the transaction (preflight passed), so the app can show the
+ * coins right away. `settled` confirms on chain and records it on the server in the background.
+ */
+export async function claimRewardFast(bridge: WalletBridge, req: { kind: "quest"; questId: string } | { kind: "box" } | { kind: "tier"; tier: number }) {
   const built = await api<{ tx: string; coins: number; lastValidBlockHeight: number }>("/api/hub/claim", { body: req });
   const tx = Transaction.from(Uint8Array.from(atob(built.tx), (c) => c.charCodeAt(0)));
   if (!tx.feePayer?.equals(bridge.publicKey)) throw new Error("That reward was built for another wallet.");
   const signed = await bridge.signTransaction(tx);
-  const sig = await sendSigned(signed, built.lastValidBlockHeight);
-  const r = await confirmOnServer(sig);
-  return { sig, coins: built.coins, ...r };
+  const conn = connection();
+  const sig = await conn.sendRawTransaction(signed.serialize(), { preflightCommitment: "confirmed", maxRetries: 5 });
+  const settled = (async () => {
+    const res = await conn.confirmTransaction({ signature: sig, blockhash: signed.recentBlockhash!, lastValidBlockHeight: built.lastValidBlockHeight }, "confirmed");
+    if (res.value.err) throw new Error("The claim failed on Solana.");
+    return confirmOnServer(sig);
+  })();
+  settled.catch(() => {});
+  return { sig, coins: built.coins, settled };
 }
 
 export async function checkIn(bridge: WalletBridge, live: HubState | null | undefined) {

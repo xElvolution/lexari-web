@@ -1,5 +1,6 @@
 "use client";
 
+import SignInLoader from "@/components/SignInLoader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -147,6 +148,7 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm" onClick={phase === "done" ? undefined : onClose}>
+      {phase === "done" && <SignInLoader sub="Your wallet signed. Setting up your session…" />}
       <div ref={card} role="dialog" aria-live="polite" onClick={(e) => e.stopPropagation()} className="relative w-full max-w-[400px] rounded-[30px] bg-card p-7 text-center text-ink shadow-[0_14px_0_#5b2bff] ring-1 ring-line">
         {phase !== "done" && <button onClick={onClose} aria-label="Cancel" className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-tint text-ink transition hover:rotate-90"><Icon name="x" size={16} /></button>}
         <div className="relative mx-auto grid h-24 w-24 place-items-center">
@@ -226,6 +228,7 @@ export default function SignIn() {
     })();
   }, [ready, authenticated, user, bridge, router, getAccessToken]);
   const privyBusy = authenticated && (privyStep === "wallet" || privyStep === "sign");
+  const loader = privyBusy ? <SignInLoader sub={privyStep === "wallet" ? "Getting your Lexari wallet ready…" : "Confirming your account…"} /> : null;
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = gsap.context(() => {
@@ -237,6 +240,7 @@ export default function SignIn() {
 
   return (
     <main ref={root} className="grid min-h-[100svh] bg-base text-ink lg:grid-cols-[1fr_1fr]">
+      {loader}
       <section className="grain carpet-w relative flex flex-col overflow-hidden bg-grape px-6 pb-10 pt-6 text-white sm:px-10 lg:min-h-[100svh] lg:pb-14">
         <div className="relative z-10 flex items-center justify-between">
           <Link href={LANDING_URL} aria-label="Lexari home" style={{ "--ink": "#fff", "--bg": "#5b2bff" } as React.CSSProperties}><Logo /></Link>

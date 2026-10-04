@@ -15,6 +15,7 @@ import { myAgents } from "@/components/agents";
 import { burst } from "@/components/fly";
 import { openAgent } from "@/components/overlays";
 import { Coin, flyCoins } from "./coin";
+import BoxModal from "./BoxModal";
 
 /* Native phone layout for the Hub (≤430px). Same actions as the desktop Hub, compact rows and cards. */
 
@@ -100,16 +101,15 @@ function BoxCard({ s, now }: { s: State; now: number }) {
   const opened = h.boxes.length > 0;
   const won = opened ? h.ledger.find((e) => e.reason === "Mystery box")?.delta ?? 0 : 0;
   const busy = useHubBusy();
-  const [shake, setShake] = useState(false);
+  const [shake] = useState(false);
+  const [modal, setModal] = useState<"" | "real" | "preview">("");
   const el = useRef<HTMLButtonElement>(null);
-  const open = () => {
-    setShake(true);
-    void hub.openBox(now || Date.now()).then((r) => {
-      setShake(false);
-      if (!r.ok) { toast({ text: r.error || "The box did not open.", face: "home" }); return; }
-      flyCoins(el.current, r.coins); burst(el.current, 16);
-      toast({ text: r.coins >= 120 ? `Jackpot! +${r.coins} coins` : `Mystery box · +${r.coins} coins`, face: "home" });
-    });
+  const open = () => setModal("real");
+  const run = async () => {
+    if (modal === "preview") { const c = won || 60; return { ok: true, coins: c }; }
+    const r = await hub.openBox(now || Date.now());
+    if (r.ok) { flyCoins(el.current, r.coins); burst(el.current, 16); }
+    return r;
   };
   return (
     <section id="box" className="flex scroll-mt-20 flex-col rounded-[18px] bg-[#0a0a0a] p-3.5 text-white ring-1 ring-white/10">
@@ -117,9 +117,10 @@ function BoxCard({ s, now }: { s: State; now: number }) {
       <div className="mt-2 text-[15px] font-bold">Mystery box</div>
       <div className="text-[12px] leading-snug text-white/60">{opened ? `Won ${won || "?"} · next in ${countdown(nextReset("daily", now) - now)}` : "15 to 250 coins, once a day"}</div>
       <div className="mt-auto pt-3">
-        {opened ? <span className={`${pill} w-full bg-white/10 text-white/80`}>Opened</span>
-          : <button ref={el} type="button" onClick={open} disabled={!!busy} className={`${pill} w-full bg-white text-[#0a0a0a]`}>{busy === "box" ? "Opening…" : "Open"}</button>}
+        {opened ? <button type="button" data-box-replay onClick={() => setModal("preview")} className={`${pill} w-full bg-white/10 text-white/80`}>Opened · replay</button>
+          : <button ref={el} type="button" data-box-card-open onClick={open} disabled={!!busy} className={`${pill} w-full bg-white text-[#0a0a0a]`}>{busy === "box" ? "Opening…" : "Open"}</button>}
       </div>
+      <BoxModal open={!!modal} preview={modal === "preview"} onOpen={run} onClose={() => setModal("")} />
     </section>
   );
 }
