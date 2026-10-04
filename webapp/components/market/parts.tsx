@@ -61,7 +61,7 @@ export function AppCard({ a, wide = false, fill = false }: { a: Specialist; wide
                 <span className="grain pointer-events-none absolute inset-0" />
                 <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full border-[18px] opacity-25" style={{ borderColor: PALETTE[a.color].fill }} />
                 <span aria-hidden className="pointer-events-none absolute right-16 top-6 h-3 w-3 rounded-full opacity-70" style={{ background: PALETTE[a.color].fill }} />
-                <span className="relative flex items-center justify-between gap-2">
+                <span className="relative flex items-center justify-between gap-2 pr-9">
                   <span className="label rounded-full bg-white px-2 py-1 text-[8.5px] text-[#0a0a0a]">New</span>
                   <span className="label truncate text-[8.5px] text-white/70">{a.job}</span>
                 </span>

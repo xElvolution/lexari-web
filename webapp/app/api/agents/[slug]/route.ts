@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { agents, chats } from "@/server/db/schema";
 import { jsonError, readJson } from "@/server/http";
@@ -29,6 +29,6 @@ export const PATCH = withUser<{ params: Promise<{ slug: string }> }>(async (user
   const [row] = await database.select().from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, slug))).limit(1);
   if (!row) return jsonError(404, "There is no such agent.");
   const { memoryOn, ...meta } = body;
-  await database.update(agents).set({ meta: { ...(row.meta || {}), ...meta }, ...(memoryOn === undefined ? {} : { memoryOn }), updatedAt: new Date() }).where(eq(agents.id, row.id));
+  await database.update(agents).set({ meta: sql`coalesce(${agents.meta}, '{}'::jsonb) || ${JSON.stringify(meta)}::jsonb`, ...(memoryOn === undefined ? {} : { memoryOn }), updatedAt: new Date() }).where(eq(agents.id, row.id));
   return Response.json({ ok: true });
 });

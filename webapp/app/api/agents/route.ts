@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { agents } from "@/server/db/schema";
 import { recordEvent } from "@/server/events";
@@ -28,7 +28,8 @@ export const POST = withUser(async (user, req) => {
     lookJson: body.look === undefined ? existing?.lookJson ?? {} : { v: body.look }, meta: { ...(existing?.meta || {}), ...body.meta }, updatedAt: new Date(),
   };
   if (existing) {
-    await database.update(agents).set(values).where(eq(agents.id, existing.id));
+    // Merge meta in one statement so a parallel PATCH (e.g. the agent's voice, saved alongside) is not overwritten.
+    await database.update(agents).set({ ...values, meta: sql`coalesce(${agents.meta}, '{}'::jsonb) || ${JSON.stringify(body.meta || {})}::jsonb` }).where(eq(agents.id, existing.id));
     return Response.json({ ok: true });
   }
   const count = await database.select({ id: agents.id }).from(agents).where(eq(agents.userId, user.userId));

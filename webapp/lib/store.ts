@@ -475,6 +475,17 @@ const push = (convo: string, m: Omit<Msg, "id" | "at">) => {
   set((x) => ({ ...x, threads: { ...x.threads, [convo]: [...(x.threads[convo] || []), { ...m, id, at: Date.now() }].slice(-200) } }));
   return id;
 };
+/** Adds a message right after another one (a reply sits under the message it answers, even if you sent more since). */
+const pushAfter = (convo: string, afterId: string, m: Omit<Msg, "id" | "at">) => {
+  const id = uid();
+  set((x) => {
+    const list = [...(x.threads[convo] || [])]; const i = list.findIndex((mm) => mm.id === afterId);
+    const msg = { ...m, id, at: Date.now() } as Msg;
+    if (i < 0 || i === list.length - 1) list.push(msg); else list.splice(i + 1, 0, msg);
+    return { ...x, threads: { ...x.threads, [convo]: list.slice(-200) } };
+  });
+  return id;
+};
 function setMsg(convo: string, id: string, text: string) {
   set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((m) => (m.id === id ? { ...m, text } : m)) } }));
 }
@@ -501,8 +512,9 @@ async function replyFromModel(convo: string, userMsg: Msg) {
   queued.add(convo);
   const speaker = speakerFor(st, convo, userMsg.text);
   typingWho.set(convo, speaker); emit();
-  const bubble = push(convo, { from: speaker, text: "" });
-  const history = (st.threads[convo] || []).filter((m) => m.id !== userMsg.id && m.id !== "hello" && m.text && m.from !== "system").slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) }));
+  const bubble = pushAfter(convo, userMsg.id, { from: speaker, text: "" });
+  const all = st.threads[convo] || []; const upto = all.findIndex((m) => m.id === userMsg.id);
+  const history = (upto >= 0 ? all.slice(0, upto) : all).filter((m) => m.id !== userMsg.id && m.id !== "hello" && m.text && m.from !== "system").slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) }));
   const memoryOn = st.prefs.memory !== false && st.meta[speaker]?.memory !== false;
   const recall = memoryOn ? st.memory.filter((n) => !n.locked && n.text).slice(0, 8).map((n) => ({ tag: n.tag.slice(0, 40), text: n.text.slice(0, 240) })) : [];
   const text = userMsg.text || (userMsg.voice ? `Voice note, ${userMsg.voice} seconds.` : userMsg.file ? `Attachment: ${userMsg.file.name}` : "");
@@ -568,8 +580,15 @@ export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voic
   const v = text.trim(); if (!v && !extra.file && !extra.voice) return Promise.resolve("");
   const msgId = push(id, { from: "you", text: v, ...extra });
   const msg = (get().threads[id] || []).find((m) => m.id === msgId)!;
-  return replyFromModel(id, msg);
+  // One reply at a time per chat: a message sent while the agent is still answering waits its turn
+  // (it used to be dropped: it showed, got no reply and was gone after a reload).
+  const prev = chains.get(id) ?? Promise.resolve("");
+  const run = prev.catch(() => "").then(() => replyFromModel(id, msg));
+  chains.set(id, run);
+  void run.finally(() => { if (chains.get(id) === run) chains.delete(id); });
+  return run;
 }
+const chains = new Map<string, Promise<string>>();
 
 /* ---------- reactions ---------- */
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎉", "👀", "🔥"];
