@@ -186,7 +186,7 @@ function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
     <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`} data-msg-hold={m.id}>
       <div ref={box} className="group/msg relative max-w-full">
         <span aria-hidden className="pointer-events-none absolute left-0 top-1/2 grid h-9 w-9 -translate-x-[130%] -translate-y-1/2 place-items-center rounded-full bg-tint text-brand-ink" style={{ opacity: gesture.shift > 24 ? 1 : 0 }}><Icon name="reply" size={16} /></span>
-        <div {...gesture.handlers} title={shortTime(m.at, now)} className={`relative select-text rounded-[20px] px-4 py-2.5 text-[15.5px] leading-snug ${cls} ${open ? "ring-2 ring-grape" : ""} [-webkit-touch-callout:none]`} style={{ transform: `translateX(${gesture.shift}px)`, transition: gesture.shift ? "none" : "transform .2s ease", touchAction: "pan-y" }}>
+        <div {...gesture.handlers} title={shortTime(m.at, now)} className={`relative select-text rounded-[20px] px-4 py-2.5 text-[15.5px] leading-snug max-[430px]:rounded-[18px] max-[430px]:px-3.5 max-[430px]:py-2 max-[430px]:leading-[1.4] ${cls} ${open ? "ring-2 ring-grape" : ""} [-webkit-touch-callout:none]`} style={{ transform: `translateX(${gesture.shift}px)`, transition: gesture.shift ? "none" : "transform .2s ease", touchAction: "pan-y" }}>
           <Body m={m} mine={mine} s={s} />
           {gesture.pop && <span className="pop pointer-events-none absolute -right-1 -top-3 text-[22px]" aria-hidden>❤️</span>}
         </div>
@@ -249,7 +249,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-base">
-      <header className="flex h-[64px] shrink-0 items-center gap-3 border-b border-line px-3 sm:px-5">
+      <header className="flex h-[64px] shrink-0 items-center gap-3 border-b border-line px-3 sm:px-5 max-[430px]:h-[54px] max-[430px]:gap-2 max-[430px]:px-2">
         {onBack && <button onClick={onBack} aria-label="Back to chats" data-tour="chat-back" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink transition hover:bg-tint"><Icon name="back" size={20} /></button>}
         {c.group ? (
           <button onClick={onEditGroup} className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl text-left">
@@ -269,7 +269,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
       </header>
 
       <div ref={scroller} className="no-bar min-h-0 flex-1 overflow-y-auto" aria-live="polite">
-        <div className="mx-auto flex min-h-full max-w-[820px] flex-col px-4 py-6 sm:px-6">
+        <div className="mx-auto flex min-h-full max-w-[820px] flex-col px-4 py-6 sm:px-6 max-[430px]:px-3 max-[430px]:py-4">
           {msgs.length === 0 && (
             <div className="m-auto max-w-sm text-center">
               {c.group ? <GroupTile members={c.members} look={look} size={96} className="mx-auto" /> : <AgentTile id={id} look={look} size={96} className="mx-auto" />}

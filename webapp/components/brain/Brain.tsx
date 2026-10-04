@@ -122,6 +122,7 @@ function Panel({ s, cat, onClose }: { s: State; cat: number; onClose: () => void
         <button onClick={onClose} aria-label="Close" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-tint text-ink transition hover:rotate-90"><Icon name="x" size={16} /></button>
       </div>
       <div className="no-bar min-h-0 flex-1 overflow-y-auto p-4">
+        {s.memoryLocked && EDITABLE.has(id) && notes.some((n) => n.locked) && <button onClick={() => void unlockMemories()} className="mb-2 flex w-full items-center justify-between gap-2 rounded-2xl bg-tint px-3.5 py-2.5 text-left text-[13px] text-ink/75"><span>These are encrypted on this device.</span><span className="font-bold text-brand-ink">Open</span></button>}
         {EDITABLE.has(id) && (notes.length ? <ul className="grid gap-2">{notes.map((n) => <NoteRow key={n.id} n={n} now={now} />)}</ul>
           : <p className="rounded-2xl border-2 border-dashed border-line p-5 text-center text-[14px] text-ink/70">Nothing here yet. Teach {agentName(s)} something below.</p>)}
         {id === "Files" && (files.length ? (
@@ -217,8 +218,6 @@ export default function Brain() {
         <p className="label flex items-center gap-2 text-brand-ink"><i className="live-dot h-2 w-2 rounded-full bg-grape" />Memory</p>
         <h1 className="display mt-2 text-[40px] text-ink sm:text-[60px]">{agentName(s)}&apos;s brain</h1>
         <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink/70"><span className="tab-num font-bold text-ink">{total}</span> memories in {CATS.length} areas</p>
-        {s.memoryLocked && <button onClick={() => void unlockMemories()} className="btn btn-brand btn-sm pointer-events-auto mt-3 !h-10"><Icon name="memory" size={15} />Open your memories</button>}
-        {s.memoryLocked && <p className="mt-2 max-w-[22rem] text-[12.5px] text-ink/60">They are encrypted. Your wallet signs once on this device to open them.</p>}
       </div>
       <p className={`label pointer-events-none absolute inset-x-0 bottom-4 z-10 mx-auto w-max max-w-[calc(100%-2rem)] rounded-full bg-card/85 px-3.5 py-2 text-center text-[9.5px] text-ink/75 shadow-[0_8px_24px_-12px_rgba(20,0,80,.35)] ring-1 ring-line backdrop-blur-md transition-opacity sm:inset-x-auto sm:left-8 sm:mx-0 ${focus >= 0 ? "opacity-0 min-[900px]:opacity-100" : ""}`}>Drag to turn · tap a label to open it</p>
       {failed && <p className="absolute inset-x-5 top-1/2 z-10 text-center text-[15px] text-ink/70">Your browser could not draw the 3D brain. Tap a label above to open that memory area.</p>}

@@ -17,7 +17,7 @@ import { Coin, flyCoins } from "./coin";
 /* Native phone layout for the Hub (≤430px). Same actions as the desktop Hub, compact rows and cards. */
 
 const card = "rounded-[18px] bg-card ring-1 ring-line";
-const h2 = "text-[17px] font-bold leading-tight text-ink";
+const h2 = "text-[1.0625rem] font-bold leading-tight text-ink";
 const meta = "text-[12.5px] leading-snug text-ink/60";
 const pill = "inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-3.5 text-[13px] font-bold transition disabled:opacity-50";
 
@@ -29,7 +29,7 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
   return (
     <div id="top" className="space-y-3 pb-2">
       <header className="flex items-end justify-between gap-3 pt-1">
-        <div><p className="label text-[9.5px] text-brand-ink">Hub</p><h1 className="mt-1 text-[22px] font-extrabold leading-none tracking-tight text-ink">Earn and level up</h1></div>
+        <div><p className="label text-[9.5px] text-brand-ink">Hub</p><h1 className="mt-1 text-[1.375rem] font-extrabold leading-none tracking-tight text-ink">Earn and level up</h1></div>
       </header>
 
       {/* balance */}
@@ -38,7 +38,7 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
         <p className="label text-[9px] text-white/70">Your balance</p>
         <div className="mt-1.5 flex items-center gap-2.5">
           <span data-coin-target className="inline-grid"><Coin size={30} /></span>
-          <span className="text-[28px] font-extrabold leading-none tabular-nums" aria-live="polite">{coins.toLocaleString("en-US")}</span>
+          <span className="text-[1.75rem] font-extrabold leading-none tabular-nums" aria-live="polite">{coins.toLocaleString("en-US")}</span>
           <span className="ml-auto text-right text-[12px] leading-tight text-white/75">+{week.toLocaleString("en-US")} this week<br />{h.lifetime.toLocaleString("en-US")} all time</span>
         </div>
         <div className="mt-3 flex gap-2 text-[12px] font-semibold">
