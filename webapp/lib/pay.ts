@@ -85,7 +85,7 @@ export async function payForHire(slug: string, name: string): Promise<{ ok: true
   return r.ok ? { ok: true, tx: r.tx, mint: "SOL", price: HIRE_LAMPORTS } : r;
 }
 
-export type Card = { agent: string; issuer: string; test: boolean; number: string; last4: string; expMonth: number; expYear: number; cvv: string; limit: number; spent: number; frozen: boolean; tx: string };
+export type Card = { agent: string; issuer: string; test: boolean; number: string; last4: string; expMonth: number; expYear: number; cvv: string; limit: number; spent: number; frozen: boolean; tx: string; amount?: number; createdAt?: string };
 
 /** Pays the card price in devnet SOL to the treasury, then the server verifies it and issues the card. */
 export async function payForCard(agent: string, limit: number, name = "your agent"): Promise<{ ok: true; tx: string; card: Card } | { ok: false; error: string; cancelled?: boolean }> {

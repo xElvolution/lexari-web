@@ -94,8 +94,17 @@ export default function CardSheet({ agent, name, card, onClose }: { agent: strin
             <div className="py-3"><div className="text-[14.5px] font-semibold text-ink">Monthly limit</div>
               <div className="mt-2 grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Monthly limit">{CARD_LIMITS.map((l) => <button key={l} role="radio" aria-checked={card.limit === l} onClick={() => card.limit !== l && act({ limit: l }, `Limit set to $${l} a month`)} className={`rounded-xl py-1.5 text-[13px] font-bold ring-1 transition ${card.limit === l ? "bg-tint text-ink ring-2 ring-grape" : "text-ink/70 ring-line hover:ring-grape/50"}`}>${l}</button>)}</div></div>
           </div>
-          <div className="mt-4"><span className="label text-[9px] text-ink/55">Recent purchases</span><p className="mt-1.5 text-[13.5px] text-ink/60">No purchases yet. When {name} buys a tool or compute, it shows here.</p></div>
-          {card.tx && <a href={txUrl(card.tx)} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink/55 hover:text-brand-ink">Card payment on Solana <Icon name="arrow" size={12} /></a>}
+          <div data-card-history className="mt-4">
+            <span className="label text-[9px] text-ink/55">Transactions</span>
+            <ul className="mt-2 divide-y divide-[var(--line)] rounded-2xl px-4 ring-1 ring-line">
+              <li className="flex items-center gap-3 py-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-tint text-brand-ink"><Icon name="file" size={16} /></span>
+                <span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold text-ink">Card bought</span><span className="block text-[12px] text-ink/55">{card.createdAt ? new Date(card.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "Paid on Solana"}{card.tx ? " · " : ""}{card.tx && <a href={txUrl(card.tx)} target="_blank" rel="noreferrer" className="font-semibold hover:text-brand-ink">View on Solana</a>}</span></span>
+                <span className="tab-num shrink-0 font-mono text-[13px] font-semibold text-ink">{card.amount ? `−${(card.amount / 1e9).toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL` : ""}</span>
+              </li>
+            </ul>
+            <p className="mt-2 text-[12.5px] text-ink/55">{card.spent ? `$${card.spent} spent this month.` : `No purchases yet. When ${name} buys a tool or compute, it shows here.`}</p>
+          </div>
         </>}
       </div>
     </div>

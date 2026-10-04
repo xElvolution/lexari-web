@@ -13,11 +13,8 @@ import { myAgents, type MyAgent } from "../agents";
 import { openAdd } from "../overlays";
 import CardVisual from "./CardVisual";
 import GetCardDialog from "./GetCardDialog";
-import { CARD_LIMITS } from "./cards";
-import { cardFor, updateCard, useCards } from "./useCards";
-import { friendly } from "@/lib/api";
+import { cardFor, useCards } from "./useCards";
 import type { Card } from "@/lib/pay";
-import { cardPriceLabel } from "@/lib/prices";
 import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
 import CardSheet from "./CardSheet";
 
@@ -122,34 +119,23 @@ function OtherWallet({ s, a, card, onCard }: { s: State; a: MyAgent; card: Card 
   );
 }
 
-function CardRow({ s, a, card, onGet, onOpen }: { s: State; a: MyAgent; card: Card | null; onGet: () => void; onOpen: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const act = async (patch: { frozen?: boolean; limit?: number }, done: string) => {
-    setBusy(true);
-    try { await updateCard(a.id, patch); toast({ text: done, face: "home" }); } catch (e) { toast({ text: friendly(e, "Could not update the card."), face: "home" }); } finally { setBusy(false); }
-  };
+/** One card: the card itself, a thin usage bar and a centred View card button. Everything else is in the card sheet. */
+function CardRow({ a, card, onGet, onOpen }: { a: MyAgent; card: Card | null; onGet: () => void; onOpen: () => void }) {
+  const pct = card ? Math.min(100, Math.round((card.spent / Math.max(1, card.limit)) * 100)) : 0;
   return (
-    <article data-rise className="grid items-center gap-4 rounded-[24px] bg-card p-4 ring-1 ring-line sm:p-5 md:grid-cols-[minmax(0,320px)_1fr]">
-      {card ? <button data-open-card={a.id} onClick={onOpen} aria-label={`Open ${a.name}'s card`} className="block w-full max-w-[360px] text-left transition active:scale-[.98]"><CardVisual id={a.id} name={a.name} card={card} /></button> : <CardVisual id={a.id} name={a.name} card={card} className="opacity-90" />}
-      <div className="min-w-0">
-        <div className="flex items-center gap-2"><h3 className="truncate text-[17px] font-bold text-ink">{a.name}</h3>
-          {card ? <span className={`label rounded-full px-2 py-0.5 text-[8px] ${card.frozen ? "bg-ink/10 text-ink/70" : "bg-[#e7f8ee] text-[#137a3d]"}`}>{card.frozen ? "Frozen" : "Active"}</span>
-            : <span className="label rounded-full border border-dashed border-ink/30 px-2 py-0.5 text-[8px] text-ink/60">No card</span>}</div>
-        {card ? (
-          <>
-            <p className="mt-1 text-[14px] leading-snug text-ink/65">Test card ending {card.last4} · ${card.spent} of ${card.limit} used this month.</p>
-            <div className="mt-3 grid grid-cols-4 gap-1.5" role="radiogroup" aria-label={`Monthly limit for ${a.name}`}>
-              {CARD_LIMITS.map((l) => <button key={l} role="radio" aria-checked={card.limit === l} disabled={busy} onClick={() => card.limit !== l && act({ limit: l }, `Limit set to $${l} a month`)} className={`rounded-xl py-1.5 text-center text-[13px] font-bold ring-1 transition ${card.limit === l ? "bg-tint text-ink ring-2 ring-grape" : "text-ink/70 ring-line hover:ring-grape/50"}`}>${l}</button>)}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2"><button onClick={onOpen} className="btn btn-brand btn-sm"><Icon name="eye" size={15} />View card</button><button onClick={() => act({ frozen: !card.frozen }, card.frozen ? "Card unfrozen" : "Card frozen")} disabled={busy} className="btn btn-line btn-sm text-ink disabled:opacity-60"><Icon name={card.frozen ? "check" : "x"} size={15} />{card.frozen ? "Unfreeze" : "Freeze"}</button></div>
-          </>
-        ) : (
-          <>
-            <p className="mt-1 text-[14px] leading-snug text-ink/65">{a.id === "home" ? "Let your personal agent pay for what it needs, inside a limit you set." : `${a.name} needs its own card to buy tools or compute for you.`} {cardPriceLabel()} on devnet.</p>
-            <button onClick={onGet} className="btn btn-brand btn-sm mt-3"><Icon name="plus" size={15} />Get a card</button>
-          </>
-        )}
-      </div>
+    <article data-rise data-card-row={a.id} className="mx-auto flex w-full max-w-[400px] flex-col items-center gap-3 rounded-[24px] bg-card p-4 ring-1 ring-line">
+      {card ? <button data-open-card={a.id} onClick={onOpen} aria-label={`Open ${a.name}'s card`} className="block w-full text-left transition active:scale-[.98]"><CardVisual id={a.id} name={a.name} card={card} /></button> : <CardVisual id={a.id} name={a.name} card={card} className="w-full opacity-90" />}
+      {card ? (
+        <>
+          <div data-card-usage className="w-full px-1" aria-label={`${pct}% of the monthly limit used`}>
+            <div className="h-1 overflow-hidden rounded-full bg-ink/10"><div className="h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></div>
+            <div className="mt-1.5 text-right text-[11.5px] font-semibold tabular-nums text-ink/55">{pct}% used</div>
+          </div>
+          <button data-view-card-row onClick={onOpen} className="btn btn-brand btn-sm"><Icon name="eye" size={15} />View card</button>
+        </>
+      ) : (
+        <button onClick={onGet} className="btn btn-brand btn-sm"><Icon name="plus" size={15} />Get a card for {a.name}</button>
+      )}
     </article>
   );
 }
@@ -189,7 +175,7 @@ export default function WalletsView() {
           </section>
         </div>
       ) : (
-        <div className="mt-6 grid gap-3">{agents.map((a) => <CardRow key={a.id} s={s} a={a} card={cardFor(cards, a.id)} onGet={() => setGetFor(a.id)} onOpen={() => setOpenFor(a.id)} />)}</div>
+        <div className="mt-6 grid gap-3">{agents.map((a) => <CardRow key={a.id} a={a} card={cardFor(cards, a.id)} onGet={() => setGetFor(a.id)} onOpen={() => setOpenFor(a.id)} />)}</div>
       )}
       {getFor && <GetCardDialog s={s} id={getFor} onClose={() => setGetFor(null)} />}
       {openFor && cardFor(cards, openFor) && <CardSheet agent={openFor} name={agents.find((a) => a.id === openFor)?.name || "Agent"} card={cardFor(cards, openFor)!} onClose={() => setOpenFor(null)} />}
