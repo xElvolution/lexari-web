@@ -23,6 +23,9 @@ const HOME = process.env.GROK_HOME || "/root";
 const MAX = Math.max(1, Number(process.env.RELAY_CONCURRENCY || 2));
 const TIMEOUT_MS = 120_000;
 let running = 0;
+const QUEUE_MS = 45_000;
+const queue = [];
+const next = () => { while (running < MAX && queue.length) queue.shift()(); };
 
 const lockdown = (system, prompt, cwd, model) => [
   "-p", prompt,
@@ -45,7 +48,16 @@ function run(sock, line) {
   const { system, prompt, model } = req || {};
   if (typeof system !== "string" || typeof prompt !== "string" || !prompt || Buffer.byteLength(system) > 60_000 || Buffer.byteLength(prompt) > 120_000) return end(sock, { relayExit: -1, stderr: "bad request" });
   if (model != null && (typeof model !== "string" || !/^[\w.-]{1,64}$/.test(model))) return end(sock, { relayExit: -1, stderr: "bad model" });
-  if (running >= MAX) return end(sock, { relayExit: -1, stderr: "busy" });
+  if (running >= MAX) {
+    // Wait for a free slot instead of failing straight away (several agents in a group, or two app processes during a deploy).
+    if (queue.length >= MAX * 6) return end(sock, { relayExit: -1, stderr: "busy" });
+    const item = () => { if (!sock.destroyed) run(sock, line); };
+    queue.push(item);
+    const drop = () => { const i = queue.indexOf(item); if (i >= 0) queue.splice(i, 1); };
+    sock.on("close", drop);
+    setTimeout(() => { if (queue.includes(item)) { drop(); end(sock, { relayExit: -1, stderr: "busy" }); } }, QUEUE_MS);
+    return;
+  }
   running++;
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "lexari-grok-"));
   const child = spawn(BIN, lockdown(system, prompt, cwd, model || ""), { cwd, env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME, LANG: "C.UTF-8", NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"] });
@@ -59,6 +71,7 @@ function run(sock, line) {
   child.on("close", (code) => {
     clearTimeout(timer);
     running--;
+    setImmediate(next);
     fs.rmSync(cwd, { recursive: true, force: true });
     fs.rmSync(path.join(HOME, ".grok", "sessions", encodeURIComponent(cwd)), { recursive: true, force: true });
     end(sock, { relayExit: code, stderr: stderr.slice(0, 300) });

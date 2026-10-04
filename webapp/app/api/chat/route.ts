@@ -37,7 +37,9 @@ export async function POST(req: Request) {
   const minePromise = retryRead(() => db().select().from(agents).where(eq(agents.userId, session.userId)));
   minePromise.catch(() => {});
   try {
-    const [perMin, perDay] = await Promise.all([rateLimit(`chat:m:${session.userId}`, PER_MINUTE), rateLimit(`chat:d:${session.userId}`, PER_DAY, 86_400_000)]);
+    // Every member of a group answers the same message: only the first answer counts against the per-minute limit.
+    const groupFollow = body.follow === true && body.convo.startsWith("g-") && !body.call;
+    const [perMin, perDay] = await Promise.all([groupFollow ? Promise.resolve(true) : rateLimit(`chat:m:${session.userId}`, PER_MINUTE), rateLimit(`chat:d:${session.userId}`, PER_DAY, 86_400_000)]);
     if (!perMin) return jsonError(429, "That's a lot of messages. Wait a minute.");
     if (!perDay) return jsonError(429, "You've reached today's message limit. It resets tomorrow.");
   } catch (error) {
@@ -64,12 +66,24 @@ export async function POST(req: Request) {
   const speakerName = (speakerRow?.meta as { nick?: string })?.nick || speakerRow?.name || body.speaker;
   const role = speakerRow?.kind === "hired" ? house?.job || speakerRow.role : speakerRow?.role || home.role;
   const tone = speakerRow?.tone || home.tone || "short";
+  // In a group, earlier turns by other members are labelled with their names, and the agent knows who else is in the room.
+  const isGroupChat = body.convo.startsWith("g-");
+  const nameFor = (slug: string) => { const r = mine.find((a) => a.slug === slug); return (r?.meta as { nick?: string })?.nick || r?.name || SPECIALISTS.find((x) => x.slug === slug)?.name || slug; };
+  let members: string[] = [];
+  if (isGroupChat) {
+    const [g] = await retryRead(() => database.select({ members: chats.memberSlugs, title: chats.title }).from(chats).where(and(eq(chats.userId, userId), eq(chats.slug, body.convo))).limit(1)).catch(() => []);
+    members = (g?.members || []).filter((m) => m !== body.speaker).map(nameFor);
+  }
+  const history = isGroupChat ? body.history.map((t) => (t.from !== "you" && t.from !== body.speaker ? { ...t, text: `${nameFor(t.from)} said: ${t.text}` } : t)) : body.history;
+  const peers = (body.peers || []).filter((p) => p.from !== body.speaker);
+  const text = peers.length ? `${body.text}\n\n(Already answered in the group:\n${peers.map((p) => `${nameFor(p.from)}: ${p.text}`).join("\n")}\nNow give YOUR answer as ${speakerName}. Add something of your own; don't repeat them or speak for them.)` : body.text;
   const prompt = buildPrompt({
     agentName: home.name, role, tone, speaker: speakerName,
     about: speakerRow?.kind === "custom" ? speakerRow.about : house?.back || "",
     you: (home.meta as { you?: string })?.you || "",
-    history: body.history, recall: speakerRow?.memoryOn === false ? [] : body.recall, text: body.text,
+    history, recall: speakerRow?.memoryOn === false ? [] : body.recall, text,
   });
+  prompt[0] = { ...prompt[0], content: `${prompt[0].content}\nYour name is ${speakerName}. When the person says your name (even misspelled by speech-to-text), they mean you.${isGroupChat && members.length ? ` You are in a group chat with ${members.join(", ")}${body.call ? " on a group voice call" : ""}. Every member answers in turn in their own voice. Only speak as yourself, never write lines for the others, and don't prefix your reply with your name.` : ""}` };
 
   const call = body.call === true;
   if (call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${CALL_HINT}` };
@@ -81,8 +95,8 @@ export async function POST(req: Request) {
   const hold = tools || !!wallet;
 
   // Your message is saved before the agent starts, so it never disappears if the reply fails or the page reloads.
-  let userSaved = false;
-  if (!call) try { await saveUserMsg(userId, body); userSaved = true; } catch (error) { console.error(`[chat] save user message: ${(error as Error).message}`); }
+  let userSaved = body.follow === true; // a later group member answers a message the first one already saved
+  if (!call && !userSaved) try { await saveUserMsg(userId, body); userSaved = true; } catch (error) { console.error(`[chat] save user message: ${(error as Error).message}`); }
 
   const sent = Date.now();
   const encoder = new TextEncoder();
@@ -90,6 +104,8 @@ export async function POST(req: Request) {
   // Leaving or reloading the page must not lose the reply: keep generating and save it; the app picks it up on its next load.
   // Only a hard cap stops a runaway reply.
   const cap = setTimeout(() => abort.abort(), 180_000);
+  // A call turn the person talked over (or hung up on) is dropped right away, so it doesn't hold a model slot.
+  if (call) req.signal.addEventListener("abort", () => abort.abort(), { once: true });
   const stream = new ReadableStream({
     async start(controller) {
       const send = (payload: unknown) => { try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)); } catch {} };
@@ -151,11 +167,11 @@ export async function POST(req: Request) {
         if (split.remember) send({ remember: split.remember });
         if (call) { send({ done: true }); return; } // a call is not saved as chat messages
         await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay ? { send: pay } : null, userSaved);
-        await recordEvent(userId, "message", { ref: body.userMsgId });
+        if (!body.follow) await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).
         await notify(userId, { kind: "reply", title: speakerName || "Your agent", body: split.reply.replace(/\s+/g, " ").slice(0, 140), url: `/agents/${encodeURIComponent(body.convo)}`, key: `reply:${body.replyMsgId}` });
         // A real request to a specialist or an agent you made is a job, with the reply as its output.
-        if (body.speaker !== "home" && body.text.trim().length >= 12) {
+        if (body.speaker !== "home" && body.text.trim().length >= 12 && !body.follow) {
           const now = new Date();
           await database.insert(jobs).values({
             userId, agentId: speakerRow?.id, assignee: body.speaker, prompt: body.text.slice(0, 2000), status: "done",

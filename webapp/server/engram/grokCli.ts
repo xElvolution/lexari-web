@@ -138,7 +138,33 @@ function runRelay(cfg: ReturnType<typeof grokCliConfig>, system: string, prompt:
   return { out: sock, exited, stderr: () => stderr, killed: () => killed, kill: () => { killed = true; sock.destroy(); }, cleanup: () => {}, onLine };
 }
 
+const RETRY_MS = [700, 1800, 3500];
+const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((r) => { const t = setTimeout(r, ms); signal?.addEventListener("abort", () => { clearTimeout(t); r(); }, { once: true }); });
+
+/**
+ * Streams one reply. A run that fails before any text arrived (the relay was busy, the CLI hit a rate limit or
+ * exited with an error) is retried with backoff, so a group where several agents answer in a row, or a call
+ * overlapping a chat, still gets every reply. Only when every try fails does the person see an error.
+ */
 export async function* streamGrokCli(messages: ChatMessage[], signal?: AbortSignal, model?: string): AsyncGenerator<string> {
+  let last: unknown;
+  for (let attempt = 0; attempt <= RETRY_MS.length; attempt++) {
+    let any = false;
+    try {
+      for await (const t of runOnce(messages, signal, model)) { any = true; yield t; }
+      return;
+    } catch (e) {
+      last = e;
+      if (any || signal?.aborted || attempt === RETRY_MS.length || (e instanceof ModelError && /not connected|queue full|in time/.test(e.friendly))) throw e;
+      console.error(`[grok-cli] try ${attempt + 1} failed, retrying: ${(e as Error).message.slice(0, 200)}`);
+      await sleep(RETRY_MS[attempt] + Math.floor(Math.random() * 400), signal);
+      if (signal?.aborted) throw e;
+    }
+  }
+  throw last;
+}
+
+async function* runOnce(messages: ChatMessage[], signal?: AbortSignal, model?: string): AsyncGenerator<string> {
   const cfg = { ...grokCliConfig() };
   if (model) cfg.model = model;
   if (!cfg.ready) throw new ModelError("The agent is not connected to a model yet.", cfg.socket ? `grok-cli: relay socket ${cfg.socket} missing` : `grok-cli: no login under ${cfg.home || "(no HOME)"}/.grok`);

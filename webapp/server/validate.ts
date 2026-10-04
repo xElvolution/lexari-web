@@ -63,6 +63,10 @@ export const chatBody = z.object({
   meta: z.object({ file: z.object({ name: z.string().max(120), size: z.string().max(20) }).optional(), voice: z.number().max(3600).optional(), reply: z.object({ id: z.string().max(40), from: z.string().max(80), text: z.string().max(300) }).optional() }).partial().default({}),
   /** a live voice call turn: answered in short spoken sentences and not saved to the chat */
   call: z.boolean().optional(),
+  /** a group turn after the first member answered (the same message, so it doesn't count against the per-minute limit) */
+  follow: z.boolean().optional(),
+  /** what other group members already answered to this message */
+  peers: z.array(z.object({ from: z.string().max(80), text: z.string().max(1200) })).max(12).optional(),
 }).strict();
 
 export const groupBody = z.object({

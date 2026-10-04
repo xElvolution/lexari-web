@@ -18,6 +18,7 @@ import { applyTheme } from "@shared/components/theme";
 import { signOutSession } from "./session";
 import { bridgeFor, runSignOutHooks } from "./walletBridge";
 import { openNote, savedKeys, sealNote, unlock } from "./vault";
+import { addressed } from "./names";
 
 export type Msg = {
   id: string; from: string; text: string; at: number; jobId?: number;
@@ -48,7 +49,7 @@ export const DEFAULT_PREFS: Prefs = {
   notif: { replies: true, groups: true, calls: true, wallet: true, cards: true, digest: false, product: false },
 };
 /** A memory. `locked` until this device has the key (one wallet signature). */
-export type Note = { id: string; tag: MemoryTag; text: string; source: string; at: number; chainHash?: string; chainAsset?: string; chainTx?: string; pendingChain?: boolean; serverId?: string; locked?: boolean; saving?: boolean; /** HMAC of the text: the dedupe key and the onchain hash */ hash?: string };
+export type Note = { /** the agent that keeps it ("home" or one you made) */ agent?: string; id: string; tag: MemoryTag; text: string; source: string; at: number; chainHash?: string; chainAsset?: string; chainTx?: string; pendingChain?: boolean; serverId?: string; locked?: boolean; saving?: boolean; /** HMAC of the text: the dedupe key and the onchain hash */ hash?: string };
 /** look: a seed number (null = the house face) or a face built in the creator */
 export type AgentLook = number | null | FaceLook;
 export type Agent = { name: string; look: AgentLook; you: string; role: string; tone: ToneId };
@@ -202,7 +203,7 @@ function fromAccount(acc: Account): State {
   let active = "home";
   try { active = localStorage.getItem(`${ACTIVE_KEY}:${acc.user.wallet}`) || "home"; } catch {}
   const memory: Note[] = acc.memories.map((m) => ({
-    id: m.id, serverId: m.id, tag: (m.tag || "About you") as MemoryTag, text: "", source: m.source || "You", at: m.at, locked: true,
+    id: m.id, serverId: m.id, agent: m.agent || "home", tag: (m.tag || "About you") as MemoryTag, text: "", source: m.source || "You", at: m.at, locked: true,
     hash: m.contentHash, chainHash: m.onchainPda ? m.contentHash : undefined, chainAsset: m.onchainPda ? home?.asset || undefined : undefined, chainTx: m.chainTx || undefined,
   }));
   return {
@@ -408,13 +409,13 @@ export function release(slug: string) {
 export function setPlan(id: PlanId, seats: number, expiresAt: number | null) { set((x) => ({ ...x, plan: id, planInfo: { seats, expiresAt } })); }
 
 /* ---------- memory ---------- */
-export function addNote(text: string, tag: MemoryTag = "About you", source = "You", chain = false) {
-  const n: Note = { id: uid(), tag, text, source, at: Date.now(), pendingChain: chain || undefined, saving: true };
+export function addNote(text: string, tag: MemoryTag = "About you", source = "You", chain = false, agent = "home") {
+  const n: Note = { id: uid(), tag, text, source, at: Date.now(), pendingChain: chain || undefined, saving: true, agent };
   set((s) => ({ ...s, memory: [n, ...s.memory] }));
   void (async () => {
     try {
       const sealed = await sealNote(await memoryKeys(), text);
-      const r = await api<{ id: string; duplicate?: boolean }>("/api/memories", { body: { agentSlug: "home", tag, source: source.slice(0, 60), ...sealed } });
+      const r = await api<{ id: string; duplicate?: boolean }>("/api/memories", { body: { agentSlug: agent, tag, source: source.slice(0, 60), ...sealed } });
       if (r.duplicate) set((s) => ({ ...s, memory: s.memory.filter((m) => m.id !== n.id) }));
       else set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === n.id ? { ...m, serverId: r.id, saving: false, hash: sealed.contentHash } : m)) }));
     } catch (e) {
@@ -440,7 +441,7 @@ export function forgetNote(id: string) {
   set((x) => ({ ...x, memory: x.memory.filter((m) => m.id !== id) }));
   if (note?.serverId) sync(api(`/api/memories/${note.serverId}`, { method: "DELETE" }), () => set((x) => ({ ...x, memory: [...x.memory.slice(0, idx), note, ...x.memory.slice(idx)] })));
   // Undo puts it back as a new memory.
-  return () => { if (note) addNote(note.text, note.tag, note.source); };
+  return () => { if (note) addNote(note.text, note.tag, note.source, false, note.agent || "home"); };
 }
 /** Local calendar day. */
 export function todayKey(now = Date.now()) {
@@ -490,17 +491,31 @@ function setMsg(convo: string, id: string, text: string) {
   set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((m) => (m.id === id ? { ...m, text } : m)) } }));
 }
 
-/** Who answers in a conversation: the agent itself, or in a group the member you named (else members take turns). */
-function speakerFor(st: State, convo: string, text: string) {
+/** The names each member of a conversation answers to (its name and your nickname for it). */
+export function memberNames(st: State, convo: string): Record<string, string[]> {
+  const ids = isGroup(convo) ? groupOf(st, convo)?.members || [] : [convo];
+  const out: Record<string, string[]> = {};
+  for (const m of ids) {
+    const base = m === "home" ? st.agent?.name : st.custom.find((c) => c.id === m)?.name || SPECIALISTS.find((p) => p.slug === m)?.name;
+    out[m] = [base, st.meta[m]?.nick].filter((x): x is string => !!x && x.trim().length > 1);
+  }
+  return out;
+}
+/** Who answers one turn: the member you named (fuzzy, so speech-to-text spellings work), else `fallback`, else the first member. */
+export function speakerFor(st: State, convo: string, text: string, fallback?: string) {
   if (!isGroup(convo)) return convo;
   const g = groupOf(st, convo);
   if (!g?.members.length) return "home";
-  const t = text.toLowerCase();
-  const nameOf = (m: string) => (m === "home" ? st.agent?.name : st.meta[m]?.nick || st.custom.find((c) => c.id === m)?.name || SPECIALISTS.find((p) => p.slug === m)?.name || m)?.toLowerCase() || m;
-  const named = g.members.find((m) => t.includes(nameOf(m)));
-  if (named) return named;
-  const k = (st.threads[convo] || []).filter((m) => m.from === "you").length;
-  return g.members[k % g.members.length];
+  const named = addressed(text, memberNames(st, convo));
+  if (named && g.members.includes(named)) return named;
+  return fallback && g.members.includes(fallback) ? fallback : g.members[0];
+}
+/** In a group every member answers, one after another: the one you named first, then the rest in member order. */
+export function groupOrder(st: State, convo: string, text: string) {
+  const g = groupOf(st, convo);
+  if (!g?.members.length) return ["home"];
+  const named = addressed(text, memberNames(st, convo));
+  return named && g.members.includes(named) ? [named, ...g.members.filter((m) => m !== named)] : [...g.members];
 }
 
 /** Ask the model for a reply and stream the tokens into the thread. The server saves both messages. */
@@ -510,9 +525,30 @@ async function replyFromModel(convo: string, userMsg: Msg) {
   const st = get();
   if (!st.agent || !convoExists(st, convo)) return "";
   queued.add(convo);
-  const speaker = speakerFor(st, convo, userMsg.text);
+  try {
+    // A group: each member answers in its own bubble and voice, in turn (one model run at a time keeps the queue short).
+    const order = isGroup(convo) ? groupOrder(st, convo, userMsg.text) : [convo];
+    let after = userMsg.id, last = "";
+    const peers: { from: string; text: string }[] = [];
+    for (let i = 0; i < order.length; i++) {
+      if (!convoExists(get(), convo)) break;
+      const r = await oneReply(convo, userMsg, order[i], after, i > 0, peers);
+      if (r.bubble) after = r.bubble;
+      if (r.text) { last = r.text; peers.push({ from: order[i], text: r.text.slice(0, 1200) }); }
+    }
+    return last;
+  } finally {
+    typingWho.delete(convo);
+    queued.delete(convo);
+    emit();
+  }
+}
+
+const TRANSIENT = /busy|could not answer|did not answer|couldn't reply|could not reach|try again/i;
+async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: string, follow: boolean, peers: { from: string; text: string }[]): Promise<{ bubble: string; text: string }> {
+  const st = get();
   typingWho.set(convo, speaker); emit();
-  const bubble = pushAfter(convo, userMsg.id, { from: speaker, text: "" });
+  const bubble = pushAfter(convo, afterId, { from: speaker, text: "" });
   const all = st.threads[convo] || []; const upto = all.findIndex((m) => m.id === userMsg.id);
   const history = (upto >= 0 ? all.slice(0, upto) : all).filter((m) => m.id !== userMsg.id && m.id !== "hello" && m.text && m.from !== "system").slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) }));
   const memoryOn = st.prefs.memory !== false && st.meta[speaker]?.memory !== false;
@@ -522,50 +558,63 @@ async function replyFromModel(convo: string, userMsg: Msg) {
   if (userMsg.file) meta.file = userMsg.file;
   if (userMsg.voice) meta.voice = userMsg.voice;
   if (userMsg.reply) meta.reply = { ...userMsg.reply, text: userMsg.reply.text.slice(0, 300) };
-  const fail = (m: string) => { setTimeout(refreshThreads, 1500); setMsg(convo, bubble, m); set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, from: "system" } : mm)) } })); return m; };
-  try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history, recall, userMsgId: userMsg.id, replyMsgId: bubble, meta }),
-    });
-    if (!res.ok || !res.body) {
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 401) void hydrate();
-      return fail(typeof data.error === "string" ? data.error : "The agent could not answer.");
-    }
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "", full = "";
-    while (true) {
-      const step = await reader.read();
-      if (step.done) break;
-      buf += dec.decode(step.value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() || "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        let payload: { token?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"] } = {};
-        try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
-        if (payload.error) return fail(payload.error);
-        if (payload.send) { const sd = payload.send; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, send: sd } : mm)) } })); }
-        if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
-        if (payload.remember && memoryOn) addNote(payload.remember, "About you", "Chat", true);
-        if (payload.done && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
-        // You saw this reply arrive, so it doesn't need to sit in the bell.
-        if (payload.done && document.visibilityState === "visible") void api("/api/notifications", { method: "POST", body: { keys: [`reply:${bubble}`] } }).catch(() => {});
+  const who = (memberNames(st, convo)[speaker] || [])[0] || "The agent";
+  const fail = (m: string) => {
+    setMsg(convo, bubble, isGroup(convo) ? `${who} couldn't answer this time. ${m}` : m);
+    set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, from: "system" } : mm)) } }));
+    if (!isGroup(convo)) setTimeout(refreshThreads, 1500);
+    return { bubble, text: "" };
+  };
+  // The server already retries the model; one more try here covers a dropped connection or a busy moment.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let full = "", error = "";
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history, recall, userMsgId: userMsg.id, replyMsgId: bubble, meta, ...(follow ? { follow: true } : {}), ...(peers.length ? { peers: peers.slice(-8) } : {}) }),
+      });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401) { void hydrate(); return fail("You're signed out. Sign in again."); }
+        error = typeof data.error === "string" ? data.error : "The agent could not answer.";
+        if (res.status === 429 || res.status === 402 || res.status === 403 || res.status === 400) return fail(error);
+      } else {
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        read: while (true) {
+          const step = await reader.read();
+          if (step.done) break;
+          buf += dec.decode(step.value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() || "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            let payload: { token?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"] } = {};
+            try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
+            if (payload.error) { error = payload.error; break read; }
+            if (payload.send) { const sd = payload.send; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, send: sd } : mm)) } })); }
+            if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
+            if (payload.remember && memoryOn) addNote(payload.remember, "About you", "Chat", true, isCustom(speaker) ? speaker : "home");
+            if (payload.done && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
+            // You saw this reply arrive, so it doesn't need to sit in the bell.
+            if (payload.done && document.visibilityState === "visible") void api("/api/notifications", { method: "POST", body: { keys: [`reply:${bubble}`] } }).catch(() => {});
+          }
+        }
       }
+    } catch {
+      error = "Could not reach the agent.";
     }
-    if (!full.trim() && !(get().threads[convo] || []).find((m) => m.id === bubble)?.send) return fail("The agent sent an empty reply.");
-    return (get().threads[convo] || []).find((m) => m.id === bubble)?.text || full;
-  } catch {
-    return fail("Could not reach the agent.");
-  } finally {
-    typingWho.delete(convo);
-    queued.delete(convo);
-    emit();
+    const cur = (get().threads[convo] || []).find((m) => m.id === bubble);
+    if (!error && (full.trim() || cur?.send)) return { bubble, text: cur?.text || full };
+    if (!error) error = "The agent sent an empty reply.";
+    // Retry only when nothing reached the screen yet and the failure looks temporary.
+    if (attempt === 0 && !full.trim() && TRANSIENT.test(error)) { await new Promise((r) => setTimeout(r, 1500)); continue; }
+    return fail(error);
   }
+  return fail("The agent could not answer.");
 }
 
 /* ---------- live calls: nothing from a call goes into the thread ---------- */
@@ -591,10 +640,10 @@ export function useCalling() { return useSyncExternalStore(subscribe, () => call
  * One turn of a voice call. Streams the reply (onText gets the text so far) without adding bubbles to the chat
  * or saving it; the server answers in short spoken sentences.
  */
-export async function callTurn(convo: string, text: string, history: { from: string; text: string }[], onText: (full: string) => void, signal?: AbortSignal): Promise<string> {
+export async function callTurn(convo: string, text: string, history: { from: string; text: string }[], onText: (full: string) => void, signal?: AbortSignal, who?: string): Promise<string> {
   const st = get();
   if (!st.agent || !convoExists(st, convo)) return "";
-  const speaker = speakerFor(st, convo, text);
+  const speaker = who || speakerFor(st, convo, text);
   const memoryOn = st.prefs.memory !== false && st.meta[speaker]?.memory !== false;
   const recall = memoryOn ? st.memory.filter((n) => !n.locked && n.text).slice(0, 8).map((n) => ({ tag: n.tag.slice(0, 40), text: n.text.slice(0, 240) })) : [];
   const res = await fetch("/api/chat", {
@@ -614,7 +663,7 @@ export async function callTurn(convo: string, text: string, history: { from: str
       try { p = JSON.parse(t.slice(5).trim()); } catch { continue; }
       if (p.error) throw new Error(p.error);
       if (p.token) { full += p.token; onText(full.replace(/\n?REMEMBER:[\s\S]*$/, "").trim()); }
-      if (p.remember && memoryOn) addNote(p.remember, "About you", "Call", true);
+      if (p.remember && memoryOn) addNote(p.remember, "About you", "Call", true, isCustom(speaker) ? speaker : "home");
     }
   }
   lastActive.set(speaker, Date.now());
