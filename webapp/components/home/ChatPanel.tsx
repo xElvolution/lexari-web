@@ -7,7 +7,7 @@ import { voiceOf } from "@/lib/voices";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { CHAT_SUGGESTIONS, specialistBySlug } from "@/content/appData";
-import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, isLocked, planOf, toast, toggleReaction, useNow, useTyping, type Msg, type State } from "@/lib/store";
+import { MORE_REACTIONS, QUICK_REACTIONS, ensureReplies, isLocked, planOf, toast, toggleReaction, useAgentActive, useCalling, useNow, useTyping, type Msg, type State } from "@/lib/store";
 import SendCard from "./SendCard";
 import Icon from "../Icon";
 import { AgentTile, GroupTile } from "../faces";
@@ -251,9 +251,11 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
   }, [msgs.length, typing]);
 
   const online = usePresence();
+  const active = useAgentActive(id);
+  const calling = useCalling();
   const sp = !c.group && id !== "home" ? specialistBySlug(id) : undefined;
   const suggestions = msgs.filter((m) => m.from === "you").length > 1 ? [] : c.group ? ["What's still open for Friday?", "Everyone, one line on progress"] : id === "home" ? [...CHAT_SUGGESTIONS.slice(0, 2), "Remember that I work from Lagos"] : sp?.examples.slice(0, 2) ?? [];
-  const sub = typing ? `${c.group ? `${nameOf(s, typing)} is ` : ""}typing…` : c.group ? c.sub : `${c.sub} · ${online === false || isLocked(s, id) ? "offline" : "online"}`;
+  const sub = typing ? `${c.group ? `${nameOf(s, typing)} is ` : ""}typing…` : c.group ? c.sub : `${c.sub} · ${online === false || isLocked(s, id) ? "offline" : calling === id ? "on a call" : active ? "active now" : "idle"}`;
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-base">

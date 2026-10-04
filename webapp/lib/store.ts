@@ -568,6 +568,59 @@ async function replyFromModel(convo: string, userMsg: Msg) {
   }
 }
 
+/* ---------- live calls: nothing from a call goes into the thread ---------- */
+let calling: string | null = null;
+export function setCalling(id: string | null) { calling = id; if (id) lastActive.set(id, Date.now()); emit(); }
+const lastActive = new Map<string, number>();
+/** True while this agent is generating, on a call, or within 2 minutes of its last exchange. */
+export function agentBusy(id: string) { return calling === id || [...typingWho.values()].includes(id); }
+export function lastExchange(s: State, id: string) {
+  let t = lastActive.get(id) || 0;
+  for (const list of Object.values(s.threads)) for (let i = list.length - 1; i >= Math.max(0, list.length - 30); i--) { const m = list[i]; if (m.from === id && m.text && m.id !== "hello") { if (m.at > t) t = m.at; break; } }
+  return t;
+}
+export const ACTIVE_MS = 2 * 60_000;
+/** Green dot: this agent is answering, on a call, or talked in the last 2 minutes. Re-checked every 15 s. */
+export function useAgentActive(id: string) {
+  useNow(15_000);
+  return useSyncExternalStore(subscribe, () => agentBusy(id) || Date.now() - lastExchange(get(), id) < ACTIVE_MS, () => false);
+}
+export function useCalling() { return useSyncExternalStore(subscribe, () => calling, () => null); }
+
+/**
+ * One turn of a voice call. Streams the reply (onText gets the text so far) without adding bubbles to the chat
+ * or saving it; the server answers in short spoken sentences.
+ */
+export async function callTurn(convo: string, text: string, history: { from: string; text: string }[], onText: (full: string) => void, signal?: AbortSignal): Promise<string> {
+  const st = get();
+  if (!st.agent || !convoExists(st, convo)) return "";
+  const speaker = speakerFor(st, convo, text);
+  const memoryOn = st.prefs.memory !== false && st.meta[speaker]?.memory !== false;
+  const recall = memoryOn ? st.memory.filter((n) => !n.locked && n.text).slice(0, 8).map((n) => ({ tag: n.tag.slice(0, 40), text: n.text.slice(0, 240) })) : [];
+  const res = await fetch("/api/chat", {
+    method: "POST", signal, headers: { "content-type": "application/json" },
+    body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history: history.slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) })), recall, userMsgId: uid(), replyMsgId: uid(), meta: {}, call: true }),
+  });
+  if (!res.ok || !res.body) { const d = await res.json().catch(() => ({})); throw new Error(typeof d.error === "string" ? d.error : "The agent could not answer."); }
+  const reader = res.body.getReader(); const dec = new TextDecoder();
+  let buf = "", full = "";
+  while (true) {
+    const step = await reader.read(); if (step.done) break;
+    buf += dec.decode(step.value, { stream: true });
+    const lines = buf.split("\n"); buf = lines.pop() || "";
+    for (const line of lines) {
+      const t = line.trim(); if (!t.startsWith("data:")) continue;
+      let p: { token?: string; remember?: string; error?: string } = {};
+      try { p = JSON.parse(t.slice(5).trim()); } catch { continue; }
+      if (p.error) throw new Error(p.error);
+      if (p.token) { full += p.token; onText(full.replace(/\n?REMEMBER:[\s\S]*$/, "").trim()); }
+      if (p.remember && memoryOn) addNote(p.remember, "About you", "Call", true);
+    }
+  }
+  lastActive.set(speaker, Date.now());
+  return full.replace(/\n?REMEMBER:[\s\S]*$/, "").trim();
+}
+
 async function refreshJobs() {
   try {
     const acc = await api<Account>("/api/me");
