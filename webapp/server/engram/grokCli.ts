@@ -44,12 +44,20 @@ function release() {
   waiting.shift()?.();
 }
 
+/** Marker in the system prompt when the agent has a Lexari desktop (see app/api/chat). */
+export const DESKTOP_MARK = "[lexari-desktop]";
+
 /** One prompt from the transcript: the CLI takes a single message, so earlier turns are quoted. */
 export function flatten(messages: ChatMessage[]) {
+  const sys = messages.filter((m) => m.role === "system").map((m) => m.content);
+  // An agent with a Lexari desktop asks for shell commands with <run> tags; the server runs them in its sandbox.
+  const desktop = sys.some((c) => c.includes(DESKTOP_MARK));
   const system = [
-    ...messages.filter((m) => m.role === "system").map((m) => m.content),
+    ...sys,
     // The CLI is a coding agent at heart; inside Lexari it is only a chat partner.
-    "You are chatting inside the Lexari app on someone's phone or computer. In this chat you cannot run code, browse the web, open or edit files, or use tools, so never offer to and never mention a workspace, terminal, repository, files on this machine, Grok, xAI or a CLI. Describe what you can do in plain terms: answer questions, explain, plan, write and edit text, brainstorm, and remember what the person tells you.",
+    desktop
+      ? "You are chatting inside the Lexari app. You have your own sandboxed Linux computer that Lexari runs for you. You cannot use your own built-in tools; the only way to use the computer is to write <run>command</run>, and Lexari runs it and shows you the output. Never mention a CLI, Grok or xAI."
+      : "You are chatting inside the Lexari app on someone's phone or computer. In this chat you cannot run code, browse the web, open or edit files, or use tools, so never offer to and never mention a workspace, terminal, repository, files on this machine, Grok, xAI or a CLI. Describe what you can do in plain terms: answer questions, explain, plan, write and edit text, brainstorm, and remember what the person tells you.",
   ].join("\n\n");
   const turns = messages.filter((m) => m.role !== "system");
   const last = turns.pop();
@@ -58,7 +66,7 @@ export function flatten(messages: ChatMessage[]) {
     history ? `Conversation so far:\n${history}\n` : "",
     `Person: ${last?.content ?? ""}`,
     "",
-    "Reply to the person's last message as yourself. Plain text only. Do not use tools.",
+    desktop ? "Reply to the person's last message as yourself. Plain text, plus <run>…</run> lines when you need your computer. Do not use your built-in tools." : "Reply to the person's last message as yourself. Plain text only. Do not use tools.",
   ].join("\n");
   return { system, prompt };
 }

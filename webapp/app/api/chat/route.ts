@@ -10,6 +10,7 @@ import { configError, jsonError, rateLimit, readJson, toErrorResponse } from "@/
 import { chatBody } from "@/server/validate";
 import { SPECIALISTS } from "@/content/appData";
 import { desktopOn, runInDesktop, runRequests } from "@/server/desktop";
+import { DESKTOP_MARK } from "@/server/engram/grokCli";
 
 export const runtime = "nodejs";
 
@@ -135,6 +136,7 @@ async function saveTurn(userId: string, body: { convo: string; text: string; use
 }
 
 const DESKTOP_HINT = [
+  DESKTOP_MARK,
   "You have your own Linux computer (bash, python3, git, no internet). Files live in /home/agent and the person can watch your terminal in the Desktop view.",
   "When the person asks you to make or change files, run code, or check something on your computer, write each shell command as <run>command</run> (at most three).",
   "You will then get the output and must answer in plain sentences. Never pretend you ran something you did not.",
