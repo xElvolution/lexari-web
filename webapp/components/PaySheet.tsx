@@ -104,7 +104,7 @@ function Sheet() {
 
         {short_ && phase !== "done" && (
           <div data-need-funds className="mt-3 rounded-2xl bg-grape/10 p-3.5 ring-1 ring-grape/30">
-            <p className="text-[14px] font-bold text-ink">You need {sol(need)} devnet SOL</p>
+            <p className="text-[14px] font-bold text-ink">You need {(need / 1e9).toFixed(3)} devnet SOL</p>
             <p className="mt-0.5 text-[12.5px] leading-snug text-ink/65">Devnet SOL is free test money. It covers the price plus a tiny network fee.</p>
             {faucet?.on && faucet.left > 5_000_000 ? (
               <button onClick={fund} disabled={busy} className="btn btn-brand btn-sm mt-3 w-full disabled:opacity-60">{phase === "funding" ? "Sending devnet SOL…" : "Get devnet SOL"}</button>
