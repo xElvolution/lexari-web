@@ -164,7 +164,7 @@ export default function Tour({ s }: { s: State }) {
         {pos.arrow && <span className={`absolute h-4 w-4 rotate-45 bg-card ring-1 ring-line ${pos.arrow.side === "top" ? "-top-2" : "-bottom-2"}`} style={{ left: pos.arrow.x - 8 }} />}
         <div key={step.id} className="tour-in relative rounded-[24px] bg-card p-4 text-ink shadow-[0_24px_60px_-18px_rgba(0,0,0,.6)] ring-1 ring-line">
           <div className="flex items-start gap-3">
-            <span className="relative shrink-0"><AgentTile id="home" look={s.agent?.look} size={46} radius={15} /><span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-[#34d399] ring-2 ring-[var(--card)]" /></span>
+            <span className="relative shrink-0"><AgentTile id="home" look={s.agent?.look} size={46} radius={15} status={false} /><span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-[#34d399] ring-2 ring-[var(--card)]" /></span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2"><span className="text-[12.5px] font-bold text-brand-ink">{ctx.me}</span><button onClick={endTour} className="text-[12.5px] font-semibold text-ink/50 hover:text-ink">Skip tour</button></div>
               <div className="relative mt-1 rounded-[16px] rounded-tl-md bg-tint px-3.5 py-2.5">
