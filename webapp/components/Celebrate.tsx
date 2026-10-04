@@ -4,11 +4,11 @@ import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { txUrl } from "@/lib/nft";
 import Icon from "./Icon";
 
-type Party = { title: string; body?: string; tx?: string; art?: ReactNode; cta?: { label: string; href?: string; onClick?: () => void } };
+type Party = { title: string; body?: string; tx?: string; art?: ReactNode; confetti?: boolean; cta?: { label: string; href?: string; onClick?: () => void } };
 let cur: Party | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
-/** A celebration pop-up with confetti: mint, hire, card issued, plan upgraded. */
+/** A celebration pop-up: mint, hire, card issued, plan upgraded. Confetti only when asked for (the ID card NFT mint). */
 export function celebrate(p: Party) { cur = p; emit(); }
 export function closeCelebrate() { cur = null; emit(); }
 
@@ -39,7 +39,7 @@ export default function Celebrate() {
   if (!p) return null;
   return (
     <div className="fixed inset-0 z-[98] grid place-items-center bg-black/65 p-5 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) closeCelebrate(); }}>
-      <Confetti />
+      {p.confetti && <Confetti />}
       <div role="dialog" aria-modal="true" aria-label={p.title} data-celebrate className="pop relative w-full max-w-[400px] overflow-hidden rounded-[28px] bg-card p-6 text-center ring-1 ring-line">
         <div className="pointer-events-none absolute inset-x-0 -top-24 mx-auto h-48 w-48 rounded-full bg-grape/40 blur-[60px]" />
         {p.art ? <div className="relative mx-auto flex justify-center">{p.art}</div> : <span className="relative mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-grape text-white"><Icon name="spark" size={28} /></span>}

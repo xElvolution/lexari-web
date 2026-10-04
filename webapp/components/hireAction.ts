@@ -6,14 +6,14 @@ import { payForHire } from "@/lib/pay";
 import { hirePriceLabel } from "@/lib/prices";
 import { get, hire, seatsLeft, toast } from "@/lib/store";
 import { openUpgrade } from "./overlays";
-import { burst, flyToSeats } from "./fly";
+import { flyToSeats } from "./fly";
 import { createElement } from "react";
 import { celebrate } from "./Celebrate";
 import { AgentTile } from "./faces";
 
 const inflight = new Set<string>();
 
-/** Hire: pay on Solana (or re-add one you already paid for), have the server verify it, then the flying face, burst and toast. */
+/** Hire: pay on Solana (or re-add one you already paid for), have the server verify it, then the flying face and toast. */
 export async function hireWithFx(slug: string, faceEl: HTMLElement | null, _goPlans?: () => void): Promise<"ok" | "full" | "already" | "unpaid"> {
   if (inflight.has(slug)) return "unpaid";
   inflight.add(slug);
@@ -40,7 +40,7 @@ async function run(slug: string, faceEl: HTMLElement | null): Promise<"ok" | "fu
   }
   const r = hire(slug);
   if (r === "ok") {
-    flyToSeats(faceEl); burst(faceEl, 16);
+    flyToSeats(faceEl);
     if (tx) celebrate({ title: `${sp.name} joined your team`, body: `${sp.job}. Say hi in Agents.`, tx, art: createElement(AgentTile, { id: slug, look: null, size: 96, radius: 30 }), cta: { label: "Say hi", href: `/app?c=${slug}` } });
     toast({ text: before ? `${sp.name} is back on your team` : `${sp.name} joined your team · ${hirePriceLabel()}`, face: sp.seed, color: sp.color });
   } else {

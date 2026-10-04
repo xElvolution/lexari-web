@@ -6,7 +6,6 @@ import { gsap } from "gsap";
 import { toast, type State } from "@/lib/store";
 import { countdown, hub, nextReset, useHubBusy, questsView, type Period, type QuestView } from "@/lib/hub";
 import Icon from "@/components/Icon";
-import { burst } from "@/components/fly";
 import { Coin, flyCoins } from "./coin";
 
 const TABS: { id: Period; label: string; blurb: string }[] = [
@@ -58,7 +57,7 @@ function QuestRow({ q, i, hard }: { q: QuestView; i: number; hard: boolean }) {
     void hub.claimQuest(q.id).then((r) => {
     if (!r.ok) { toast({ text: r.error || "That quest is not ready.", face: "home" }); return; }
     if (row.current) gsap.fromTo(row.current, { scale: 0.98 }, { scale: 1, duration: 0.5, ease: "back.out(3)" });
-    flyCoins(btn.current, r.coins); burst(btn.current, hard ? 24 : 14);
+    flyCoins(btn.current, r.coins);
     toast({ text: `${q.title} · +${r.coins} coins`, face: "home" });
     });
   };

@@ -12,7 +12,6 @@ import { WEBAPP_URL } from "@shared/sites";
 import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
 import { myAgents } from "@/components/agents";
-import { burst } from "@/components/fly";
 import { openAgent } from "@/components/overlays";
 import { Coin, flyCoins } from "./coin";
 import BoxModal from "./BoxModal";
@@ -74,7 +73,7 @@ function CheckInRow({ s, now }: { s: State; now: number }) {
   const btn = useRef<HTMLButtonElement>(null);
   const claim = () => void hub.checkIn(now || Date.now()).then((r) => {
     if (!r.ok) { toast({ text: r.error || "Already checked in today.", face: "home" }); return; }
-    flyCoins(btn.current, r.coins); burst(btn.current, 14);
+    flyCoins(btn.current, r.coins);
     toast({ text: `Day ${r.day} checked in · +${r.coins} coins`, face: "home" });
   });
   const start = Math.max(1, cur - 6);
@@ -108,7 +107,7 @@ function BoxCard({ s, now }: { s: State; now: number }) {
   const run = async () => {
     if (modal === "preview") { const c = won || 60; return { ok: true, coins: c }; }
     const r = await hub.openBox(now || Date.now());
-    if (r.ok) { flyCoins(el.current, r.coins); burst(el.current, 16); }
+    if (r.ok) { flyCoins(el.current, r.coins); }
     return r;
   };
   return (
@@ -166,7 +165,7 @@ function QuestItem({ q }: { q: QuestView }) {
   const btn = useRef<HTMLButtonElement>(null);
   const claim = () => void hub.claimQuest(q.id).then((r) => {
     if (!r.ok) { toast({ text: r.error || "That quest is not ready.", face: "home" }); return; }
-    flyCoins(btn.current, r.coins); burst(btn.current, 12);
+    flyCoins(btn.current, r.coins);
     toast({ text: `${q.title} · +${r.coins} coins`, face: "home" });
   });
   const pct = Math.round((q.have / q.goal) * 100);
@@ -194,7 +193,6 @@ function TrainList({ s }: { s: State }) {
   const busy = useHubBusy();
   const train = (id: string, name: string, amount: number, el: HTMLElement) => void hub.train(id, amount).then((r) => {
     if (!r.ok) { toast({ text: r.error || "Could not train.", face: "home" }); return; }
-    burst(el, 12);
     toast({ text: r.levelsGained > 0 ? `${name} reached level ${r.level}!` : `${name} +${amount} XP`, face: "home" });
   });
   return (
@@ -237,7 +235,7 @@ function InviteRow({ s }: { s: State }) {
   const claimable = TIERS.map((t, i) => ({ t, i })).filter(({ t, i }) => h.invited.length >= t.friends && !h.tiers.includes(i));
   const claim = (i: number, el: HTMLElement) => void hub.claimTier(i).then((r) => {
     if (!r.ok) { toast({ text: r.error || "That reward is not ready.", face: "home" }); return; }
-    flyCoins(el, r.coins); burst(el, 14); toast({ text: `${TIERS[i].title} · +${r.coins} coins`, face: "home" });
+    flyCoins(el, r.coins); toast({ text: `${TIERS[i].title} · +${r.coins} coins`, face: "home" });
   });
   return (
     <section id="invite" className={`${card} scroll-mt-20 p-3.5`}>

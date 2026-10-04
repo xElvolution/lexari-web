@@ -11,7 +11,6 @@ const utcKey = (t: number) => new Date(t).toISOString().slice(0, 10);
 import { myAgents } from "@/components/agents";
 import { WhoFace } from "@/components/faces";
 import Icon from "@/components/Icon";
-import { burst } from "@/components/fly";
 import { Coin, flyCoins, useCount } from "./coin";
 
 const lookFor = (s: State, id: string) => (id === "home" ? s.agent?.look : null);
@@ -134,7 +133,7 @@ export function CheckIn({ s, now }: { s: State; now: number }) {
     const tile = track.current?.querySelector<HTMLElement>("[data-today]");
     if (tile) gsap.fromTo(tile, { scale: 0.7, rotate: -8 }, { scale: 1, rotate: 0, duration: 0.6, ease: "back.out(3)" });
     if (flame.current) gsap.fromTo(flame.current, { scale: 1.6 }, { scale: 1, duration: 0.7, ease: "elastic.out(1, .45)" });
-    flyCoins(tile || btn.current, r.coins); burst(tile || btn.current, 18);
+    flyCoins(tile || btn.current, r.coins);
     toast({ text: `Day ${r.day} checked in · +${r.coins} coins`, face: "home" });
     });
   };
@@ -203,7 +202,7 @@ export function MysteryBox({ s, now }: { s: State; now: number }) {
         if (!r.ok) { setPhase("idle"); toast({ text: r.error || "The box did not open.", face: "home" }); return; }
         setPhase("open");
         if (lid.current) gsap.fromTo(lid.current, { y: 0, rotate: 0 }, { ...LID_OPEN, duration: 0.5, ease: "back.out(2)" });
-        flyCoins(box.current, r.coins); burst(box.current, 22);
+        flyCoins(box.current, r.coins);
         toast({ text: r.coins >= 120 ? `Jackpot! +${r.coins} coins` : `Mystery box · +${r.coins} coins`, face: "home" });
       });
     }, 850);

@@ -9,7 +9,6 @@ import { MAX_LEVEL, PERKS, coinsOf, hub, levelOf, xpFor, useHubBusy } from "@/li
 import { myAgents } from "@/components/agents";
 import { WhoFace } from "@/components/faces";
 import Icon from "@/components/Icon";
-import { burst } from "@/components/fly";
 import { Coin, Rise } from "./coin";
 import { LevelBadge } from "./top";
 
@@ -121,7 +120,7 @@ export default function LevelUp({ s }: { s: State }) {
   );
 }
 
-/** Full-screen level-up moment: spinning rays, a happy face, confetti and the perk it just unlocked. */
+/** Full-screen level-up moment: spinning rays, a happy face and the perk it just unlocked. */
 function Celebrate({ s, id, level, name, onClose }: { s: State; id: string; level: number; name: string; onClose: () => void }) {
   const card = useRef<HTMLDivElement>(null);
   const perk = PERKS.find((p) => p.level === level);
@@ -139,7 +138,7 @@ function Celebrate({ s, id, level, name, onClose }: { s: State; id: string; leve
       gsap.fromTo(el, { scale: 0.6, opacity: 0, y: 30 }, { scale: 1, opacity: 1, y: 0, duration: 0.65, ease: "back.out(1.8)" });
       gsap.fromTo(el.querySelector("[data-lv]"), { scale: 3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.7, delay: 0.25, ease: "elastic.out(1, .5)" });
       const face = el.querySelector("[data-face]") as HTMLElement | null;
-      [0, 350, 800].forEach((d) => timers.push(setTimeout(() => burst(face, 26), d)));
+      if (face) gsap.fromTo(face, { scale: 0.4, rotate: -12 }, { scale: 1, rotate: 0, duration: 0.9, delay: 0.15, ease: "elastic.out(1, .45)" });
     });
     return () => { window.removeEventListener("keydown", k); timers.forEach(clearTimeout); ctx.kill(); };
   }, []);

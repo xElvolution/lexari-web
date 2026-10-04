@@ -84,7 +84,7 @@ export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID c
         setTx(next.tx);
         setPhase("idle");
         onMinted?.();
-        celebrate({ title: `${nm} is on Solana`, body: "Your agent's ID card was minted as an NFT. It's yours forever.", tx: next.tx, art: createElement(AgentTile, { id, look: id === "home" ? s.agent?.look : null, size: 96, radius: 30 }) });
+        celebrate({ confetti: true, title: `${nm} is on Solana`, body: "Your agent's ID card was minted as an NFT. It's yours forever.", tx: next.tx, art: createElement(AgentTile, { id, look: id === "home" ? s.agent?.look : null, size: 96, radius: 30 }) });
       } else {
         const res = await updateCard({ bridge, asset: rec!.tokenId, name: nm, role: rl, dna, svg: faceSvg(face) });
         const next: NftRecord = { ...rec!, tx: res.tx, dna, name: nm, role: rl, owner: publicKey.toBase58(), at: Date.now(), uri: res.uri, registered: true };

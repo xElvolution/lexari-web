@@ -9,7 +9,6 @@ import { toast, type State } from "@/lib/store";
 import { TIERS, hub, hubOf, inviteCode, useHubBusy } from "@/lib/hub";
 import { AgentFace } from "@/components/faces";
 import Icon from "@/components/Icon";
-import { burst } from "@/components/fly";
 import { Coin, flyCoins } from "./coin";
 
 const SHARE = [
@@ -35,7 +34,7 @@ export default function Referral({ s }: { s: State }) {
   useEffect(() => {
     if (friends.length > prev.current) {
       const el = orbit.current?.querySelector<HTMLElement>(`[data-slot="${friends.length - 1}"] [data-friend]`);
-      if (el) { gsap.fromTo(el, { scale: 0 }, { scale: 1, duration: 0.7, ease: "elastic.out(1, .5)" }); burst(el, 16); }
+      if (el) { gsap.fromTo(el, { scale: 0 }, { scale: 1, duration: 0.7, ease: "elastic.out(1, .5)" }); }
     }
     prev.current = friends.length;
   }, [friends.length]);
@@ -53,7 +52,7 @@ export default function Referral({ s }: { s: State }) {
   const claim = (i: number, el: HTMLElement) => {
     void hub.claimTier(i).then((r) => {
       if (!r.ok) { toast({ text: r.error || "That tier is not ready.", face: "home" }); return; }
-      flyCoins(el, r.coins); burst(el, 22);
+      flyCoins(el, r.coins);
       toast({ text: `${TIERS[i].title} · +${r.coins} coins`, face: "home" });
     });
   };
