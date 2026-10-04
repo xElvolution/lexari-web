@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { burst } from "@/components/fly";
 import { createPortal } from "react-dom";
 import { toast, type State } from "@/lib/store";
 import { coinsOf } from "@/lib/hub";
@@ -34,34 +35,6 @@ function Preview({ it, small }: { it: Cosmetic; small?: boolean }) {
   );
 }
 
-/** The balance ticks down to the new number after a purchase (instant when motion is reduced). */
-function useCountDown(target: number) {
-  const [v, setV] = useState(target);
-  const cur = useRef(target); cur.current = v;
-  useEffect(() => {
-    const from = cur.current;
-    if (from === target || matchMedia("(prefers-reduced-motion: reduce)").matches) { setV(target); return; }
-    const t0 = performance.now(); let raf = 0;
-    const step = (t: number) => { const k = Math.min(1, (t - t0) / 600); setV(Math.round(from + (target - from) * (1 - (1 - k) ** 3))); if (k < 1) raf = requestAnimationFrame(step); };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [target]);
-  return v;
-}
-
-/** Apply: the new background (or bubble style) sweeps over the sheet in a circle from the item, then fades. */
-function StoreRipple({ it }: { it?: Cosmetic }) {
-  if (!it) return null;
-  return (
-    <span data-store-ripple className="store-ripple absolute inset-0 bg-base" style={it.kind === "bg" ? CHAT_BG[it.id] : undefined}>
-      <span className="absolute inset-x-6 top-1/3 flex flex-col gap-2">
-        <span className="self-start rounded-[16px] rounded-bl-md bg-card px-3.5 py-2 text-[14px] text-ink ring-1 ring-line">Fresh look!</span>
-        <span className={`self-end rounded-[16px] rounded-br-md px-3.5 py-2 text-[14px] font-medium ${it.kind === "bubble" ? MY_BUBBLE[it.id] : "bg-grape text-white"}`}>Love it</span>
-      </span>
-    </span>
-  );
-}
-
 /** Spend coins on cosmetics: chat backgrounds and bubble styles. Buy, then wear (or take off). */
 export function StoreSheet({ s, onClose }: { s: State; onClose: () => void }) {
   const close = useRef(onClose); close.current = onClose;
@@ -74,27 +47,21 @@ export function StoreSheet({ s, onClose }: { s: State; onClose: () => void }) {
   const cos = s.live?.cosmetics || {};
   const owned = new Set(cos.owned || []);
   const coins = coinsOf(s);
-  const shown = useCountDown(coins);
-  // Animations: fx is the item that was just bought or applied (and where it sits on screen, for the ripple).
-  const [fx, setFx] = useState<{ id: string; kind: "buy" | "apply"; x: number; y: number; n: number } | null>(null);
-  const fly = useRef<HTMLDivElement>(null);
-  const fire = (id: string, kind: "buy" | "apply") => {
-    const el = document.querySelector(`[data-store-item="${id}"]`)?.getBoundingClientRect();
-    setFx({ id, kind, x: el ? el.left + el.width / 2 : innerWidth / 2, y: el ? el.top + el.height / 3 : innerHeight / 2, n: Date.now() });
-    try { navigator.vibrate?.(kind === "buy" ? [12, 40, 18] : 14); } catch {}
-    window.setTimeout(() => setFx((f) => (f && Date.now() - f.n >= 900 ? null : f)), 950);
+  // Buy and Apply get one thing: a confetti burst from the item. Owned is plain state, nothing animates.
+  const confetti = (id: string) => {
+    burst(document.querySelector<HTMLElement>(`[data-store-item="${id}"]`), 26, ["#5b2bff", "#8f6bff", "#ffd84d", "#1fbf6a", "#ff6b9a", "#36c5ff", "#ffffff"]);
+    try { navigator.vibrate?.(14); } catch {}
   };
   const buy = async (it: Cosmetic) => {
-    fire(it.id, "buy");
+    confetti(it.id);
     const m = await import("@/lib/offHub");
     const r = await m.buyItem(it.id, it.price);
     if (!r.ok) { toast({ text: r.error || "That didn't go through.", face: "home" }); return; }
     await m.wearItem(it.kind, it.id);
-    window.setTimeout(() => fire(it.id, "apply"), 380);
     toast({ text: `${it.name} is yours. It's on in your chats.`, face: "home" });
   };
   const wear = async (it: Cosmetic, on: boolean) => {
-    if (on) fire(it.id, "apply");
+    if (on) confetti(it.id);
     const m = await import("@/lib/offHub");
     const r = await m.wearItem(it.kind, on ? it.id : null);
     if (!r.ok) toast({ text: r.error || "Couldn't change that.", face: "home" });
@@ -110,11 +77,10 @@ export function StoreSheet({ s, onClose }: { s: State; onClose: () => void }) {
   const card = (it: Cosmetic, small: boolean) => {
     const have = owned.has(it.id); const on = cos[it.kind] === it.id;
     return (
-      <li key={it.id + (fx?.id === it.id ? fx.n : "")} data-store-item={it.id} data-fx={fx?.id === it.id ? fx.kind : undefined} className={`store-card relative overflow-hidden ${small ? "w-[calc((100%-24px)/4.25)] shrink-0 snap-start rounded-[16px] p-1.5" : "rounded-[18px] p-2"} bg-tint ${on ? "ring-2 ring-grape" : "ring-1 ring-line"}`}>
+      <li key={it.id} data-store-item={it.id} className={`store-card relative overflow-hidden ${small ? "w-[calc((100%-24px)/4.25)] shrink-0 snap-start rounded-[16px] p-1.5" : "rounded-[18px] p-2"} bg-tint ${on ? "ring-2 ring-grape" : "ring-1 ring-line"}`}>
         <Preview it={it} small={small} />
         <div className={`mt-1.5 flex items-center justify-between gap-1 px-0.5 ${small ? "" : "mt-2"}`}><span className={`truncate font-bold text-ink ${small ? "text-[12px]" : "text-[13.5px]"}`}>{it.name}</span>{!small && !have && <span className="flex items-center gap-0.5 text-[12.5px] font-bold tabular-nums text-ink/75"><Coin size={12} />{it.price}</span>}{!small && have && <span className="label text-[8px] text-brand-ink">Owned</span>}</div>
         {action(it, small)}
-        {fx?.id === it.id && fx.kind === "buy" && <><span aria-hidden className="store-shine pointer-events-none absolute inset-0" /><span aria-hidden className="store-stamp pointer-events-none absolute left-1/2 top-[30%] rounded-md border-2 border-[#22c55e] bg-card/90 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#16a34a]">Owned</span></>}
       </li>
     );
   };
@@ -122,11 +88,7 @@ export function StoreSheet({ s, onClose }: { s: State; onClose: () => void }) {
   return createPortal(
     <div data-store-bg className="fixed inset-0 z-[85] flex items-end justify-center bg-black/65 backdrop-blur-sm sm:items-center sm:p-6" onMouseDown={(e) => { if (e.target === e.currentTarget) close.current(); }}>
       <div role="dialog" aria-modal="true" aria-label="Store" data-store-sheet data-hub-sheet className="pop flex max-h-[calc(100dvh-16px)] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[28px] bg-card ring-1 ring-line sm:max-h-[86vh] sm:rounded-[28px]">
-        <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-1 pt-3">{cat ? <button type="button" data-store-back onClick={() => setFull(null)} className="flex items-center gap-1 text-[1.125rem] font-bold text-ink"><Icon name="back" size={18} />{cat.title}</button> : <h2 className="text-[1.125rem] font-bold text-ink">Store</h2>}<span className="ml-auto flex items-center gap-1 rounded-full bg-tint px-2.5 py-1 text-[12.5px] font-bold tabular-nums text-ink"><Coin size={13} /><span data-store-balance className={shown !== coins ? "text-[#e5484d]" : ""}>{shown.toLocaleString("en-US")}</span></span><button type="button" data-sheet-close onClick={() => close.current()} aria-label="Close" className="grid h-9 w-9 place-items-center rounded-full bg-tint text-ink/75"><Icon name="x" size={18} /></button></div>
-        {fx && <div ref={fly} key={fx.n} aria-hidden className="pointer-events-none fixed inset-0 z-[90]" style={{ ["--x" as string]: `${fx.x}px`, ["--y" as string]: `${fx.y}px` }}>
-          {fx.kind === "buy" && Array.from({ length: 6 }, (_, i) => <span key={i} className="store-coin absolute right-[72px] top-[22px]" style={{ animationDelay: `${i * 45}ms` }}><Coin size={14} /></span>)}
-          {fx.kind === "apply" && <><StoreRipple it={STORE_ITEMS.find((x) => x.id === fx.id)} />{Array.from({ length: 10 }, (_, i) => <span key={i} className="store-spark absolute" style={{ left: "var(--x)", top: "var(--y)", ["--a" as string]: `${i * 36}deg` }} />)}</>}
-        </div>}
+        <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-1 pt-3">{cat ? <button type="button" data-store-back onClick={() => setFull(null)} className="flex items-center gap-1 text-[1.125rem] font-bold text-ink"><Icon name="back" size={18} />{cat.title}</button> : <h2 className="text-[1.125rem] font-bold text-ink">Store</h2>}<span className="ml-auto flex items-center gap-1 rounded-full bg-tint px-2.5 py-1 text-[12.5px] font-bold tabular-nums text-ink"><Coin size={13} /><span data-store-balance>{coins.toLocaleString("en-US")}</span></span><button type="button" data-sheet-close onClick={() => close.current()} aria-label="Close" className="grid h-9 w-9 place-items-center rounded-full bg-tint text-ink/75"><Icon name="x" size={18} /></button></div>
         <div data-sheet-body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-1">
           {cat ? (
             <div data-store-full={cat.kind}>

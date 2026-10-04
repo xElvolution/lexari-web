@@ -217,6 +217,18 @@ export const STORE: { id: string; kind: "bg" | "bubble"; price: number }[] = [
   { id: "bubble-glass", kind: "bubble", price: 90 },
   { id: "bubble-neon", kind: "bubble", price: 140 },
   { id: "bubble-candy", kind: "bubble", price: 110 },
+  { id: "bg-lavender", kind: "bg", price: 60 },
+  { id: "bg-dots", kind: "bg", price: 70 },
+  { id: "bg-pinstripe", kind: "bg", price: 100 },
+  { id: "bg-ripple", kind: "bg", price: 130 },
+  { id: "bg-deepsea", kind: "bg", price: 170 },
+  { id: "bg-velvet", kind: "bg", price: 240 },
+  { id: "bubble-outline", kind: "bubble", price: 60 },
+  { id: "bubble-midnight", kind: "bubble", price: 70 },
+  { id: "bubble-lilac", kind: "bubble", price: 100 },
+  { id: "bubble-mint", kind: "bubble", price: 120 },
+  { id: "bubble-sunset", kind: "bubble", price: 160 },
+  { id: "bubble-gold", kind: "bubble", price: 220 },
 ];
 export async function buy(user: User, item: string) {
   const it = STORE.find((x) => x.id === item);

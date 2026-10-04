@@ -20,12 +20,12 @@ export function flyToSeats(from: HTMLElement | null) {
 }
 
 /** A little confetti burst of purple squares from an element. */
-export function burst(from: HTMLElement | null, n = 14) {
+export function burst(from: HTMLElement | null, n = 14, colors = ["#5b2bff", "#8f6bff", "#c9b8ff", "#ffffff", "#0a0a0a"]) {
   if (!from || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const r = from.getBoundingClientRect();
-  const colors = ["#5b2bff", "#8f6bff", "#c9b8ff", "#ffffff", "#0a0a0a"];
   for (let i = 0; i < n; i++) {
     const d = document.createElement("i");
+    d.dataset.confetti = "";
     Object.assign(d.style, { position: "fixed", left: `${r.left + r.width / 2}px`, top: `${r.top + r.height / 2}px`, width: "8px", height: "8px", borderRadius: i % 3 ? "2px" : "99px", background: colors[i % colors.length], zIndex: "95", pointerEvents: "none", boxShadow: "0 0 0 1px rgba(0,0,0,.08)" });
     document.body.appendChild(d);
     const ang = (i / n) * Math.PI * 2, dist = 60 + Math.random() * 70;
