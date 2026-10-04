@@ -1,5 +1,6 @@
 "use client";
 
+import { usePresence } from "@/lib/presence";
 import { speak } from "@/lib/voice";
 import { voiceOf } from "@/lib/voices";
 
@@ -249,9 +250,10 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
     seen.current = msgs.length;
   }, [msgs.length, typing]);
 
+  const online = usePresence();
   const sp = !c.group && id !== "home" ? specialistBySlug(id) : undefined;
   const suggestions = msgs.filter((m) => m.from === "you").length > 1 ? [] : c.group ? ["What's still open for Friday?", "Everyone, one line on progress"] : id === "home" ? [...CHAT_SUGGESTIONS.slice(0, 2), "Remember that I work from Lagos"] : sp?.examples.slice(0, 2) ?? [];
-  const sub = typing ? `${c.group ? `${nameOf(s, typing)} is ` : ""}typing…` : c.group ? c.sub : `${c.sub} · online`;
+  const sub = typing ? `${c.group ? `${nameOf(s, typing)} is ` : ""}typing…` : c.group ? c.sub : `${c.sub} · ${online === false || isLocked(s, id) ? "offline" : "online"}`;
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-base">

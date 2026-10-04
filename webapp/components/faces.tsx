@@ -1,7 +1,7 @@
 "use client";
 
 import { lookVariant, type FaceState } from "@shared/components/avatar";
-import { primaryOf, useApp, type AgentLook } from "@/lib/store";
+import { isLocked, primaryOf, useApp, type AgentLook } from "@/lib/store";
 import { usePresence } from "@/lib/presence";
 import Face from "@shared/components/Face";
 import { specialistBySlug } from "@/content/appData";
@@ -33,13 +33,15 @@ export function AgentTile({ id, look, size = 48, face, className = "", radius, s
   const online = usePresence();
   const mine = !!s && (id === "home" || s.hired.includes(id) || s.custom.some((c) => c.id === id));
   const primary = mine && primaryOf(s) === id;
+  // grey when agents can't answer right now, or this one is locked past your plan's seats
+  const live = online && !(s && isLocked(s, id));
   const dot = status && mine && size >= 26 && online !== null;
   const r = radius ?? Math.round(size * 0.32);
   const d = Math.max(8, Math.round(size * 0.24));
   return (
     <span data-agent-tile={id} {...(primary ? { "data-primary": "" } : {})} className={`relative grid shrink-0 place-items-center ${primary ? "primary-ring" : ""} ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: r, background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)", ["--r" as string]: `${r}px` }}>
       <span className="grid place-items-center" style={big ? { transform: "scale(var(--av-scale, 1))" } : undefined}><WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} /></span>
-      {dot && <i data-presence={online ? "online" : "offline"} aria-label={online ? "Online" : "Offline"} title={online ? "Online" : "Offline"} className={`absolute rounded-full ${online ? "bg-[#22c55e]" : "bg-[#8a8797]"}`} style={{ width: d, height: d, right: -Math.round(d * 0.15), bottom: -Math.round(d * 0.15), boxShadow: "0 0 0 2px var(--alt, var(--bg))" }} />}
+      {dot && <i data-presence={live ? "online" : "offline"} aria-label={live ? "Online" : "Offline"} title={live ? "Online" : online ? "Offline · locked on your plan" : "Offline"} className={`absolute rounded-full ${live ? "bg-[#22c55e]" : "bg-[#8a8797]"}`} style={{ width: d, height: d, right: -Math.round(d * 0.15), bottom: -Math.round(d * 0.15), boxShadow: "0 0 0 2px var(--alt, var(--bg))" }} />}
     </span>
   );
 }
