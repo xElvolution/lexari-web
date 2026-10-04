@@ -26,13 +26,15 @@ export function WhoFace({ who, look, size = 40, className = "", animated = false
 }
 
 /** An agent's face on its soft colour tile. Rounded square, sized in px. */
-export function AgentTile({ id, look, size = 48, face, className = "", radius, status = true }: { id: string; look: AgentLook | undefined; size?: number; face?: number; className?: string; radius?: number; status?: boolean }) {
+export function AgentTile({ id, look, size = 48, face, className = "", radius, status = true, ring = true }: { id: string; look: AgentLook | undefined; size?: number; face?: number; className?: string; radius?: number; status?: boolean; ring?: boolean }) {
   // big tiles shrink a little on phones (--av-scale is set in mobile-compact.css)
   const big = size >= 44;
   const s = useApp();
   const online = usePresence();
   const mine = !!s && (id === "home" || s.hired.includes(id) || s.custom.some((c) => c.id === id));
   const primary = mine && primaryOf(s) === id;
+  // ring colours: gold = primary, purple = made by you, silver = hired
+  const kind = !mine || !ring || size < 26 ? "" : primary ? "primary-ring" : id === "home" || id.startsWith("c-") ? "made-ring" : "hired-ring";
   // green only while it is answering, on a call or just talked; grey when idle, offline or locked past your plan's seats
   const active = useAgentActive(id);
   const live = !!online && active && !(s && isLocked(s, id));
@@ -40,7 +42,7 @@ export function AgentTile({ id, look, size = 48, face, className = "", radius, s
   const r = radius ?? Math.round(size * 0.32);
   const d = Math.max(8, Math.round(size * 0.24));
   return (
-    <span data-agent-tile={id} {...(primary ? { "data-primary": "" } : {})} className={`relative grid shrink-0 place-items-center ${primary ? "primary-ring" : ""} ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: r, background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)", ["--r" as string]: `${r}px` }}>
+    <span data-agent-tile={id} {...(primary ? { "data-primary": "" } : {})} data-ring={kind ? kind.replace("-ring", "") : undefined} className={`relative grid shrink-0 place-items-center ${primary ? "primary-ring" : kind} ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: r, background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)", ["--r" as string]: `${r}px` }}>
       <span className="grid place-items-center" style={big ? { transform: "scale(var(--av-scale, 1))" } : undefined}><WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} /></span>
       {dot && <i data-presence={live ? "active" : online && !(s && isLocked(s, id)) ? "idle" : "offline"} aria-label={live ? "Active now" : "Idle"} title={live ? "Active now" : s && isLocked(s, id) ? "Offline · locked on your plan" : online ? "Idle" : "Offline"} className={`absolute rounded-full ${live ? "bg-[#22c55e]" : "bg-[#8a8797]"}`} style={{ width: d, height: d, right: -Math.round(d * 0.15), bottom: -Math.round(d * 0.15), boxShadow: "0 0 0 2px var(--alt, var(--bg))" }} />}
     </span>
@@ -61,3 +63,15 @@ export function GroupTile({ members, look, size = 48, className = "" }: { member
     </span>
   );
 }
+
+/** The ring legend: what gold, purple and silver mean. */
+export function RingLegend({ className = "" }: { className?: string }) {
+  return (
+    <div data-ring-legend className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-ink/75 ${className}`}>
+      <span className="flex items-center gap-1.5"><i className="h-3.5 w-3.5 rounded-full ring-2 ring-[#f5c542] shadow-[0_0_8px_rgba(245,197,66,.6)]" />Primary</span>
+      <span className="flex items-center gap-1.5"><i className="h-3.5 w-3.5 rounded-full ring-2 ring-[#8f6bff]" />Made by you</span>
+      <span className="flex items-center gap-1.5"><i className="h-3.5 w-3.5 rounded-full ring-2 ring-[#c4c8d2]" />Hired</span>
+    </div>
+  );
+}
+

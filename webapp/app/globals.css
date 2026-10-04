@@ -40,6 +40,25 @@ html[data-motion="off"] :is(.hub-flame, .hub-flame-core, .hub-orbit, .hub-orbit 
 .primary-ring::before { content: ""; position: absolute; inset: -3px; border-radius: calc(var(--r, 14px) + 3px); pointer-events: none; animation: primary-glow 2.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .primary-ring::before { animation: none; box-shadow: 0 0 0 2px #f5c542, 0 0 12px 2px rgba(245, 197, 66, 0.5); } }
 
+/* level-up pop-up: the face bounces while it levels up, then a burst */
+@keyframes lv-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes lv-bounce { 0%, 100% { transform: translateY(0) scale(1); } 30% { transform: translateY(-16px) scale(1.06, .96); } 55% { transform: translateY(0) scale(.96, 1.05); } 75% { transform: translateY(-6px) scale(1.02); } }
+@keyframes lv-pop { 0% { transform: scale(1); } 35% { transform: scale(1.22) rotate(-4deg); } 65% { transform: scale(.95) rotate(2deg); } 100% { transform: scale(1); } }
+@keyframes lv-burst { 0% { transform: rotate(var(--a)) translateY(0) scale(.4); opacity: 1; } 100% { transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(1); opacity: 0; } }
+@keyframes lv-arrow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.lv-float { animation: lv-float 2.6s ease-in-out infinite; }
+.lv-bounce { animation: lv-bounce .7s ease-in-out infinite; }
+.lv-pop { animation: lv-pop .7s cubic-bezier(.2,.9,.3,1.3) 1; }
+.lv-arrow { animation: lv-arrow 1.2s ease-in-out infinite; }
+.lv-burst > i { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 3px; animation: lv-burst 1.1s cubic-bezier(.15,.7,.3,1) forwards; }
+@media (prefers-reduced-motion: reduce) { .lv-float, .lv-bounce, .lv-pop, .lv-arrow, .lv-burst > i { animation: none; } .lv-burst { display: none; } }
+
+/* agents you made: purple ring; hired specialists: silver ring (the primary one is gold, above) */
+.made-ring::before, .hired-ring::before { content: ""; position: absolute; inset: -3px; border-radius: calc(var(--r, 14px) + 3px); pointer-events: none; }
+.made-ring::before { box-shadow: 0 0 0 2px #8f6bff; }
+.hired-ring::before { box-shadow: 0 0 0 2px #c4c8d2; }
+[data-theme="light"] .hired-ring::before { box-shadow: 0 0 0 2px #a9aebb; }
+
 /* mystery box (placeholder motion until the reference style lands) */
 @keyframes box-bounce { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-14px) scale(1.04, 0.97); } }
 @keyframes box-shake { 0%, 100% { transform: rotate(0) scale(1.05); } 15% { transform: rotate(-12deg) scale(1.08); } 30% { transform: rotate(10deg) scale(1.1); } 45% { transform: rotate(-9deg) scale(1.12); } 60% { transform: rotate(8deg) scale(1.14); } 75% { transform: rotate(-5deg) scale(1.16); } }

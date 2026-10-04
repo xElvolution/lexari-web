@@ -1,40 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { specialistBySlug } from "@/content/appData";
 import { hirePriceLabel } from "@/lib/prices";
-import { agentName, isLocked, primaryOf, planOf, release, seatsUsed, toast, useApp } from "@/lib/store";
+import { agentName, isCreated, isLocked, primaryOf, planOf, release, seatsUsed, toast, useApp } from "@/lib/store";
 import { PlanSummary } from "@/components/Plans";
 import Icon from "@/components/Icon";
-import { AgentFace, SpecFace } from "@/components/faces";
+import { AgentFace, RingLegend, SpecFace } from "@/components/faces";
+import { myAgents } from "@/components/agents";
 import { PageHead } from "@/components/ui";
 import { AgentTile } from "@/components/faces";
 import { openAdd, openAgent, openUpgrade } from "@/components/overlays";
 import { AgentMenu, useAgentMenu } from "@/components/home/AgentMenu";
 import { useRouter } from "next/navigation";
 
+const PAGE = 20;
+type Kind = "primary" | "made" | "hired";
+const RING: Record<Kind, string> = { primary: "ring-[#f5c542]", made: "ring-[#8f6bff]", hired: "ring-[#c4c8d2]" };
+
 export default function TeamPage() {
   const s = useApp()!;
   const [pick, setPick] = useState<string | null>(null);
   const menu = useAgentMenu();
   const router = useRouter();
-  const nameFor = (id: string) => (id === "home" ? agentName(s) : s.custom.find((c) => c.id === id)?.name || specialistBySlug(id)?.name || id);
+  const nameFor = (id: string) => (id === "home" ? agentName(s) : s.meta[id]?.nick || s.custom.find((c) => c.id === id)?.name || specialistBySlug(id)?.name || id);
   const plan = planOf(s);
-  const taken = 1 + s.hired.length;
+  const team = myAgents(s); // your agent, then the ones you made, then hired specialists
   const used = seatsUsed(s);
-  // Desks you have (plan seats; agents you make sit in "Made by you" but count too), then locked desks up to the next row of five.
-  const open = Math.max(0, plan.seats - used);
-  const unlocked = Math.min(Math.max(plan.seats, taken), 100);
+  const primary = primaryOf(s);
+  // Seats you have, then locked seats up to the next row of five (at most 100).
+  const unlocked = Math.min(Math.max(plan.seats, used), 100);
   const seats = Math.max(5, Math.ceil(Math.min(unlocked + (plan.seats < 100 ? 1 : 0), 100) / 5) * 5);
+  const pages = Math.ceil(seats / PAGE);
   const big = seats <= 5;
-  const cols = seats <= 20 ? "grid-cols-5" : "grid-cols-5 sm:grid-cols-10";
   const free = s.paid.filter((x) => !s.hired.includes(x));
+  const strip = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  const goPage = (i: number) => { const el = strip.current; if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" }); };
+  const onScroll = () => { const el = strip.current; if (el) setPage(Math.round(el.scrollLeft / Math.max(1, el.clientWidth))); };
+  const kindOf = (id: string): Kind => (id === primary ? "primary" : isCreated(s, id) ? "made" : "hired");
+  const picked = pick ? team.find((a) => a.id === pick) : undefined;
+
+  const seat = (i: number) => {
+    const a = team[i];
+    const style = { animationDelay: `${Math.min(i % PAGE, 40) * 14}ms` };
+    const num = big && <span className="label absolute bottom-[8%] right-[10%] text-[9px] text-ink/55 max-[430px]:hidden">{String(i + 1).padStart(2, "0")}</span>;
+    if (a) {
+      const k = kindOf(a.id);
+      const locked = isLocked(s, a.id);
+      const cls = `pop relative grid aspect-square place-items-center rounded-[22%] bg-tint ring-2 transition hover:-translate-y-0.5 ${RING[k]} ${k === "primary" ? "primary-ring [--r:22%]" : ""} ${pick === a.id ? "outline outline-2 outline-offset-2 outline-grape" : ""}`;
+      const face = a.id === "home" ? <AgentFace look={s.agent?.look} size={120} track={big} className={`!h-[72%] !w-[72%] ${locked ? "opacity-40 grayscale" : ""}`} /> : <SpecFace slug={a.id} size={90} className={`!h-[72%] !w-[72%] ${locked ? "opacity-40 grayscale" : ""}`} />;
+      if (locked) return <button key={i} data-agent-locked={a.id} onClick={() => openUpgrade("plans")} className={`${cls} opacity-80`} style={style} title={`${a.name} · locked on ${plan.name}`} aria-label={`${a.name} is locked on your plan. Upgrade to unlock.`}>{face}<span className="absolute inset-0 grid place-items-center"><span className="grid h-7 w-7 place-items-center rounded-full bg-ink text-[var(--bg)]"><Icon name="lock" size={13} /></span></span>{num}</button>;
+      return <button key={i} {...menu.bind(a.id)} data-seat={a.id} data-ring={k} data-primary={k === "primary" ? "" : undefined} onClick={() => setPick(pick === a.id ? null : a.id)} className={cls} style={style} title={`${a.name} · seat ${i + 1}`} aria-label={`${a.name}, seat ${i + 1}${k === "primary" ? ", primary" : k === "made" ? ", made by you" : ", hired"}`}>{face}{num}</button>;
+    }
+    if (i >= unlocked) return <button key={i} data-seat-locked onClick={() => openUpgrade(plan.id === "free" ? "add" : "full")} className="pop relative grid aspect-square place-items-center rounded-[22%] bg-ink/[.06] text-ink/35 transition hover:bg-tint hover:text-brand-ink" style={style} aria-label={`Seat ${i + 1} is locked. Upgrade for more seats.`} title="Locked · upgrade for more seats"><Icon name="lock" size={big ? 18 : 13} />{num}</button>;
+    return <button key={i} data-seat-open onClick={() => openAdd()} className="pop relative grid aspect-square place-items-center rounded-[22%] border-2 border-dashed border-ink/25 bg-base/60 transition hover:border-grape hover:bg-tint" style={style} aria-label={`Open seat ${i + 1}. Add an agent.`}>{big && <Icon name="plus" size={18} className="text-ink/40" />}{num}</button>;
+  };
 
   return (
     <>
       <AgentMenu s={s} at={menu.at} close={menu.close} onChat={(id) => router.push(`/agents/${id}`)} name={nameFor} />
-      <PageHead kicker="Team" title="Your team floor." body={`${agentName(s)} is always first. Specialists you hire from the marketplace join here.`} />
+      <PageHead kicker="Team" title="Your team floor." body={`Everyone on your team has a seat: ${agentName(s)}, the agents you made and the specialists you hired.`} />
 
       <div data-rise className="mt-5 grid gap-5 lg:grid-cols-[1.5fr_.5fr]">
         <div className="relative overflow-hidden rounded-[30px] bg-card p-4 ring-2 ring-tint sm:p-7">
@@ -43,42 +70,35 @@ export default function TeamPage() {
             <span className="label text-ink/65">floor plan</span>
             <span className="label tab-num text-brand-ink">{used} of {plan.seats} seat{plan.seats === 1 ? "" : "s"}</span>
           </div>
-          <div className={`relative mt-5 grid gap-1.5 sm:gap-2.5 ${cols}`}>
-            {Array.from({ length: seats }).map((_, i) => {
-              const slug = i > 0 ? s.hired[i - 1] : undefined;
-              const state = i === 0 ? "home" : slug ? "hired" : i < taken + open ? "open" : "locked";
-              const sp = slug ? specialistBySlug(slug) : undefined;
-              const cls = `pop relative grid aspect-square place-items-center rounded-[22%] transition ${state === "home" ? "bg-grape shadow-[0_4px_0_#3514b0]" : state === "hired" ? `bg-tint ring-2 ${pick === slug ? "ring-grape" : "ring-grape/40"} hover:-translate-y-1` : "border-2 border-dashed border-ink/25 bg-base/60 hover:border-grape hover:bg-tint"}`;
-              const style = { animationDelay: `${Math.min(i, 40) * 14}ms` };
-              const num = big && <span className={`label absolute bottom-[8%] right-[10%] text-[9px] ${state === "home" ? "text-white/85 max-[430px]:hidden" : "text-ink/55"}`}>{String(i + 1).padStart(2, "0")}</span>;
-              if (state === "home") return <Link key={i} href="/agents/home" {...menu.bind("home")} data-primary={primaryOf(s) === "home" ? "" : undefined} className={`${cls} ${primaryOf(s) === "home" ? "primary-ring [--r:22%]" : ""}`} style={style} title={`${agentName(s)} · seat 01`}><AgentFace look={s.agent?.look} size={120} track={big} className="!h-[72%] !w-[72%]" />{num}</Link>;
-              if (state === "hired" && isLocked(s, slug!)) return <button key={i} data-agent-locked={slug} onClick={() => openUpgrade("plans")} className={`${cls} opacity-80`} style={style} title={`${sp?.name} · locked on ${plan.name}`} aria-label={`${sp?.name} is locked on your plan. Upgrade to unlock.`}><SpecFace slug={slug!} size={90} className="!h-[72%] !w-[72%] opacity-40 grayscale" /><span className="absolute inset-0 grid place-items-center"><span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-[var(--bg)]"><Icon name="lock" size={14} /></span></span>{num}</button>;
-              if (state === "hired") return <button key={i} onClick={() => setPick(pick === slug ? null : slug!)} className={cls} style={style} title={`${sp?.name} · seat ${i + 1}`} aria-label={`${sp?.name}, seat ${i + 1}`}><SpecFace slug={slug!} size={90} className="!h-[72%] !w-[72%]" />{num}</button>;
-              if (state === "locked") return <button key={i} data-seat-locked onClick={() => openUpgrade(plan.id === "free" ? "add" : "full")} className="pop relative grid aspect-square place-items-center rounded-[22%] bg-ink/[.06] text-ink/35 transition hover:bg-tint hover:text-brand-ink" style={style} aria-label={`Seat ${i + 1} is locked. Upgrade for more seats.`} title="Locked · upgrade for more seats"><Icon name="lock" size={big ? 18 : 13} />{num}</button>;
-              return <button key={i} onClick={() => openAdd()} className={cls} style={style} aria-label={`Open seat ${i + 1}. Add an agent.`}>{big && <Icon name="plus" size={18} className="text-ink/40" />}{num}</button>;
-            })}
+          <RingLegend className="relative mt-3" />
+          <div ref={strip} onScroll={onScroll} data-floor-pages={pages} className="no-bar relative -mx-1 mt-4 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain">
+            {Array.from({ length: pages }, (_, p) => (
+              <div key={p} data-floor-page={p + 1} className="w-full shrink-0 snap-start px-1" aria-label={`Seats ${p * PAGE + 1} to ${Math.min(seats, (p + 1) * PAGE)}`}>
+                <div className={`grid gap-2 sm:gap-2.5 ${seats <= 5 ? "grid-cols-5" : "grid-cols-5 sm:grid-cols-10"}`}>
+                  {Array.from({ length: Math.min(PAGE, seats - p * PAGE) }, (_, j) => seat(p * PAGE + j))}
+                </div>
+              </div>
+            ))}
           </div>
-          {pick && (() => { const sp = specialistBySlug(pick)!; return (
-            <div className="pop relative mt-5 flex flex-wrap items-center gap-3 rounded-[22px] bg-ink p-3 text-[var(--bg)]">
-              <span className="grid h-12 w-12 place-items-center rounded-xl bg-[var(--bg)]/10"><SpecFace slug={pick} size={40} /></span>
-              <span className="min-w-0 flex-1 max-sm:basis-[calc(100%-3.75rem)]"><b className="display block text-[24px] leading-none">{sp.name}</b><span className="text-[13px] opacity-75">{sp.job} · seat {String(s.hired.indexOf(pick) + 2).padStart(2, "0")}</span></span>
-              <Link href={`/agents/${pick}`} className="rounded-full bg-grape px-4 py-2 text-[14px] font-bold text-white">Chat</Link>
-              <button onClick={() => openAgent(pick)} className="rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">ID card</button>
-              <button onClick={() => { release(pick); setPick(null); toast({ text: `${sp.name} left the seat`, face: sp.seed, color: sp.color }); }} className="rounded-full px-4 py-2 text-[14px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">Release</button>
+          {pages > 1 && (
+            <div data-floor-dots className="relative mt-3 flex items-center justify-center gap-1.5" role="tablist" aria-label="Floor pages">
+              {Array.from({ length: pages }, (_, p) => <button key={p} role="tab" aria-selected={page === p} aria-label={`Page ${p + 1}`} onClick={() => goPage(p)} className={`grid h-7 min-w-7 place-items-center rounded-full px-1.5 text-[12px] font-bold tabular-nums transition ${page === p ? "bg-grape text-white" : "bg-tint text-ink/60 hover:text-ink"}`}>{p + 1}</button>)}
+            </div>
+          )}
+          {picked && (() => { const k = kindOf(picked.id); return (
+            <div className="pop relative mt-4 flex flex-wrap items-center gap-2.5 rounded-[22px] bg-ink p-3 text-[var(--bg)]">
+              <AgentTile id={picked.id} look={s.agent?.look} size={44} status={false} />
+              <span className="min-w-0 flex-1 max-sm:basis-[calc(100%-3.5rem)]"><b className="block truncate text-[18px] leading-tight">{picked.name}</b><span className="text-[12.5px] opacity-75">{k === "primary" ? "Primary" : k === "made" ? "Made by you" : picked.role} · seat {String(team.indexOf(picked) + 1).padStart(2, "0")}</span></span>
+              <Link href={`/agents/${picked.id}`} className="rounded-full bg-grape px-3.5 py-1.5 text-[13.5px] font-bold text-white">Chat</Link>
+              <button onClick={() => openAgent(picked.id)} className="rounded-full px-3.5 py-1.5 text-[13.5px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">ID card</button>
+              {k === "hired" && <button onClick={() => { release(picked.id); setPick(null); toast({ text: `${picked.name} left the seat` }); }} className="rounded-full px-3.5 py-1.5 text-[13.5px] font-bold ring-1 ring-current/30 hover:bg-[var(--bg)]/10">Release</button>}
             </div>
           ); })()}
-          <div className="relative mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-ink/75">
-            <span className="flex items-center gap-2"><i className="h-3.5 w-3.5 rounded bg-grape" />{agentName(s)}</span>
-            <span className="flex items-center gap-2"><i className="h-3.5 w-3.5 rounded bg-tint ring-2 ring-grape/45" />Hired specialist</span>
-            <span className="flex items-center gap-2"><i className="h-3.5 w-3.5 rounded border-2 border-dashed border-ink/30" />Open seat</span>
-            <span className="flex items-center gap-2"><i className="grid h-3.5 w-3.5 place-items-center rounded bg-ink/10"><Icon name="lock" size={9} className="text-ink/50" /></i>Locked</span>
+          <div className="relative mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px] text-ink/70">
+            <span className="flex items-center gap-1.5"><i className="h-3.5 w-3.5 rounded border-2 border-dashed border-ink/30" />Open seat</span>
+            <span className="flex items-center gap-1.5"><i className="grid h-3.5 w-3.5 place-items-center rounded bg-ink/10"><Icon name="lock" size={9} className="text-ink/50" /></i>Locked</span>
+            <span className="text-ink/50">Long-press an agent for more</span>
             <button onClick={() => openAdd()} className="btn btn-brand btn-sm ml-auto"><Icon name="plus" size={16} />Add an agent</button>
-          </div>
-          <div className="relative mt-6 rounded-[22px] bg-tint p-4">
-            <div className="flex items-center justify-between gap-3"><h3 className="text-[15px] font-bold text-ink">Made by you</h3><button onClick={() => openAdd("create")} className="flex items-center gap-1.5 text-[13.5px] font-bold text-brand-ink hover:underline"><Icon name="plus" size={14} />Create an agent</button></div>
-            {s.custom.length ? (
-              <div className="mt-3 flex flex-wrap gap-2">{s.custom.map((c) => <button key={c.id} {...menu.bind(c.id)} data-made={c.id} onClick={() => openAgent(c.id)} className="flex items-center gap-2 rounded-full bg-card py-1 pl-1 pr-3.5 text-[14px] font-bold text-ink ring-1 ring-line transition hover:ring-grape"><AgentTile id={c.id} look={null} size={30} radius={15} />{c.name}</button>)}</div>
-            ) : <p className="mt-1 text-[13.5px] text-ink/60">Agents you create sit here. Each one takes a seat.</p>}
           </div>
         </div>
 
