@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "./db";
-import { agents, chats, hires, jobs, memories, messages, users } from "./db/schema";
+import { agents, chats, hires, jobs, memories, messages, userMedia, users } from "./db/schema";
 import type { SessionUser } from "./auth/session";
 import { currentPlan } from "./plans";
 
@@ -16,6 +16,8 @@ export async function loadAccount(user: SessionUser) {
     database.select({ slug: hires.slug, tx: hires.tx, createdAt: hires.createdAt }).from(hires).where(eq(hires.buyerId, user.userId)),
     currentPlan(user.userId),
   ]);
+  const mediaRows = await database.select({ kind: userMedia.kind, at: userMedia.updatedAt }).from(userMedia).where(eq(userMedia.userId, user.userId));
+  const media = Object.fromEntries(mediaRows.map((m) => [m.kind, m.at.getTime()])) as { avatar?: number; cover?: number };
   const chatIds = chatRows.map((c) => c.id);
   const msgRows = chatIds.length
     ? await database.select().from(messages).where(inArray(messages.chatId, chatIds)).orderBy(desc(messages.createdAt)).limit(3000)
@@ -37,6 +39,7 @@ export async function loadAccount(user: SessionUser) {
     },
     profile: (me?.profile || {}) as Record<string, unknown>,
     plan,
+    media,
     lockOn: !!me?.lockHash,
     biometric: (me?.lockCreds || []).length > 0,
     prefs: (me?.prefs || {}) as Record<string, unknown>,

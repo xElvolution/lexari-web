@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LOOKS, TONES, shortAddr } from "@/content/appData";
 import {
-  agentName, clearChats, deleteAccount, exportData, setActive, planOf, setNotif, setPrefs, signOut, startTour, toast, updateAgent, useApp, type State,
+  agentName, clearChats, deleteAccount, exportData, setActive, planOf, setNotif, setPrefs, signOut, toast, updateAgent, useApp, type State,
 } from "@/lib/store";
 import { LANDING_URL, WEBAPP_URL } from "@shared/sites";
 import { applyTheme, onTheme, savedTheme, watchSystemTheme } from "@shared/components/theme";
@@ -60,7 +60,6 @@ const dangerBtn = "inline-flex h-10 items-center gap-2 rounded-full px-4 text-[1
 
 /* ---------- sections ---------- */
 function General({ s }: { s: State }) {
-  const router = useRouter();
   const [theme, setTheme] = useState<Theme>("dark");
   useEffect(() => { setTheme(savedTheme()); watchSystemTheme(); return onTheme(setTheme); }, []);
   const pickTheme = (t: Theme) => { applyTheme(t); setPrefs({ theme: t }); };
@@ -85,9 +84,6 @@ function General({ s }: { s: State }) {
       </Group>
       <Group title="Chats">
         <Row title="Default agent" desc="Who opens first on the Agents page."><Select label="Default agent" value={p.defaultAgent} options={myAgents(s).map((a) => [a.id, a.name] as [string, string])} onChange={(v) => { setPrefs({ defaultAgent: v }); setActive(v); }} /></Row>
-      </Group>
-      <Group title="Help">
-        <Row title="Guided tour" desc={`${agentName(s)} walks you through the app again, step by step.${s.tour?.done ? " You finished it before." : ""}`}><button onClick={() => { startTour(); router.push("/app"); }} className={smallBtn}><Icon name="play" size={14} />Replay tour</button></Row>
       </Group>
     </>
   );

@@ -39,7 +39,7 @@ export type Prefs = {
   motion: boolean; demoLabels: boolean; instructions: string; twofa: boolean; signedOut: string[]; theme?: "light" | "dark" | "system";
   notif: Record<string, boolean>;
 };
-export type Profile = { name: string; username: string; bio: string; since: number };
+export type Profile = { name: string; username: string; bio: string; since: number; avatar?: number; cover?: number };
 export const DEFAULT_PREFS: Prefs = {
   language: "English", voice: "Iris", defaultAgent: "home", memory: true, history: true, improve: false,
   motion: true, demoLabels: false, instructions: "", twofa: false, signedOut: [],
@@ -207,7 +207,7 @@ function fromAccount(acc: Account): State {
     threads, groups, active,
     wallets: { home: acc.user.wallet },
     prefs,
-    profile: { name: String((acc.profile as Partial<Profile>).name || (acc.user.email ? acc.user.email.split("@")[0] : agent?.you || "You")), username: String((acc.profile as Partial<Profile>).username || ""), bio: String((acc.profile as Partial<Profile>).bio || ""), since: acc.user.createdAt },
+    profile: { name: String((acc.profile as Partial<Profile>).name || (acc.user.email ? acc.user.email.split("@")[0] : agent?.you || "You")), username: String((acc.profile as Partial<Profile>).username || ""), bio: String((acc.profile as Partial<Profile>).bio || ""), since: acc.user.createdAt, avatar: acc.media?.avatar, cover: acc.media?.cover },
     custom, born, meta,
     tour: { on: !!home && !prefsRaw.tourDone, step: 0, done: !!prefsRaw.tourDone },
     referralCode: acc.user.referralCode,
@@ -602,6 +602,17 @@ export function updateProfile(p: Partial<Profile>) {
   const { name, username, bio } = get().profile!;
   sync(api("/api/me", { method: "PATCH", body: { profile: { name: name.slice(0, 60), username: username.slice(0, 30), bio: bio.slice(0, 300) } } }));
 }
+/** Profile picture / cover: saves the cropped image, then shows it everywhere. */
+export async function setMedia(kind: "avatar" | "cover", dataUrl: string | null) {
+  if (dataUrl) {
+    const r = await api<{ at: number }>(`/api/media/${kind}`, { method: "PUT", body: { data: dataUrl } });
+    set((x) => ({ ...x, profile: x.profile ? { ...x.profile, [kind]: r.at } : x.profile }));
+  } else {
+    await api(`/api/media/${kind}`, { method: "DELETE" });
+    set((x) => ({ ...x, profile: x.profile ? { ...x.profile, [kind]: undefined } : x.profile }));
+  }
+}
+export const mediaUrl = (kind: "avatar" | "cover", at?: number) => (at ? `/api/media/${kind}?v=${at}` : "");
 export function clearChats() {
   const prev = get().threads;
   set((x) => ({ ...x, threads: x.agent ? { home: [hello(x.agent)] } : ({} as Record<string, Msg[]>) }));

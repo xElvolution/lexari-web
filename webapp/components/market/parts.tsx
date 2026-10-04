@@ -1,5 +1,7 @@
 "use client";
 
+import { PALETTE } from "@shared/components/avatar";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -55,11 +57,17 @@ export function AppCard({ a, wide = false, fill = false }: { a: Specialist; wide
         <div className="flip-inner">
           <div className="flip-face overflow-hidden rounded-[22px]">
             {wide ? (
-              <span className="relative flex h-full flex-col justify-between overflow-hidden rounded-[22px] p-4 ring-1 ring-line" style={{ background: `linear-gradient(135deg, color-mix(in oklab, var(--color-grape) 30%, var(--card)), var(--card))` }}>
-                <span className="label self-start rounded-full bg-ink px-2 py-1 text-[8.5px] text-[var(--bg)]">New</span>
-                <span className="flex items-end gap-3">
-                  <span ref={face} className="shrink-0 transition duration-300 group-hover:scale-105"><AgentTile id={a.slug} look={null} size={84} radius={24} /></span>
-                  <span data-quote className="min-w-0 flex-1 pb-1 text-right text-[14px] font-semibold leading-snug text-ink/80">&ldquo;{a.quip}&rdquo;</span>
+              <span data-banner className="relative flex h-full flex-col justify-between overflow-hidden rounded-[22px] p-4 text-white ring-1 ring-white/10" style={{ background: `radial-gradient(80% 110% at 88% 18%, color-mix(in oklab, ${PALETTE[a.color].fill} 78%, transparent) 0%, transparent 62%), radial-gradient(60% 70% at 0% 100%, color-mix(in oklab, ${PALETTE[a.color].shade} 55%, transparent) 0%, transparent 70%), linear-gradient(125deg, #0a0a0a 0%, #1d0f5c 58%, color-mix(in oklab, ${PALETTE[a.color].fill} 45%, #5b2bff) 100%)` }}>
+                <span className="grain pointer-events-none absolute inset-0" />
+                <span aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full border-[18px] opacity-25" style={{ borderColor: PALETTE[a.color].fill }} />
+                <span aria-hidden className="pointer-events-none absolute right-16 top-6 h-3 w-3 rounded-full opacity-70" style={{ background: PALETTE[a.color].fill }} />
+                <span className="relative flex items-center justify-between gap-2">
+                  <span className="label rounded-full bg-white px-2 py-1 text-[8.5px] text-[#0a0a0a]">New</span>
+                  <span className="label truncate text-[8.5px] text-white/70">{a.job}</span>
+                </span>
+                <span className="relative flex items-end gap-3">
+                  <span ref={face} className="shrink-0 drop-shadow-[0_10px_24px_rgba(0,0,0,.45)] transition duration-300 group-hover:scale-105"><AgentTile id={a.slug} look={null} size={84} radius={24} /></span>
+                  <span data-quote className="min-w-0 flex-1 pb-1 text-right text-[14px] font-semibold leading-snug text-white/90">&ldquo;{a.quip}&rdquo;</span>
                 </span>
               </span>
             ) : (
