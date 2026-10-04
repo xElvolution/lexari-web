@@ -169,40 +169,109 @@ export function isEcho(heard: string, spoken: string) {
   return h.filter((w) => said.has(w)).length / h.length >= 0.6;
 }
 
+/** Voice activity detection on the microphone: fires when someone starts talking. Calibrates to the room and to the
+ *  agent's own voice leaking from the speaker during its first ~0.6 s, so the speaker alone doesn't trip it. */
+type Vad = { stop: () => void; desensitize: () => void };
+let vadOff = false; // some phones can't share the mic between this and speech-to-text; then words alone do barge-in
+async function startVad(onSpeech: () => void): Promise<Vad | null> {
+  if (vadOff || typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) return null;
+  const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AC) return null;
+  let stream: MediaStream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } }); } catch { return null; }
+  const ac = new AC();
+  void ac.resume().catch(() => {});
+  const an = ac.createAnalyser(); an.fftSize = 1024;
+  ac.createMediaStreamSource(stream).connect(an);
+  const buf = new Float32Array(an.fftSize);
+  const t0 = performance.now();
+  let floor = 0.006, echo = 0, above = 0, last = t0, fired = false, extra = 1;
+  const iv = window.setInterval(() => {
+    an.getFloatTimeDomainData(buf);
+    let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    const rms = Math.sqrt(sum / buf.length), now = performance.now(), dt = now - last; last = now;
+    if (now - t0 < 600) { echo = Math.max(echo, rms); return; } // the agent just started talking: learn its loudness
+    const th = Math.max(0.018, floor * 4, echo * 1.7) * extra;
+    above = rms > th ? above + dt : Math.max(0, above - dt * 2);
+    if (rms < th) floor = floor * 0.97 + Math.min(rms, floor * 2) * 0.03;
+    if (above >= 140 && !fired) { fired = true; onSpeech(); window.setTimeout(() => { fired = false; above = 0; }, 2500); }
+  }, 30);
+  return {
+    stop: () => { window.clearInterval(iv); stream.getTracks().forEach((t) => t.stop()); void ac.close().catch(() => {}); },
+    desensitize: () => { extra = Math.min(2.5, extra * 1.35); },
+  };
+}
+
 /**
- * Speaks while the microphone keeps listening (barge-in). As soon as you start talking (and it isn't the
- * agent's own voice echoing back) speech stops and what you say becomes the next turn.
+ * Speaks while the microphone keeps listening (barge-in, like a voice-mode call):
+ * - voice activity detection stops the agent's speech the instant you start talking;
+ * - speech-to-text confirms it was you (not the agent's own voice echoing back) and keeps listening until you finish;
+ * - if it was only a noise, the agent carries on from the word where it stopped.
  * Resolves with your words, or "" when the agent finished without being interrupted.
  */
-export function speakAndListen(text: string, v: VoiceSettings | undefined, opts: { onBargeIn?: () => void; onText?: (t: string) => void; isStopped?: () => boolean } = {}): Promise<string> {
+export function speakAndListen(text: string, v: VoiceSettings | undefined, opts: { onBargeIn?: () => void; onHold?: () => void; onResume?: () => void; onText?: (t: string) => void; isStopped?: () => boolean } = {}): Promise<string> {
   if (typeof window === "undefined" || !window.speechSynthesis || !text.trim()) return Promise.resolve("");
   window.speechSynthesis.cancel();
   return new Promise((resolve) => {
-    let interrupted = false, finished = false, settled = false;
-    const settle = (t: string) => { if (!settled) { settled = true; resolve(t); } };
-    let ear: Transcriber | null = null;
+    let interrupted = false, finished = false, settled = false, holding = false;
+    let at = 0, from = 0, began = 0;
+    let ear: Transcriber | null = null, vad: Vad | null = null;
+    let safety = 0, holdTimer = 0;
+    const settle = (t: string) => { if (settled) return; settled = true; window.clearTimeout(safety); window.clearTimeout(holdTimer); vad?.stop(); vad = null; resolve(t); };
+    const interrupt = () => {
+      if (interrupted) return;
+      interrupted = true; holding = false; window.clearTimeout(holdTimer); window.clearTimeout(safety);
+      window.speechSynthesis.cancel(); vad?.stop(); vad = null; opts.onBargeIn?.();
+    };
+    const end = () => { if (interrupted || holding || finished) return; finished = true; ear?.abort(); settle(""); };
     const startEar = () => {
-      if (finished || interrupted || opts.isStopped?.()) return;
+      if (finished || interrupted || settled || opts.isStopped?.()) return;
       ear = transcribe({
         maxMs: 60_000,
         onText: (t) => {
           if (finished && !interrupted) return;
-          if (!interrupted && t && !isEcho(t, text)) { interrupted = true; window.speechSynthesis.cancel(); opts.onBargeIn?.(); }
+          if (!interrupted && t && !isEcho(t, text)) interrupt();
           if (interrupted) opts.onText?.(t);
         },
       });
       void ear.done.then((t) => {
         if (interrupted) { settle(t && !isEcho(t, text) ? t : ""); return; }
         if (!finished) startEar(); // a phrase of echo or silence ended: keep listening while it speaks
-      }, () => { if (!interrupted && !finished) setTimeout(startEar, 400); });
+      }, () => {
+        if (vad) { vad.stop(); vad = null; vadOff = true; } // the mic can't be shared here: rely on words only
+        if (!interrupted && !finished) window.setTimeout(startEar, 400);
+      });
     };
-    const utter = utterance(text, v);
-    const end = () => { if (interrupted) return; finished = true; ear?.abort(); settle(""); };
-    utter.onend = end; utter.onerror = end;
-    window.setTimeout(end, Math.min(60_000, 2000 + text.length * 90 / (v?.rate || 1)));
-    window.speechSynthesis.speak(utter);
+    const say = (start: number) => {
+      const rest = text.slice(start);
+      if (!rest.trim()) { end(); return; }
+      from = start; at = start; began = performance.now();
+      const u = utterance(rest, v);
+      u.onboundary = (e) => { at = start + (e.charIndex || 0); };
+      u.onend = () => { if (!holding) end(); };
+      u.onerror = () => { if (!holding) end(); };
+      window.clearTimeout(safety);
+      safety = window.setTimeout(end, Math.min(60_000, 2000 + rest.length * 90 / (v?.rate || 1)));
+      window.speechSynthesis.speak(u);
+    };
+    // VAD heard something: stop talking now, and give speech-to-text a moment to say whether it was you.
+    const hold = () => {
+      if (interrupted || finished || holding || settled) return;
+      holding = true; window.speechSynthesis.cancel(); window.clearTimeout(safety);
+      opts.onHold?.();
+      // where it stopped: the last word boundary, or an estimate from elapsed time when the voice has no boundary events
+      const est = from + Math.floor(((performance.now() - began) / 1000) * 14 * (v?.rate || 1));
+      let resumeAt = at > from ? at : Math.min(text.length, est);
+      while (resumeAt > from && /\S/.test(text[resumeAt - 1] || "")) resumeAt--;
+      holdTimer = window.setTimeout(() => {
+        if (interrupted || settled) return;
+        holding = false; vad?.desensitize(); opts.onResume?.(); say(resumeAt); // only a noise or the speaker's echo
+      }, 1700);
+    };
+    say(0);
     // give the speaker a moment to start so the first syllables aren't taken as you talking
-    setTimeout(startEar, 350);
+    window.setTimeout(startEar, 350);
+    void startVad(hold).then((x) => { if (settled || interrupted || finished) x?.stop(); else vad = x; });
   });
 }
 

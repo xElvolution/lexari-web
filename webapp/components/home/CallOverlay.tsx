@@ -72,6 +72,8 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
         if (speakerRef.current && !mutedRef.current) {
           next = await speakAndListen(reply, voiceOf(id), {
             isStopped: () => stop || mutedRef.current,
+            onHold: () => { if (!stop) setCaption("Listening…"); },
+            onResume: () => { if (!stop) setCaption("Speaking… talk any time to interrupt"); },
             onBargeIn: () => { if (!stop) setCaption("Go ahead, I'm listening…"); },
             onText: (t) => { if (!stop && t) setCaption(`You: ${t}`); },
           });
