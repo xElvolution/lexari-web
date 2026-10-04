@@ -6,14 +6,14 @@
 @media (max-width: 430px) {
   :root { --av-scale: .84; }
 
-  /* headings: a native-app scale */
-  .text-\[28px\] { font-size: 22px; } .text-\[30px\] { font-size: 23px; } .text-\[32px\] { font-size: 24px; }
-  .text-\[34px\] { font-size: 25px; } .text-\[36px\] { font-size: 26px; } .text-\[38px\] { font-size: 27px; }
-  .text-\[40px\] { font-size: 28px; } .text-\[42px\] { font-size: 29px; } .text-\[44px\] { font-size: 30px; }
-  .text-\[46px\] { font-size: 31px; } .text-\[48px\] { font-size: 32px; } .text-\[52px\] { font-size: 34px; }
-  .text-\[56px\] { font-size: 36px; } .text-\[60px\] { font-size: 38px; } .text-\[64px\] { font-size: 40px; }
-  .text-\[72px\] { font-size: 44px; } .text-\[76px\] { font-size: 46px; } .text-\[88px\] { font-size: 52px; }
-  .text-\[18px\] { font-size: 16px; } .text-\[17px\] { font-size: 15.5px; } .text-\[16px\] { font-size: 15px; }
+  /* headings: a native-app scale (page titles land around 26px) */
+  .text-\[28px\] { font-size: 21px; } .text-\[30px\] { font-size: 22px; } .text-\[32px\] { font-size: 23px; }
+  .text-\[34px\] { font-size: 24px; } .text-\[36px\] { font-size: 24px; } .text-\[38px\] { font-size: 25px; }
+  .text-\[40px\] { font-size: 26px; } .text-\[42px\] { font-size: 26px; } .text-\[44px\] { font-size: 26px; }
+  .text-\[46px\] { font-size: 27px; } .text-\[48px\] { font-size: 28px; } .text-\[52px\] { font-size: 30px; }
+  .text-\[56px\] { font-size: 32px; } .text-\[60px\] { font-size: 34px; } .text-\[64px\] { font-size: 36px; }
+  .text-\[72px\] { font-size: 40px; } .text-\[76px\] { font-size: 44px; } .text-\[88px\] { font-size: 48px; }
+  .text-\[18px\] { font-size: 16px; } .text-\[17px\] { font-size: 15.5px; } .text-\[16px\] { font-size: 15px; } .text-\[15px\] { font-size: 14.5px; }
   .display { line-height: .95; }
 
   /* buttons around 44px */
@@ -38,6 +38,14 @@
   .p-7.pt-9 { padding-top: 1.75rem; } .p-5.pb-4 { padding-bottom: .75rem; } .px-6.py-14 { padding-top: 2.5rem; padding-bottom: 2.5rem; }
   .pt-8 { padding-top: 1.5rem; } .pt-6 { padding-top: 1rem; }
 
+  /* larger squares and avatars */
+  .h-16 { height: 3.5rem; } .w-16 { width: 3.5rem; }
+  .gap-3 { gap: .625rem; } .my-7 { margin-top: 1.25rem; margin-bottom: 1.25rem; } .my-8 { margin-top: 1.5rem; margin-bottom: 1.5rem; }
+  .mb-8 { margin-bottom: 1.5rem; } .mb-6 { margin-bottom: 1.125rem; } .py-10 { padding-top: 1.75rem; padding-bottom: 1.75rem; } .py-12 { padding-top: 2rem; padding-bottom: 2rem; }
+
+  /* hub balance: smaller coin next to the number */
+  [data-hub-hero] [data-coin-target] { zoom: .75; }
+
   /* onboarding: the badge rig is smaller on phones (zoom keeps the layout in step) */
   .onb-badge { zoom: .82; }
 
@@ -47,5 +55,5 @@
 }
 @media (max-width: 370px) {
   :root { --av-scale: .8; }
-  .text-\[40px\] { font-size: 26px; } .text-\[44px\] { font-size: 28px; } .text-\[48px\] { font-size: 30px; } .text-\[56px\], .text-\[60px\] { font-size: 34px; }
+  .text-\[40px\], .text-\[42px\], .text-\[44px\] { font-size: 25px; } .text-\[48px\] { font-size: 26px; } .text-\[56px\], .text-\[60px\] { font-size: 30px; }
 }
