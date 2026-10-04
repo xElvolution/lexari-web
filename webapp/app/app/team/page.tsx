@@ -18,20 +18,19 @@ export default function TeamPage() {
   // the floor always shows a few open desks, in rows of five
   const seats = Math.max(5, Math.ceil((taken + 1) / 5) * 5);
   const big = seats <= 5;
-  const cols = seats <= 5 ? "grid-cols-3 sm:grid-cols-5" : seats <= 20 ? "grid-cols-5" : "grid-cols-5 sm:grid-cols-10";
+  const cols = seats <= 20 ? "grid-cols-5" : "grid-cols-5 sm:grid-cols-10";
   const free = s.paid.filter((x) => !s.hired.includes(x));
 
   return (
     <>
-      <PageHead kicker="Team" title="Your team floor." body={`Seat 01 is ${agentName(s)}, always. Every other seat is a desk for a specialist you hire from the marketplace.`}
-        right={<span data-rise className="label flex items-center gap-2 rounded-full bg-grape px-3.5 py-2.5 text-[10px] text-white"><Icon name="team" size={14} />{taken} on the team</span>} />
+      <PageHead kicker="Team" title="Your team floor." body={`${agentName(s)} is always first. Specialists you hire from the marketplace join here.`} />
 
       <div data-rise className="mt-5 grid gap-5 lg:grid-cols-[1.5fr_.5fr]">
         <div className="relative overflow-hidden rounded-[30px] bg-card p-4 ring-2 ring-tint sm:p-7">
           <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:linear-gradient(var(--line)_1px,transparent_1px),linear-gradient(90deg,var(--line)_1px,transparent_1px)] [background-size:28px_28px]" />
           <div className="relative flex items-center justify-between">
             <span className="label text-ink/65">floor plan</span>
-            <span className="label tab-num text-brand-ink">{taken} hired · {seats - taken} open</span>
+            <span className="label tab-num text-brand-ink">{taken} on the team</span>
           </div>
           <div className={`relative mt-5 grid gap-1.5 sm:gap-2.5 ${cols}`}>
             {Array.from({ length: seats }).map((_, i) => {
@@ -43,7 +42,7 @@ export default function TeamPage() {
               const num = big && <span className={`label absolute bottom-[8%] right-[10%] text-[9px] ${state === "home" ? "text-white/85" : "text-ink/55"}`}>{String(i + 1).padStart(2, "0")}</span>;
               if (state === "home") return <Link key={i} href="/app?c=home" className={cls} style={style} title={`${agentName(s)} · seat 01`}><AgentFace look={s.agent?.look} size={120} track={big} className="!h-[72%] !w-[72%]" />{num}</Link>;
               if (state === "hired") return <button key={i} onClick={() => setPick(pick === slug ? null : slug!)} className={cls} style={style} title={`${sp?.name} · seat ${i + 1}`} aria-label={`${sp?.name}, seat ${i + 1}`}><SpecFace slug={slug!} size={90} className="!h-[72%] !w-[72%]" />{num}</button>;
-              return <button key={i} onClick={() => openAdd()} className={cls} style={style} aria-label={`Open seat ${i + 1}. Add an agent.`}>{big && <Icon name="plus" size={22} className="text-ink/40" />}{num}</button>;
+              return <button key={i} onClick={() => openAdd()} className={cls} style={style} aria-label={`Open seat ${i + 1}. Add an agent.`}>{big && <Icon name="plus" size={18} className="text-ink/40" />}{num}</button>;
             })}
           </div>
           {pick && (() => { const sp = specialistBySlug(pick)!; return (

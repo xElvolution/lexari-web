@@ -26,6 +26,9 @@
   /* fixed control heights (pairs stay square) */
   .h-14 { height: 3.125rem; } .w-14 { width: 3.125rem; } .h-12 { height: 2.75rem; } .w-12 { width: 2.75rem; } .h-11 { height: 2.625rem; } .w-11 { width: 2.625rem; }
 
+  /* home strip squares match the scaled agent tiles */
+  .h-\[54px\] { height: 46px; } .w-\[54px\] { width: 46px; } .w-\[64px\] { width: 56px; }
+
   /* padding, gaps and spacing */
   .p-9, .p-8 { padding: 1.25rem; } .p-7 { padding: 1.125rem; } .p-6 { padding: 1rem; } .p-5 { padding: .875rem; } .p-4 { padding: .8rem; }
   .px-8, .px-7 { padding-left: 1.125rem; padding-right: 1.125rem; } .px-6 { padding-left: 1rem; padding-right: 1rem; }

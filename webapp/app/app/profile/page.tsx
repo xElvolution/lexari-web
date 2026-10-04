@@ -60,15 +60,15 @@ export default function ProfilePage() {
   return (
     <>
       <section data-rise className="overflow-hidden rounded-[30px] bg-card ring-1 ring-line">
-        <div className="grain relative h-32 bg-[linear-gradient(120deg,#2a0f9a,#5b2bff_55%,#8f6bff)] sm:h-40">
+        <div className="grain relative h-24 bg-[linear-gradient(120deg,#2a0f9a,#5b2bff_55%,#8f6bff)] sm:h-40">
         </div>
         <div className="px-5 pb-6 sm:px-8">
-          <div className="relative z-10 -mt-12 flex flex-wrap items-end gap-4 sm:-mt-14">
-            <span className="grid h-24 w-24 place-items-center rounded-full bg-ink text-[34px] font-bold text-[var(--bg)] ring-[6px] ring-[var(--card)] sm:h-28 sm:w-28">{initials(p.name)}</span>
-            <div className="ml-auto flex gap-2 pb-1">
-              <button onClick={() => setEdit(true)} className="btn btn-ghost btn-sm !h-10"><Icon name="edit" size={15} />Edit profile</button>
-              <button onClick={() => { startTour(); router.push("/app"); }} className="btn btn-ghost btn-sm !h-10"><Icon name="play" size={14} />Replay tour</button>
-              <button onClick={() => { void signOut().then(() => router.push("/signin")); }} className="btn btn-line btn-sm !h-10 text-ink"><Icon name="out" size={15} />Sign out</button>
+          <div className="relative z-10 -mt-10 flex flex-wrap items-end gap-3 sm:-mt-14 sm:gap-4">
+            <span className="grid h-20 w-20 place-items-center rounded-full bg-ink text-[28px] font-bold text-[var(--bg)] ring-[5px] ring-[var(--card)] sm:h-28 sm:w-28 sm:text-[34px]">{initials(p.name)}</span>
+            <div className="flex w-full gap-1.5 pb-1 sm:ml-auto sm:w-auto sm:gap-2">
+              <button onClick={() => setEdit(true)} className="btn btn-ghost btn-sm !h-10 flex-1 whitespace-nowrap max-sm:!px-2 max-sm:!text-[13px] sm:flex-none"><Icon name="edit" size={15} />Edit profile</button>
+              <button onClick={() => { startTour(); router.push("/app"); }} className="btn btn-ghost btn-sm !h-10 flex-1 whitespace-nowrap max-sm:!px-2 max-sm:!text-[13px] sm:flex-none"><Icon name="play" size={14} />Replay tour</button>
+              <button onClick={() => { void signOut().then(() => router.push("/signin")); }} className="btn btn-line btn-sm !h-10 flex-1 whitespace-nowrap text-ink max-sm:!px-2 max-sm:!text-[13px] sm:flex-none"><Icon name="out" size={15} />Sign out</button>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2.5">
