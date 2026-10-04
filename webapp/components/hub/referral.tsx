@@ -11,7 +11,7 @@ import { AgentFace } from "@/components/faces";
 import Icon from "@/components/Icon";
 import { Coin, flyCoins } from "./coin";
 
-const SHARE = [
+export const SHARE = [
   { id: "x", label: "X", href: (t: string, u: string) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(t)}&url=${encodeURIComponent(u)}`, glyph: <path d="M4 4l16 16M20 4L4 20" /> },
   { id: "tg", label: "Telegram", href: (t: string, u: string) => `https://t.me/share/url?url=${encodeURIComponent(u)}&text=${encodeURIComponent(t)}`, glyph: <path d="M21 4L3 11l6 2 2 6 3-4 5 4z" /> },
   { id: "wa", label: "WhatsApp", href: (t: string, u: string) => `https://wa.me/?text=${encodeURIComponent(`${t} ${u}`)}`, glyph: <path d="M4 20l1.4-4A8 8 0 1 1 8 18.6zM9 9c0 3 3 6 6 6" /> },

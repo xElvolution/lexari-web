@@ -6,12 +6,14 @@ import type React from "react";
 import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
 import { isCreated, isLocked, primaryOf, refreshHub, toast, type State } from "@/lib/store";
 import {
-  MAX_LEVEL, PERKS, STREAK_PAY, TIERS, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, inviteCode, levelOf, nextReset,
+  ACHIEVEMENTS, MAX_LEVEL, PERKS, STREAK_PAY, TIERS, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, inviteCode, levelOf, nextReset,
   questsView, streakOf, useHubBusy, weekStart, xpFor, type Period, type QuestView,
 } from "@/lib/hub";
 import { WEBAPP_URL } from "@shared/sites";
 import Icon from "@/components/Icon";
 import { AgentTile, WhoFace } from "@/components/faces";
+import { LevelBadge } from "./top";
+import { SHARE } from "./referral";
 import { myAgents } from "@/components/agents";
 import { openAgent, openUpgrade } from "@/components/overlays";
 import { Coin, flyCoins } from "./coin";
@@ -30,14 +32,18 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
   const coins = coinsOf(s);
   const streak = streakOf(s, now);
   const week = earnedSince(s, weekStart(now));
-  const [train, setTrain] = useState(false);
+  const [train, setTrain] = useState<{ id?: string; won?: number } | null>(null);
   const hide = useHideBalance();
+  const ready = questsView(s, now).filter((q) => q.done && !q.claimed).length + TIERS.filter((t, i) => hubOf(s).invited.length >= t.friends && !hubOf(s).tiers.includes(i)).length;
   if (!s.live) return <HubLoading />; // never a fake 0 while the onchain state loads
   return (
     <div id="top" className="space-y-3 pb-2">
       <header className="flex items-end justify-between gap-3 pt-1">
         <div><p className="label text-[9.5px] text-brand-ink">Hub</p><h1 className="mt-1 text-[1.375rem] font-extrabold leading-none tracking-tight text-ink">Earn and level up</h1></div>
       </header>
+      <nav aria-label="Hub sections" className="no-bar -mx-4 flex gap-1.5 overflow-x-auto px-4">
+        {([["#checkin", "Check in"], ["#quests", "Quests"], ["#level", "Train"], ["#invite", "Invite"], ["#achievements", "Badges"]] as const).map(([href, l]) => <a key={href} href={href} className="shrink-0 rounded-full bg-tint px-3 py-1.5 text-[12.5px] font-bold text-ink/80 ring-1 ring-line">{l}</a>)}
+      </nav>
 
       {/* balance */}
       <section data-hub-hero className="relative overflow-hidden rounded-[20px] bg-grape p-4 text-white shadow-[0_14px_30px_-18px_rgba(91,43,255,.9)]">
@@ -48,20 +54,29 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
           <span data-balance className="text-[1.75rem] font-extrabold leading-none tabular-nums" aria-live="polite">{hide ? MASK : coins.toLocaleString("en-US")}</span>
           <span className="ml-auto text-right text-[12px] leading-tight text-white/75">+{hide ? MASK : week.toLocaleString("en-US")} this week<br />{hide ? MASK : h.lifetime.toLocaleString("en-US")} all time</span>
         </div>
-        <div className="mt-3 flex gap-2 text-[12px] font-semibold">
+        <div className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-semibold">
           <span className="rounded-full bg-white/15 px-2.5 py-1">🔥 {streak}-day streak</span>
-          <span className="rounded-full bg-white/15 px-2.5 py-1">{myAgents(s).length} on your team</span>
+          {ready > 0 ? <a href="#quests" className="rounded-full bg-white px-2.5 py-1 text-[#3514b0]">{ready} reward{ready === 1 ? "" : "s"} ready</a> : <a href="#quests" className="rounded-full bg-white/15 px-2.5 py-1">See quests</a>}
+          <a href="#level" className="rounded-full bg-white/15 px-2.5 py-1">Level up</a>
         </div>
+        <ul data-hub-team className="no-bar -mx-1 mt-3 flex gap-2 overflow-x-auto px-1" aria-label="Your team">
+          {myAgents(s).filter((a) => isCreated(s, a.id)).slice(0, 8).map((a) => (
+            <li key={a.id} className="relative shrink-0">
+              <span className="grid h-11 w-11 place-items-center rounded-[14px] bg-[#0a0a0a] ring-1 ring-white/15"><WhoFace who={a.id} look={a.id === "home" ? s.agent?.look : null} size={36} /></span>
+              <LevelBadge level={levelOf(s, a.id).level} small className="absolute -bottom-1.5 -right-1.5 !h-[22px] !w-[22px] [&_svg]:!h-[22px] [&_svg]:!w-[22px] [&>span]:!text-[10px]" />
+            </li>
+          ))}
+        </ul>
       </section>
 
+      {!s.live.program.live && <p role="status" className="rounded-[16px] bg-tint px-3.5 py-2.5 text-[13px] font-semibold text-ink/75 ring-1 ring-line">Rewards open soon: the Lexari program is not live on Solana yet. Your progress still counts.</p>}
       <CheckInRow s={s} now={now} />
-      <div className="grid grid-cols-2 gap-3">
-        <BoxCard s={s} now={now} />
-        <LevelCard s={s} onTrain={() => setTrain(true)} />
-      </div>
+      <BoxCard s={s} now={now} />
       <QuestList s={s} now={now} />
-      {train && <TrainSheet s={s} onClose={() => setTrain(false)} />}
-      <InviteRow s={s} />
+      <TrainSection s={s} onSheet={(id, won) => setTrain({ id, won })} />
+      {train && <TrainSheet s={s} first={train.id} won0={train.won} onClose={() => setTrain(null)} />}
+      <InviteSection s={s} />
+      <AchievementsRow s={s} now={now} />
     </div>
   );
 }
@@ -110,27 +125,70 @@ function BoxCard({ s, now }: { s: State; now: number }) {
     return r;
   };
   return (
-    <section id="box" data-box-opened={opened ? "" : undefined} className="flex scroll-mt-20 flex-col rounded-[18px] bg-[#0a0a0a] p-3.5 text-white ring-1 ring-white/10">
-      <span className={`text-[26px] leading-none ${opened ? "opacity-70" : "hub-wobble"}`} aria-hidden>🎁</span>
-      <div className="mt-2 text-[15px] font-bold">Mystery box</div>
-      <div className="text-[12px] leading-snug text-white/60">{opened ? `Opened today${won ? ` · won ${won}` : ""}` : "15 to 250 coins, once a day"}</div>
-      <div className="mt-auto pt-3">
-        {opened ? <span data-box-next className={`${pill} w-full bg-white/10 tabular-nums text-white/75`}>Next in {countdown(nextReset("daily", now) - now)}</span>
-          : <button ref={el} type="button" data-box-card-open onClick={() => setModal(true)} disabled={!!busy} className={`${pill} w-full bg-white text-[#0a0a0a]`}>{busy === "box" ? "Opening…" : "Open"}</button>}
-      </div>
+    <section id="box" data-box-opened={opened ? "" : undefined} className="flex scroll-mt-20 items-center gap-3 rounded-[18px] bg-[#0a0a0a] p-3.5 text-white ring-1 ring-white/10">
+      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-white/10 text-[22px] leading-none ${opened ? "" : "hub-wobble"}`} aria-hidden>🎁</span>
+      <div className="min-w-0 flex-1"><div className="text-[15px] font-bold">Mystery box</div><div className="text-[12px] leading-snug text-white/60">{opened ? `Opened today${won ? ` · won ${won}` : ""}` : "15 to 250 coins, once a day"}</div></div>
+      {opened ? <span data-box-next className={`${pill} bg-white/10 tabular-nums text-white/75`}>Next {countdown(nextReset("daily", now) - now).replace(/ \d+s$/, "")}</span>
+        : <button ref={el} type="button" data-box-card-open onClick={() => setModal(true)} disabled={!!busy} className={`${pill} bg-white text-[#0a0a0a]`}>{busy === "box" ? "Opening…" : "Open"}</button>}
       <BoxModal open={modal} onOpen={run} onClose={() => setModal(false)} />
     </section>
   );
 }
 
-function LevelCard({ s, onTrain }: { s: State; onTrain: () => void }) {
+/** Train your agents (phone): pick an agent, see its level and XP, top up with +25 / +100 XP packs or level up in one go, and the perks road. */
+function TrainSection({ s, onSheet }: { s: State; onSheet: (id: string, won?: number) => void }) {
+  const primary = primaryOf(s);
+  const team = myAgents(s).filter((a) => isCreated(s, a.id)).sort((a, b) => (a.id === primary ? -1 : b.id === primary ? 1 : 0));
+  const [pick, setPick] = useState(primary);
+  const [all, setAll] = useState(false);
+  const busy = useHubBusy();
+  const agent = team.find((a) => a.id === pick) ?? team[0];
+  if (!agent) return null;
+  const coins = coinsOf(s);
+  const { level, xp } = levelOf(s, agent.id);
+  const max = level >= MAX_LEVEL;
+  const need = max ? 0 : xpFor(level);
+  const pct = max ? 100 : Math.round((xp / need) * 100);
+  const toNext = Math.max(0, need - xp);
+  const minted = !!(s.live?.levels.find((l) => l.slug === agent.id)?.asset || s.meta[agent.id]?.nft?.tokenId);
+  const pack = (n: number) => void hub.train(agent.id, n).then((r) => {
+    if (!r.ok) { toast({ text: r.error || "Not enough coins. Do a quest first.", face: "home" }); return; }
+    if (r.levelsGained > 0) onSheet(agent.id, r.level);
+    else toast({ text: `${agent.name} +${Math.min(n, coins)} XP`, face: "home" });
+  });
+  const nextPerk = PERKS.find((p) => p.level > level);
+  const perks = all ? PERKS : PERKS.filter((p) => p.level >= Math.max(2, level) ).slice(0, 3);
   return (
-    <button type="button" onClick={onTrain} data-level-card className={`${card} flex flex-col p-3.5 text-left`}>
-      <AgentTile id={primaryOf(s)} look={s.agent?.look} size={30} />
-      <div className="mt-2 text-[15px] font-bold text-ink">Level up</div>
-      <div className={meta}>Spend coins to level up your agent.</div>
-      <span data-train-agents className={`${pill} mt-auto w-full bg-tint text-brand-ink`} style={{ marginTop: "auto" }}>Train agents</span>
-    </button>
+    <section id="level" data-train-section className={`${card} scroll-mt-20 p-3.5`}>
+      <div className="flex items-center justify-between gap-2"><h2 className={h2}>Train your agents</h2><span className="flex items-center gap-1 rounded-full bg-tint px-2.5 py-1 text-[12px] font-bold tabular-nums text-ink"><Coin size={13} />{coins.toLocaleString("en-US")}</span></div>
+      {team.length > 1 && (
+        <div className="no-bar -mx-3.5 mt-2 flex gap-1.5 overflow-x-auto px-3.5" role="radiogroup" aria-label="Agent to train">
+          {team.map((a) => <button key={a.id} role="radio" aria-checked={a.id === agent.id} onClick={() => setPick(a.id)} className={`flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[12.5px] font-bold transition ${a.id === agent.id ? "bg-grape text-white" : "bg-tint text-ink/75"}`}><AgentTile id={a.id} look={a.id === "home" ? s.agent?.look : undefined} size={24} status={false} ring={false} />{a.name}<span className="opacity-70">Lv {levelOf(s, a.id).level}</span></button>)}
+        </div>
+      )}
+      <button type="button" data-level-card onClick={() => onSheet(agent.id)} className="mt-3 flex w-full items-center gap-3 rounded-[14px] bg-[#0a0a0a] p-2.5 text-left text-white">
+        <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#141414] ring-1 ring-white/10"><WhoFace who={agent.id} look={agent.id === "home" ? s.agent?.look : null} size={40} animated /><LevelBadge level={level} small className="absolute -bottom-1.5 -right-1.5" /></span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-[14.5px] font-bold">{agent.name}</span><span className="mt-1 flex items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/15"><span className="block h-full rounded-full bg-[linear-gradient(90deg,#c9b8ff,#5b2bff)]" style={{ width: `${pct}%` }} /></span><span className="text-[11px] tabular-nums text-white/65">{max ? "max" : `${xp}/${need}`}</span></span></span>
+        <Icon name="right" size={16} className="shrink-0 text-white/50" />
+      </button>
+      {!max && (minted ? (
+        <div data-train-packs className="mt-2 grid grid-cols-3 gap-1.5">
+          {[25, 100].map((n) => <button key={n} type="button" onClick={() => pack(n)} disabled={!!busy || coins <= 0} className="flex h-11 flex-col items-center justify-center rounded-[12px] bg-tint text-[13px] font-bold text-ink disabled:opacity-45"><span>+{n} XP</span><span className="flex items-center gap-0.5 text-[10.5px] font-semibold text-ink/55"><Coin size={10} />{n}</span></button>)}
+          <button type="button" data-train-open onClick={() => onSheet(agent.id)} disabled={!!busy} className="flex h-11 flex-col items-center justify-center rounded-[12px] bg-grape text-[13px] font-extrabold text-white disabled:opacity-45"><span>Level up</span><span className="flex items-center gap-0.5 text-[10.5px] font-semibold text-white/75"><Coin size={10} />{toNext}</span></button>
+        </div>
+      ) : <button type="button" onClick={() => openAgent(agent.id)} className={`${pill} mt-2 w-full bg-grape text-white`}>Mint ID card to level up</button>)}
+      <div className="mt-3 flex items-baseline justify-between"><h3 className="text-[13.5px] font-bold text-ink">Perks</h3>{nextPerk && <span className="text-[11.5px] font-semibold text-ink/55">Next: {nextPerk.title} at Lv {nextPerk.level}</span>}</div>
+      <ol data-perks className="mt-1.5 space-y-1">
+        {perks.map((p) => { const got = level >= p.level; return (
+          <li key={p.level} className={`flex items-center gap-2.5 rounded-[12px] px-2 py-1.5 ${p === nextPerk ? "bg-tint ring-1 ring-grape/40" : ""}`}>
+            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-extrabold ${got ? "bg-grape text-white" : "bg-card text-ink/50 ring-1 ring-line"}`}>{got ? <Icon name="check" size={12} stroke={3} /> : p.level}</span>
+            <span className="min-w-0 flex-1"><span className={`block text-[13px] font-bold leading-tight ${got || p === nextPerk ? "text-ink" : "text-ink/55"}`}>{p.title}</span><span className="block truncate text-[11.5px] text-ink/55">{p.body}</span></span>
+            <span className={`label shrink-0 text-[8px] ${got ? "text-brand-ink" : "text-ink/40"}`}>{got ? "Unlocked" : `Lv ${p.level}`}</span>
+          </li>
+        ); })}
+      </ol>
+      <button type="button" onClick={() => setAll(!all)} className="mt-1 w-full text-center text-[12.5px] font-bold text-brand-ink">{all ? "Show less" : `All ${PERKS.length} perks`}</button>
+    </section>
   );
 }
 
@@ -193,18 +251,19 @@ const LevelUpMark = ({ size = 18 }: { size?: number }) => <svg width={size} heig
  * wider while the level-up signs and confirms, then pops with a burst when the new level lands. Cost, your coins and
  * one button (Level up / Not enough coins / Upgrade plan / Mint ID card) underneath.
  */
-function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
+function TrainSheet({ s, onClose, first, won0 }: { s: State; onClose: () => void; first?: string; won0?: number }) {
   // Only agents you made level up (hired specialists never do); your primary agent comes first.
   const primary = primaryOf(s);
   const team = myAgents(s).filter((a) => isCreated(s, a.id)).sort((a, b) => (a.id === primary ? -1 : b.id === primary ? 1 : 0));
-  const [pick, setPick] = useState(primary);
-  const [won, setWon] = useState<{ level: number; n: number } | null>(null);
+  const [pick, setPick] = useState(first || primary);
+  const [won, setWon] = useState<{ level: number; n: number } | null>(won0 ? { level: won0, n: 1 } : null);
+  const firstPick = useRef(true);
   const agent = team.find((a) => a.id === pick) ?? team[0];
   const coins = coinsOf(s);
   const busy = useHubBusy();
   const close = useRef(onClose); close.current = onClose;
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, []);
-  useEffect(() => { setWon(null); }, [pick]);
+  useEffect(() => { if (firstPick.current) { firstPick.current = false; return; } setWon(null); }, [pick]);
   if (!agent) return null;
   const { level, xp } = levelOf(s, agent.id);
   const max = level >= MAX_LEVEL;
@@ -271,31 +330,74 @@ function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
   );
 }
 
-function InviteRow({ s }: { s: State }) {
+/** Invite friends (phone): your code and link, copy and share buttons, how many joined, and the milestone rewards to claim. */
+function InviteSection({ s }: { s: State }) {
   const h = hubOf(s);
   const code = inviteCode(s);
   const link = `${WEBAPP_URL}/signin?ref=${code}`;
+  const msg = `I've got my own AI agent on Lexari. Join with my code ${code} and we both get coins.`;
   const busy = useHubBusy();
-  const copy = () => { if (navigator.clipboard?.writeText) navigator.clipboard.writeText(link).then(() => toast({ text: "Invite link copied", face: "home" }), () => toast({ text: "Couldn't copy. Long-press the code instead.", face: "home" })); };
-  const share = () => { if (navigator.share) navigator.share({ title: "Lexari", text: `Join me on Lexari with code ${code}.`, url: link }).catch(() => {}); else copy(); };
-  const next = TIERS.findIndex((t) => h.invited.length < t.friends);
-  const claimable = TIERS.map((t, i) => ({ t, i })).filter(({ t, i }) => h.invited.length >= t.friends && !h.tiers.includes(i));
+  const [copied, setCopied] = useState(false);
+  const copy = (what: "code" | "link") => { if (navigator.clipboard?.writeText) navigator.clipboard.writeText(what === "code" ? code : link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); toast({ text: what === "code" ? `Code ${code} copied` : "Invite link copied", face: "home" }); }, () => toast({ text: "Couldn't copy. Long-press the code instead.", face: "home" })); };
+  const more = () => { if (navigator.share) navigator.share({ title: "Lexari", text: msg, url: link }).catch(() => {}); else copy("link"); };
+  const friends = h.invited.length;
+  const next = TIERS.find((t) => friends < t.friends);
   const claim = (i: number, el: HTMLElement) => void hub.claimTier(i).then((r) => {
     if (!r.ok) { toast({ text: r.error || "That reward is not ready.", face: "home" }); return; }
     flyCoins(el, r.coins); toast({ text: `${TIERS[i].title} · +${r.coins} coins`, face: "home" });
   });
   return (
-    <section id="invite" className={`${card} scroll-mt-20 p-3.5`}>
+    <section id="invite" data-invite-section className="scroll-mt-20 overflow-hidden rounded-[18px] bg-[#0a0a0a] p-3.5 text-white ring-1 ring-white/10">
       <div className="flex items-center gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-tint text-brand-ink"><Icon name="users" size={18} /></span>
-        <div className="min-w-0 flex-1"><div className="text-[15px] font-bold text-ink">Invite friends</div><div className={meta}>{h.invited.length} joined{next >= 0 ? ` · ${TIERS[next].friends - h.invited.length} more for +${TIERS[next].reward}` : ""}</div></div>
-        <button type="button" onClick={share} className={`${pill} bg-grape text-white`}><Icon name="arrow" size={13} />Share</button>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-grape"><Icon name="users" size={18} /></span>
+        <div className="min-w-0 flex-1"><div className="text-[15px] font-bold">Invite friends</div><div className="text-[12px] leading-snug text-white/60">{friends} joined{next ? ` · ${next.friends - friends} more for +${next.reward}` : " · every milestone reached"}</div></div>
       </div>
-      <button type="button" onClick={copy} className="mt-3 flex w-full items-center justify-between gap-2 rounded-[12px] bg-tint px-3 py-2 text-left">
-        <span className="min-w-0"><span className="label block text-[8.5px] text-ink/55">Your code</span><span className="block font-mono text-[15px] font-bold tracking-wider text-brand-ink">{code || "—"}</span></span>
-        <span className="text-[12.5px] font-bold text-brand-ink">Copy link</span>
-      </button>
-      {claimable.map(({ t, i }) => <button key={i} type="button" disabled={!!busy} onClick={(e) => claim(i, e.currentTarget)} className={`${pill} mt-2 w-full bg-grape text-white`}>Claim {t.title} · +{t.reward}</button>)}
+      <div className="relative mt-3 flex items-center gap-2 rounded-[14px] bg-white p-2.5 pl-3.5 text-[#0a0a0a]">
+        <button type="button" onClick={() => copy("code")} className="min-w-0 flex-1 text-left" aria-label={`Copy code ${code}`}><span className="label block text-[8px] text-black/50">Your code</span><span className="block truncate font-mono text-[18px] font-extrabold tracking-wider text-[#3514b0]">{code || "—"}</span><span className="block truncate font-mono text-[10.5px] text-black/45">{link.replace(/^https?:\/\//, "")}</span></button>
+        <button type="button" data-invite-copy onClick={() => copy("link")} className={`${pill} !h-9 ${copied ? "bg-[#0a0a0a]" : "bg-grape"} text-white`}><Icon name={copied ? "check" : "copy"} size={14} />{copied ? "Copied" : "Copy link"}</button>
+      </div>
+      <div className="no-bar -mx-3.5 mt-2.5 flex gap-1.5 overflow-x-auto px-3.5">
+        {SHARE.map((x) => <a key={x.id} href={x.href(msg, link)} target="_blank" rel="noreferrer" className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-white/10 pl-2.5 pr-3 text-[12.5px] font-bold ring-1 ring-white/15"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{x.glyph}</svg>{x.label}</a>)}
+        <button type="button" onClick={more} className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[12.5px] font-bold ring-1 ring-white/15"><Icon name="more" size={14} />More</button>
+      </div>
+      <ol data-invite-tiers className="mt-3 grid grid-cols-4 gap-1.5">
+        {TIERS.map((t, i) => {
+          const reached = friends >= t.friends; const got = h.tiers.includes(i);
+          return (
+            <li key={t.friends} className={`flex flex-col items-center rounded-[12px] px-1 py-2 text-center ${reached && !got ? "bg-grape/30 ring-1 ring-grape" : "bg-white/[.06]"}`}>
+              <span className={`grid h-7 w-7 place-items-center rounded-full ${got ? "bg-white text-grape" : reached ? "bg-grape text-white" : "bg-white/10 text-white/45"}`}>{got ? <Icon name="check" size={13} stroke={3} /> : <Icon name="box" size={13} />}</span>
+              <span className="mt-1 text-[11px] font-bold leading-tight">{t.friends} {t.friends === 1 ? "friend" : "friends"}</span>
+              <span className="flex items-center gap-0.5 text-[11px] font-extrabold tabular-nums text-white/80"><Coin size={10} />{t.reward.toLocaleString("en-US")}</span>
+              {reached && !got ? <button type="button" onClick={(e) => claim(i, e.currentTarget)} disabled={!!busy} className="mt-1 h-6 rounded-full bg-white px-2.5 text-[11px] font-extrabold text-[#0a0a0a] disabled:opacity-60">{busy === `tier:${i}` ? "…" : "Claim"}</button>
+                : <span className="mt-1 h-6 text-[10px] font-semibold leading-6 text-white/45">{got ? "Collected" : t.title.split(" ")[0]}</span>}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+/** Achievements (phone): badges you collect, in a compact grid. */
+function AchievementsRow({ s, now }: { s: State; now: number }) {
+  const h = hubOf(s);
+  const list = ACHIEVEMENTS.map((a) => ({ ...a, got: a.test(s, h, now) }));
+  const n = list.filter((a) => a.got).length;
+  return (
+    <section id="achievements" data-achievements className={`${card} scroll-mt-20 p-3.5`}>
+      <div className="flex items-center justify-between"><h2 className={h2}>Achievements</h2><span className="text-[12.5px] font-bold tabular-nums text-brand-ink">{n} of {list.length}</span></div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-tint"><div className="h-full rounded-full bg-grape" style={{ width: `${(n / list.length) * 100}%` }} /></div>
+      <ul className="mt-3 grid grid-cols-4 gap-1.5">
+        {list.map((a) => (
+          <li key={a.id} className={`flex flex-col items-center rounded-[12px] px-1 py-2 text-center ${a.got ? "bg-tint" : "bg-tint/50"}`} title={a.body}>
+            <span className={`relative grid h-9 w-9 place-items-center ${a.got ? "text-white" : "text-ink/30"}`}>
+              <svg viewBox="0 0 56 56" width="36" height="36" className="absolute inset-0" aria-hidden><path d="M28 3 L50 15.5 V40.5 L28 53 L6 40.5 V15.5 Z" fill={a.got ? "#5b2bff" : "none"} stroke={a.got ? "#3514b0" : "currentColor"} strokeWidth="3" strokeDasharray={a.got ? undefined : "4 4"} strokeLinejoin="round" /></svg>
+              <Icon name={a.icon} size={15} className="relative" />
+            </span>
+            <span className={`mt-1 text-[11px] font-bold leading-tight ${a.got ? "text-ink" : "text-ink/45"}`}>{a.title}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
