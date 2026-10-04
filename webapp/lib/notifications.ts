@@ -41,6 +41,15 @@ function keyBytes(b64: string) {
 
 /** Asks the browser for permission (only call from a tap), subscribes, and saves it. */
 export async function enablePush(test = true): Promise<{ ok: boolean; why?: string }> {
+  try { return await enablePushInner(test); } catch (e) {
+    // e.g. "Registration failed - permission denied" (push service blocked, as in Brave or some Android browsers): a plain message, not an error.
+    const m = (e as Error)?.message || "";
+    return { ok: false, why: /permission|denied|NotAllowed/i.test(m + (e as Error)?.name)
+      ? "This browser blocked notifications for Lexari. Allow them in your browser's site settings (in Brave, turn on Google push messaging), then try again."
+      : "Couldn't turn on notifications on this device. Reload and try again." };
+  }
+}
+async function enablePushInner(test: boolean): Promise<{ ok: boolean; why?: string }> {
   if (!pushSupported()) return { ok: false, why: "This browser can't show notifications. On iPhone, add Lexari to your Home Screen first." };
   const perm = await Notification.requestPermission();
   if (perm !== "granted") return { ok: false, why: perm === "denied" ? "Notifications are blocked for Lexari. Allow them in your browser's site settings." : "Notifications weren't allowed." };
