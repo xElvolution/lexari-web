@@ -110,7 +110,7 @@ export default function Detail({ slug }: { slug: string }) {
             </figure>
           ))}
           <figure className="flex w-[250px] shrink-0 snap-start flex-col items-center justify-center overflow-hidden rounded-[28px] bg-tint p-4 text-center sm:w-[270px]">
-            <div className="bob"><Face seed={a.seed} variant={{ color: a.color }} size={150} track /></div>
+            <div className="bob max-[430px]:[zoom:.8]"><Face seed={a.seed} variant={{ color: a.color }} size={150} track /></div>
             <figcaption className="display mt-4 text-[24px] text-ink">&ldquo;{a.quip}&rdquo;</figcaption>
           </figure>
         </div>

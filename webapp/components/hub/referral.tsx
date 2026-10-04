@@ -72,7 +72,7 @@ export default function Referral({ s }: { s: State }) {
       <span className="pointer-events-none absolute -right-16 bottom-0 h-72 w-72 rounded-full bg-[#8f6bff]/30 blur-[90px]" />
       <div className="relative grid gap-8 p-5 sm:p-8 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center lg:gap-12">
         {/* the orbit */}
-        <div ref={orbit} className="relative mx-auto h-[290px] w-[290px] sm:h-[330px] sm:w-[330px]">
+        <div ref={orbit} className="relative mx-auto h-[290px] w-[290px] sm:h-[330px] sm:w-[330px] max-[430px]:[zoom:.78]">
           <span className="absolute inset-[14%] rounded-full border border-dashed border-white/20" />
           <span className="absolute inset-[30%] rounded-full bg-grape/25 blur-2xl" />
           <span className="absolute left-1/2 top-1/2 grid h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[30px] bg-grape shadow-[0_14px_40px_-10px_rgba(91,43,255,.9)]">

@@ -71,7 +71,7 @@ export default function LevelUp({ s }: { s: State }) {
       <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
         <div className="carpet relative overflow-hidden rounded-[26px] bg-[#0a0a0a] p-5 text-white ring-1 ring-white/10 sm:p-6">
           <span className="pointer-events-none absolute left-1/2 top-[44%] h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-grape/45 blur-3xl" />
-          <div ref={stage} className="relative mx-auto grid h-[260px] w-[260px] place-items-center">
+          <div ref={stage} className="relative mx-auto grid h-[260px] w-[260px] place-items-center max-[430px]:[zoom:.74]">
             <svg viewBox="0 0 260 260" className="absolute inset-0 -rotate-90" aria-hidden>
               <circle cx="130" cy="130" r={R} fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="12" />
               <circle cx="130" cy="130" r={R} fill="none" stroke="url(#lvg)" strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - pct / 100)} className="transition-[stroke-dashoffset] duration-700 ease-out" />
@@ -147,7 +147,7 @@ function Celebrate({ s, id, level, name, onClose }: { s: State; id: string; leve
       <div ref={card} className="relative w-full max-w-[400px] overflow-hidden rounded-[34px] bg-grape p-7 pt-9 text-center text-white shadow-[0_30px_80px_-20px_rgba(91,43,255,.9)]">
         <span className="hub-rays pointer-events-none absolute left-1/2 top-[34%] h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2" style={{ background: "repeating-conic-gradient(from 0deg, rgba(255,255,255,.16) 0deg 9deg, transparent 9deg 22deg)", maskImage: "radial-gradient(circle, #000 15%, transparent 55%)", WebkitMaskImage: "radial-gradient(circle, #000 15%, transparent 55%)" }} />
         <p className="label relative text-white/80">Level up</p>
-        <div data-face className="relative mx-auto mt-4 grid h-[170px] w-[170px] place-items-center rounded-full bg-[#0a0a0a] ring-4 ring-white/25">
+        <div data-face className="relative mx-auto mt-4 grid h-[170px] w-[170px] place-items-center rounded-full bg-[#0a0a0a] ring-4 ring-white/25 max-[430px]:[zoom:.82]">
           <WhoFace who={id} look={id === "home" ? s.agent?.look : null} size={140} animated state="happy" />
           <span className="absolute -bottom-3 -right-1"><LevelBadge level={level} big /></span>
         </div>

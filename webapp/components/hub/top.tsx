@@ -209,7 +209,7 @@ export function MysteryBox({ s, now }: { s: State; now: number }) {
       <p className="label relative text-[10px] text-lilac">Daily mystery box</p>
       <h2 className="display relative mt-1 text-[36px] leading-none sm:text-[42px]">{phase === "open" ? `+${won || "?"} coins` : "What's inside?"}</h2>
       <p className="relative mt-2 text-[14px] leading-snug text-white/65">One a day. Anywhere from 15 to 250 coins.</p>
-      <div ref={box} className="relative mx-auto mt-4 grid h-[170px] w-[200px] place-items-center">
+      <div ref={box} className="relative mx-auto mt-4 grid h-[170px] w-[200px] place-items-center max-[430px]:[zoom:.78]">
         {phase === "open" && <span className="hub-rays pointer-events-none absolute inset-[-30px] rounded-full opacity-70" style={{ background: "repeating-conic-gradient(from 0deg, rgba(143,107,255,.45) 0deg 10deg, transparent 10deg 24deg)", maskImage: "radial-gradient(circle, #000 25%, transparent 68%)", WebkitMaskImage: "radial-gradient(circle, #000 25%, transparent 68%)" }} />}
         <svg viewBox="0 0 120 110" width="150" height="138" overflow="visible" className={`relative overflow-visible ${phase === "idle" ? "hub-wobble" : phase === "shaking" ? "hub-wobble-fast" : ""}`} aria-hidden>
           <ellipse cx="60" cy="104" rx="42" ry="5" fill="#000" opacity=".5" />
