@@ -3,12 +3,12 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { endTour, setTourStep, type State } from "@/lib/store";
+import { endTour, primaryOf, setTourStep, type State } from "@/lib/store";
 import Icon from "./Icon";
 import { AgentTile } from "./faces";
 import { myAgents, nameOf } from "./agents";
 
-type Ctx = { me: string; you: string; spec: string; specName: string };
+type Ctx = { me: string; you: string; spec: string; specName: string; primary: string; primaryName: string };
 type Step = {
   id: string; action: "next" | "click";
   target?: (c: Ctx) => string; // data-tour value to spotlight. None: a centred card
@@ -19,7 +19,8 @@ type Step = {
 };
 
 const STEPS: Step[] = [
-  { id: "hi", action: "next", home: true, title: (c) => `Hi${c.you ? ` ${c.you}` : ""}, I'm ${c.me}.`, text: () => "Five short stops. You'll tap the real buttons.", cta: "Let's go" },
+  { id: "hi", action: "next", home: true, title: (c) => `Hi${c.you ? ` ${c.you}` : ""}, I'm ${c.me}.`, text: () => "Six short stops. You'll tap the real buttons.", cta: "Let's go" },
+  { id: "primary", action: "next", home: true, target: (c) => `tile-${c.primary}`, text: (c) => `The gold ring marks ${c.primaryName}, your main personal agent.` },
   { id: "tile", action: "click", home: true, target: (c) => `tile-${c.spec}`, text: (c) => `This row is your team. Tap ${c.specName} to open their chat.` },
   { id: "composer", action: "next", target: () => "composer", text: () => "This is where you talk. Type a message, or use the mic, the clip, or the phone." },
   { id: "brain", action: "click", leaveChat: true, target: () => "nav-brain", text: (c) => `Tap Brain. That's what I remember about you${c.you ? `, ${c.you}` : ""}, and you can edit or delete any of it.` },
@@ -57,7 +58,7 @@ export default function Tour({ s }: { s: State }) {
   const step = steps[Math.min(i, steps.length - 1)];
   const [prevClick, setPrevClick] = useState(false);
   const spec = useMemo(() => myAgents(s).find((a) => a.id !== "home" && a.id !== s.active)?.id ?? "home", [s.tour.on]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ctx: Ctx = { me: nameOf(s, "home"), you: s.agent?.you || (s.profile?.name && s.profile.name !== "You" ? s.profile.name.split(" ")[0] : ""), spec, specName: nameOf(s, spec) };
+  const ctx: Ctx = { me: nameOf(s, "home"), you: s.agent?.you || (s.profile?.name && s.profile.name !== "You" ? s.profile.name.split(" ")[0] : ""), spec, specName: nameOf(s, spec), primary: primaryOf(s), primaryName: nameOf(s, primaryOf(s)) };
   const tKey = step.target?.(ctx), cKey = step.action === "click" ? step.click ?? tKey : undefined;
   const [rect, setRect] = useState<R | null>(null);
   const [missing, setMissing] = useState(false);
