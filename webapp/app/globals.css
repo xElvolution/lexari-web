@@ -85,8 +85,8 @@ html[data-motion="off"] :is(.hub-flame, .hub-flame-core, .hub-orbit, .hub-orbit 
 /* the same glow on a Team floor seat (box-shadow: the seat's own pop animation stays untouched) */
 [data-seat-perk="glow"] { animation: seatGlow 3.2s ease-in-out infinite; }
 [data-seat-perk="legend"] { animation: seatGold 3.2s ease-in-out infinite; }
-@keyframes seatGlow { 0%, 100% { box-shadow: 0 0 12px 1px rgba(139, 92, 246, .5); } 50% { box-shadow: 0 0 22px 5px rgba(168, 120, 255, .85); } }
-@keyframes seatGold { 0%, 100% { box-shadow: 0 0 12px 1px rgba(233, 183, 58, .55); } 50% { box-shadow: 0 0 24px 6px rgba(247, 215, 116, .9); } }
+@keyframes seatGlow { 0%, 100% { box-shadow: 0 0 0 2px rgba(196, 170, 255, .75), 0 0 16px 4px rgba(139, 92, 246, .65); } 50% { box-shadow: 0 0 0 2px rgba(214, 196, 255, .95), 0 0 28px 8px rgba(168, 120, 255, .9); } }
+@keyframes seatGold { 0%, 100% { box-shadow: 0 0 0 2px rgba(247, 215, 116, .8), 0 0 16px 4px rgba(233, 183, 58, .65); } 50% { box-shadow: 0 0 0 2px rgba(255, 230, 150, .95), 0 0 28px 8px rgba(247, 215, 116, .9); } }
 /* Lv7 Holo card: a moving rainbow foil over the face panel */
 .holo-sheen {
   background: linear-gradient(115deg, transparent 20%, rgba(255, 0, 170, .28) 32%, rgba(0, 220, 255, .3) 44%, rgba(120, 255, 120, .26) 56%, rgba(255, 230, 0, .26) 66%, transparent 80%);

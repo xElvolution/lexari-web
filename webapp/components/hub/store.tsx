@@ -55,9 +55,8 @@ export function StoreSheet({ s, onClose }: { s: State; onClose: () => void }) {
   const buy = async (it: Cosmetic) => {
     confetti(it.id);
     const m = await import("@/lib/offHub");
-    const r = await m.buyItem(it.id, it.price);
+    const r = await m.buyItem(it.id, it.price, it.kind); // the server wears it right away
     if (!r.ok) { toast({ text: r.error || "That didn't go through.", face: "home" }); return; }
-    await m.wearItem(it.kind, it.id);
     toast({ text: `${it.name} is yours. It's on in your chats.`, face: "home" });
   };
   const wear = async (it: Cosmetic, on: boolean) => {

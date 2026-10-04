@@ -84,9 +84,10 @@ export const offHub: HubAdapter = {
 };
 
 /** Store: buy a cosmetic (coins drop at once) or wear one you own. */
-export async function buyItem(item: string, price: number) {
+export async function buyItem(item: string, price: number, kind?: "bg" | "bubble") {
   if (coinsOf(get()) < price) return { ok: false, error: "Not enough coins yet. Do a quest or open the box." };
-  patchHub((l) => { const w = withCoins(l, -price, false); const c = (w as HubState & { cosmetics?: Cos }).cosmetics || {}; return { ...w, cosmetics: { ...c, owned: [...(c.owned || []), item] }, ledger: [ledgerLine("store_buy", price), ...w.ledger] } as HubState; });
+  // The server wears a bought item right away, so show it worn at once too.
+  patchHub((l) => { const w = withCoins(l, -price, false); const c = (w as HubState & { cosmetics?: Cos }).cosmetics || {}; return { ...w, cosmetics: { ...c, ...(kind ? { [kind]: item } : {}), owned: [...(c.owned || []), item] }, ledger: [ledgerLine("store_buy", price), ...w.ledger] } as HubState; });
   try { const r = await post<{ cosmetics: Cos }>({ action: "buy", item }); patchHub((l) => ({ ...l, cosmetics: r.cosmetics }) as HubState); void refreshHub(); return { ok: true }; }
   catch (e) { undo(); return { ok: false, error: friendly(e, "That didn't go through. Your coins are back.") }; }
 }
