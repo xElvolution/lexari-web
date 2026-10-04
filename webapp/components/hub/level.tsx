@@ -115,13 +115,13 @@ export default function LevelUp({ s }: { s: State }) {
           </ol>
         </div>
       </div>
-      {party && <Celebrate key={`${party.id}-${party.level}`} s={s} id={party.id} level={party.level} name={team.find((a) => a.id === party.id)?.name ?? "Agent"} onClose={() => { setParty(null); setFace("idle"); }} />}
+      {party && <LevelParty key={`${party.id}-${party.level}`} s={s} id={party.id} level={party.level} name={team.find((a) => a.id === party.id)?.name ?? "Agent"} onClose={() => { setParty(null); setFace("idle"); }} />}
     </section>
   );
 }
 
 /** Full-screen level-up moment: spinning rays, a happy face and the perk it just unlocked. */
-function Celebrate({ s, id, level, name, onClose }: { s: State; id: string; level: number; name: string; onClose: () => void }) {
+export function LevelParty({ s, id, level, name, onClose }: { s: State; id: string; level: number; name: string; onClose: () => void }) {
   const card = useRef<HTMLDivElement>(null);
   const perk = PERKS.find((p) => p.level === level);
   // The Hub re-renders every second (countdowns), which hands us a fresh onClose each time.

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
-import { hubReady, isCreated, primaryOf, refreshHub, setPrimary, toast, type State } from "@/lib/store";
+import { hubReady, isCreated, isLocked, primaryOf, refreshHub, toast, type State } from "@/lib/store";
 import {
   MAX_LEVEL, STREAK_PAY, TIERS, checkedInToday, coinsOf, countdown, earnedSince, hub, hubOf, inviteCode, levelOf, nextReset,
   questsView, streakOf, useHubBusy, weekStart, xpFor, type Period, type QuestView,
@@ -12,9 +12,10 @@ import { WEBAPP_URL } from "@shared/sites";
 import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
 import { myAgents } from "@/components/agents";
-import { openAgent } from "@/components/overlays";
+import { openAgent, openUpgrade } from "@/components/overlays";
 import { Coin, flyCoins } from "./coin";
 import BoxModal from "./BoxModal";
+import { LevelParty } from "./level";
 
 /* Native phone layout for the Hub (≤430px). Same actions as the desktop Hub, compact rows and cards. */
 
@@ -55,10 +56,10 @@ export default function HubPhone({ s, now }: { s: State; now: number }) {
       <CheckInRow s={s} now={now} />
       <div className="grid grid-cols-2 gap-3">
         <BoxCard s={s} now={now} />
-        <LevelCard s={s} onTrain={() => { setTrain(true); setTimeout(() => document.getElementById("level")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} />
+        <LevelCard s={s} onTrain={() => setTrain(true)} />
       </div>
       <QuestList s={s} now={now} />
-      {train && <TrainList s={s} />}
+      {train && <TrainSheet s={s} onClose={() => setTrain(false)} />}
       <InviteRow s={s} />
     </div>
   );
@@ -185,44 +186,67 @@ function QuestItem({ q }: { q: QuestView }) {
   );
 }
 
-function TrainList({ s }: { s: State }) {
-  // Only agents you made can level up (hired specialists never do). One of them is your primary agent.
-  const team = myAgents(s).filter((a) => isCreated(s, a.id));
+/** Level up pop-up: the agent, its level, what the next level costs, and one button (Level up / Not enough coins / Upgrade plan). */
+function TrainSheet({ s, onClose }: { s: State; onClose: () => void }) {
+  // Only agents you made level up (hired specialists never do); your primary agent comes first.
   const primary = primaryOf(s);
+  const team = myAgents(s).filter((a) => isCreated(s, a.id)).sort((a, b) => (a.id === primary ? -1 : b.id === primary ? 1 : 0));
+  const [pick, setPick] = useState(primary);
+  const [party, setParty] = useState<{ id: string; level: number } | null>(null);
+  const agent = team.find((a) => a.id === pick) ?? team[0];
   const coins = coinsOf(s);
   const busy = useHubBusy();
-  const train = (id: string, name: string, amount: number, el: HTMLElement) => void hub.train(id, amount).then((r) => {
-    if (!r.ok) { toast({ text: r.error || "Could not train.", face: "home" }); return; }
-    toast({ text: r.levelsGained > 0 ? `${name} reached level ${r.level}!` : `${name} +${amount} XP`, face: "home" });
+  const close = useRef(onClose); close.current = onClose;
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, []);
+  if (!agent) return null;
+  const { level, xp } = levelOf(s, agent.id);
+  const max = level >= MAX_LEVEL;
+  const need = max ? 0 : xpFor(level);
+  const pct = max ? 100 : Math.round((xp / need) * 100);
+  const cost = Math.max(0, need - xp);
+  const minted = !!(s.live?.levels.find((l) => l.slug === agent.id)?.asset || s.meta[agent.id]?.nft?.tokenId);
+  const locked = isLocked(s, agent.id);
+  const short = coins < cost;
+  const up = () => void hub.train(agent.id, cost).then((r) => {
+    if (!r.ok) { toast({ text: r.error || "Could not level up.", face: "home" }); return; }
+    if (r.levelsGained > 0) setParty({ id: agent.id, level: r.level });
+    else toast({ text: `${agent.name} +${cost} XP`, face: "home" });
   });
   return (
-    <section id="level" className={`${card} scroll-mt-20 p-3.5`}>
-      <div className="flex items-center justify-between"><h2 className={h2}>Train your agents</h2><span className="flex items-center gap-1 text-[12.5px] font-bold text-ink/70"><Coin size={13} />{coins}</span></div>
-      <p className={`${meta} mt-0.5`}>Coins become XP for agents you made. Each level unlocks a perk. An agent needs its minted ID card to level up. Hired specialists don&apos;t level up.</p>
-      <ul className="mt-1 divide-y divide-[var(--line)]">
-        {team.map((a) => {
-          const { level, xp } = levelOf(s, a.id);
-          const need = level >= MAX_LEVEL ? 0 : xpFor(level);
-          const pct = level >= MAX_LEVEL ? 100 : Math.round((xp / need) * 100);
-          const amount = Math.min(25, coins);
-          return (
-            <li key={a.id} className="flex items-center gap-3 py-2.5">
-              <AgentTile id={a.id} look={a.id === "home" ? s.agent?.look : undefined} size={34} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5"><span className="truncate text-[14.5px] font-semibold text-ink">{a.name}</span><span className="text-[11.5px] font-bold text-brand-ink">Lv {level}</span>
-                  {a.id === primary ? <span data-primary-badge className="rounded-full bg-[#ffd84d]/20 px-1.5 py-px text-[10.5px] font-bold text-[#d4a000]">Primary</span>
-                    : <button type="button" data-make-primary={a.id} onClick={() => { setPrimary(a.id); toast({ text: `${a.name} is now your primary agent`, face: "home" }); }} className="rounded-full px-1.5 py-px text-[10.5px] font-bold text-brand-ink underline-offset-2 hover:underline">Make primary</button>}
-                </div>
-                <div className="mt-1 flex items-center gap-2"><span className="h-1 flex-1 overflow-hidden rounded-full bg-tint"><span className="block h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></span><span className="text-[11px] tabular-nums text-ink/50">{level >= MAX_LEVEL ? "max" : `${xp}/${need}`}</span></div>
-              </div>
-              {!(s.live?.levels.find((l) => l.slug === a.id)?.asset || s.meta[a.id]?.nft?.tokenId)
-                ? <button type="button" onClick={() => openAgent(a.id)} className={`${pill} bg-tint text-brand-ink`}>Mint ID</button>
-                : <button type="button" disabled={!!busy || level >= MAX_LEVEL || amount <= 0} onClick={(e) => train(a.id, a.name, amount, e.currentTarget)} className={`${pill} bg-grape text-white`}>{busy === "train" ? "…" : `+${amount || 25} XP`}</button>}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <div data-train-sheet-bg className="fixed inset-0 z-[85] flex items-end justify-center bg-black/60 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label="Level up" data-train-sheet className="pop pb-safe-dlg w-full max-w-[460px] rounded-t-[26px] bg-card p-5 ring-1 ring-line">
+        <div className="flex items-center justify-between"><h2 className="text-[1.125rem] font-bold text-ink">Level up</h2><button onClick={onClose} aria-label="Close" className="grid h-9 w-9 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={18} /></button></div>
+        {team.length > 1 && (
+          <div className="no-bar -mx-5 mt-2 flex gap-2 overflow-x-auto px-5" role="radiogroup" aria-label="Agent to level up">
+            {team.map((a) => <button key={a.id} role="radio" aria-checked={a.id === agent.id} onClick={() => setPick(a.id)} className={`flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-[13px] font-bold transition ${a.id === agent.id ? "bg-grape text-white" : "bg-tint text-ink/75"}`}><AgentTile id={a.id} look={a.id === "home" ? s.agent?.look : undefined} size={26} status={false} />{a.name}</button>)}
+          </div>
+        )}
+        <div className="mt-4 flex items-center gap-3">
+          <AgentTile id={agent.id} look={agent.id === "home" ? s.agent?.look : undefined} size={56} status={false} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[16px] font-bold text-ink">{agent.name}</div>
+            <div className="text-[13px] font-semibold text-brand-ink">Level {level}{max ? " · max" : ""}</div>
+            <div className="mt-1.5 flex items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-tint"><span className="block h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></span><span className="text-[11px] tabular-nums text-ink/50">{max ? "max" : `${xp}/${need} XP`}</span></div>
+          </div>
+        </div>
+        {!max && (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-[14px] bg-tint px-3 py-2.5"><div className="label text-[8.5px] text-ink/50">Cost to level {level + 1}</div><div data-train-cost className="mt-0.5 flex items-center gap-1 text-[16px] font-bold tabular-nums text-ink"><Coin size={15} />{cost} coins</div></div>
+            <div className="rounded-[14px] bg-tint px-3 py-2.5"><div className="label text-[8.5px] text-ink/50">You have</div><div className="mt-0.5 flex items-center gap-1 text-[16px] font-bold tabular-nums text-ink"><Coin size={15} />{coins.toLocaleString("en-US")}</div></div>
+          </div>
+        )}
+        <div className="mt-4">
+          {max ? <button disabled className="btn btn-line btn-sm w-full text-ink">Max level</button>
+            : locked ? <button data-train-upgrade onClick={() => { onClose(); openUpgrade("full"); }} className="btn btn-brand btn-sm w-full">Upgrade plan</button>
+            : !minted ? <button onClick={() => { onClose(); openAgent(agent.id); }} className="btn btn-brand btn-sm w-full">Mint ID card to level up</button>
+            : short ? <button data-train-short disabled className="btn btn-line btn-sm w-full text-ink/60">Not enough coins</button>
+            : <button data-train-go onClick={up} disabled={!!busy} className="btn btn-brand btn-sm w-full disabled:opacity-60">{busy === "train" ? "Levelling up…" : <>Level up · <Coin size={14} />{cost}</>}</button>}
+          {!max && !locked && minted && short && <p className="mt-2 text-center text-[12.5px] text-ink/55">{cost - coins} more coins needed. <a href="#quests" onClick={onClose} className="font-bold text-brand-ink">Do a quest</a></p>}
+          {locked && <p className="mt-2 text-center text-[12.5px] text-ink/55">{agent.name} is past your plan&apos;s seats.</p>}
+        </div>
+      </div>
+      {party && <LevelParty key={`${party.id}-${party.level}`} s={s} id={party.id} level={party.level} name={team.find((a) => a.id === party.id)?.name ?? "Agent"} onClose={() => setParty(null)} />}
+    </div>
   );
 }
 
