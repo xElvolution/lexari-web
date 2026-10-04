@@ -36,7 +36,7 @@ export function PlansGrid({ onUpgraded }: { compact?: boolean; onUpgraded?: () =
     if (!r.ok) { if (!r.cancelled && r.error) toast({ text: r.error, face: "home" }); return; }
     setPlan(r.plan.id as PlanId, r.plan.seats, r.plan.expiresAt);
     onUpgraded?.();
-    celebrate({ title: `You're on ${r.plan.name}`, body: `${r.plan.seats} seats unlocked. Hire away.`, tx: r.tx });
+    celebrate({ confetti: "big", title: `You're on ${r.plan.name}`, body: `${r.plan.seats} seats unlocked. Hire away.`, tx: r.tx });
   };
   return (
     <div data-plans className="grid gap-3">
