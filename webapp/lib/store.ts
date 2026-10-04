@@ -143,6 +143,10 @@ function sync(p: Promise<unknown>, undo?: () => void) {
 
 /* ---------- loading the account ---------- */
 const hello = (a: Agent, at = Date.now()): Msg => ({ id: "hello", from: "home", at, text: `Hi${a.you ? ` ${a.you}` : ""}, I'm ${a.name}. Ask me anything.` });
+const customHi = (c: { name: string; about?: string }, you?: string) => `Hi${you ? ` ${you}` : ""}, I'm ${c.name}. ${c.about ? "I've read the brief you gave me." : "Tell me what you want me to do."} What should I start with?`;
+/** The greeting always opens the thread (it lives on this device only), so it never disappears once you start talking. */
+const withHello = (t: Msg[] = [], h: Msg): Msg[] => (t.some((m) => m.id === "hello") ? t : [{ ...h, at: Math.min(h.at, ...t.map((m) => m.at - 1)) }, ...t]);
+const helloFirst = (a: Msg, b: Msg) => (a.id === "hello" ? -1 : b.id === "hello" ? 1 : a.at - b.at);
 
 function customFrom(a: Account["agents"][number]): CustomAgent {
   const look = (a.look && typeof a.look === "object" ? a.look : {}) as Partial<CustomAgent>;
@@ -192,8 +196,9 @@ function fromAccount(acc: Account): State {
     threads[c.slug] = c.messages.filter((m) => { const k = String((m as Msg).id); if (seen.has(k)) return false; seen.add(k); return true; }).map((m) => m as Msg);
     if (c.kind === "group") groups.push({ id: c.slug, name: c.title, members: c.members, at: c.createdAt });
   }
-  if (agent && !(threads.home || []).length) threads.home = [hello(agent, Number(acc.user.createdAt) || Date.now())];
+  if (agent) threads.home = withHello(threads.home, hello(agent, Number(new Date(acc.user.createdAt as unknown as string)) || Date.now()));
   const custom = acc.agents.filter((a) => a.kind === "custom").map(customFrom);
+  for (const c of custom) threads[c.id] = withHello(threads[c.id], { id: "hello", from: c.id, at: Number(c.at) || Date.now(), text: customHi(c, agent?.you) });
   let active = "home";
   try { active = localStorage.getItem(`${ACTIVE_KEY}:${acc.user.wallet}`) || "home"; } catch {}
   const memory: Note[] = acc.memories.map((m) => ({
@@ -228,7 +233,8 @@ function mergeThreads(local: Record<string, Msg[]>, server: Record<string, Msg[]
     const newest = theirs.length ? theirs[theirs.length - 1].at : 0;
     const extra = mine.filter((m) => !ids.has(m.id) && m.id !== "hello" && (m.at >= newest - 120_000 || !theirs.length));
     if (!extra.length) { if (!theirs.length && mine.length) out[k] = mine; continue; }
-    out[k] = [...theirs.filter((m) => m.id !== "hello" || !extra.length), ...extra].sort((a, b) => a.at - b.at).slice(-200);
+    const merged = [...theirs, ...extra].sort(helloFirst);
+    out[k] = merged.length > 200 ? [merged[0], ...merged.slice(-199)] : merged;
   }
   return out;
 }
@@ -683,7 +689,7 @@ const customBody = (c: CustomAgent) => ({
 export function createAgent(a: Omit<CustomAgent, "id" | "at">) {
   const c: CustomAgent = { ...a, id: `c-${uid().toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10)}`, at: Date.now() };
   const you = get().agent?.you;
-  const hi = `Hi${you ? ` ${you}` : ""}, I'm ${c.name}. ${c.about ? "I've read the brief you gave me." : "Tell me what you want me to do."} What should I start with?`;
+  const hi = customHi(c, you);
   set((x) => ({ ...x, custom: [...x.custom, c], born: { ...x.born, [c.id]: c.at }, active: c.id, threads: { ...x.threads, [c.id]: [{ id: "hello", from: c.id, at: Date.now(), text: hi }] } }));
   sync(api("/api/agents", { body: customBody(c) }), () => set((x) => ({ ...x, custom: x.custom.filter((y) => y.id !== c.id) })));
   return c.id;
