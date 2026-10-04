@@ -6,7 +6,7 @@ import { SOLANA_RPC } from "./nft";
 import { CARD_LAMPORTS, HIRE_LAMPORTS, HIRE_USDC, TREASURY, hireMint } from "./prices";
 import { api, friendly } from "./api";
 import { get } from "./store";
-import { bridgeFor } from "./walletBridge";
+import { ensureBridge } from "./walletBridge";
 
 /** Asks the server to verify a payment, retrying while the RPC catches up. */
 async function record(slug: string, tx: string, mint: "SOL" | "USDC") {
@@ -20,7 +20,7 @@ async function record(slug: string, tx: string, mint: "SOL" | "USDC") {
 
 export async function payForHire(slug: string): Promise<{ ok: true; tx: string; mint: "SOL" | "USDC"; price: number } | { ok: false; error: string }> {
   if (!TREASURY) return { ok: false, error: "Payments are not set up on this server." };
-  const bridge = bridgeFor(get().auth?.address);
+  const bridge = await ensureBridge(get().auth?.address, get().auth?.wallet);
   if (!bridge) return { ok: false, error: "Connect the wallet you signed in with to hire." };
   const mint = hireMint();
   const price = mint === "USDC" ? HIRE_USDC : HIRE_LAMPORTS;
@@ -55,7 +55,7 @@ export type Card = { agent: string; issuer: string; test: boolean; number: strin
 /** Pays the card price in devnet SOL to the treasury, then asks the server to verify it and issue the card. */
 export async function payForCard(agent: string, limit: number): Promise<{ ok: true; tx: string; card: Card } | { ok: false; error: string }> {
   if (!TREASURY) return { ok: false, error: "Payments are not set up on this server." };
-  const bridge = bridgeFor(get().auth?.address);
+  const bridge = await ensureBridge(get().auth?.address, get().auth?.wallet);
   if (!bridge) return { ok: false, error: "Connect the wallet you signed in with to pay." };
   const connection = new Connection(SOLANA_RPC, "confirmed");
   let sig = "";

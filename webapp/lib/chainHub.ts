@@ -4,12 +4,12 @@ import { checkIn, claimReward, levelUp, programIsLive } from "./chain";
 import { friendly } from "./api";
 import { MAX_LEVEL, QUESTS, TIERS, coinsOf, levelOf, type HubAdapter } from "./hub";
 import { get, refreshHub } from "./store";
-import { bridgeFor } from "./walletBridge";
+import { ensureBridge } from "./walletBridge";
 
 async function ready() {
   const s = get();
   if (!(await programIsLive().catch(() => false))) return { who: null, error: "Rewards open soon. The Lexari program is not live on Solana yet." };
-  const who = bridgeFor(s.auth?.address);
+  const who = await ensureBridge(s.auth?.address, s.auth?.wallet);
   if (!who) return { who: null, error: s.auth?.method === "google" ? "Your wallet is still loading. Try again in a moment." : "Connect the wallet you signed in with first." };
   return { who, error: "" };
 }

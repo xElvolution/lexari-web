@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Buffer } from "buffer";
 import { ConnectionProvider, WalletProvider, useWallet } from "@solana/wallet-adapter-react";
-import { onSignOut, setWalletBridge } from "@/lib/walletBridge";
+import { onSignOut, setWalletBridge, setWalletConnector } from "@/lib/walletBridge";
+import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import { BackpackWalletAdapter } from "@solana/wallet-adapter-backpack";
@@ -15,6 +16,17 @@ if (!(globalThis as { Buffer?: typeof Buffer }).Buffer) (globalThis as { Buffer?
 function Bridge() {
   const wallet = useWallet();
   useEffect(() => { onSignOut("adapter", wallet.connected ? () => wallet.disconnect() : null); }, [wallet]);
+  useEffect(() => {
+    setWalletConnector(async (preferred) => {
+      // Installed only: a "loadable" wallet on a phone would leave Lexari for the wallet app mid-action.
+      const ok = (w: (typeof wallet.wallets)[number]) => w.readyState === WalletReadyState.Installed;
+      const pick = wallet.wallets.find((w) => ok(w) && (!preferred || w.adapter.name.toLowerCase() === preferred.toLowerCase())) ?? wallet.wallets.find(ok);
+      if (!pick) throw new Error("No Solana wallet in this browser. Open Lexari inside your wallet app.");
+      if (wallet.wallet?.adapter.name !== pick.adapter.name) wallet.select(pick.adapter.name);
+      if (!pick.adapter.connected) await pick.adapter.connect();
+    });
+    return () => setWalletConnector(null);
+  }, [wallet]);
   useEffect(() => {
     const { publicKey, signTransaction, signAllTransactions, signMessage } = wallet;
     if (!publicKey || !signTransaction || !signMessage) { setWalletBridge(null, "adapter"); return; }

@@ -156,7 +156,9 @@ function guard<A extends unknown[], R>(key: (...a: A) => string, run: (...a: A) 
   return async (...a: A) => {
     if (busy) return idle;
     setBusy(key(...a));
-    try { return await run(...a); } finally { setBusy(null); }
+    // Never spin forever: a wallet or RPC that hangs ends with a clear message after 90s.
+    const slow = new Promise<R>((res) => setTimeout(() => res({ ...(idle as object), error: "That took too long. Check your wallet and try again." } as R), 90_000));
+    try { return await Promise.race([run(...a), slow]); } finally { setBusy(null); }
   };
 }
 const adapter = () => import("./chainHub").then((m) => m.chainHub);

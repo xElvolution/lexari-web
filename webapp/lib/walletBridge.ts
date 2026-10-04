@@ -51,3 +51,21 @@ export function onSignOut(key: string, run: (() => Promise<unknown> | unknown) |
 export async function runSignOutHooks() {
   await Promise.all([...hooks.values()].map((f) => Promise.resolve().then(f).catch(() => {})));
 }
+
+/* Reconnect: after a reload nothing is connected until the wallet is asked again. SolanaProviders registers how. */
+let connector: ((preferred?: string) => Promise<void>) | null = null;
+export function setWalletConnector(fn: typeof connector) { connector = fn; }
+
+/** The bridge for this address, asking the installed wallet to connect when needed (waits up to ~12s). */
+export async function ensureBridge(address: string | undefined | null, preferred?: string): Promise<WalletBridge | null> {
+  const have = bridgeFor(address);
+  if (have) return have;
+  if (!connector) return null;
+  try { await connector(preferred); } catch { /* the wait below decides */ }
+  for (let i = 0; i < 40; i++) {
+    const b = bridgeFor(address);
+    if (b) return b;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return null;
+}

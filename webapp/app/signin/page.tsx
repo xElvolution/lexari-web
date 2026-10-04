@@ -102,6 +102,8 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
       try {
         if (!adapter.connected) await adapter.connect();
         if (cancel) return;
+        // Remember the wallet so it reconnects by itself after a reload (wallet-adapter autoConnect).
+        try { localStorage.setItem("lexari-wallet", JSON.stringify(adapter.name)); } catch { /* private mode */ }
         adapterRef.current = adapter;
         setAddress(adapter.publicKey?.toBase58() ?? null);
         setPhase("sign");
