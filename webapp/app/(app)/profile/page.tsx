@@ -120,7 +120,6 @@ export default function ProfilePage() {
           </div>
           {p.username ? <p className="mt-1.5 text-[15px] font-semibold text-ink/55">@{p.username}</p> : <button type="button" onClick={() => setEdit(true)} className="mt-1.5 text-[14px] font-semibold text-brand-ink">Add a username</button>}
           {p.bio && <p className="mt-3 max-w-[40rem] text-[15.5px] text-ink/75">{p.bio}</p>}
-          {p.avatar && <button onClick={() => remove("avatar")} className="mt-2 block text-[12.5px] font-semibold text-ink/50 hover:text-ink">Remove picture</button>}
           <div className="mt-4 flex flex-wrap gap-6 text-[14px]">
             <span><b className="text-ink">{team.length}</b> <span className="text-ink/60">agents</span></span>
             <span><b className="text-ink">{s.groups.length}</b> <span className="text-ink/60">groups</span></span>

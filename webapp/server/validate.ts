@@ -57,7 +57,7 @@ export const chatBody = z.object({
   text: z.string().min(1).max(4000),
   speaker: z.string().min(1).max(80),
   history: z.array(z.object({ from: z.string().max(80), text: z.string().max(2000) })).max(16).default([]),
-  recall: z.array(z.object({ tag: z.string().max(40), text: z.string().max(240) })).max(8).default([]),
+  recall: z.array(z.object({ tag: z.string().max(40), text: z.string().max(240) })).max(20).default([]),
   userMsgId: z.string().min(4).max(40),
   replyMsgId: z.string().min(4).max(40),
   meta: z.object({ file: z.object({ name: z.string().max(120), size: z.string().max(20) }).optional(), voice: z.number().max(3600).optional(), reply: z.object({ id: z.string().max(40), from: z.string().max(80), text: z.string().max(300) }).optional() }).partial().default({}),

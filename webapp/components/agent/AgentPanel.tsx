@@ -14,6 +14,8 @@ import { AgentTile } from "../faces";
 import { kindOf, myAgents, nameOf } from "../agents";
 import { closeAgent, useOverlays } from "../overlays";
 import AgentIdCard, { type IdInfo } from "./AgentIdCard";
+import { agentLevelOf } from "@/lib/store";
+import { skillSlots } from "@/lib/perks";
 import { Field, SkillPicker, Toggle, TonePicker, areaCls, inputCls, variant, type Look } from "./fields";
 import FaceCreator from "./FaceCreator";
 import OnchainCard from "./OnchainCard";
@@ -68,6 +70,7 @@ function Panel({ s, id }: { s: State; id: string }) {
   const [about, setAbout] = useState(k === "home" ? s.meta.home?.about ?? s.prefs.instructions ?? "" : c?.about ?? "");
   const [tone, setTone] = useState<ToneId>(k === "home" ? s.agent?.tone ?? "short" : c?.tone ?? "warm");
   const [skills, setSkills] = useState<string[]>(k === "home" ? s.meta.home?.skills ?? ["web", "files", "code", "calendar"] : c?.skills ?? []);
+  const [d0Skills] = useState(() => (k === "home" ? s.meta.home?.skills?.length ?? 4 : c?.skills.length ?? 0)); // agents that already had more keep them
   const [memory, setMemory] = useState(info.memory);
   const [lookHome, setLookHome] = useState<AgentLook>(s.agent?.look ?? null);
   const [look, setLook] = useState<Look>(c ? { shape: c.shape, color: c.color, eyes: c.eyes, mouth: c.mouth, extra: c.extra, blush: c.blush ?? (c.tone === "warm" || c.tone === "playful"), brows: c.brows, orbit: c.orbit, dots: c.dots, bg: c.bg } : { shape: "round", color: "purple", eyes: "oval", mouth: "smile" });
@@ -163,7 +166,7 @@ function Panel({ s, id }: { s: State; id: string }) {
                     <div><span className="label text-[9.5px] text-ink/60">Face</span><div className="mt-1.5">{k === "home" ? <FaceCreator value={lookVariant(lookHome)} onChange={setLookHome} name={name.trim() || info.name} /> : <FaceCreator value={variant(look)} onChange={(f) => setLook(f as Look)} name={name.trim() || info.name} />}</div></div>
                     <Field label="Instructions" hint="What it should always do"><textarea value={about} onChange={(e) => setAbout(e.target.value.slice(0, 400))} placeholder="Keep answers short. Always link sources." className={areaCls} /></Field>
                     <Field label="Personality"><TonePicker tone={tone} onChange={setTone} /></Field>
-                    <div><span className="label text-[9.5px] text-ink/60">Skills</span><div className="mt-1.5"><SkillPicker skills={skills} onChange={setSkills} /></div></div>
+                    <div><span className="label text-[9.5px] text-ink/60">Skills</span><div className="mt-1.5"><SkillPicker skills={skills} onChange={setSkills} max={Math.max(skillSlots(agentLevelOf(s, id)), d0Skills)} /></div></div>
                   </>
                 )}
                 <VoicePicker value={voice} onChange={setVoice} name={k === "hired" ? nick.trim() || sp?.name || info.name : name.trim() || info.name} />

@@ -86,18 +86,24 @@ export function TonePicker({ tone, onChange }: { tone: ToneId; onChange: (t: Ton
   );
 }
 
-export function SkillPicker({ skills, onChange }: { skills: string[]; onChange: (s: string[]) => void }) {
+/** Skills to switch on. An agent has 4 skill slots, 5 from level 6 (Extra skill slot). */
+export function SkillPicker({ skills, onChange, max = 4 }: { skills: string[]; onChange: (s: string[]) => void; max?: number }) {
+  const full = skills.length >= max;
   return (
-    <ul className="divide-y divide-[var(--line)] rounded-2xl px-3.5 ring-1 ring-line">
-      {AGENT_SKILLS.map((k) => {
-        const on = skills.includes(k.id);
-        return (
-          <li key={k.id} className="flex items-center gap-3 py-2.5">
-            <span className="min-w-0 flex-1"><span className="block text-[14px] font-bold text-ink">{k.label}</span><span className="block text-[12.5px] text-ink/55">{k.desc}</span></span>
-            <Toggle on={on} label={k.label} onChange={(v) => onChange(v ? [...skills, k.id] : skills.filter((x) => x !== k.id))} />
-          </li>
-        );
-      })}
-    </ul>
+    <div>
+      <p className="mb-1.5 text-[12px] font-semibold text-ink/55">{skills.length} of {max} skill slots used{max < 5 ? " · level 6 adds one more" : ""}</p>
+      <ul className="divide-y divide-[var(--line)] rounded-2xl px-3.5 ring-1 ring-line">
+        {AGENT_SKILLS.map((k) => {
+          const on = skills.includes(k.id);
+          const locked = !on && full;
+          return (
+            <li key={k.id} className={`flex items-center gap-3 py-2.5 ${locked ? "opacity-50" : ""}`}>
+              <span className="min-w-0 flex-1"><span className="block text-[14px] font-bold text-ink">{k.label}</span><span className="block text-[12.5px] text-ink/55">{k.desc}</span></span>
+              <Toggle on={on} label={k.label} onChange={(v) => { if (v && locked) return; onChange(v ? [...skills, k.id] : skills.filter((x) => x !== k.id)); }} />
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

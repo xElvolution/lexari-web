@@ -15,6 +15,8 @@ import { lockedSlugs } from "@/server/plans";
 import { SPECIALISTS } from "@/content/appData";
 import { desktopOn, runInDesktop, runRequests } from "@/server/desktop";
 import { DESKTOP_MARK } from "@/server/engram/grokCli";
+import { agentLevel, takeShift } from "@/server/hub/levels";
+import { queuePriority, recallSize, shifts } from "@/lib/perks";
 
 export const runtime = "nodejs";
 
@@ -78,11 +80,14 @@ export async function POST(req: Request) {
   const history = isGroupChat ? body.history.map((t) => (t.from !== "you" && t.from !== body.speaker ? { ...t, text: `${nameFor(t.from)} said: ${t.text}` } : t)) : body.history;
   const peers = (body.peers || []).filter((p) => p.from !== body.speaker);
   const text = peers.length ? `${body.text}\n\n(Already answered in the group:\n${peers.map((p) => `${nameFor(p.from)}: ${p.text}`).join("\n")}\nNow give YOUR answer as ${speakerName}. Add something of your own; don't repeat them or speak for them.)` : body.text;
+  // Level perks: Quick replies / Priority desk jump the model queue, Bigger memory reads more notes, Second shift runs two at once.
+  const level = speakerRow && speakerRow.kind !== "hired" ? await agentLevel(userId, speakerRow.slug) : body.speaker === "home" ? await agentLevel(userId, "home") : 1;
+  const priority = queuePriority(level);
   const prompt = buildPrompt({
     agentName: home.name, role, tone, speaker: speakerName,
     about: speakerRow?.kind === "custom" ? speakerRow.about : house?.back || "",
     you: (home.meta as { you?: string })?.you || "",
-    history, recall: speakerRow?.memoryOn === false ? [] : body.recall, text,
+    history, recall: speakerRow?.memoryOn === false ? [] : body.recall, recallMax: recallSize(level), text,
   });
   prompt[0] = { ...prompt[0], content: `${prompt[0].content}\nYour name is ${speakerName}. When the person says your name (even misspelled by speech-to-text), they mean you.${isGroupChat && members.length ? ` You are in a group chat with ${members.join(", ")}${body.call ? " on a group voice call" : ""}. Every member answers in turn in their own voice. Only speak as yourself, never write lines for the others, and don't prefix your reply with your name.` : ""}` };
 
@@ -114,10 +119,13 @@ export async function POST(req: Request) {
     async start(controller) {
       const send = (payload: unknown) => { try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)); } catch {} };
       let full = "";
+      // Second shift: one agent answers one turn at a time (two from level 5); a call turn never waits.
+      let leave: (() => void) | null = null;
       try {
+        if (!call) leave = await takeShift(`${userId}:${body.speaker}`, shifts(level)).catch(() => null);
         // Stream the reply, but hold text back from the first "<" so <run> requests never reach the screen.
         let shown = 0;
-        for await (const token of streamCompletion(prompt, abort.signal, { fast: call })) {
+        for await (const token of streamCompletion(prompt, abort.signal, { fast: call, priority })) {
           full += token;
           const cut = hold ? (full.indexOf("<") >= 0 ? full.indexOf("<") : full.length) : full.length;
           if (cut > shown) { send({ token: full.slice(shown, cut) }); shown = cut; }
@@ -135,7 +143,7 @@ export async function POST(req: Request) {
           const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Output from your computer:\n${results.join("\n\n")}\n\nNow answer the person in plain sentences. Do not write <run> again.` }];
           let answer = "";
           if (before && shown > 0) send({ token: "\n\n" });
-          for await (const token of streamCompletion(follow, abort.signal)) { answer += token; send({ token }); }
+          for await (const token of streamCompletion(follow, abort.signal, { priority })) { answer += token; send({ token }); }
           full = `${before && shown > 0 ? before + "\n\n" : ""}${answer.replace(/<run>[\s\S]*?<\/run>/g, "").trim()}`;
         }
         // Wallet tags: reads are answered with real chain data; a send becomes a confirm card only you can approve.
@@ -158,7 +166,7 @@ export async function POST(req: Request) {
             const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Lexari wallet data:\n${facts}\n\nNow answer the person in plain sentences using this data. Do not write <wallet> again.` }];
             let answer = "";
             if (before && shown > 0) send({ token: "\n\n" });
-            for await (const token of streamCompletion(follow, abort.signal)) { answer += token; }
+            for await (const token of streamCompletion(follow, abort.signal, { priority })) { answer += token; }
             const clean = stripWalletTags(answer);
             send({ token: clean });
             full = `${before && shown > 0 ? before + "\n\n" : ""}${clean}${w.sends.length ? full.slice(full.search(/<send/i)) : ""}`;
@@ -197,6 +205,7 @@ export async function POST(req: Request) {
         if (error instanceof ModelError) { console.error(`[chat] ${error.message}`); send({ error: error.friendly }); }
         else { console.error(`[chat] ${(error as Error)?.message || "failed"}`); send({ error: "Your agent couldn't reply. Try again." }); }
       } finally {
+        leave?.();
         clearTimeout(cap);
         try { controller.close(); } catch {}
       }

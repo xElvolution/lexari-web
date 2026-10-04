@@ -13,10 +13,12 @@ export function buildPrompt(input: {
   /** what the agent calls the person */
   you?: string;
   recall: RecallNote[];
+  /** how many notes it reads (Bigger memory perk reads more) */
+  recallMax?: number;
   history: Turn[];
   text: string;
 }): ChatMessage[] {
-  const notes = input.recall.slice(0, 8).map((n) => `- ${n.tag}: ${n.text}`).join("\n");
+  const notes = input.recall.slice(0, input.recallMax ?? 8).map((n) => `- ${n.tag}: ${n.text}`).join("\n");
   const system = [
     `You are ${input.speaker}, a Lexari agent${input.role ? ` (${input.role})` : ""}.`,
     `The person's home agent is ${input.agentName}. Speak in a ${input.tone || "short"} tone.`,

@@ -19,6 +19,7 @@ import { signOutSession } from "./session";
 import { bridgeFor, runSignOutHooks } from "./walletBridge";
 import { openNote, savedKeys, sealNote, unlock } from "./vault";
 import { addressed, addressedAll } from "./names";
+import { hasPerk, recallSize } from "./perks";
 
 export type Msg = {
   id: string; from: string; text: string; at: number; jobId?: number;
@@ -612,6 +613,23 @@ async function replyFromModel(convo: string, userMsg: Msg) {
   }
 }
 
+/** An agent's level from the Hub state (1 if it never trained). */
+export function agentLevelOf(st: State, agent: string) { return st.hub?.levels?.[agent]?.level ?? 1; }
+/**
+ * The notes an agent reads before replying: its own first, then notes from any Mentor (level 9+) agent,
+ * then the rest. Bigger memory (level 3) reads 20 instead of 8.
+ */
+export function recallFor(st: State, speaker: string) {
+  const open = st.memory.filter((n) => !n.locked && n.text);
+  const owner = (n: Note) => n.agent || "home";
+  const mentor = (a: string) => a !== speaker && recallLevel(agentLevelOf(st, a)).mentor;
+  const rank = (n: Note) => (owner(n) === speaker ? 0 : mentor(owner(n)) ? 1 : 2);
+  const max = recallLevel(agentLevelOf(st, speaker)).size;
+  return open.map((n, i) => ({ n, i })).sort((a, b) => rank(a.n) - rank(b.n) || a.i - b.i).slice(0, max)
+    .map(({ n }) => ({ tag: n.tag.slice(0, 40), text: n.text.slice(0, 240) }));
+}
+const recallLevel = (lv: number) => ({ size: recallSize(lv), mentor: hasPerk(lv, "mentor") });
+
 const TRANSIENT = /busy|could not answer|did not answer|couldn't reply|could not reach|try again/i;
 async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: string, follow: boolean, peers: { from: string; text: string }[]): Promise<{ bubble: string; text: string }> {
   const st = get();
@@ -620,7 +638,7 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
   const all = st.threads[convo] || []; const upto = all.findIndex((m) => m.id === userMsg.id);
   const history = (upto >= 0 ? all.slice(0, upto) : all).filter((m) => m.id !== userMsg.id && m.id !== "hello" && m.text && m.from !== "system").slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) }));
   const memoryOn = st.prefs.memory !== false && st.meta[speaker]?.memory !== false;
-  const recall = memoryOn ? st.memory.filter((n) => !n.locked && n.text).slice(0, 8).map((n) => ({ tag: n.tag.slice(0, 40), text: n.text.slice(0, 240) })) : [];
+  const recall = memoryOn ? recallFor(st, speaker) : [];
   const text = userMsg.text || (userMsg.voice ? `Voice note, ${userMsg.voice} seconds.` : userMsg.file ? `Attachment: ${userMsg.file.name}` : "");
   const meta: Record<string, unknown> = {};
   if (userMsg.file) meta.file = userMsg.file;
@@ -713,7 +731,7 @@ export async function callTurn(convo: string, text: string, history: { from: str
   if (!st.agent || !convoExists(st, convo)) return "";
   const speaker = who || speakerFor(st, convo, text);
   const memoryOn = st.prefs.memory !== false && st.meta[speaker]?.memory !== false;
-  const recall = memoryOn ? st.memory.filter((n) => !n.locked && n.text).slice(0, 8).map((n) => ({ tag: n.tag.slice(0, 40), text: n.text.slice(0, 240) })) : [];
+  const recall = memoryOn ? recallFor(st, speaker) : [];
   const res = await fetch("/api/chat", {
     method: "POST", signal, headers: { "content-type": "application/json" },
     body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history: history.slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) })), recall, userMsgId: uid(), replyMsgId: uid(), meta: {}, call: true }),

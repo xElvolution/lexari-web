@@ -1,4 +1,5 @@
 import { applyCosmetic, buy, checkIn, claimQuest, claimTier, openBox, train } from "@/server/hub/offchain";
+import { forgetLevel } from "@/server/hub/levels";
 import { jsonError, rateLimit } from "@/server/http";
 import { withUser } from "@/server/route";
 
@@ -14,7 +15,7 @@ export const POST = withUser(async (user, req) => {
     case "quest": if (typeof b.questId !== "string") return jsonError(400, "Missing quest."); return Response.json(await claimQuest(user, b.questId));
     case "box": return Response.json(await openBox(user));
     case "tier": if (!Number.isInteger(b.tier)) return jsonError(400, "Missing tier."); return Response.json(await claimTier(user, b.tier!));
-    case "train": if (typeof b.agent !== "string" || !Number.isFinite(b.coins)) return jsonError(400, "Missing agent or amount."); return Response.json(await train(user, b.agent, Math.min(100_000, Number(b.coins))));
+    case "train": { if (typeof b.agent !== "string" || !Number.isFinite(b.coins)) return jsonError(400, "Missing agent or amount."); const r = await train(user, b.agent, Math.min(100_000, Number(b.coins))); forgetLevel(user.userId, b.agent); return Response.json(r); }
     case "buy": if (typeof b.item !== "string") return jsonError(400, "Missing item."); return Response.json(await buy(user, b.item));
     case "wear": if (b.kind !== "bg" && b.kind !== "bubble") return jsonError(400, "Missing kind."); return Response.json(await applyCosmetic(user, b.kind, typeof b.item === "string" ? b.item : null));
     default: return jsonError(400, "Unknown action.");

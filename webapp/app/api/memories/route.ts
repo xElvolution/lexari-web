@@ -1,4 +1,6 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { agentLevel } from "@/server/hub/levels";
+import { memoryCap } from "@/lib/perks";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { agents, memories } from "@/server/db/schema";
 import { recordEvent } from "@/server/events";
@@ -23,6 +25,10 @@ export const POST = withUser(async (user, req) => {
   const [dupe] = await database.select({ id: memories.id }).from(memories)
     .where(and(eq(memories.userId, user.userId), eq(memories.contentHash, body.contentHash), isNull(memories.deletedAt))).limit(1);
   if (dupe) return Response.json({ id: dupe.id, duplicate: true });
+  // Bigger memory perk: an agent keeps 100 notes, 150 from level 3.
+  const cap = memoryCap(agent.kind === "hired" ? 1 : await agentLevel(user.userId, agent.slug));
+  const [{ n }] = await database.select({ n: sql<number>`count(*)::int` }).from(memories).where(and(eq(memories.userId, user.userId), eq(memories.agentId, agent.id), isNull(memories.deletedAt)));
+  if (Number(n) >= cap) return jsonError(409, `${agent.name}'s brain is full (${cap} notes). Forget a few, or reach level 3 for Bigger memory.`);
   const [row] = await database.insert(memories).values({
     userId: user.userId, agentId: agent.id, tag: body.tag, source: body.source, ciphertext: body.ciphertext, iv: body.iv, contentHash: body.contentHash,
   }).returning({ id: memories.id });

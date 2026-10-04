@@ -1,7 +1,8 @@
 "use client";
 
 import BgArt from "@shared/components/BgArt";
-import type { AgentLook } from "@/lib/store";
+import { agentLevelOf, useApp, type AgentLook } from "@/lib/store";
+import { hasPerk } from "@/lib/perks";
 import { useState, type CSSProperties } from "react";
 import { Barcode, Code } from "@shared/components/Badge";
 import Logo from "@shared/components/Logo";
@@ -18,6 +19,11 @@ export default function AgentIdCard({ info, flipped: controlled, onFlip, faceEl 
   const flip = () => { onFlip ? onFlip(!flipped) : setOwn(!flipped); };
   const face = "rounded-[24px] bg-white p-3 text-[#0a0a0a] shadow-[0_26px_50px_-20px_rgba(20,0,80,.55),0_2px_0_#fff_inset] ring-1 ring-black/10 [backface-visibility:hidden] [-webkit-backface-visibility:hidden]";
   const desk = `Desk ${String(info.desk).padStart(2, "0")}`;
+  // Level perks on the card: 4 Card glow, 7 Holo card, 10 Legend (gold)
+  const app = useApp();
+  const lv = app ? agentLevelOf(app, info.id) : 1;
+  const perk = hasPerk(lv, "legend") ? "legend" : hasPerk(lv, "glow") ? "glow" : undefined;
+  const holo = hasPerk(lv, "holo");
   return (
     <div className="sway relative mx-auto flex w-fit flex-col items-center" style={{ transformOrigin: "50% 0%" }}>
       <div className="relative z-10 h-6 w-11 rounded-md bg-gradient-to-b from-[#f2f2f2] to-[#a3a3a3] shadow-[inset_0_-2px_0_rgba(0,0,0,.2)]"><span className="absolute left-1/2 top-1/2 h-2 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/40" /></div>
@@ -25,6 +31,7 @@ export default function AgentIdCard({ info, flipped: controlled, onFlip, faceEl 
         role="button" tabIndex={0} aria-pressed={flipped} data-tour="id-card"
         aria-label={flipped ? `${info.name}'s ID card, back. Press to see the front.` : `${info.name}'s ID card. Press to flip.`}
         onClick={flip} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } }}
+        data-card-perk={perk} data-level={lv}
         className="relative -mt-2 w-[268px] cursor-pointer select-none rounded-[24px] outline-none transition-transform duration-700 [transition-timing-function:cubic-bezier(.3,1.35,.5,1)] focus-visible:ring-4 focus-visible:ring-grape/60"
         style={{ transformStyle: "preserve-3d", transform: `perspective(1000px) rotateY(${flipped ? 180 : 0}deg)` }}
       >
@@ -37,9 +44,11 @@ export default function AgentIdCard({ info, flipped: controlled, onFlip, faceEl 
           </div>
           <div className="carpet-w relative mt-2.5 grid h-[128px] place-items-center overflow-hidden rounded-[16px] bg-[#0a0a0a]">
             <BgArt id={info.bg} />
+            {holo && <span aria-hidden className="holo-sheen pointer-events-none absolute inset-0" />}
             <span key={info.id + (info.look && typeof info.look === "object" ? "f" : String(info.look))} className="pop relative">{faceEl ?? <WhoFace who={info.id} look={info.look} size={96} animated />}</span>
             <span className="label absolute left-3 top-3 text-[8.5px] text-white/70">LEXARI</span>
             <span className="label absolute right-3 top-3 rounded-full bg-grape px-2 py-0.5 text-[8.5px] text-white">● online</span>
+            {lv > 1 && <span className={`label absolute bottom-2.5 right-3 rounded-full px-2 py-0.5 text-[8px] ${perk === "legend" ? "bg-gradient-to-r from-[#f7d774] to-[#d99a1e] text-[#3b2600]" : "bg-white/15 text-white"}`}>{perk === "legend" ? "★ Legend" : `Lv ${lv}`}</span>}
             <span className="label absolute bottom-2.5 left-3 text-[8px] text-white/55">{info.idNo}</span>
           </div>
           <div className="px-1 pt-2.5">

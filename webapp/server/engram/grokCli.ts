@@ -32,16 +32,17 @@ export function grokCliConfig() {
 }
 
 let running = 0;
-const waiting: (() => void)[] = [];
-async function slot(max: number) {
+/** Waiting turns, highest priority first (Quick replies = 1, Priority desk = 2), first come first served within a priority. */
+const waiting: { go: () => void; prio: number }[] = [];
+async function slot(max: number, prio = 0) {
   if (running < max) { running++; return; }
   if (waiting.length >= max * 8) throw new ModelError("The agent is busy. Try again in a minute.", "grok-cli queue full");
-  await new Promise<void>((resolve) => waiting.push(resolve));
+  await new Promise<void>((resolve) => { const at = waiting.findIndex((w) => w.prio < prio); const item = { go: resolve, prio }; if (at < 0) waiting.push(item); else waiting.splice(at, 0, item); });
   running++;
 }
 function release() {
   running--;
-  waiting.shift()?.();
+  waiting.shift()?.go();
 }
 
 /** Marker in the system prompt when the agent has a Lexari desktop (see app/api/chat). */
@@ -146,12 +147,12 @@ const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((r) => { c
  * exited with an error) is retried with backoff, so a group where several agents answer in a row, or a call
  * overlapping a chat, still gets every reply. Only when every try fails does the person see an error.
  */
-export async function* streamGrokCli(messages: ChatMessage[], signal?: AbortSignal, model?: string): AsyncGenerator<string> {
+export async function* streamGrokCli(messages: ChatMessage[], signal?: AbortSignal, model?: string, prio = 0): AsyncGenerator<string> {
   let last: unknown;
   for (let attempt = 0; attempt <= RETRY_MS.length; attempt++) {
     let any = false;
     try {
-      for await (const t of runOnce(messages, signal, model)) { any = true; yield t; }
+      for await (const t of runOnce(messages, signal, model, prio)) { any = true; yield t; }
       return;
     } catch (e) {
       last = e;
@@ -164,11 +165,11 @@ export async function* streamGrokCli(messages: ChatMessage[], signal?: AbortSign
   throw last;
 }
 
-async function* runOnce(messages: ChatMessage[], signal?: AbortSignal, model?: string): AsyncGenerator<string> {
+async function* runOnce(messages: ChatMessage[], signal?: AbortSignal, model?: string, prio = 0): AsyncGenerator<string> {
   const cfg = { ...grokCliConfig() };
   if (model) cfg.model = model;
   if (!cfg.ready) throw new ModelError("The agent is not connected to a model yet.", cfg.socket ? `grok-cli: relay socket ${cfg.socket} missing` : `grok-cli: no login under ${cfg.home || "(no HOME)"}/.grok`);
-  await slot(cfg.concurrency);
+  await slot(cfg.concurrency, prio);
   const { system, prompt } = flatten(messages);
   const run = cfg.socket ? runRelay(cfg, system, prompt) : runLocal(cfg, system, prompt);
   const timer = setTimeout(run.kill, cfg.timeoutMs);

@@ -41,8 +41,11 @@ export function AgentTile({ id, look, size = 48, face, className = "", radius, s
   const dot = status && mine && size >= 26 && online !== null;
   const r = radius ?? Math.round(size * 0.32);
   const d = Math.max(8, Math.round(size * 0.24));
+  // Level perks: a glow from level 4 (Card glow), gold from level 10 (Legend)
+  const lv = mine && size >= 26 && s ? s.hub?.levels?.[id]?.level ?? 1 : 1;
+  const perk = lv >= 10 ? "legend" : lv >= 4 ? "glow" : undefined;
   return (
-    <span data-agent-tile={id} {...(primary ? { "data-primary": "" } : {})} data-ring={kind ? kind.replace("-ring", "") : undefined} className={`relative grid shrink-0 place-items-center ${primary ? "primary-ring" : kind} ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: r, background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)", ["--r" as string]: `${r}px` }}>
+    <span data-agent-tile={id} data-tile-perk={perk} {...(primary ? { "data-primary": "" } : {})} data-ring={kind ? kind.replace("-ring", "") : undefined} className={`relative grid shrink-0 place-items-center ${primary ? "primary-ring" : kind} ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: r, background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)", ["--r" as string]: `${r}px` }}>
       <span className="grid place-items-center" style={big ? { transform: "scale(var(--av-scale, 1))" } : undefined}><WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} /></span>
       {dot && <i data-presence={live ? "active" : online && !(s && isLocked(s, id)) ? "idle" : "offline"} aria-label={live ? "Active now" : "Idle"} title={live ? "Active now" : s && isLocked(s, id) ? "Offline · locked on your plan" : online ? "Idle" : "Offline"} className={`absolute rounded-full ${live ? "bg-[#22c55e]" : "bg-[#8a8797]"}`} style={{ width: d, height: d, right: -Math.round(d * 0.15), bottom: -Math.round(d * 0.15), boxShadow: "0 0 0 2px var(--alt, var(--bg))" }} />}
     </span>

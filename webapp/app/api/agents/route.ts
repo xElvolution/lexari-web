@@ -6,6 +6,8 @@ import { jsonError, readJson } from "@/server/http";
 import { withUser } from "@/server/route";
 import { assertSeat } from "@/server/plans";
 import { agentBody } from "@/server/validate";
+import { agentLevel } from "@/server/hub/levels";
+import { skillSlots } from "@/lib/perks";
 
 export const runtime = "nodejs";
 
@@ -23,6 +25,9 @@ export const POST = withUser(async (user, req) => {
   const database = db();
   const [existing] = await database.select().from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, body.slug))).limit(1);
   if (existing && existing.kind === "hired") return jsonError(400, "A hired specialist keeps its maker's settings.");
+  // Skill slots: 4, 5 from level 6 (Extra skill slot). Agents that already had more keep them.
+  const slots = Math.max(skillSlots(await agentLevel(user.userId, body.slug)), existing?.skills?.length ?? 0);
+  if (body.skills.length > slots) return jsonError(400, `This agent has ${slots} skill slots. Level 6 adds one more.`);
   const values = {
     name: body.name, role: body.role, tone: body.tone, about: body.about, skills: body.skills, memoryOn: body.memoryOn,
     lookJson: body.look === undefined ? existing?.lookJson ?? {} : { v: body.look }, meta: { ...(existing?.meta || {}), ...body.meta }, updatedAt: new Date(),

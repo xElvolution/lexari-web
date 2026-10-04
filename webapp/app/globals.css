@@ -70,3 +70,22 @@ html[data-motion="off"] :is(.hub-flame, .hub-flame-core, .hub-orbit, .hub-orbit 
 .card-sheen { background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .13) 45%, rgba(201, 184, 255, .16) 50%, transparent 62%); background-size: 260% 100%; animation: card-sheen 7s ease-in-out infinite; mix-blend-mode: screen; }
 @keyframes card-sheen { 0%, 100% { background-position: 120% 0; } 50% { background-position: -20% 0; } }
 @media (prefers-reduced-motion: reduce) { .card-sheen { animation: none; } }
+
+/* ---------- level perks (lib/perks.ts) ---------- */
+/* Lv4 Card glow: a soft purple halo that breathes; Lv10 Legend: the same in gold */
+[data-card-perk="glow"] { border-radius: 24px; animation: perkGlow 3.2s ease-in-out infinite; }
+[data-card-perk="legend"] { border-radius: 24px; animation: perkGold 3.2s ease-in-out infinite; }
+[data-card-perk="legend"] > div:first-child { box-shadow: 0 0 0 3px #e9b73a, 0 26px 50px -20px rgba(120, 80, 0, .55) !important; }
+@keyframes perkGlow { 0%, 100% { box-shadow: 0 0 22px 2px rgba(139, 92, 246, .45); } 50% { box-shadow: 0 0 38px 8px rgba(168, 120, 255, .7); } }
+@keyframes perkGold { 0%, 100% { box-shadow: 0 0 22px 2px rgba(233, 183, 58, .5); } 50% { box-shadow: 0 0 40px 9px rgba(247, 215, 116, .75); } }
+[data-tile-perk="glow"] { animation: tileGlow 3.2s ease-in-out infinite; }
+[data-tile-perk="legend"] { animation: tileGold 3.2s ease-in-out infinite; }
+@keyframes tileGlow { 0%, 100% { filter: drop-shadow(0 0 3px rgba(139, 92, 246, .55)); } 50% { filter: drop-shadow(0 0 7px rgba(168, 120, 255, .85)); } }
+@keyframes tileGold { 0%, 100% { filter: drop-shadow(0 0 3px rgba(233, 183, 58, .6)); } 50% { filter: drop-shadow(0 0 8px rgba(247, 215, 116, .9)); } }
+/* Lv7 Holo card: a moving rainbow foil over the face panel */
+.holo-sheen {
+  background: linear-gradient(115deg, transparent 20%, rgba(255, 0, 170, .28) 32%, rgba(0, 220, 255, .3) 44%, rgba(120, 255, 120, .26) 56%, rgba(255, 230, 0, .26) 66%, transparent 80%);
+  background-size: 260% 260%; mix-blend-mode: screen; animation: holoMove 4.5s linear infinite;
+}
+@keyframes holoMove { 0% { background-position: 100% 0%; } 100% { background-position: -160% 100%; } }
+@media (prefers-reduced-motion: reduce) { [data-card-perk], [data-tile-perk], .holo-sheen { animation: none; } }
