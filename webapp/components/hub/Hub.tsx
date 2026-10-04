@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
-import HubPhone from "./HubPhone";
+import HubPhone, { HubLoading } from "./HubPhone";
 import { refreshHub, useApp, useNow } from "@/lib/store";
 import { questsView, TIERS, hubOf } from "@/lib/hub";
 import { PageHead } from "@/components/ui";
@@ -22,6 +22,7 @@ export default function Hub() {
   useEffect(() => { void refreshHub(); }, []);
   const phone = useSyncExternalStore((f) => { const m = window.matchMedia("(max-width: 430px)"); m.addEventListener("change", f); return () => m.removeEventListener("change", f); }, () => window.matchMedia("(max-width: 430px)").matches, () => false);
   if (phone) return <><HubPhone s={s} now={now} /><FloatingBalance s={s} /></>;
+  if (!s.live) return <div className="mx-auto max-w-[520px] pt-6"><HubLoading /></div>;
   const ready = questsView(s, now).filter((q) => q.done && !q.claimed).length + TIERS.filter((t, i) => h.invited.length >= t.friends && !h.tiers.includes(i)).length;
   return (
     <div id="top" className="scroll-mt-24">

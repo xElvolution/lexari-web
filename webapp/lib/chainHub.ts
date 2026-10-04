@@ -3,7 +3,7 @@
 import { checkInFast, claimRewardFast, levelUp, programIsLive, recentBlockhash } from "./chain";
 import { friendly } from "./api";
 import { MAX_LEVEL, QUESTS, STREAK_PAY, TIERS, coinsOf, levelOf, type HubAdapter } from "./hub";
-import { get, hubReady, refreshHub, set, toast } from "./store";
+import { addHubPending, dropHubPending, get, hubReady, refreshHub, toast } from "./store";
 import { ensureBridge } from "./walletBridge";
 
 async function ready() {
@@ -17,24 +17,8 @@ async function ready() {
 
 /** Show the reward now; the chain confirm and server record finish in the background (rolled back if they fail). */
 function optimistic(kind: "quest" | "box" | "tier" | "checkin", key: string | number, coins: number, sig: string, settled: Promise<unknown>, what: string, streak = 0) {
-  set((x) => {
-    const live = x.live; if (!live) return x;
-    const nowS = Math.floor(Date.now() / 1000);
-    const base = live.player ?? { coins: 0, lifetime: 0, streak: 0, checkedInToday: false, lastCheckIn: 0, referrer: null };
-    const player = kind === "checkin" ? { ...base, coins: base.coins + coins, lifetime: base.lifetime + coins, streak, checkedInToday: true, lastCheckIn: nowS }
-      : live.player ? { ...live.player, coins: live.player.coins + coins, lifetime: live.player.lifetime + coins } : live.player;
-    return {
-      ...x, bond: { ...x.bond, coins: (player?.coins ?? x.bond.coins) },
-      live: {
-        ...live, player,
-        quests: kind === "quest" ? live.quests.map((q) => (q.id === key ? { ...q, claimed: true } : q)) : live.quests,
-        box: kind === "box" ? { ...live.box, opened: true, coins } : live.box,
-        referral: kind === "tier" ? { ...live.referral, tiers: live.referral.tiers.map((t) => (t.tier === key ? { ...t, claimed: true } : t)) } : live.referral,
-        ledger: [{ kind: kind === "quest" ? "claim_quest" : kind === "box" ? "open_box" : kind === "checkin" ? "check_in" : "claim_referral_tier", amount: coins, at: Date.now(), tx: sig, data: {} }, ...live.ledger],
-      },
-    };
-  });
-  settled.catch((e) => { void refreshHub(); toast({ text: friendly(e, `${what} didn't go through on Solana. Your coins were not added.`), face: "home" }); });
+  addHubPending({ sig, kind, key, coins, streak, at: Date.now() });
+  settled.then(() => dropHubPending(sig), (e) => { dropHubPending(sig); void refreshHub(); toast({ text: friendly(e, `${what} didn't go through on Solana. Your coins were not added.`), face: "home" }); });
 }
 
 export const chainHub: HubAdapter = {

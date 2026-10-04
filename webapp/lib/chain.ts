@@ -18,7 +18,7 @@ import {
   PROGRAM_ID, agentPda, checkInIx, deleteMemoryIx, initPlayerIx, levelUpIx, memoryPda, playerPda, registerAgentIx, updateAgentIx, writeMemoryIx,
 } from "./lexari-ix";
 import { CHAIN_NAME, SOLANA_CLUSTER, SOLANA_RPC, type NftRecord } from "./nft";
-import { applyHub } from "./store";
+import { applyHub, nextHubSeq } from "./store";
 import { hexToBytes } from "./vault";
 import type { WalletBridge } from "./walletBridge";
 
@@ -53,8 +53,9 @@ export async function programIsLive(conn = connection()) {
 
 /** Records a confirmed transaction on the server and refreshes the Hub. */
 export async function confirmOnServer(signature: string) {
+  const seq = nextHubSeq();
   const r = await api<{ recorded: string[]; state: HubState }>("/api/hub/confirm", { body: { signature } });
-  applyHub(r.state);
+  applyHub(r.state, seq);
   return r;
 }
 

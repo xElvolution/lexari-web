@@ -259,7 +259,11 @@ export function hydrate(): Promise<void> {
       const acc = await api<Account>("/api/me");
       const next = fromAccount(acc);
       // Never lose messages you can see: keep anything on screen the server hasn't saved yet (a reply still streaming).
-      if (state?.auth?.address && state.auth.address === next.auth?.address) next.threads = mergeThreads(state.threads, next.threads);
+      if (state?.auth?.address && state.auth.address === next.auth?.address) {
+        next.threads = mergeThreads(state.threads, next.threads);
+        // keep the Hub state on screen: a reload must not flash the balance to 0
+        if (state.live) { next.live = state.live; next.bond = { ...next.bond, coins: state.bond.coins }; }
+      }
       // The theme you picked on another device (or before this browser's storage was cleared).
       try { const t = next.prefs.theme; if (t && !localStorage.getItem("lexari-theme")) applyTheme(t); } catch {}
       registerCustom(next.custom);
@@ -320,21 +324,71 @@ async function memoryKeys() {
 }
 
 /* ---------- hub ---------- */
+/*
+ * The Hub balance must never flicker. Three things used to fight over it: a full account reload (which reset `live`
+ * to null, so the balance showed 0), Hub fetches that overlapped (an older answer landing after a newer one), and the
+ * chain read lagging behind a claim the app already showed (so it dropped back, e.g. to 120, then jumped up again).
+ * Now: a reload keeps the Hub state; every fetch gets a number and only the newest answer is applied; and a claim
+ * that is still settling stays on top of whatever the server says until the chain shows it (or it fails).
+ */
 let hubLoading: Promise<HubState | null> | null = null;
 let hubTried = false;
+let hubSeq = 0, hubShown = 0;
+export type HubPending = { sig: string; kind: "quest" | "box" | "tier" | "checkin"; key: string | number; coins: number; streak?: number; at: number };
+const hubPending = new Map<string, HubPending>();
 /** True once the onchain Hub state has loaded (or failed to load) at least once. Until then the Hub shows a loading state. */
 export const hubReady = () => hubTried;
+/** A number for a Hub fetch you are about to start (answers are applied newest-first). */
+export const nextHubSeq = () => ++hubSeq;
 export function refreshHub(): Promise<HubState | null> {
   if (hubLoading) return hubLoading;
+  const seq = nextHubSeq();
   hubLoading = api<HubState>("/api/hub/state")
-    .then((live) => { applyHub(live); return live; })
+    .then((live) => { applyHub(live, seq); return live; })
     .catch(() => null)
     .finally(() => { hubLoading = null; if (!hubTried) { hubTried = true; emit(); } });
   return hubLoading;
 }
-export function applyHub(live: HubState) {
-  set((s) => ({ ...s, live, bond: { ...s.bond, coins: live.player?.coins ?? 0 } }));
+/** Is this claim already in the chain state? (The flags come from the same account read as the coins.) */
+function landed(live: HubState, p: HubPending) {
+  if (p.kind === "box") return !!live.box.opened;
+  if (p.kind === "checkin") return !!live.player?.checkedInToday;
+  if (p.kind === "quest") return !!live.quests.find((q) => q.id === p.key)?.claimed;
+  return !!live.referral.tiers.find((t) => t.tier === p.key)?.claimed;
 }
+/** The server state plus claims the app showed that the chain doesn't have yet. */
+function withPending(live: HubState): HubState {
+  let out = live;
+  for (const p of [...hubPending.values()]) {
+    if (landed(live, p) || Date.now() - p.at > 180_000) { hubPending.delete(p.sig); continue; }
+    const nowS = Math.floor(Date.now() / 1000);
+    const base = out.player ?? { coins: 0, lifetime: 0, streak: 0, checkedInToday: false, lastCheckIn: 0, referrer: null };
+    const player = p.kind === "checkin" ? { ...base, coins: base.coins + p.coins, lifetime: base.lifetime + p.coins, streak: p.streak ?? base.streak, checkedInToday: true, lastCheckIn: nowS }
+      : out.player ? { ...out.player, coins: out.player.coins + p.coins, lifetime: out.player.lifetime + p.coins } : out.player;
+    out = {
+      ...out, player,
+      quests: p.kind === "quest" ? out.quests.map((q) => (q.id === p.key ? { ...q, claimed: true } : q)) : out.quests,
+      box: p.kind === "box" ? { ...out.box, opened: true, coins: p.coins } : out.box,
+      referral: p.kind === "tier" ? { ...out.referral, tiers: out.referral.tiers.map((t) => (t.tier === p.key ? { ...t, claimed: true } : t)) } : out.referral,
+      ledger: out.ledger.some((e) => e.tx === p.sig) ? out.ledger : [{ kind: p.kind === "quest" ? "claim_quest" : p.kind === "box" ? "open_box" : p.kind === "checkin" ? "check_in" : "claim_referral_tier", amount: p.coins, at: p.at, tx: p.sig, data: {} }, ...out.ledger],
+    };
+  }
+  return out;
+}
+/** Applies a Hub state from the server. `seq` (from nextHubSeq, taken before the request) drops answers older than one already shown. */
+export function applyHub(live: HubState, seq = nextHubSeq()) {
+  if (seq < hubShown) return;
+  hubShown = seq;
+  const shown = withPending(live);
+  set((s) => ({ ...s, live: shown, bond: { ...s.bond, coins: shown.player?.coins ?? 0 } }));
+}
+/** A claim the app shows right away while the chain settles it. */
+export function addHubPending(p: HubPending) {
+  hubPending.set(p.sig, p);
+  set((s) => (s.live ? { ...s, live: withPending(s.live), bond: { ...s.bond, coins: withPending(s.live).player?.coins ?? s.bond.coins } } : s));
+}
+/** The claim failed: take it off the screen (the next fetch shows the chain's number). */
+export function dropHubPending(sig: string) { hubPending.delete(sig); }
 
 /* ---------- helpers ---------- */
 /** The current plan. Every agent (yours, hired, made by you) takes a seat. */
