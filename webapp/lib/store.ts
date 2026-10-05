@@ -831,12 +831,19 @@ export type TxInput = { id: string; kind: Exclude<TxKind, "incoming" | "return">
 export async function logTx(convo: string, ev: TxInput): Promise<TxReceipt | null> {
   const mid = `tx-${ev.id}`;
   upsertReceipt(convo, mid, { ...ev, at: Date.now(), ...(ev.sig ? { url: `https://explorer.solana.com/tx/${ev.sig}?cluster=devnet` } : {}) } as TxReceipt);
-  try {
-    const r = await api<{ tx: TxReceipt }>("/api/tx", { body: { convo, ...ev, ...(ev.error ? { error: ev.error.slice(0, 200) } : {}) } });
-    upsertReceipt(convo, mid, r.tx);
-    if (r.tx.status === "confirmed") noteTx(convo, r.tx);
-    return r.tx;
-  } catch { return null; }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await api<{ tx: TxReceipt }>("/api/tx", { body: { convo, ...ev, ...(ev.error ? { error: ev.error.slice(0, 200) } : {}) } });
+      upsertReceipt(convo, mid, r.tx);
+      if (r.tx.status === "confirmed") noteTx(convo, r.tx);
+      return r.tx;
+    } catch (e) {
+      const st = (e as { status?: number }).status;
+      if (st && st < 500 && st !== 429) return null;
+      await new Promise((x) => setTimeout(x, 1500 * (attempt + 1)));
+    }
+  }
+  return null;
 }
 /** Refreshes this chat's receipts (live status) and, with scan, picks up SOL that arrived from elsewhere. */
 export async function refreshReceipts(convo: string, scan = false) {

@@ -27,15 +27,18 @@ export const POST = withUser(async (user, req) => {
   if (body instanceof Response) return body;
   if (!(await rateLimit(`tx:${user.userId}`, 40))) return jsonError(429, "Too many updates. Wait a minute.");
   const prev = await readTx(user.userId, body.convo, body.id);
-  let ev: TxEvent = { ...(prev || {}), ...body, at: prev?.at || Date.now() } as TxEvent;
+  const { convo, ...fields } = body;
+  let ev: TxEvent = { ...(prev || {}), ...fields, at: prev?.at || Date.now() } as TxEvent;
   if (body.status === "confirmed" && !body.sig) ev.status = "failed";
   if (ev.sig && (body.status === "confirmed" || body.status === "pending")) {
-    const r = await checkSig(ev.sig, user.wallet, ev.to).catch(() => ({ status: "pending" as const }));
+    // a quick status check only; the background follower fills in the on-chain amount, fee and new balance
+    const quick = checkSig(ev.sig, user.wallet, ev.to, false).catch(() => ({ status: "pending" as const }));
+    const r = await Promise.race([quick, new Promise<{ status: "pending" }>((res) => setTimeout(() => res({ status: "pending" }), 2500))]);
     ev.status = r.status;
     if ("error" in r && r.error) ev.error = r.error;
   }
-  ev = await recordTx(user.userId, body.convo, ev);
-  if (ev.sig && (ev.status === "pending" || ev.status === "confirmed")) void settleTx(user.userId, body.convo, body.id, user.wallet).catch(() => {});
+  ev = await recordTx(user.userId, convo, ev);
+  if (ev.sig && (ev.status === "pending" || ev.status === "confirmed")) void settleTx(user.userId, convo, body.id, user.wallet).catch(() => {});
   return Response.json({ tx: ev, id: `tx-${body.id}` });
 });
 

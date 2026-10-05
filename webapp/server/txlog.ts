@@ -9,8 +9,8 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { LAMPORTS_PER_SOL, PublicKey, type ParsedTransactionWithMeta } from "@solana/web3.js";
 import { db } from "./db";
 import { agents, chats, messages } from "./db/schema";
-import { connection } from "./hub/chain";
-import { cluster, treasury } from "./config";
+import { Connection } from "@solana/web3.js";
+import { cluster, rpcUrl, treasury } from "./config";
 import { faucetAddress } from "./faucet";
 import { hireWallet } from "./hireWallet";
 
@@ -67,7 +67,6 @@ export async function recordTx(userId: string, convo: string, ev: TxEvent): Prom
   if (row) await d.update(messages).set({ text: receiptText(next), metaJson: sql`coalesce(${messages.metaJson}, '{}'::jsonb) || ${JSON.stringify({ tx: next })}::jsonb` }).where(eq(messages.id, row.id));
   else await d.insert(messages).values({ chatId, fromId: "system", text: receiptText(next), clientId, metaJson: { tx: next }, createdAt: new Date(next.at) }).onConflictDoNothing();
   await d.update(chats).set({ updatedAt: new Date() }).where(eq(chats.id, chatId));
-  txCache.delete(userId);
   return next;
 }
 
@@ -93,6 +92,11 @@ async function allReceipts(userId: string, limit = 30) {
 
 /* ---------- on chain ---------- */
 
+// Its own connection that fails fast on a 429 (the public devnet RPC rate-limits hard): history is cached and a
+// receipt is re-checked on the next poll, so a skipped call costs nothing, while retry storms slowed every request.
+let rpcConn: Connection | null = null;
+const connection = () => (rpcConn ||= new Connection(rpcUrl(), { commitment: "confirmed", disableRetryOnRateLimit: true }));
+
 const parsed = new Map<string, ParsedTransactionWithMeta | null>();
 type Transfer = { from: string; to: string; lamports: number };
 function transfersOf(tx: ParsedTransactionWithMeta): Transfer[] {
@@ -110,27 +114,26 @@ function deltaOf(tx: ParsedTransactionWithMeta, addr: string) {
   if (i < 0 || !tx.meta) return 0;
   return tx.meta.postBalances[i] - tx.meta.preBalances[i];
 }
-async function getParsed(sigs: string[]) {
-  const need = sigs.filter((s) => !parsed.has(s));
-  if (need.length) {
-    const c = connection();
-    let got: (ParsedTransactionWithMeta | null)[] = [];
-    try { got = await c.getParsedTransactions(need, { maxSupportedTransactionVersion: 0, commitment: "confirmed" }); }
-    catch { got = []; for (const s of need.slice(0, 12)) got.push(await c.getParsedTransaction(s, { maxSupportedTransactionVersion: 0, commitment: "confirmed" }).catch(() => null)); }
-    need.forEach((s, i) => { if (got[i]) parsed.set(s, got[i]); });
-    if (parsed.size > 5000) parsed.clear();
+/** Parsed transactions, cached forever by signature; at most `max` new ones are fetched per call (one at a time). */
+async function getParsed(sigs: string[], max = 8) {
+  const need = sigs.filter((s) => !parsed.has(s)).slice(0, max);
+  for (const sig of need) {
+    const tx = await connection().getParsedTransaction(sig, { maxSupportedTransactionVersion: 0, commitment: "confirmed" }).catch(() => undefined);
+    if (tx === undefined) break; // rate-limited: try the rest next time
+    parsed.set(sig, tx);
   }
+  if (parsed.size > 5000) parsed.clear();
   return sigs.map((s) => parsed.get(s) || null);
 }
 
 /** Checks one signature on chain. Returns the status and, once confirmed, what moved for `wallet`. */
-export async function checkSig(sig: string, wallet: string, to?: string) {
+export async function checkSig(sig: string, wallet: string, to?: string, parse = true) {
   const c = connection();
   const st = (await c.getSignatureStatuses([sig], { searchTransactionHistory: true })).value[0];
   if (!st) return { status: "pending" as TxStatus };
   if (st.err) return { status: "failed" as TxStatus, error: "The transaction failed on Solana." };
   if (st.confirmationStatus !== "confirmed" && st.confirmationStatus !== "finalized") return { status: "pending" as TxStatus };
-  const [tx] = await getParsed([sig]);
+  const [tx] = parse ? await getParsed([sig]) : [null];
   if (!tx) return { status: "confirmed" as TxStatus };
   const t = transfersOf(tx);
   const toMe = to ? t.filter((x) => x.to === to && x.from === wallet).reduce((a, x) => a + x.lamports, 0) : 0;
@@ -144,7 +147,16 @@ export async function checkSig(sig: string, wallet: string, to?: string) {
  * Follows a receipt until Solana says confirmed or failed (up to `waitMs`), then stores the result and your new balance.
  * The amount and recipient on a confirmed receipt are the on-chain ones.
  */
-export async function settleTx(userId: string, convo: string, id: string, wallet: string, waitMs = 45_000): Promise<TxEvent | null> {
+const settling = new Map<string, Promise<TxEvent | null>>();
+export function settleTx(userId: string, convo: string, id: string, wallet: string, waitMs = 45_000): Promise<TxEvent | null> {
+  const key = `${userId}:${convo}:${id}`;
+  const cur = settling.get(key);
+  if (cur) return waitMs > 0 ? cur : readTx(userId, convo, id); // one follower per receipt; a quick poll doesn't wait on it
+  const p = settleOnce(userId, convo, id, wallet, waitMs).finally(() => settling.delete(key));
+  settling.set(key, p);
+  return p;
+}
+async function settleOnce(userId: string, convo: string, id: string, wallet: string, waitMs: number): Promise<TxEvent | null> {
   let ev = await readTx(userId, convo, id);
   if (!ev) return null;
   const end = Date.now() + waitMs;
@@ -152,7 +164,11 @@ export async function settleTx(userId: string, convo: string, id: string, wallet
     const payerWallet = ev.kind === "return" && ev.from ? ev.from : wallet;
     const r = await checkSig(ev.sig, payerWallet, ev.to).catch(() => ({ status: "pending" as TxStatus }));
     if (r.status !== "pending") {
-      const bal = await connection().getBalance(new PublicKey(wallet), "confirmed").then((b) => b / LAMPORTS_PER_SOL).catch(() => undefined);
+      let bal: number | undefined;
+      for (let i = 0; i < 3 && bal === undefined; i++) {
+        bal = await connection().getBalance(new PublicKey(wallet), "confirmed").then((b) => b / LAMPORTS_PER_SOL).catch(() => undefined);
+        if (bal === undefined) await new Promise((res) => setTimeout(res, 800));
+      }
       const extra = r as { fee?: number; sol?: number; matched?: boolean; error?: string };
       ev = await recordTx(userId, convo, {
         ...ev, status: r.status, ...(extra.error ? { error: extra.error } : {}), ...(extra.fee !== undefined ? { fee: extra.fee } : {}),
@@ -161,7 +177,7 @@ export async function settleTx(userId: string, convo: string, id: string, wallet
       break;
     }
     if (Date.now() > end) break;
-    await new Promise((res) => setTimeout(res, 1500));
+    await new Promise((res) => setTimeout(res, 2000));
   }
   return ev;
 }
@@ -169,76 +185,91 @@ export async function settleTx(userId: string, convo: string, id: string, wallet
 /* ---------- the agent's wallet history ---------- */
 
 export type TxLine = { sig?: string; at: number; dir: "out" | "in" | "self"; sol: number; counterparty: string; kind?: TxKind; status: TxStatus; wallet: string; fee?: number };
-type Snapshot = { at: number; balance: number | null; lines: TxLine[]; hired: { name: string; address: string; balance: number | null }[] };
-const txCache = new Map<string, Snapshot>();
-const inflight = new Map<string, Promise<Snapshot>>();
+type Snapshot = { at: number; balance: number | null; lines: TxLine[]; hired: { name: string; address: string; balance: number | null }[]; names?: Map<string, string> };
+type ChainPart = { at: number; balances: (number | null)[]; wallets: string[]; sigs: { signature: string; err: unknown; blockTime?: number | null }[][]; hired: { slug: string; name: string; address: string }[] };
+const chainCache = new Map<string, ChainPart>();
+const inflight = new Map<string, Promise<ChainPart>>();
 
 async function hiredOf(userId: string) {
   const rows = await db().select({ slug: agents.slug, name: agents.name, meta: agents.meta }).from(agents).where(and(eq(agents.userId, userId), eq(agents.kind, "hired")));
   return rows.slice(0, 4).map((r) => { try { return { slug: r.slug, name: (r.meta as { nick?: string })?.nick || r.name, address: hireWallet(userId, r.slug).publicKey.toBase58() }; } catch { return null; } }).filter((x): x is { slug: string; name: string; address: string } => !!x);
 }
 
-async function snapshot(userId: string, wallet: string): Promise<Snapshot> {
+/** Balances (one call) and recent signatures: 20 for your wallet, 5 per hired agent's task wallet. Cached 45 s. */
+async function chainPart(userId: string, wallet: string): Promise<ChainPart> {
   const c = connection();
   const hired = await hiredOf(userId).catch(() => []);
+  const wallets = [wallet, ...hired.map((h) => h.address)];
+  const infos = await c.getMultipleAccountsInfo(wallets.map((w) => new PublicKey(w)), "confirmed").catch(() => null);
+  const balances = wallets.map((_, i) => (infos ? (infos[i]?.lamports ?? 0) / LAMPORTS_PER_SOL : null));
+  const sigs: ChainPart["sigs"] = [];
+  for (let i = 0; i < wallets.length; i++) sigs.push(await c.getSignaturesForAddress(new PublicKey(wallets[i]), { limit: i ? 5 : 20 }, "confirmed").catch(() => []));
+  // details for the newest ones (cached by signature, so this is only slow the first time)
+  await getParsed(sigs.flat().sort((x, y) => (y.blockTime || 0) - (x.blockTime || 0)).map((x) => x.signature), 10).catch(() => []);
+  return { at: Date.now(), balances, wallets, sigs, hired };
+}
+
+function build(part: ChainPart, events: (TxEvent & { convo: string })[], wallet: string): Snapshot {
   const names = new Map<string, string>([[wallet, "your wallet"]]);
   if (treasury()) names.set(treasury(), "Lexari (payment)");
   const fa = faucetAddress(); if (fa) names.set(fa, "Lexari faucet");
-  for (const h of hired) names.set(h.address, `${h.name}'s task wallet`);
-  const wallets = [{ addr: wallet, n: 20 }, ...hired.map((h) => ({ addr: h.address, n: 6 }))];
-  const [events, balances, sigLists] = await Promise.all([
-    allReceipts(userId).catch(() => []),
-    Promise.all(wallets.map((w) => c.getBalance(new PublicKey(w.addr), "confirmed").then((b) => b / LAMPORTS_PER_SOL).catch(() => null))),
-    Promise.all(wallets.map((w) => c.getSignaturesForAddress(new PublicKey(w.addr), { limit: w.n }, "confirmed").catch(() => []))),
-  ]);
+  for (const h of part.hired) names.set(h.address, `${h.name}'s task wallet`);
   const bySig = new Map(events.filter((e) => e.sig).map((e) => [e.sig!, e]));
   const lines: TxLine[] = [];
   const seen = new Set<string>();
-  for (let wi = 0; wi < wallets.length; wi++) {
-    const list = sigLists[wi];
-    const txs = await getParsed(list.map((s) => s.signature)).catch(() => list.map(() => null));
-    list.forEach((s, i) => {
-      if (seen.has(s.signature)) return; // a fund transfer shows on both wallets: list it once, from your side
-      const tx = txs[i];
-      const me = wallets[wi].addr;
+  part.wallets.forEach((me, wi) => {
+    for (const s of part.sigs[wi] || []) {
+      if (seen.has(s.signature)) continue; // a fund transfer shows on both wallets: list it once, from your side
+      const tx = parsed.get(s.signature) || null;
       const status: TxStatus = s.err ? "failed" : "confirmed";
       const at = (s.blockTime || 0) * 1000 || Date.now();
-      if (!tx) { const e = bySig.get(s.signature); lines.push({ sig: s.signature, at, dir: e?.kind === "incoming" ? "in" : "out", sol: e?.sol || 0, counterparty: e?.to || "", kind: e?.kind, status, wallet: me }); seen.add(s.signature); return; }
+      const e = bySig.get(s.signature);
+      if (!tx) {
+        if (e) { lines.push({ sig: s.signature, at, dir: e.kind === "incoming" ? "in" : "out", sol: e.sol, counterparty: e.kind === "incoming" ? e.from || "" : e.to || "", kind: e.kind, status, wallet: me, fee: e.fee }); seen.add(s.signature); }
+        continue; // not parsed yet: shown once the details are in
+      }
       const delta = deltaOf(tx, me);
       const t = transfersOf(tx);
       const out = t.filter((x) => x.from === me), inn = t.filter((x) => x.to === me);
       const dir: TxLine["dir"] = delta > 0 ? "in" : "out";
-      const big = (dir === "in" ? inn : out).sort((a, b) => b.lamports - a.lamports)[0];
+      const big = [...(dir === "in" ? inn : out)].sort((x, y) => y.lamports - x.lamports)[0];
       const counter = big ? (dir === "in" ? big.from : big.to) : "";
-      const moved = big ? (dir === "in" ? inn : out).filter((x) => (dir === "in" ? x.from : x.to) === counter).reduce((a, x) => a + x.lamports, 0) : Math.abs(delta);
-      if (!moved && !Math.abs(delta)) return;
-      lines.push({ sig: s.signature, at, dir, sol: moved / LAMPORTS_PER_SOL, counterparty: counter, kind: bySig.get(s.signature)?.kind, status, wallet: me, fee: (tx.meta?.fee || 0) / LAMPORTS_PER_SOL });
+      const moved = big ? (dir === "in" ? inn : out).filter((x) => (dir === "in" ? x.from : x.to) === counter).reduce((acc, x) => acc + x.lamports, 0) : Math.abs(delta);
+      if (!moved) continue;
+      lines.push({ sig: s.signature, at, dir, sol: moved / LAMPORTS_PER_SOL, counterparty: counter, kind: e?.kind, status, wallet: me, fee: (tx.meta?.fee || 0) / LAMPORTS_PER_SOL });
       seen.add(s.signature);
-    });
-  }
-  // Receipts not on chain yet (pending), cancelled or failed before sending.
+    }
+  });
+  // Receipts the chain list doesn't show (pending, cancelled, failed before sending, or older than the window).
   for (const e of events) if (!e.sig || !seen.has(e.sig)) {
     lines.push({ sig: e.sig, at: e.at, dir: e.kind === "incoming" ? "in" : "out", sol: e.sol, counterparty: e.kind === "incoming" ? e.from || "" : e.to || "", kind: e.kind, status: e.status, wallet: e.kind === "return" ? e.from || wallet : wallet, fee: e.fee });
     if (e.sig) seen.add(e.sig);
   }
-  lines.sort((a, b) => b.at - a.at);
-  const snap: Snapshot = { at: Date.now(), balance: balances[0], lines: lines.slice(0, 24), hired: hired.map((h, i) => ({ name: h.name, address: h.address, balance: balances[i + 1] })) };
-  (snap as Snapshot & { names: Map<string, string> }).names = names;
-  return snap;
+  lines.sort((x, y) => y.at - x.at);
+  // A receipt's balance (read right after it confirmed) is newer than a cached chain read.
+  const latest = events.find((e) => e.status === "confirmed" && typeof e.balance === "number" && e.balance >= 0 && e.at > part.at - 120_000);
+  const balance = latest && latest.at > part.at ? latest.balance! : part.balances[0];
+  return { at: Date.now(), balance, lines: lines.slice(0, 24), hired: part.hired.map((h, i) => ({ name: h.name, address: h.address, balance: part.balances[i + 1] })), names };
 }
 
-/** Your wallet history, cached for 20 s (a call turn uses whatever is cached if a refresh takes too long). */
-export async function walletHistory(userId: string, wallet: string, maxWaitMs = 4000): Promise<Snapshot | null> {
-  const hit = txCache.get(userId);
-  if (hit && Date.now() - hit.at < 20_000) return hit;
-  let p = inflight.get(userId);
-  if (!p) {
-    p = snapshot(userId, wallet).then((s) => { txCache.set(userId, s); return s; }).finally(() => inflight.delete(userId));
-    inflight.set(userId, p);
+/** Your wallet history: receipts from the database (always fresh) plus the chain part (cached 45 s; a call turn uses whatever is cached). */
+export async function walletHistory(userId: string, wallet: string, maxWaitMs = 4000, fresh = false): Promise<Snapshot | null> {
+  const events = allReceipts(userId).catch(() => [] as (TxEvent & { convo: string })[]);
+  const hit = chainCache.get(userId);
+  let part: ChainPart | null = hit && Date.now() - hit.at < (fresh ? 8_000 : 45_000) ? hit : null;
+  if (!part) {
+    let p = inflight.get(userId);
+    if (!p) {
+      p = chainPart(userId, wallet).then((x) => { chainCache.set(userId, x); return x; }).finally(() => inflight.delete(userId));
+      inflight.set(userId, p);
+    }
+    p.catch(() => {});
+    const timeout = new Promise<null>((r) => setTimeout(() => r(null), maxWaitMs));
+    part = (await Promise.race([p, timeout]).catch(() => null)) || hit || null;
   }
-  p.catch(() => {});
-  const timeout = new Promise<null>((r) => setTimeout(() => r(null), maxWaitMs));
-  return (await Promise.race([p, timeout]).catch(() => null)) || hit || null;
+  const ev = await events;
+  if (!part) part = { at: 0, balances: [null], wallets: [wallet], sigs: [[]], hired: [] };
+  return build(part, ev, wallet);
 }
 
 const KIND_NOTE: Partial<Record<TxKind, string>> = { send: "send from chat", fund: "funded a hired agent's task", return: "leftover returned", hire: "hire payment", plan: "plan payment", card: "card payment", mint: "ID card mint", incoming: "incoming" };
@@ -255,7 +286,7 @@ export const TX_MARK = "[lexari-tx]";
 
 /** The block the agent reads on every turn: balance, recent transactions (newest first) and today's totals. */
 export function historyBlock(snap: Snapshot, wallet: string, tz = "UTC") {
-  const names = (snap as Snapshot & { names?: Map<string, string> }).names || new Map();
+  const names = snap.names || new Map<string, string>();
   const who = (a: string) => (a ? names.get(a) ? `${names.get(a)} (${short(a)})` : short(a) : "unknown");
   const today = dayKey(Date.now(), tz), yest = dayKey(Date.now() - 86_400_000, tz);
   const mine = snap.lines.filter((l) => l.wallet === wallet);
@@ -286,7 +317,7 @@ export function historyBlock(snap: Snapshot, wallet: string, tz = "UTC") {
  * (yours: your main chat; a hired agent's: that agent's chat). Only the last 24 hours, newest 3 per wallet.
  */
 export async function noticeIncoming(userId: string, wallet: string) {
-  const snap = await walletHistory(userId, wallet, 6000);
+  const snap = await walletHistory(userId, wallet, 8000, true);
   if (!snap) return 0;
   const hired = await hiredOf(userId).catch(() => []);
   const fresh = snap.lines.filter((l) => l.dir === "in" && l.status === "confirmed" && l.sig && !l.kind && Date.now() - l.at < 86_400_000 && l.sol > 0);
@@ -302,8 +333,7 @@ export async function noticeIncoming(userId: string, wallet: string) {
     if (l.counterparty === wallet || hired.some((h) => h.address === l.counterparty)) continue; // your own moves are already receipts
     const c = (per.get(l.wallet) || 0) + 1; per.set(l.wallet, c); if (c > 3) continue;
     const h = hired.find((x) => x.address === l.wallet);
-    const names = (snap as Snapshot & { names?: Map<string, string> }).names;
-    const from = names?.get(l.counterparty);
+    const from = snap.names?.get(l.counterparty);
     await recordTx(userId, h ? h.slug : "home", { id, kind: "incoming", status: "confirmed", sol: +l.sol.toFixed(9), at: l.at, from: l.counterparty, to: l.wallet, sig: l.sig, ...(from ? { label: from } : {}), ...(h ? { agent: h.slug } : {}) });
     n++;
   }
