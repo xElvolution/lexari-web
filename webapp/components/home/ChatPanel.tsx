@@ -52,10 +52,13 @@ function Shots({ m }: { m: Msg }) {
 function ComputerRow({ id, onDesktop, desktopOpen }: { id: string; onDesktop: () => void; desktopOpen: boolean }) {
   const p = useComputer(id);
   const [stopping, setStopping] = useState(false);
+  const row = useRef<HTMLDivElement>(null);
   useEffect(() => { if (!p) setStopping(false); }, [p]);
+  // Keep the row in sight as the steps change (the thread only scrolls by itself when a message arrives).
+  useEffect(() => { if (p) row.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [p?.step, p?.label]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!p) return null;
   return (
-    <div data-computer-row className="ml-10 mt-2 flex max-w-[min(100%,460px)] items-center gap-2.5 rounded-[16px] bg-card px-3 py-2 ring-1 ring-line">
+    <div ref={row} data-computer-row className="ml-10 mt-2 flex max-w-[min(100%,460px)] items-center gap-2.5 rounded-[16px] bg-card px-3 py-2 ring-1 ring-line">
       <span aria-hidden className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" />
       <span className="min-w-0 flex-1 text-[13px] leading-snug text-ink/80"><b className="block text-ink">Working on your computer…</b><span className="block truncate" aria-live="polite">Step {p.step}: {p.label}</span></span>
       {!desktopOpen && <button onClick={onDesktop} className="shrink-0 rounded-full bg-tint px-3 py-1.5 text-[12.5px] font-bold text-brand-ink">Watch</button>}

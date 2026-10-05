@@ -216,6 +216,7 @@ export async function runComputer(userId: string, convo: string, replyId: string
         } else notes.push(c.note);
         if (c.read) notes.push(c.note);
       }
+      console.log(`[computer] ${userId.slice(0, 8)} turn ${step}: ${label} | ${(s.actions || []).slice(0, 4).map((a) => ("x" in a ? `${a.do}(${Math.round(Number(a.x))},${Math.round(Number(a.y))})` : a.do === "navigate" || a.do === "readpage" ? `${a.do}(${String(a.url).slice(0, 80)})` : a.do)).join(" ")}`);
       log.push(`Turn ${step}: saw "${String(s.see || "").slice(0, 140)}" → ${label}: ${notes.join("; ")}`);
       await new Promise((r) => setTimeout(r, settle));
     }
@@ -228,6 +229,7 @@ export async function runComputer(userId: string, convo: string, replyId: string
     if (stopped) out = "Stopped. Here's where my screen is now.";
     else if (!out) out = `I worked on it for ${log.length} step${log.length === 1 ? "" : "s"} but didn't finish in time. Here's where my screen is now; tell me if I should keep going.`;
     else if (ask && answer && ask !== answer) out = `${answer}\n\n${ask}`;
+    console.log(`[computer] ${userId.slice(0, 8)} finished: ${stopped ? "stopped" : ask ? "asked the person" : answer ? "done" : "out of budget"}, ${log.length} turns, ${Math.round((Date.now() - started) / 1000)}s, ${saved.length} shots`);
     return { text: out, shots: saved };
   } finally {
     signal?.removeEventListener("abort", onAbort);
