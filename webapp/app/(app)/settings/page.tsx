@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LOOKS, TONES, shortAddr } from "@/content/appData";
 import {
-  agentName, clearChats, deleteAccount, exportData, setActive, planOf, setNotif, setPrefs, signOut, toast, updateAgent, useApp, type State,
+  agentName, clearChats, deleteAccount, exportData, setActive, setNotif, setPrefs, signOut, toast, updateAgent, useApp, type State,
 } from "@/lib/store";
 import { LANDING_URL, WEBAPP_URL } from "@shared/sites";
 import { applyTheme, onTheme, savedTheme, watchSystemTheme } from "@shared/components/theme";
@@ -14,7 +14,7 @@ import Icon from "@/components/Icon";
 import { AgentFace, AgentTile } from "@/components/faces";
 import { myAgents } from "@/components/agents";
 import { openAdd, openAgent } from "@/components/overlays";
-import { PlanSummary } from "@/components/Plans";
+import BillingSection from "@/components/billing/BillingSection";
 import LockSettings from "@/components/lock/LockSettings";
 import { disablePush, enablePush, pushOnHere, pushPermission } from "@/lib/notifications";
 
@@ -271,20 +271,12 @@ function Accounts({ s }: { s: State }) {
 }
 
 function Billing({ s }: { s: State }) {
-  const p = planOf(s);
   return (
-    <>
-      <Group title="Current plan">
-        <div className="flex flex-wrap items-center gap-5 py-5">
-          <div><span className="label text-[9px] text-ink/55">Current plan</span><div data-current-plan className="display mt-1 text-[36px] leading-none text-ink">{p.name}</div></div>
-          <p className="min-w-[180px] flex-1 text-[13.5px] text-ink/60">{p.seats === 1 ? "One agent: your own." : `${p.seats} seats.`}{p.expiresAt ? ` Paid until ${new Date(p.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}.` : ""} Specialists are a one-time {hirePriceLabel()} hire each.</p>
-        </div>
+    <BillingSection>
+      <Group title="Hires">
+        <Row title="Specialists" desc={s.paid.length ? `${s.paid.length} specialist${s.paid.length === 1 ? "" : "s"} paid for, a one-time ${hirePriceLabel()} each. Released ones come back for free.` : `Specialists are a one-time ${hirePriceLabel()} hire each, paid from your wallet.`}><Link href="/wallets" className={smallBtn}>Wallet</Link></Row>
       </Group>
-      <section className="mt-6"><PlanSummary /></section>
-      <Group title="Payments">
-        <Row title="Hires" desc={s.paid.length ? `${s.paid.length} specialist${s.paid.length === 1 ? "" : "s"} paid for. Released ones come back for free.` : "No hires yet."}><Link href="/wallets" className={smallBtn}>Wallet</Link></Row>
-      </Group>
-    </>
+    </BillingSection>
   );
 }
 

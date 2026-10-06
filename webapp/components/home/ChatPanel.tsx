@@ -17,6 +17,7 @@ import Composer from "./Composer";
 import { mentionParts } from "@/lib/names";
 import { CHAT_BG, MY_BUBBLE } from "@/lib/cosmetics";
 import { openAgent, openUpgrade } from "../overlays";
+import ModelChip from "../billing/ModelChip";
 import { shotUrl, stopComputer, useComputer } from "@/lib/computer";
 
 /** Screenshots the agent attached after using its computer: the last one (the final screen) large, the others small. Tap to view. */
@@ -343,6 +344,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
             </span>
           </button>
         )}
+        <ModelChip convo={id} agent={c.group ? null : id} group={!!c.group} />
         {c.group && <button onClick={onEditGroup} aria-label="Edit group" title="Edit group" className="grid h-10 w-10 place-items-center rounded-full text-ink/75 transition hover:bg-tint hover:text-brand-ink"><Icon name="users" size={19} /></button>}
       </header>
 

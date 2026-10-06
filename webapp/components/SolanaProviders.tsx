@@ -10,6 +10,7 @@ import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import { BackpackWalletAdapter } from "@solana/wallet-adapter-backpack";
 import type { Adapter } from "@solana/wallet-adapter-base";
 import { SOLANA_RPC } from "@/lib/nft";
+import DevWallet from "./DevWallet";
 
 if (!(globalThis as { Buffer?: typeof Buffer }).Buffer) (globalThis as { Buffer?: typeof Buffer }).Buffer = Buffer;
 
@@ -53,6 +54,7 @@ export default function SolanaProviders({ children }: { children: React.ReactNod
     <ConnectionProvider endpoint={SOLANA_RPC}>
       <WalletProvider wallets={wallets} autoConnect localStorageKey="lexari-wallet">
         <Bridge />
+        <DevWallet />
         {children}
       </WalletProvider>
     </ConnectionProvider>

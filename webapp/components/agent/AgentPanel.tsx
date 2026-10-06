@@ -20,6 +20,7 @@ import { Field, SkillPicker, Toggle, TonePicker, areaCls, inputCls, variant, typ
 import FaceCreator from "./FaceCreator";
 import OnchainCard from "./OnchainCard";
 import AgentMoney from "../wallet/AgentMoney";
+import AgentModelRow from "../billing/AgentModelRow";
 import { lookVariant } from "@shared/components/avatar";
 import type { AgentLook } from "@/lib/store";
 
@@ -170,6 +171,7 @@ function Panel({ s, id }: { s: State; id: string }) {
                   </>
                 )}
                 <VoicePicker value={voice} onChange={setVoice} name={k === "hired" ? nick.trim() || sp?.name || info.name : name.trim() || info.name} />
+                <AgentModelRow agent={id} name={info.name} />
                 <div className="flex items-center gap-3 rounded-2xl bg-card p-3.5 ring-1 ring-line">
                   <span className="min-w-0 flex-1"><span className="block text-[14px] font-bold text-ink">Memory</span><span className="block text-[12.5px] text-ink/60">{memory ? "Remembers what you tell it." : "Starts fresh every chat."}</span></span>
                   <Toggle on={memory} onChange={setMemory} label="Memory" />
