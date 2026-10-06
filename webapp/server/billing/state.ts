@@ -57,7 +57,7 @@ export async function billingState(userId: string) {
       crypto: { ready: cryptoReady(), mint: usdcMint(), treasury: treasury(), cluster: cluster() },
     },
     payments: pays.map((p) => ({ id: p.id, rail: p.rail, test: p.provider === "dev", product: p.product, sku: p.sku, status: p.status === "pending" && p.expiresAt && p.expiresAt.getTime() < now ? "expired" : p.status, amountMinor: p.amountMinor, currency: p.currency, txSig: p.txSig, at: p.createdAt.getTime(), paidAt: p.paidAt?.getTime() ?? null })),
-    recent: usage.map((u) => ({ at: u.createdAt.getTime(), model: u.requestedModel, served: u.servedModel, pool: u.pool, billed: u.billedMicros, cost: u.costMicros, tokens: u.promptTokens + u.completionTokens, agent: u.agentSlug, kind: u.kind })),
+    recent: usage.map((u) => ({ at: u.createdAt.getTime(), model: u.requestedModel, pool: u.pool, billed: u.billedMicros, cost: u.costMicros, tokens: u.promptTokens + u.completionTokens, agent: u.agentSlug, kind: u.kind })),
     dev: process.env.NODE_ENV !== "production" && process.env.LEXARI_DEV_BILLING === "1",
   };
 }

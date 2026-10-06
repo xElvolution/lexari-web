@@ -8,7 +8,7 @@ const paid = (o: Partial<MeterSnapshot> = {}): MeterSnapshot => ({ paid: true, l
 const free = (o: Partial<MeterSnapshot> = {}): MeterSnapshot => ({ ...paid(), paid: false, laminaLeft: 0, premiumLeft: 0, creditsOnFree: true, ...o });
 
 test("engine cost in micro dollars from per-million prices", () => {
-  // 3,000 in + 400 out on Kimi K2.5 (0.45 / 2.25 per M) = $0.00135 + $0.0009 = $0.00225
+  // 3,000 in + 400 out at Lamina's list price (0.45 / 2.25 per M) = $0.00135 + $0.0009 = $0.00225
   assert.equal(costMicros(LAMINA.price, 3000, 400), 2250);
   // Claude Sonnet 5.5 (2 / 10): $0.006 + $0.004 = $0.01
   assert.equal(costMicros(PREMIUM[0].price, 3000, 400), 10_000);

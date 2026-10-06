@@ -7,7 +7,8 @@
  *      OPENROUTER_DATA_COLLECTION ("deny" by default: only providers that do not store prompts), LLM_TIMEOUT_MS.
  * Keep the URL and key in env so a move to another OpenAI-compatible gateway is a config change.
  */
-import { ENGINE_PRICES, type ModelInfo } from "@/content/models";
+import type { ModelInfo } from "@/content/models";
+import { ENGINE_PRICES, routeFor } from "./engines";
 import { ModelError, type ChatMessage } from "./cortex";
 import { DESKTOP_MARK } from "./grokCli";
 
@@ -29,7 +30,7 @@ const base = () => (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/ap
 export function houseNote(model: ModelInfo, messages: ChatMessage[]) {
   const desktop = messages.some((m) => m.role === "system" && m.content.includes(DESKTOP_MARK));
   const who = model.pool === "lamina"
-    ? "If asked which model you are, say you run on Lamina, Lexari's house model."
+    ? "If asked which model you are, say you run on Lamina, Lexari's own model, and don't name any other model or company behind it."
     : `If asked which model you are, say you are running on ${model.label} inside Lexari.`;
   const where = desktop
     ? "You are chatting inside the Lexari app. The only ways to use your computer are the <run> and <computer> tags described above; Lexari runs them for you."
@@ -56,6 +57,8 @@ export function parseChunk(data: string): { token?: string; usage?: { prompt_tok
 export async function* streamGateway(messages: ChatMessage[], model: ModelInfo, opts: { signal?: AbortSignal; maxTokens: number; onUsage?: (u: Usage) => void }): AsyncGenerator<string> {
   const key = process.env.OPENROUTER_API_KEY || "";
   if (!key) throw new ModelError("This model is not available on this server yet.", "no OPENROUTER_API_KEY");
+  const route = routeFor(model);
+  if (!route.length) throw new ModelError("This model is not available on this server yet.", `no gateway route for ${model.id}`);
   const timeout = AbortSignal.timeout(Number(process.env.LLM_TIMEOUT_MS || 90_000));
   const sys = { role: "system" as const, content: houseNote(model, messages) };
   const firstUser = messages.findIndex((m) => m.role !== "system");
@@ -70,7 +73,7 @@ export async function* streamGateway(messages: ChatMessage[], model: ModelInfo, 
         "HTTP-Referer": process.env.NEXT_PUBLIC_WEBAPP_URL || "https://app.lexari.ai", "X-Title": "Lexari",
       },
       body: JSON.stringify({
-        model: model.route[0], ...(model.route.length > 1 ? { models: model.route } : {}),
+        model: route[0], ...(route.length > 1 ? { models: route } : {}),
         messages: withNote, stream: true, temperature: 0.7, max_tokens: opts.maxTokens,
         provider: { data_collection: dataCollection },
       }),
@@ -88,7 +91,7 @@ export async function* streamGateway(messages: ChatMessage[], model: ModelInfo, 
   }
   const reader = res.body.getReader();
   const dec = new TextDecoder();
-  let buf = "", served = model.route[0], out = "";
+  let buf = "", served = route[0], out = "";
   let usage: { prompt_tokens?: number; completion_tokens?: number; cost?: number } | null = null;
   try {
     while (true) {

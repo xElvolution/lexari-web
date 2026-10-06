@@ -67,7 +67,7 @@ export default function ModelSheet({ convo, agent, group }: { convo: string; age
       )}
       {!state ? <div className="grid h-40 place-items-center text-ink/50"><Spinner /></div> : (
         <div className="grid gap-2">
-          <Row m={LAMINA} on={selected === LAMINA.id} busy={busy === LAMINA.id} onPick={pick} note={state.models.laminaVia === "gateway" ? "Fast, tuned for agents, with automatic fallbacks" : "Running on Lexari's backup engine on this server"} />
+          <Row m={LAMINA} on={selected === LAMINA.id} busy={busy === LAMINA.id} onPick={pick} note="Lexari's own model. Fast, tuned for your agents." />
           <div className="mt-3 flex items-center justify-between px-1">
             <h3 className="label text-[9.5px] text-ink/50">Premium</h3>
             <span className="text-[11.5px] text-ink/45">Uses premium usage at API price + 20%</span>

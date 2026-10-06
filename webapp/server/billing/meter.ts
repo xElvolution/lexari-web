@@ -6,7 +6,8 @@
 import { and, eq, gt, sql } from "drizzle-orm";
 import { PLAN_DAYS, planById, type PlanId } from "@/content/appData";
 import { ALERT_AT, DEFAULT_SPEND_LIMIT_USD, FREE_LAMINA_PER_DAY, HOLD_OUT_TOKENS, HOLD_TTL_MS, MICROS, type SpendMode } from "@/content/billing";
-import { ENGINE_PRICES, type ModelInfo } from "@/content/models";
+import type { ModelInfo } from "@/content/models";
+import { ENGINE_PRICES, routeFor } from "../engram/engines";
 import type { Usage } from "@/server/engram/gateway";
 import { db } from "../db";
 import { billingSettings, creditLedger, usageHolds, usageLedger, usagePeriods } from "../db/billingSchema";
@@ -132,7 +133,7 @@ export class Turn {
       }
       const [row] = await tx.insert(usageLedger).values({
         userId, convo: this.input.convo.slice(0, 120), agentSlug: this.input.agent.slice(0, 60), kind: this.input.kind, pool: chain[0] || "free",
-        requestedModel: model.id, servedModel: served || model.route[0], promptTokens: tokens.p, completionTokens: tokens.c,
+        requestedModel: model.id, servedModel: served || routeFor(model)[0] || model.id, promptTokens: tokens.p, completionTokens: tokens.c,
         costMicros: cost, billedMicros: s.billed, laminaMicros: s.lamina, premiumMicros: s.premium, creditsMicros: s.credits, estimated: this.usages.some((u) => u.estimated),
       }).returning({ id: usageLedger.id });
       if (s.credits) {
