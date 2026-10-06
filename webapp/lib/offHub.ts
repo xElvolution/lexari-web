@@ -93,6 +93,6 @@ export async function buyItem(item: string, price: number, kind?: "bg" | "bubble
 }
 export async function wearItem(kind: "bg" | "bubble", item: string | null) {
   patchHub((l) => { const c = { ...((l as HubState & { cosmetics?: Cos }).cosmetics || {}) }; if (item) c[kind] = item; else delete c[kind]; return { ...l, cosmetics: c } as HubState; });
-  try { await post({ action: "wear", kind, item }); return { ok: true }; } catch (e) { undo(); return { ok: false, error: friendly(e, "Couldn't change that.") }; }
+  try { await post({ action: "wear", kind, item }); void refreshHub(); return { ok: true }; } catch (e) { undo(); return { ok: false, error: friendly(e, "Couldn't change that.") }; }
 }
 type Cos = { owned?: string[]; bg?: string; bubble?: string };

@@ -22,7 +22,16 @@ export default function Hub() {
   const now = tick || Date.now();
   const h = hubOf(s);
   const [store, setStore] = useState(false);
-  useEffect(() => { void refreshHub(); }, []);
+  // Quest progress changes from other screens and the server (replies, jobs, friends joining): fetch it when the Hub
+  // opens, when you come back to the tab, and every few seconds while it's on screen.
+  useEffect(() => {
+    const go = () => { if (document.visibilityState === "visible") void refreshHub(); };
+    void refreshHub();
+    const t = setInterval(go, 5000);
+    window.addEventListener("focus", go);
+    document.addEventListener("visibilitychange", go);
+    return () => { clearInterval(t); window.removeEventListener("focus", go); document.removeEventListener("visibilitychange", go); };
+  }, []);
   const phone = useSyncExternalStore((f) => { const m = window.matchMedia("(max-width: 430px)"); m.addEventListener("change", f); return () => m.removeEventListener("change", f); }, () => window.matchMedia("(max-width: 430px)").matches, () => false);
   if (phone) return <><HubPhone s={s} now={now} /><FloatingBalance s={s} /></>;
   if (!s.live) return <div className="mx-auto max-w-[520px] pt-6"><HubLoading /></div>;

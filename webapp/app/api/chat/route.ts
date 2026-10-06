@@ -123,6 +123,9 @@ export async function POST(req: Request) {
   // Your message is saved before the agent starts, so it never disappears if the reply fails or the page reloads.
   let userSaved = body.follow === true || !!event; // a later group member answers a message the first one already saved
   if (!call && !userSaved) try { await saveUserMsg(userId, body); userSaved = true; } catch (error) { console.error(`[chat] save user message: ${(error as Error).message}`); }
+  // Your message counts for the message quests as soon as it is saved, not when the reply finishes (or if it fails).
+  const counted: Promise<boolean> = !call && !body.follow && !event && userSaved
+    ? recordEvent(userId, "message", { ref: body.userMsgId }).then(() => true, () => false) : Promise.resolve(false);
 
   const sent = Date.now();
   const encoder = new TextEncoder();
@@ -225,7 +228,7 @@ export async function POST(req: Request) {
         if (split.remember) send({ remember: split.remember });
         if (call) { send({ done: true }); return; } // a call is not saved as chat messages
         await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay ? { send: pay } : event ? { about: event.tx } : null, userSaved);
-        if (!body.follow && !event) await recordEvent(userId, "message", { ref: body.userMsgId });
+        if (!body.follow && !event && !(await counted)) await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).
         await notify(userId, { kind: "reply", title: speakerName || "Your agent", body: split.reply.replace(/\s+/g, " ").slice(0, 140), url: `/agents/${encodeURIComponent(body.convo)}`, key: `reply:${body.replyMsgId}` });
         // A real request to a specialist or an agent you made is a job, with the reply as its output.

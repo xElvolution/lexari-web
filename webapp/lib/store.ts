@@ -347,13 +347,15 @@ const hubPending = new Map<string, HubPending>();
 export const hubReady = () => hubTried;
 /** A number for a Hub fetch you are about to start (answers are applied newest-first). */
 export const nextHubSeq = () => ++hubSeq;
+let hubAgain = false;
 export function refreshHub(): Promise<HubState | null> {
-  if (hubLoading) return hubLoading;
+  // A fetch already in flight may have started before what you just did was recorded: fetch once more after it.
+  if (hubLoading) { hubAgain = true; return hubLoading; }
   const seq = nextHubSeq();
   hubLoading = api<HubState>("/api/hub/state")
     .then((live) => { applyHub(live, seq); return live; })
     .catch(() => null)
-    .finally(() => { hubLoading = null; if (!hubTried) { hubTried = true; emit(); } });
+    .finally(() => { hubLoading = null; if (!hubTried) { hubTried = true; emit(); } if (hubAgain) { hubAgain = false; void refreshHub(); } });
   return hubLoading;
 }
 /** Is this claim already in the chain state? (The flags come from the same account read as the coins.) */
@@ -484,6 +486,7 @@ export function addNote(text: string, tag: MemoryTag = "About you", source = "Yo
       const r = await api<{ id: string; duplicate?: boolean }>("/api/memories", { body: { agentSlug: agent, tag, source: source.slice(0, 60), ...sealed } });
       if (r.duplicate) set((s) => ({ ...s, memory: s.memory.filter((m) => m.id !== n.id) }));
       else set((s) => ({ ...s, memory: s.memory.map((m) => (m.id === n.id ? { ...m, serverId: r.id, saving: false, hash: sealed.contentHash } : m)) }));
+      void refreshHub(); // memory quests
     } catch (e) {
       set((s) => ({ ...s, memory: s.memory.filter((m) => m.id !== n.id) }));
       toast({ text: `Not saved. ${(e as Error).message || ""}`.trim(), face: "home" });
@@ -505,7 +508,7 @@ export function editNote(id: string, p: Partial<Note>) {
 export function forgetNote(id: string) {
   const s = get(); const idx = s.memory.findIndex((m) => m.id === id); const note = s.memory[idx];
   set((x) => ({ ...x, memory: x.memory.filter((m) => m.id !== id) }));
-  if (note?.serverId) sync(api(`/api/memories/${note.serverId}`, { method: "DELETE" }), () => set((x) => ({ ...x, memory: [...x.memory.slice(0, idx), note, ...x.memory.slice(idx)] })));
+  if (note?.serverId) sync(api(`/api/memories/${note.serverId}`, { method: "DELETE" }).then(() => { void refreshHub(); }), () => set((x) => ({ ...x, memory: [...x.memory.slice(0, idx), note, ...x.memory.slice(idx)] })));
   // Undo puts it back as a new memory.
   return () => { if (note) addNote(note.text, note.tag, note.source, false, note.agent || "home"); };
 }
@@ -695,6 +698,7 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
             if (payload.remember && memoryOn) addNote(payload.remember, "About you", "Chat", true, isCustom(speaker) ? speaker : "home");
             if (payload.done && event) set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, about: event } : mm)) } }));
             if (payload.done && !event && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
+            if (payload.done && !event) void refreshHub(); // quest progress (messages, jobs) is recorded by now
             // You saw this reply arrive, so it doesn't need to sit in the bell.
             if (payload.done && document.visibilityState === "visible") void api("/api/notifications", { method: "POST", body: { keys: [`reply:${bubble}`] } }).catch(() => {});
           }
@@ -778,6 +782,8 @@ export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voic
   const v = text.trim(); if (!v && !extra.file && !extra.voice) return Promise.resolve("");
   const msgId = push(id, { from: "you", text: v, ...extra });
   const msg = (get().threads[id] || []).find((m) => m.id === msgId)!;
+  // Counts for the message quests right away (the reply may still be generating, or this message may wait its turn).
+  void api("/api/chat/sent", { body: { convo: id, userMsgId: msgId } }).then(() => refreshHub(), () => {});
   // One reply at a time per chat: a message sent while the agent is still answering waits its turn
   // (it used to be dropped: it showed, got no reply and was gone after a reload).
   const prev = chains.get(id) ?? Promise.resolve("");

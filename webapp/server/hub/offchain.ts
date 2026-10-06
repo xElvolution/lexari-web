@@ -204,7 +204,8 @@ export async function train(user: User, slug: string, amount: number) {
     await tx.insert(hubLevels).values({ userId: user.userId, slug, level: lv, xp }).onConflictDoUpdate({ target: [hubLevels.userId, hubLevels.slug], set: { level: lv, xp, updatedAt: new Date() } });
     return { delta: -spend, data: { slug, coins: spend, levelBefore: before, levelAfter: lv }, out: { level: lv, xp, gained: lv - before, spent: spend } };
   });
-  if (res.gained > 0) void recordEvent(user.userId, "level", { ref: res.tx, amount: res.gained });
+  // Written before answering, so the Hub's next read already shows the weekly "Level up" quest moved.
+  if (res.gained > 0) await recordEvent(user.userId, "level", { ref: res.tx, amount: res.gained }).catch((e) => console.error("[hub] level event", (e as Error).message));
   return res;
 }
 
