@@ -38,23 +38,22 @@ export const KNOW_SUGGESTIONS = [
   "No jargon, short sentences",
 ];
 
-/* ---------- plans: seats only ---------- */
+/* ---------- plans: seats plus model usage, priced in USD (card or USDC) ---------- */
+/**
+ * Free, Pro ($20) and Max ($60), with Ultra ($200) listed for later. Each paid plan includes two monthly pools,
+ * like Cursor: Lamina usage (shown as a percentage) and premium model usage in dollars (Claude Sonnet and others).
+ * The ids are storage keys in plan_purchases and never change meaning: "plus" is sold as Max (20 seats) and "max" is
+ * Ultra (100 seats), so purchases made before the rename keep their seats.
+ */
 export const PLANS = [
-  { id: "free", name: "Free", seats: 1, lamports: 0, for: "Your own agent with its computer and memory.", points: ["Your named agent", "Its own computer", "A memory that lasts"] },
-  { id: "pro", name: "Pro", seats: 5, lamports: 50_000_000, for: "A small crew: your agent plus four specialists.", points: ["5 seats", "Hire from the marketplace", "Mention a specialist in chat"] },
-  { id: "plus", name: "Pro Plus", seats: 20, lamports: 100_000_000, for: "A full team working on several jobs at once.", points: ["20 seats", "Team chats between agents", "Hire and build your own"] },
-  { id: "max", name: "Max", seats: 100, lamports: 200_000_000, for: "A whole floor for big, parallel work.", points: ["100 seats", "Many team chats at once", "Same agent at desk one"] },
+  { id: "free", name: "Free", seats: 1, usd: 0, laminaUsd: 0, premiumUsd: 0, later: false, for: "Your own agent on Lamina, with its computer and memory.", points: ["30 Lamina messages a day", "Your named agent", "Its own computer and memory"] },
+  { id: "pro", name: "Pro", seats: 5, usd: 20, laminaUsd: 3, premiumUsd: 20, later: false, for: "Lamina all month, plus $20 of premium models.", points: ["Lamina usage included", "$20 of Claude Sonnet and more", "5 seats for your crew"] },
+  { id: "plus", name: "Max", seats: 20, usd: 60, laminaUsd: 9, premiumUsd: 60, later: false, for: "Three times Pro, for heavy daily work.", points: ["3x the Lamina usage of Pro", "$60 of premium models", "20 seats and team chats"] },
+  { id: "max", name: "Ultra", seats: 100, usd: 200, laminaUsd: 30, premiumUsd: 200, later: true, for: "A whole floor for big, parallel work.", points: ["10x the Lamina usage of Pro", "$200 of premium models", "100 seats"] },
 ] as const;
-/** Paid plans last this long on devnet; pay again to renew. */
+/** Paid plans run for this many days; Lexari tracks the cycle and reminds you before it ends. */
 export const PLAN_DAYS = 30;
-/** Yearly billing: pay for 10 months, get 12 (2 months free, about 17% off). */
-export const YEAR_DAYS = 365;
-export const YEAR_MONTHS_PAID = 10;
-export type Period = "month" | "year";
-export const planPrice = (p: { lamports: number }, period: Period) => (period === "year" ? p.lamports * YEAR_MONTHS_PAID : p.lamports);
-export const YEAR_SAVE_PCT = Math.round((1 - YEAR_MONTHS_PAID / 12) * 100);
 export const planById = (id: string) => PLANS.find((p) => p.id === id) ?? PLANS[0];
-export const solLabel = (lamports: number) => `${+(lamports / 1e9).toFixed(4)} SOL`;
 export type PlanId = (typeof PLANS)[number]["id"];
 
 /* ---------- the marketplace roster ---------- */

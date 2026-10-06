@@ -14,7 +14,7 @@ export default function UpgradeSheet() {
   if (!upgrade || !s) return null;
   const p = planOf(s);
   const title = upgrade === "plans" ? (p.id === "free" ? "Upgrade your plan" : "Plans") : p.id === "free" ? "Free plan includes one agent." : `Your ${p.name} plan is full.`;
-  const body = upgrade === "plans" ? "More seats for more agents. Your own agent always sits at desk one."
+  const body = upgrade === "plans" ? "More Lamina, premium models and seats. Your own agent always sits at desk one."
     : p.id === "free" ? "Upgrade to Pro to hire more." : `All ${p.seats} seats are taken. Move up a plan or release someone from the Team page.`;
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-5" onMouseDown={(e) => { if (e.target === e.currentTarget) closeUpgrade(); }}>
@@ -24,7 +24,7 @@ export default function UpgradeSheet() {
           <div className="min-w-0 flex-1"><h2 id="up-title" className="display text-[24px] leading-[1.05] text-ink">{title}</h2><p className="mt-1 text-[14px] text-ink/65">{body}</p></div>
           <button onClick={closeUpgrade} aria-label="Close" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={19} /></button>
         </div>
-        <div className="no-bar min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-6"><PlansGrid onUpgraded={closeUpgrade} /></div>
+        <div className="no-bar min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-6"><PlansGrid onPick={closeUpgrade} /></div>
       </div>
     </div>
   );

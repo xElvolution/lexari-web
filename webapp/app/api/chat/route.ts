@@ -2,7 +2,11 @@ import { INTERRUPTED } from "@/lib/callTurn";
 import { notify } from "@/server/notify";
 import { and, eq } from "drizzle-orm";
 import { currentSession } from "@/server/auth/session";
-import { ModelError, llmConfig, streamCompletion } from "@/server/engram/cortex";
+import { ModelError, llmConfig, modelReady, streamCompletion } from "@/server/engram/cortex";
+import { gatewayReady } from "@/server/engram/gateway";
+import { LAMINA, modelById } from "@/content/models";
+import { FREE_LAMINA_PER_DAY } from "@/content/billing";
+import { beginTurn, isBlocked, type Blocked, type Turn } from "@/server/billing/meter";
 import { splitRemember } from "@/server/engram/hippocampus";
 import { buildPrompt } from "@/server/engram/spinal";
 import { recordEvent } from "@/server/events";
@@ -52,7 +56,7 @@ export async function POST(req: Request) {
   } catch (error) {
     return toErrorResponse(error);
   }
-  if (!llmConfig().ready) {
+  if (!llmConfig().ready && !gatewayReady()) {
     console.error(`[chat] provider ${llmConfig().provider} is not configured`);
     return jsonError(503, "Your agent can't reply right now. Try again later.");
   }
@@ -73,6 +77,10 @@ export async function POST(req: Request) {
   const speakerName = (speakerRow?.meta as { nick?: string })?.nick || speakerRow?.name || body.speaker;
   const role = speakerRow?.kind === "hired" ? house?.job || speakerRow.role : speakerRow?.role || home.role;
   const tone = speakerRow?.tone || home.tone || "short";
+  // The model: this chat's pick, else the agent's, else Lamina (content/models.ts).
+  const [chatPick] = await retryRead(() => database.select({ model: chats.model }).from(chats).where(and(eq(chats.userId, userId), eq(chats.slug, body.convo))).limit(1)).catch(() => []);
+  const model = modelById(chatPick?.model) ?? modelById(speakerRow?.model) ?? LAMINA;
+  if (!modelReady(model)) return jsonError(409, `${model.label} isn't available on this server yet. Switch to Lamina to keep going.`, { billing: { reason: "model_unavailable", model: model.id, modelLabel: model.label } });
   // In a group, earlier turns by other members are labelled with their names, and the agent knows who else is in the room.
   const isGroupChat = body.convo.startsWith("g-");
   const nameFor = (slug: string) => { const r = mine.find((a) => a.slug === slug); return (r?.meta as { nick?: string })?.nick || r?.name || SPECIALISTS.find((x) => x.slug === slug)?.name || slug; };
@@ -114,11 +122,24 @@ export async function POST(req: Request) {
   let receipt: TxEvent | null = null;
   if (event) receipt = await settleTx(userId, body.convo, event.tx.replace(/^tx-/, ""), owner, 40_000).catch(() => readTx(userId, body.convo, event.tx.replace(/^tx-/, "")).catch(() => null));
   if (event && !receipt) return jsonError(404, "There is no such transaction.");
+  // Usage: reserve the estimated cost before calling the model (settled with the real cost after). Runs alongside the
+  // wallet history read so it adds no wait.
+  const turnP = beginTurn({ userId, model, convo: body.convo, agent: body.speaker, kind: event ? "event" : call ? "call" : body.follow ? "follow" : "chat", prompt });
+  turnP.catch(() => {});
   if (owner) {
     const snap = await walletHistory(userId, owner, call ? 300 : 3500).catch(() => null);
     if (snap) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${historyBlock(snap, owner, tz)}` };
   }
   if (event && receipt) prompt[prompt.length - 1] = { role: "user", content: eventPrompt(receipt) };
+  let turn: Turn;
+  try {
+    const t = await turnP;
+    if (isBlocked(t)) return jsonError(402, blockedText(t), { billing: t });
+    turn = t;
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+  const usage = { model, onUsage: turn.add };
 
   // Your message is saved before the agent starts, so it never disappears if the reply fails or the page reloads.
   let userSaved = body.follow === true || !!event; // a later group member answers a message the first one already saved
@@ -145,7 +166,7 @@ export async function POST(req: Request) {
         if (!call) leave = await takeShift(`${userId}:${body.speaker}`, shifts(level)).catch(() => null);
         // Stream the reply, but hold text back from the first "<" so <run> requests never reach the screen.
         let shown = 0;
-        for await (const token of streamCompletion(prompt, abort.signal, { fast: call, priority })) {
+        for await (const token of streamCompletion(prompt, abort.signal, { fast: call, priority, ...usage })) {
           full += token;
           const cut = hold ? (full.indexOf("<") >= 0 ? full.indexOf("<") : full.length) : full.length;
           if (cut > shown) { send({ token: full.slice(shown, cut) }); shown = cut; }
@@ -181,7 +202,7 @@ export async function POST(req: Request) {
           const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Output from your computer:\n${results.join("\n\n")}\n\nNow answer the person in plain sentences. Do not write <run> again.` }];
           let answer = "";
           if (before && shown > 0) send({ token: "\n\n" });
-          for await (const token of streamCompletion(follow, abort.signal, { priority })) { answer += token; send({ token }); }
+          for await (const token of streamCompletion(follow, abort.signal, { priority, ...usage })) { answer += token; send({ token }); }
           full = `${before && shown > 0 ? before + "\n\n" : ""}${answer.replace(/<run>[\s\S]*?<\/run>/g, "").trim()}`;
         }
         // Wallet tags: reads are answered with real chain data; a send becomes a confirm card only you can approve.
@@ -204,7 +225,7 @@ export async function POST(req: Request) {
             const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Lexari wallet data:\n${facts}\n\nNow answer the person in plain sentences using this data. Do not write <wallet> again.` }];
             let answer = "";
             if (before && shown > 0) send({ token: "\n\n" });
-            for await (const token of streamCompletion(follow, abort.signal, { priority })) { answer += token; }
+            for await (const token of streamCompletion(follow, abort.signal, { priority, ...usage })) { answer += token; }
             const clean = stripWalletTags(answer);
             send({ token: clean });
             full = `${before && shown > 0 ? before + "\n\n" : ""}${clean}${w.sends.length ? full.slice(full.search(/<send/i)) : ""}`;
@@ -246,12 +267,21 @@ export async function POST(req: Request) {
       } finally {
         leave?.();
         clearTimeout(cap);
+        await turn.settle().catch((e: Error) => console.error(`[billing] settle: ${e.message}`));
         try { controller.close(); } catch {}
       }
     },
     cancel() { /* the browser went away: finish and save anyway */ },
   });
   return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache, no-store", "x-accel-buffering": "no" } });
+}
+
+/** What the person sees in the chat when a turn is out of usage (the app also opens the out-of-usage sheet). */
+function blockedText(b: Blocked) {
+  if (b.reason === "free_daily") return `You've used today's ${FREE_LAMINA_PER_DAY} free Lamina messages. They come back at midnight UTC, or upgrade to keep going.`;
+  if (b.reason === "premium_locked") return `${b.modelLabel} is a premium model. Upgrade to Pro, top up credits, or switch to Lamina.`;
+  if (b.reason === "spend_limit") return "You've reached your monthly spend limit on extra credits. Raise it in Billing to keep going.";
+  return `You've used the included usage for ${b.modelLabel} this cycle. Top up credits or move up a plan${b.model === "lamina" ? "" : ", or switch to Lamina"}.`;
 }
 
 type TurnBody = { convo: string; text: string; userMsgId: string; replyMsgId: string; meta: Record<string, unknown> };

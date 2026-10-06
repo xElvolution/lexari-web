@@ -49,6 +49,8 @@ export const agents = pgTable(
     memoryOn: boolean("memory_on").notNull().default(true),
     /** your nickname and notes, the minted card record */
     meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
+    /** the model this agent answers with (content/models.ts); null = Lamina */
+    model: text("model"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -83,6 +85,8 @@ export const chats = pgTable(
     slug: text("slug").notNull(),
     title: text("title").notNull().default(""),
     memberSlugs: text("member_slugs").array().notNull().default([]),
+    /** the model for this chat only; null = the agent's model */
+    model: text("model"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -223,6 +227,10 @@ export const planPurchases = pgTable("plan_purchases", {
   amount: bigint("amount", { mode: "number" }).notNull().default(0),
   payer: text("payer").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** when the plan starts counting (null = createdAt); a renewal starts when the current one ends */
+  startsAt: timestamp("starts_at", { withTimezone: true }),
+  /** the payments row (card or USDC) that bought it; null for older devnet SOL purchases */
+  paymentId: uuid("payment_id"),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
 

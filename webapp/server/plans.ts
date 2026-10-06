@@ -1,16 +1,23 @@
-/** Plans: seats per account, paid in devnet SOL to the treasury and checked on chain. */
-import { and, count, desc, eq, gt } from "drizzle-orm";
+/**
+ * Plans: seats and model usage per account. Bought with a card or USDC through server/billing/entitlements.ts (older
+ * purchases were devnet SOL). A purchase counts from startsAt (createdAt when null) until expiresAt.
+ */
+import { and, count, desc, eq, gt, sql } from "drizzle-orm";
 import { PLANS, planById, type PlanId } from "@/content/appData";
 import { db } from "./db";
 import { agents, planPurchases } from "./db/schema";
 import { HttpError } from "./http";
 
-export async function currentPlan(userId: string): Promise<{ id: PlanId; name: string; seats: number; expiresAt: number | null }> {
-  const rows = await db().select().from(planPurchases).where(and(eq(planPurchases.userId, userId), gt(planPurchases.expiresAt, new Date()))).orderBy(desc(planPurchases.createdAt)).limit(10);
+export type CurrentPlan = { id: PlanId; name: string; seats: number; expiresAt: number | null; startsAt: number | null; purchaseId: string | null };
+
+export async function currentPlan(userId: string): Promise<CurrentPlan> {
+  const rows = await db().select().from(planPurchases)
+    .where(and(eq(planPurchases.userId, userId), gt(planPurchases.expiresAt, new Date()), sql`coalesce(${planPurchases.startsAt}, ${planPurchases.createdAt}) <= now()`))
+    .orderBy(desc(planPurchases.createdAt)).limit(10);
   // The biggest active plan wins (an upgrade during an active plan replaces it).
-  let best = rows.map((r) => ({ p: planById(r.plan), exp: r.expiresAt.getTime() })).sort((a, b) => b.p.seats - a.p.seats)[0];
-  if (!best) best = { p: PLANS[0], exp: 0 };
-  return { id: best.p.id, name: best.p.name, seats: best.p.seats, expiresAt: best.exp || null };
+  const best = rows.map((r) => ({ p: planById(r.plan), r })).sort((a, b) => b.p.seats - a.p.seats || b.r.expiresAt.getTime() - a.r.expiresAt.getTime())[0];
+  if (!best) return { id: PLANS[0].id, name: PLANS[0].name, seats: PLANS[0].seats, expiresAt: null, startsAt: null, purchaseId: null };
+  return { id: best.p.id, name: best.p.name, seats: best.p.seats, expiresAt: best.r.expiresAt.getTime(), startsAt: (best.r.startsAt ?? best.r.createdAt).getTime(), purchaseId: best.r.id };
 }
 
 /** Agents on the account: your own agent, hired specialists and the ones you made. Each takes a seat. */
