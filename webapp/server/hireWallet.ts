@@ -8,7 +8,7 @@
  * its own address. Rotating SESSION_SECRET moves these to new addresses (fine on devnet; return leftovers first).
  */
 import { createHmac } from "node:crypto";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { connection } from "./hub/chain";
 
 const FEE = 5000;
@@ -27,16 +27,29 @@ export async function hireWalletInfo(userId: string, slug: string) {
   return { address: kp.publicKey.toBase58(), lamports, sol: lamports >= 0 ? lamports / LAMPORTS_PER_SOL : null };
 }
 
-/** Sends everything left (minus the network fee) from the agent's task wallet back to your wallet. */
+/**
+ * Sends everything left (minus the network fee) from the agent's task wallet back to your wallet.
+ * Confirmation is polled for up to ~25 s. A transfer that is sent but not confirmed in that window comes back with
+ * `confirmed: false` and its signature (it used to throw, so the app said it failed while the SOL was on its way).
+ */
 export async function returnLeftover(userId: string, slug: string, to: string) {
   const kp = hireWallet(userId, slug);
   const c = connection();
   const bal = await c.getBalance(kp.publicKey, "confirmed");
   const lamports = bal - FEE;
-  if (lamports <= 0) return { sig: null as string | null, lamports: 0 };
-  const tx = new Transaction().add(SystemProgram.transfer({ fromPubkey: kp.publicKey, toPubkey: new PublicKey(to), lamports }));
-  const sig = await sendAndConfirmTransaction(c, tx, [kp], { commitment: "confirmed" });
-  return { sig, lamports };
+  if (lamports <= 0) return { sig: null as string | null, lamports: 0, confirmed: false };
+  const { blockhash, lastValidBlockHeight } = await c.getLatestBlockhash("confirmed");
+  const tx = new Transaction({ feePayer: kp.publicKey, blockhash, lastValidBlockHeight }).add(SystemProgram.transfer({ fromPubkey: kp.publicKey, toPubkey: new PublicKey(to), lamports }));
+  tx.sign(kp);
+  const sig = await c.sendRawTransaction(tx.serialize(), { preflightCommitment: "confirmed", maxRetries: 5 });
+  const end = Date.now() + 25_000;
+  while (Date.now() < end) {
+    await new Promise((r) => setTimeout(r, 1200));
+    const st = (await c.getSignatureStatuses([sig]).catch(() => null))?.value[0];
+    if (st?.err) throw new Error("The return transfer failed on Solana.");
+    if (st?.confirmationStatus === "confirmed" || st?.confirmationStatus === "finalized") return { sig, lamports, confirmed: true };
+  }
+  return { sig, lamports, confirmed: false };
 }
 
 export const FUND_MARK = "[lexari-fund]";

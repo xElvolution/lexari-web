@@ -48,7 +48,7 @@ export const POST = withUser(async (user, req) => {
       const id = `ret-${(typeof body.clientId === "string" && /^[A-Za-z0-9_-]{4,30}$/.test(body.clientId) ? body.clientId : r.sig.slice(0, 30))}`;
       const [a] = await db().select({ name: agents.name, meta: agents.meta }).from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, slug))).limit(1);
       const nm = (a?.meta as { nick?: string } | null)?.nick || a?.name || slug;
-      await recordTx(user.userId, convo, { id, kind: "return", status: "confirmed", sol: r.lamports / 1e9, at: Date.now(), from: hireWallet(user.userId, slug).publicKey.toBase58(), to: user.wallet, sig: r.sig, agent: slug, label: `you (from ${nm}'s task wallet)` }).catch(() => null);
+      await recordTx(user.userId, convo, { id, kind: "return", status: r.confirmed ? "confirmed" : "pending", sol: r.lamports / 1e9, at: Date.now(), from: hireWallet(user.userId, slug).publicKey.toBase58(), to: user.wallet, sig: r.sig, agent: slug, label: `you (from ${nm}'s task wallet)` }).catch(() => null);
       await settleTx(user.userId, convo, id, user.wallet, 8000).catch(() => null);
       (r as { receipt?: string }).receipt = `tx-${id}`;
     }
