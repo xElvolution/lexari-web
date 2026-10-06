@@ -293,3 +293,21 @@ export const hubClaims = pgTable("hub_claims", {
   coins: integer("coins").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.userId, t.key] })]);
+
+/* ---------- Social accounts linked through Privy (0008) ---------- */
+export const socialLinks = pgTable("social_links", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").$type<"twitter" | "discord" | "telegram">().notNull(),
+  subject: text("subject").notNull(),
+  handle: text("handle"),
+  privyDid: text("privy_did"),
+  rewardable: boolean("rewardable").notNull().default(false),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.provider] }), uniqueIndex("social_links_provider_subject").on(t.provider, t.subject)]);
+export const socialSeen = pgTable("social_seen", {
+  provider: text("provider").notNull(),
+  subject: text("subject").notNull(),
+  firstUserId: uuid("first_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.provider, t.subject] })]);

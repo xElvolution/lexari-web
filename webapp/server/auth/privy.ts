@@ -2,7 +2,7 @@
  * Privy access-token check. Privy signs access tokens (ES256) with a per-app key that is public:
  * PRIVY_VERIFICATION_KEY if set, otherwise fetched once from Privy's app config. No app secret needed.
  */
-import { importSPKI, jwtVerify, type KeyLike } from "jose";
+import { importSPKI, jwtVerify, type JWTPayload, type KeyLike } from "jose";
 import { HttpError } from "../http";
 
 let cached: { key: KeyLike; at: number } | null = null;
@@ -21,16 +21,24 @@ async function verificationKey(appId: string): Promise<KeyLike> {
   return key;
 }
 
-/** Returns the Privy user id (did:privy:...) when the token is valid for this app. */
-export async function verifyPrivyToken(token: string): Promise<string> {
+/**
+ * Verifies a Privy JWT for this app (access tokens and identity tokens share the same ES256 key, issuer and audience)
+ * and returns its claims. `sub` is always a Privy user id (did:privy:...).
+ */
+export async function verifyPrivyJwt(token: string, expired = "Your Google or email sign-in expired. Try again."): Promise<JWTPayload & { sub: string }> {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   if (!appId) throw new HttpError(503, "Google and email sign-in are not set up here.");
   try {
     const { payload } = await jwtVerify(token, await verificationKey(appId), { issuer: "privy.io", audience: appId });
     if (typeof payload.sub !== "string" || !payload.sub.startsWith("did:privy:")) throw new Error("bad sub");
-    return payload.sub;
+    return payload as JWTPayload & { sub: string };
   } catch (e) {
     if (e instanceof HttpError) throw e;
-    throw new HttpError(401, "Your Google or email sign-in expired. Try again.");
+    throw new HttpError(401, expired);
   }
+}
+
+/** Returns the Privy user id (did:privy:...) when the token is valid for this app. */
+export async function verifyPrivyToken(token: string): Promise<string> {
+  return (await verifyPrivyJwt(token)).sub;
 }

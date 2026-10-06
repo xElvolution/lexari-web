@@ -209,6 +209,8 @@ export default function SignIn() {
   // After Google or email: the Privy wallet signs the same sign-in message a Phantom user would.
   useEffect(() => {
     if (!ready || !authenticated || !user || entered.current) return;
+    // A Privy session left over from confirming a wallet to link social accounts is not a Google or email sign-in.
+    if (user.linkedAccounts.some((a) => a.type === "wallet" && a.chainType === "solana" && a.walletClientType !== "privy")) { void logout().catch(() => {}); return; }
     if (!bridge || bridge.source !== "privy") { setPrivyStep("wallet"); return; }
     entered.current = true;
     setPrivyStep("sign");
@@ -226,7 +228,7 @@ export default function SignIn() {
         setPrivyStep("error");
       }
     })();
-  }, [ready, authenticated, user, bridge, router, getAccessToken]);
+  }, [ready, authenticated, user, bridge, router, getAccessToken, logout]);
   const privyBusy = authenticated && (privyStep === "wallet" || privyStep === "sign");
   const loader = privyBusy ? <SignInLoader sub={privyStep === "wallet" ? "Getting your Lexari wallet ready…" : "Confirming your account…"} /> : null;
   useEffect(() => {

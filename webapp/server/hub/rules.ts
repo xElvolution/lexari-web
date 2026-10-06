@@ -4,7 +4,7 @@
  */
 import { eq, sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
-import { agents, chainLedger, hires, hubPlayers, jobs, memories, questEvents, referrals } from "../db/schema";
+import { agents, chainLedger, hires, hubPlayers, jobs, memories, questEvents, referrals, socialLinks } from "../db/schema";
 import type { QuestRule } from "./catalog";
 
 export function periodStart(period: QuestRule["period"], now = new Date()) {
@@ -35,7 +35,7 @@ export type Facts = { streak: number; maxLevel: number };
 /** Every count the quests need, in one database round trip (the Hub used to make ~17, which took ~0.7 s). */
 export type QuestCounts = {
   checkinD: number; checkinW: number; boxD: number; levelW: number; msgD: number; msgW: number; memD: number; memAll: number;
-  jobsW: number; hires: number; team: number; agents: number; storeW: number; storeAll: number; style: number; referrals: number; claimedTotal: number;
+  jobsW: number; hires: number; team: number; agents: number; storeW: number; storeAll: number; style: number; referrals: number; claimedTotal: number; social: number;
 };
 export async function questCounts(userId: string, now = new Date()): Promise<QuestCounts> {
   const d = sql`${periodStart("daily", now).toISOString()}::timestamptz`;
@@ -54,10 +54,11 @@ export async function questCounts(userId: string, now = new Date()): Promise<Que
     ${L("store_buy", w)} as "storeW", ${L("store_buy")} as "storeAll",
     coalesce((select (case when coalesce(length(${hubPlayers.cosmetics}->>'bg'), 0) > 0 then 1 else 0 end) + (case when coalesce(length(${hubPlayers.cosmetics}->>'bubble'), 0) > 0 then 1 else 0 end) from ${hubPlayers} where ${hubPlayers.userId} = ${userId}), 0)::int as "style",
     (select count(*)::int from ${referrals} where ${referrals.referrerId} = ${userId} and exists (select 1 from ${chainLedger} where ${chainLedger.userId} = ${referrals.refereeId})) as "referrals",
-    ${L("claim_quest")} as "claimedTotal"`);
+    ${L("claim_quest")} as "claimedTotal",
+    (select count(*)::int from ${socialLinks} where ${socialLinks.userId} = ${userId} and ${socialLinks.rewardable}) as "social"`);
   const r = (rows as unknown as Record<string, unknown>[])[0] || {};
   const out = {} as QuestCounts;
-  for (const k of ["checkinD", "checkinW", "boxD", "levelW", "msgD", "msgW", "memD", "memAll", "jobsW", "hires", "team", "agents", "storeW", "storeAll", "style", "referrals", "claimedTotal"] as (keyof QuestCounts)[]) out[k] = Number(r[k] ?? 0);
+  for (const k of ["checkinD", "checkinW", "boxD", "levelW", "msgD", "msgW", "memD", "memAll", "jobsW", "hires", "team", "agents", "storeW", "storeAll", "style", "referrals", "claimedTotal", "social"] as (keyof QuestCounts)[]) out[k] = Number(r[k] ?? 0);
   return out;
 }
 
@@ -77,6 +78,7 @@ export function progressFrom(c: QuestCounts, rule: QuestRule, facts: Facts): num
     case "store_buy": return hard ? c.storeAll : c.storeW; // Store purchases (offchain ledger rows), this week or ever
     case "store_style": return c.style; // wearing a chat background and a bubble style right now: one point each
     case "agent": return c.agents;
+    case "social": return c.social; // a linked social account that never earned this reward on any Lexari account
   }
 }
 

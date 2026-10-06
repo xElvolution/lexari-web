@@ -9,7 +9,7 @@
     "db:migrate": "node --env-file-if-exists=.env.local server/db/migrate.mjs",
     "test:auth": "tsx --test server/auth/siws.test.ts",
     "test:api": "bash scripts/test-api.sh",
-    "test:unit": "tsx --test lib/threadMerge.test.ts lib/lexari-ix.test.ts lib/names.test.ts lib/callTurn.test.ts server/engram/grokCli.test.ts server/auth/siws.test.ts server/txlog.test.ts"
+    "test:unit": "tsx --test lib/threadMerge.test.ts lib/lexari-ix.test.ts lib/names.test.ts lib/callTurn.test.ts server/engram/grokCli.test.ts server/auth/siws.test.ts server/txlog.test.ts server/social.test.ts"
   },
   "dependencies": {
     "@metaplex-foundation/mpl-core": "^1.10.0",

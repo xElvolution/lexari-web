@@ -13,6 +13,9 @@ import { openAgent } from "@/components/overlays";
 import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
 import { myAgents } from "@/components/agents";
+import { SocialMark } from "@/components/social/SocialLinks";
+import { useSocial } from "@/lib/social";
+import { SOCIAL_NAME } from "@/lib/socialInfo";
 
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "Y";
 
@@ -73,6 +76,7 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<Tab>("account");
   const [crop, setCrop] = useState<{ kind: "avatar" | "cover"; file: File; current?: boolean } | null>(null);
   const [theme, setTheme] = useState<"light" | "dark" | "system">("dark");
+  const social = useSocial();
   const pick = useRef<HTMLInputElement>(null);
   const pickKind = useRef<"avatar" | "cover">("avatar");
   useEffect(() => { if (!s.profile) updateProfile({}); }, [s.profile]);
@@ -116,10 +120,16 @@ export default function ProfilePage() {
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2.5">
             <h1 className="display text-[40px] leading-none text-ink sm:text-[48px]">{p.name}</h1>
+            {social.status.tier !== "member" && <span data-status-badge title={`${social.status.label}: ${social.status.linked} linked account${social.status.linked === 1 ? "" : "s"}`} className="inline-flex items-center gap-1 rounded-full bg-grape/15 py-1 pl-1.5 pr-2.5 text-[12px] font-bold text-brand-ink"><Icon name="verified" size={15} stroke={2.2} />{social.status.label}</span>}
             <span className="label rounded-full bg-grape px-2.5 py-1 text-[9px] text-white">{plan.name}</span>
           </div>
           {p.username ? <p className="mt-1.5 text-[15px] font-semibold text-ink/55">@{p.username}</p> : <button type="button" onClick={() => setEdit(true)} className="mt-1.5 text-[14px] font-semibold text-brand-ink">Add a username</button>}
           {p.bio && <p className="mt-3 max-w-[40rem] text-[15.5px] text-ink/75">{p.bio}</p>}
+          {social.links.length > 0
+            ? <div data-social-badges className="mt-3 flex flex-wrap gap-1.5">{social.links.map((l) => (
+                <span key={l.provider} title={`${SOCIAL_NAME[l.provider]} verified through Privy`} className="inline-flex h-8 items-center gap-1.5 rounded-full bg-tint pl-2.5 pr-3 text-[13px] font-semibold text-ink"><SocialMark provider={l.provider} size={l.provider === "twitter" ? 12 : 14} />{l.handle ? `@${l.handle}` : SOCIAL_NAME[l.provider]}<Icon name="verified" size={14} stroke={2.2} className="text-brand-ink" /></span>
+              ))}</div>
+            : social.loaded && <Link href="/settings#social" className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-tint px-3 text-[13px] font-semibold text-ink/75 hover:bg-grape hover:text-white"><Icon name="link" size={14} />Link X, Discord or Telegram to get verified</Link>}
           <div className="mt-4 flex flex-wrap gap-6 text-[14px]">
             <span><b className="text-ink">{team.length}</b> <span className="text-ink/60">agents</span></span>
             <span><b className="text-ink">{s.groups.length}</b> <span className="text-ink/60">groups</span></span>

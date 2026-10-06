@@ -127,6 +127,7 @@ export const QUESTS: Quest[] = [
   { id: "h-hire", chainId: 206, period: "hard", title: "Talent scout", hint: "Hire a specialist from the market", goal: 1, reward: 300, icon: "market", go: "/marketplace", progress: (s) => live(s, "h-hire")?.progress ?? 0 },
   { id: "h-store", chainId: 207, period: "hard", title: "Collector", hint: "Buy 3 Store items", goal: 3, reward: 250, icon: "box", go: "#store", progress: (s) => live(s, "h-store")?.progress ?? 0 },
   { id: "h-style", chainId: 208, period: "hard", title: "Stylist", hint: "Apply a chat background and a bubble style", goal: 2, reward: 200, icon: "spark", go: "#store", progress: (s) => live(s, "h-style")?.progress ?? 0 },
+  { id: "h-social", chainId: 209, period: "hard", title: "Verified", hint: "Link X, Discord or Telegram in Settings", goal: 1, reward: 150, icon: "verified", go: "/settings#social", progress: (s) => live(s, "h-social")?.progress ?? 0 },
 ];
 export type QuestView = Quest & { have: number; done: boolean; claimed: boolean; resetsAt: number };
 export function questsView(s: State, now: number): QuestView[] {

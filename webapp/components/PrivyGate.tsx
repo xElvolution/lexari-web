@@ -22,20 +22,23 @@ const signArgs = (tx: Transaction | VersionedTransaction) => ({ transaction: toB
 
 /** Exposes the Privy (Google / email) Solana wallet to the rest of the app. Creates one if the account has none. */
 function PrivyBridge() {
-  const { ready, authenticated, logout } = usePrivy();
+  const { ready, authenticated, logout, user } = usePrivy();
+  // A wallet sign-in user who confirmed their wallet with Privy (to link X, Discord or Telegram) signs with that wallet,
+  // not a Privy one: never create or bridge an embedded wallet for them.
+  const external = !!user?.linkedAccounts.some((a) => a.type === "wallet" && a.chainType === "solana" && a.walletClientType !== "privy");
   useEffect(() => { onSignOut("privy", authenticated ? logout : null); return () => onSignOut("privy", null); }, [authenticated, logout]);
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const wallet = wallets.find((w) => /privy/i.test(w.standardWallet?.name || "")) || wallets[0];
 
   useEffect(() => {
-    if (!ready || !authenticated || !walletsReady || wallet || creating) return;
+    if (!ready || !authenticated || external || !walletsReady || wallet || creating) return;
     creating = true;
     createWallet().catch(() => {}).finally(() => { creating = false; });
-  }, [ready, authenticated, walletsReady, wallet, createWallet]);
+  }, [ready, authenticated, external, walletsReady, wallet, createWallet]);
 
   useEffect(() => {
-    if (!authenticated || !wallet) { setWalletBridge(null, "privy"); return; }
+    if (!authenticated || external || !wallet) { setWalletBridge(null, "privy"); return; }
     setWalletBridge({
       source: "privy",
       name: "Lexari wallet",
@@ -51,7 +54,7 @@ function PrivyBridge() {
       },
     }, "privy");
     return () => setWalletBridge(null, "privy");
-  }, [authenticated, wallet]);
+  }, [authenticated, external, wallet]);
   return null;
 }
 

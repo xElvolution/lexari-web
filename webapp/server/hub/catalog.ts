@@ -6,7 +6,7 @@ export type QuestRule = {
   goal: number;
   reward: number;
   /** quest_events.kind, or a table count described in attest.ts */
-  count: "message" | "memory" | "checkin" | "hire" | "level" | "agent" | "box" | "referral" | "team" | "job" | "store_buy" | "store_style";
+  count: "message" | "memory" | "checkin" | "hire" | "level" | "agent" | "box" | "referral" | "team" | "job" | "store_buy" | "store_style" | "social";
 };
 
 export const QUEST_RULES: QuestRule[] = [
@@ -27,6 +27,8 @@ export const QUEST_RULES: QuestRule[] = [
   { id: "h-hire", chainId: 206, period: "hard", goal: 1, reward: 300, count: "hire" },
   { id: "h-store", chainId: 207, period: "hard", goal: 3, reward: 250, count: "store_buy" },
   { id: "h-style", chainId: 208, period: "hard", goal: 2, reward: 200, count: "store_style" },
+  // Pays once per person, and only for a social account that was never linked to any Lexari account before (server/social.ts).
+  { id: "h-social", chainId: 209, period: "hard", goal: 1, reward: 150, count: "social" },
 ];
 
 export const TIER_FRIENDS = [1, 3, 5, 10];
