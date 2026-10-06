@@ -1,5 +1,6 @@
 "use client";
 
+import { hardReload, isStale, reportError } from "../ClientErrors";
 import { useEffect, useRef, useState } from "react";
 import { api, friendly } from "@/lib/api";
 import Icon from "../Icon";
@@ -39,7 +40,18 @@ export default function DesktopScreen({ active, onStatus }: { active: boolean; o
       set("connecting"); setErr("");
       let t: { path: string; ticket: string };
       try { t = await api("/api/desktop/ticket"); } catch (e) { set("error"); setErr(friendly(e, "Could not open the desktop.")); return; }
-      const { default: RFB } = await import("@novnc/novnc/lib/rfb");
+      // The viewer loads on demand. A failed load (an older deploy's chunk, a dropped connection) shows a retry state
+      // instead of an unhandled rejection. Keep @novnc/novnc at 1.4.x: 1.5+ ships a top-level await in lib/util/browser.js,
+      // which the bundler turns into an async module where `exports` is undefined ("exports is not defined" on phones).
+      let RFB: typeof import("@novnc/novnc/lib/rfb").default;
+      try { RFB = (await import("@novnc/novnc/lib/rfb")).default; }
+      catch (e) {
+        const m = (e as Error)?.message || "";
+        if (isStale(m)) { hardReload(m); return; }
+        reportError("novnc-load", e);
+        if (!disposed) { set("error"); setErr("The screen viewer couldn't load. Tap Reconnect."); }
+        return;
+      }
       if (disposed || !host.current) return;
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const rfb = new RFB(host.current, `${proto}://${location.host}${t.path}?k=vnc&t=${encodeURIComponent(t.ticket)}`, { wsProtocols: ["binary"], shared: true });
