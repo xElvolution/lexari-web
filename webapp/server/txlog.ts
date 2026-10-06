@@ -9,8 +9,8 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { LAMPORTS_PER_SOL, PublicKey, type ParsedTransactionWithMeta } from "@solana/web3.js";
 import { db } from "./db";
 import { agents, chats, messages } from "./db/schema";
-import { Connection } from "@solana/web3.js";
-import { cluster, rpcUrl, treasury } from "./config";
+import { cluster, treasury } from "./config";
+import { serverConnection } from "./rpc";
 import { faucetAddress } from "./faucet";
 import { hireWallet } from "./hireWallet";
 
@@ -94,8 +94,7 @@ async function allReceipts(userId: string, limit = 30) {
 
 // Its own connection that fails fast on a 429 (the public devnet RPC rate-limits hard): history is cached and a
 // receipt is re-checked on the next poll, so a skipped call costs nothing, while retry storms slowed every request.
-let rpcConn: Connection | null = null;
-const connection = () => (rpcConn ||= new Connection(rpcUrl(), { commitment: "confirmed", disableRetryOnRateLimit: true }));
+const connection = () => serverConnection({ fast: true });
 
 const parsed = new Map<string, ParsedTransactionWithMeta | null>();
 type Transfer = { from: string; to: string; lamports: number };

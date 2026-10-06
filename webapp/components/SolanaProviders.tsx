@@ -9,7 +9,8 @@ import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import { BackpackWalletAdapter } from "@solana/wallet-adapter-backpack";
 import type { Adapter } from "@solana/wallet-adapter-base";
-import { SOLANA_RPC } from "@/lib/nft";
+import { rpcConfig, rpcEndpoint } from "@/lib/rpc";
+import DevWallet from "./DevWallet";
 
 if (!(globalThis as { Buffer?: typeof Buffer }).Buffer) (globalThis as { Buffer?: typeof Buffer }).Buffer = Buffer;
 
@@ -50,9 +51,10 @@ export default function SolanaProviders({ children }: { children: React.ReactNod
     setWallets([new PhantomWalletAdapter(), new SolflareWalletAdapter(), new BackpackWalletAdapter()]);
   }, []);
   return (
-    <ConnectionProvider endpoint={SOLANA_RPC}>
+    <ConnectionProvider endpoint={rpcEndpoint()} config={rpcConfig}>
       <WalletProvider wallets={wallets} autoConnect localStorageKey="lexari-wallet">
         <Bridge />
+        <DevWallet />
         {children}
       </WalletProvider>
     </ConnectionProvider>

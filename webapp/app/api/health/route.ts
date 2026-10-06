@@ -4,6 +4,7 @@ import { missingConfig } from "@/server/config";
 import { llmConfig } from "@/server/engram/cortex";
 import { programStatus } from "@/server/hub/chain";
 import { attestorKeypair } from "@/server/hub/keys";
+import { rpcChoice } from "@/server/rpc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,5 +25,5 @@ export async function GET() {
   } catch { /* RPC down */ }
   const llm = llmConfig();
   const configured = missingConfig().length === 0;
-  return Response.json({ ok: configured && database, configured, database, llm: { provider: llm.provider, ready: llm.ready }, program, attestor }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ ok: configured && database, configured, database, llm: { provider: llm.provider, ready: llm.ready }, rpc: rpcChoice().source, program, attestor }, { headers: { "cache-control": "no-store" } });
 }

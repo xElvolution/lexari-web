@@ -1,8 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { Connection, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import { SOLANA_RPC } from "./nft";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { confirmSig, rpcConnection } from "./rpc";
 import { CARD_LAMPORTS, HIRE_LAMPORTS, TREASURY } from "./prices";
 import { api, friendly } from "./api";
 import { ackTx, get, logTx, refreshHub } from "./store";
@@ -55,7 +55,7 @@ function receiptFor(req: PayRequest, r: PayResult) {
   })();
 }
 
-export const connection = () => new Connection(SOLANA_RPC, "confirmed");
+export const connection = () => rpcConnection();
 export const isEmbedded = () => get().auth?.method === "google";
 
 /** The wallet that pays: the Privy wallet for Google/email accounts, the connected wallet otherwise. */
@@ -78,8 +78,7 @@ export async function sendToTreasury(bridge: WalletBridge, lamports: number, onS
   onSigned?.();
   const sig = await c.sendRawTransaction(signed.serialize());
   onSent?.();
-  const result = await c.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-  if (result.value.err) throw new Error("The payment failed on Solana.");
+  await confirmSig(c, sig, lastValidBlockHeight).catch((e: Error) => { throw /failed on Solana/.test(e.message) ? new Error("The payment failed on Solana.") : e; });
   return sig;
 }
 

@@ -1,6 +1,6 @@
 /** Server settings, all from env. See webapp/.env.example. */
-export const cluster = () => (process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "mainnet-beta" ? "mainnet-beta" : "devnet");
-export const rpcUrl = () => process.env.SOLANA_RPC || process.env.NEXT_PUBLIC_SOLANA_RPC || (cluster() === "mainnet-beta" ? "https://api.mainnet-beta.solana.com" : "https://api.devnet.solana.com");
+/** Solana cluster and RPC endpoint: see server/rpc.ts (Helius or a custom endpoint when configured). */
+export { cluster, rpcUrl } from "./rpc";
 
 /** Public origin of the webapp (https://app.lexari.ai). Sign-in messages are bound to it. */
 export function appOrigin(): { domain: string; uri: string } | null {

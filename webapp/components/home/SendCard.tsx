@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { api } from "@/lib/api";
 import { connection, payer, PAY_BUFFER } from "@/lib/pay";
+import { confirmSig } from "@/lib/rpc";
 import { txUrl } from "@/lib/nft";
 import { ackTx, get, logTx, refreshReceipts, set, useApp, type Msg } from "@/lib/store";
 import { nameOf } from "../agents";
@@ -45,8 +46,7 @@ export default function SendCard({ convo, m }: { convo: string; m: Msg & { send:
       const sig = await c.sendRawTransaction(signed.serialize());
       sent = sig;
       void receipt("pending", sig, undefined, false);
-      const r = await c.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-      if (r.value.err) throw new Error("The transfer failed on Solana.");
+      await confirmSig(c, sig, lastValidBlockHeight).catch((e: Error) => { throw /failed on Solana/.test(e.message) ? new Error("The transfer failed on Solana.") : e; });
       update({ status: "sent", sig });
       await receipt("confirmed", sig);
     } catch (e) {

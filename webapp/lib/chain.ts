@@ -5,7 +5,7 @@
  * Each transaction is signed by the wallet bridge (Phantom/Solflare/Backpack or the Privy wallet), then
  * posted to /api/hub/confirm so the server records what the chain did.
  */
-import { Connection, PublicKey, Transaction, type TransactionInstruction } from "@solana/web3.js";
+import { PublicKey, Transaction, type TransactionInstruction } from "@solana/web3.js";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { create, fetchAsset, mplCore, update } from "@metaplex-foundation/mpl-core";
 import { createGenericFile, generateSigner, publicKey as umiPk, type Umi } from "@metaplex-foundation/umi";
@@ -17,12 +17,13 @@ import { api } from "./api";
 import {
   PROGRAM_ID, agentPda, checkInIx, deleteMemoryIx, initPlayerIx, levelUpIx, memoryPda, playerPda, registerAgentIx, updateAgentIx, writeMemoryIx,
 } from "./lexari-ix";
-import { CHAIN_NAME, SOLANA_CLUSTER, SOLANA_RPC, type NftRecord } from "./nft";
+import { CHAIN_NAME, SOLANA_CLUSTER, type NftRecord } from "./nft";
+import { confirmSig, rpcConfig, rpcConnection, rpcEndpoint } from "./rpc";
 import { applyHub, nextHubSeq } from "./store";
 import { hexToBytes } from "./vault";
 import type { WalletBridge } from "./walletBridge";
 
-export const connection = () => new Connection(SOLANA_RPC, "confirmed");
+export const connection = () => rpcConnection();
 const utf8 = (s: string) => new TextEncoder().encode(s);
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 function b58(bytes: Uint8Array) {
@@ -62,8 +63,7 @@ export async function confirmOnServer(signature: string) {
 async function sendSigned(tx: Transaction, lastValidBlockHeight: number) {
   const conn = connection();
   const sig = await conn.sendRawTransaction(tx.serialize());
-  const res = await conn.confirmTransaction({ signature: sig, blockhash: tx.recentBlockhash!, lastValidBlockHeight }, "confirmed");
-  if (res.value.err) throw new Error("The transaction failed on Solana.");
+  await confirmSig(conn, sig, lastValidBlockHeight);
   return sig;
 }
 
@@ -98,8 +98,7 @@ function settle(signed: Transaction, lastValidBlockHeight: number) {
   const conn = connection();
   const p = (async () => {
     const sig = await conn.sendRawTransaction(signed.serialize(), { preflightCommitment: "confirmed", maxRetries: 5 });
-    const res = await conn.confirmTransaction({ signature: sig, blockhash: signed.recentBlockhash!, lastValidBlockHeight }, "confirmed");
-    if (res.value.err) throw new Error("The claim failed on Solana.");
+    await confirmSig(conn, sig, lastValidBlockHeight).catch((e: Error) => { throw /failed on Solana/.test(e.message) ? new Error("The claim failed on Solana.") : e; });
     return confirmOnServer(sig);
   })();
   p.catch(() => {});
@@ -153,7 +152,7 @@ function umiFor(bridge: WalletBridge): Umi {
     signTransaction: bridge.signTransaction,
     signAllTransactions: bridge.signAllTransactions || (async <T,>(txs: T[]) => { const out: T[] = []; for (const t of txs) out.push(await bridge.signTransaction(t as never) as T); return out; }),
   };
-  return createUmi(SOLANA_RPC, "confirmed").use(mplCore()).use(walletAdapterIdentity(adapter as never)).use(irysUploader({ address: irys }));
+  return createUmi(rpcEndpoint(), rpcConfig).use(mplCore()).use(walletAdapterIdentity(adapter as never)).use(irysUploader({ address: irys }));
 }
 
 async function uploadCard(umi: Umi, name: string, role: string, dna: string, svg: string) {

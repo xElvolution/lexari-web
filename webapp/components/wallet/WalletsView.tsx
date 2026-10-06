@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Connection, PublicKey, type ConfirmedSignatureInfo } from "@solana/web3.js";
-import { CHAIN_NAME, SOLANA_CLUSTER, SOLANA_RPC, tokenUrl, txUrl } from "@/lib/nft";
+import { PublicKey, type ConfirmedSignatureInfo } from "@solana/web3.js";
+import { CHAIN_NAME, SOLANA_CLUSTER, tokenUrl, txUrl } from "@/lib/nft";
+import { rpcConnection } from "@/lib/rpc";
 import { shortAddr } from "@/content/appData";
 import { isCreated, toast, useApp, type State } from "@/lib/store";
 import { useWalletBridge } from "@/lib/walletBridge";
@@ -58,7 +59,7 @@ function PersonalWallet({ s }: { s: State }) {
   const [all, setAll] = useState(false);
   useEffect(() => {
     if (!addr) return;
-    const conn = new Connection(SOLANA_RPC, "confirmed");
+    const conn = rpcConnection();
     const pk = new PublicKey(addr);
     conn.getBalance(pk).then((b) => setSol((b / 1e9).toFixed(4))).catch(() => setSol("—"));
     conn.getSignaturesForAddress(pk, { limit: 25 }).then(setTxs).catch(() => setTxs([]));

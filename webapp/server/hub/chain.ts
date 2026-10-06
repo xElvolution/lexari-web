@@ -1,11 +1,10 @@
-import { Connection, PublicKey, type AccountInfo } from "@solana/web3.js";
-import { rpcUrl } from "../config";
+import { PublicKey, type AccountInfo } from "@solana/web3.js";
+import { serverConnection } from "../rpc";
 import { PROGRAM_ID, configPda, decodeConfig } from "@/lib/lexari-ix";
 
-let conn: Connection | null = null;
+/** The server's shared connection (private RPC when configured, backoff on rate limits). */
 export function connection() {
-  if (!conn) conn = new Connection(rpcUrl(), "confirmed");
-  return conn;
+  return serverConnection();
 }
 
 /** Many accounts in as few RPC calls as possible (100 per call). */

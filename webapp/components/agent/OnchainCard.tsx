@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Connection, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
+import { rpcConnection } from "@/lib/rpc";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletReadyState } from "@solana/wallet-adapter-base";
 import Face from "@shared/components/Face";
@@ -13,7 +14,7 @@ import { celebrate } from "../Celebrate";
 import { AgentTile } from "../faces";
 import { useWalletBridge } from "@/lib/walletBridge";
 import { friendly } from "@/lib/api";
-import { CHAIN_NAME, SOLANA_RPC, cleanName, cleanRole, faceDna, faceFragment, faceSvg, tokenUrl, txUrl, type NftRecord } from "@/lib/nft";
+import { CHAIN_NAME, cleanName, cleanRole, faceDna, faceFragment, faceSvg, tokenUrl, txUrl, type NftRecord } from "@/lib/nft";
 import { mintCard, programIsLive, updateCard } from "@/lib/chain";
 import { WALLETS } from "@/content/appData";
 
@@ -71,7 +72,7 @@ export default function OnchainCard({ s, id, name, role, v, bg, cta = "Mint ID c
     if (!face) { setErr("This face can't be stored with the card."); setPhase("error"); return; }
     setErr(""); setTx(""); setPhase("signing");
     try {
-      const bal = await new Connection(SOLANA_RPC, "confirmed").getBalance(publicKey);
+      const bal = await rpcConnection().getBalance(publicKey);
       if (bal === 0) {
         setErr(`This wallet has no SOL on ${CHAIN_NAME}. Add a little, then try again.`);
         setPhase("error");
