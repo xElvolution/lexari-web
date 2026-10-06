@@ -109,6 +109,9 @@ export async function POST(req: Request) {
   if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${hiredSpeaker ? FUND_HINT(speakerName) : WALLET_HINT}` };
   const hold = tools || !!wallet;
   const tz = body.tz || "UTC";
+  const savingUser: Promise<boolean> = !call && !(body.follow === true || !!event)
+    ? saveUserMsg(userId, body).then(() => true, (error) => { console.error(`[chat] save user message: ${(error as Error).message}`); return false; })
+    : Promise.resolve(false);
   // Transaction memory: your recent transactions (receipts in chats plus the chain) on every chat and call turn.
   // A call never waits long for it (whatever is cached is used).
   let receipt: TxEvent | null = null;
@@ -121,8 +124,9 @@ export async function POST(req: Request) {
   if (event && receipt) prompt[prompt.length - 1] = { role: "user", content: eventPrompt(receipt) };
 
   // Your message is saved before the agent starts, so it never disappears if the reply fails or the page reloads.
+  // The save starts before the wallet reads above and runs alongside them, so its timestamp sits close to when you sent it.
   let userSaved = body.follow === true || !!event; // a later group member answers a message the first one already saved
-  if (!call && !userSaved) try { await saveUserMsg(userId, body); userSaved = true; } catch (error) { console.error(`[chat] save user message: ${(error as Error).message}`); }
+  if (!call && !userSaved) userSaved = await savingUser;
   // Your message counts for the message quests as soon as it is saved, not when the reply finishes (or if it fails).
   const counted: Promise<boolean> = !call && !body.follow && !event && userSaved
     ? recordEvent(userId, "message", { ref: body.userMsgId }).then(() => true, () => false) : Promise.resolve(false);

@@ -21,6 +21,7 @@ import { openNote, savedKeys, sealNote, unlock } from "./vault";
 import { addressed, addressedAll } from "./names";
 import { hasPerk, recallSize } from "./perks";
 import { computerEvent } from "./computer";
+import { mergeThreads } from "./threadMerge";
 
 export type Msg = {
   id: string; from: string; text: string; at: number; jobId?: number;
@@ -154,7 +155,6 @@ const hello = (a: Agent, at = Date.now()): Msg => ({ id: "hello", from: "home", 
 const customHi = (c: { name: string; about?: string }, you?: string) => `Hi${you ? ` ${you}` : ""}, I'm ${c.name}. ${c.about ? "I've read the brief you gave me." : "Tell me what you want me to do."} What should I start with?`;
 /** The greeting always opens the thread (it lives on this device only), so it never disappears once you start talking. */
 const withHello = (t: Msg[] = [], h: Msg): Msg[] => (t.some((m) => m.id === "hello") ? t : [{ ...h, at: Math.min(h.at, ...t.map((m) => m.at - 1)) }, ...t]);
-const helloFirst = (a: Msg, b: Msg) => (a.id === "hello" ? -1 : b.id === "hello" ? 1 : a.at - b.at);
 
 function customFrom(a: Account["agents"][number]): CustomAgent {
   const look = (a.look && typeof a.look === "object" ? a.look : {}) as Partial<CustomAgent>;
@@ -232,20 +232,6 @@ function fromAccount(acc: Account): State {
 }
 
 type RawMem = Account["memories"];
-/** Server threads plus any local message the server doesn't have yet. A thread is never emptied by a reload. */
-function mergeThreads(local: Record<string, Msg[]>, server: Record<string, Msg[]>) {
-  const out: Record<string, Msg[]> = { ...server };
-  for (const [k, mine] of Object.entries(local)) {
-    const theirs = server[k] || [];
-    const ids = new Set(theirs.map((m) => m.id));
-    const newest = theirs.length ? theirs[theirs.length - 1].at : 0;
-    const extra = mine.filter((m) => !ids.has(m.id) && m.id !== "hello" && (m.at >= newest - 120_000 || !theirs.length));
-    if (!extra.length) { if (!theirs.length && mine.length) out[k] = mine; continue; }
-    const merged = [...theirs, ...extra].sort(helloFirst);
-    out[k] = merged.length > 200 ? [merged[0], ...merged.slice(-199)] : merged;
-  }
-  return out;
-}
 /** After a reload mid-reply: the server is still finishing it. Show typing and fetch again until it lands (up to ~2 min). */
 let replyPolls = 0;
 function awaitPendingReplies(st: State) {
