@@ -13,16 +13,17 @@ export type WalletBridge = {
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
 };
 
-const slots: { adapter: WalletBridge | null; privy: WalletBridge | null } = { adapter: null, privy: null };
+/** "dev" is the local test wallet (components/DevWallet.tsx), never present in a production build. */
+const slots: { adapter: WalletBridge | null; privy: WalletBridge | null; dev: WalletBridge | null } = { adapter: null, privy: null, dev: null };
 const subs = new Set<() => void>();
 let current: WalletBridge | null = null;
 
 function pick() {
-  current = slots.adapter || slots.privy;
+  current = slots.adapter || slots.dev || slots.privy;
   subs.forEach((f) => f());
 }
 
-export function setWalletBridge(next: WalletBridge | null, source: "adapter" | "privy" = "adapter") {
+export function setWalletBridge(next: WalletBridge | null, source: "adapter" | "privy" | "dev" = "adapter") {
   slots[source] = next;
   pick();
 }
@@ -36,6 +37,7 @@ export function bridgeFor(address: string | undefined | null) {
   if (!address) return current;
   if (slots.adapter?.publicKey.toBase58() === address) return slots.adapter;
   if (slots.privy?.publicKey.toBase58() === address) return slots.privy;
+  if (slots.dev?.publicKey.toBase58() === address) return slots.dev;
   return null;
 }
 
