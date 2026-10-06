@@ -20,7 +20,8 @@ export type PayRequest = {
   /** The receipt this payment writes into a chat (the agent then follows up there). */
   receipt?: { convo: string; kind: "hire" | "plan" | "card"; label: string; speaker?: string };
 };
-export type PayResult = { ok: true; tx: string; result: unknown } | { ok: false; error: string; cancelled?: boolean };
+/** A failure can still carry `tx`: the SOL was sent (or may have been) but Lexari has not verified it yet. */
+export type PayResult = { ok: true; tx: string; result: unknown } | { ok: false; error: string; cancelled?: boolean; tx?: string };
 
 type Open = { req: PayRequest; done: (r: PayResult) => void } | null;
 let open: Open = null;
@@ -43,14 +44,17 @@ export function requestPayment(req: PayRequest): Promise<PayResult> {
 function receiptFor(req: PayRequest, r: PayResult) {
   const rc = req.receipt;
   if (!rc) return;
-  if (!r.ok && r.cancelled && rc.kind === "hire") return; // closing a hire sheet: that agent's chat isn't on your team
+  const sent = r.ok ? r.tx : r.tx || "";
+  if (!r.ok && r.cancelled && !sent && rc.kind === "hire") return; // closing a hire sheet: that agent's chat isn't on your team
   const sol = req.lamports / 1e9;
-  const id = r.ok ? `pay-${r.tx.slice(0, 32)}` : `pay-${Math.random().toString(36).slice(2, 12)}`;
-  const status = r.ok ? "confirmed" as const : r.cancelled ? "cancelled" as const : "failed" as const;
+  const id = sent ? `pay-${sent.slice(0, 32)}` : `pay-${Math.random().toString(36).slice(2, 12)}`;
+  // Sent but not verified (closed after a failed check, or confirmation timed out): never "cancelled" or "failed" with
+  // "nothing was sent". It goes in as pending with its signature, and the server follows it on chain.
+  const status = r.ok ? "confirmed" as const : sent ? "pending" as const : r.cancelled ? "cancelled" as const : "failed" as const;
   void (async () => {
     // a hire's chat only works once the hire is saved: wait a beat so the store has it
     await new Promise((x) => setTimeout(x, r.ok ? 900 : 0));
-    const t = await logTx(rc.convo, { id, kind: rc.kind, status, sol, ...(TREASURY ? { to: TREASURY } : {}), ...(r.ok ? { sig: r.tx } : {}), ...(!r.ok && r.error ? { error: r.error.slice(0, 200) } : {}), label: rc.label });
+    const t = await logTx(rc.convo, { id, kind: rc.kind, status, sol, ...(TREASURY ? { to: TREASURY } : {}), ...(sent ? { sig: sent } : {}), ...(!r.ok && !sent && r.error ? { error: r.error.slice(0, 200) } : {}), label: rc.label });
     if (t && status !== "cancelled") void ackTx(rc.convo, `tx-${id}`, rc.speaker);
   })();
 }
@@ -68,8 +72,11 @@ export async function balanceOf(address: string) {
   return connection().getBalance(new PublicKey(address), "confirmed");
 }
 
-/** Signs and sends one SOL transfer to the treasury and waits until it is confirmed. Returns the signature. */
-export async function sendToTreasury(bridge: WalletBridge, lamports: number, onSigned?: () => void, onSent?: () => void) {
+/**
+ * Signs and sends one SOL transfer to the treasury and waits until it is confirmed. Returns the signature.
+ * onSent gets the signature as soon as it is on its way, so a confirmation timeout never leads to paying twice.
+ */
+export async function sendToTreasury(bridge: WalletBridge, lamports: number, onSigned?: () => void, onSent?: (sig: string) => void) {
   const c = connection();
   const { blockhash, lastValidBlockHeight } = await c.getLatestBlockhash("confirmed");
   const tx = new Transaction({ feePayer: bridge.publicKey, blockhash, lastValidBlockHeight })
@@ -77,7 +84,7 @@ export async function sendToTreasury(bridge: WalletBridge, lamports: number, onS
   const signed = await bridge.signTransaction(tx);
   onSigned?.();
   const sig = await c.sendRawTransaction(signed.serialize());
-  onSent?.();
+  onSent?.(sig);
   await confirmSig(c, sig, lastValidBlockHeight).catch((e: Error) => { throw /failed on Solana/.test(e.message) ? new Error("The payment failed on Solana.") : e; });
   return sig;
 }

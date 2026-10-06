@@ -41,7 +41,7 @@ function Sheet() {
     return b;
   }, []);
   useEffect(() => { void refresh().then((b) => { setPhase((p) => (p === "loading" ? (b === undefined ? "nowallet" : "ready") : p)); }); }, [refresh]);
-  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape" && (phase === "ready" || phase === "nowallet")) done({ ok: false, error: "", cancelled: true }); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [phase, done]);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape" && (phase === "ready" || phase === "nowallet")) done(tx ? { ok: false, error: "Payment sent, not verified yet.", cancelled: true, tx } : { ok: false, error: "", cancelled: true }); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [phase, done, tx]);
 
   const short_ = bal !== null && bal < need;
   const busy = phase === "funding" || phase === "paying" || phase === "sending" || phase === "confirming" || phase === "verifying";
@@ -66,19 +66,24 @@ function Sheet() {
     if (b !== null) setBal(b);
     if (b !== null && b < need) { setErr(`You need ${sol(need)} devnet SOL. You have ${sol(b)}.`); return; }
     setPhase("paying");
-    let sig = "";
-    try { sig = await sendToTreasury(w, req.lamports, () => setPhase("sending"), () => setPhase("confirming")); setTx(sig); }
-    catch (e) { setErr(friendly(e, "The wallet did not pay.")); setPhase("ready"); return; }
+    let sig = "", sent = "";
+    try { sig = await sendToTreasury(w, req.lamports, () => setPhase("sending"), (s) => { sent = s; setTx(s); setPhase("confirming"); }); setTx(sig); }
+    catch (e) {
+      // Already on its way (the confirmation timed out or the RPC dropped): check it instead of offering to pay again.
+      if (sent && !/failed on Solana/i.test((e as Error)?.message || "")) { setErr(`Your payment ${short(sent)} was sent but isn't confirmed yet. Tap Check payment in a moment.`); setPhase("ready"); return; }
+      setErr(friendly(e, "The wallet did not pay.")); if (sent) setTx(""); setPhase("ready"); return;
+    }
     setPhase("verifying");
     try { const result = await req.record(sig); setPhase("done"); setTimeout(() => done({ ok: true, tx: sig, result }), 900); }
-    catch (e) { setErr(`${friendly(e, "We could not verify the payment.")} Your payment ${short(sig)} went through; tap Try again to check it.`); setPhase("ready"); }
+    catch (e) { setErr(`${friendly(e, "We could not verify the payment.")} Your payment ${short(sig)} went through; tap Check payment to try again.`); setPhase("ready"); }
   };
   const retryVerify = async () => {
     setErr(""); setPhase("verifying");
     try { const result = await req.record(tx); setPhase("done"); setTimeout(() => done({ ok: true, tx, result }), 900); }
     catch (e) { setErr(friendly(e, "We could not verify the payment.")); setPhase("ready"); }
   };
-  const close = () => { if (!busy) done({ ok: false, error: "", cancelled: true }); };
+  // Closing after the SOL was sent keeps the signature, so the chat shows it as pending (checked on chain), not "nothing was sent".
+  const close = () => { if (!busy) done(tx ? { ok: false, error: "Payment sent, not verified yet.", cancelled: true, tx } : { ok: false, error: "", cancelled: true }); };
   const copy = () => { void navigator.clipboard?.writeText(addr).then(() => toast({ text: "Address copied" }), () => {}); };
 
   return (
@@ -121,7 +126,7 @@ function Sheet() {
         {phase === "done" ? (
           <div className="mt-4 flex items-center gap-2 rounded-2xl bg-grape px-4 py-3 text-[14.5px] font-bold text-white"><Icon name="check" size={18} />Paid{tx ? ` · ${short(tx)}` : ""}</div>
         ) : tx && err ? (
-          <button onClick={retryVerify} className="btn btn-brand btn-sm mt-4 w-full">Try again</button>
+          <button data-pay-retry onClick={retryVerify} className="btn btn-brand btn-sm mt-4 w-full">Check payment</button>
         ) : (
           <button data-pay onClick={pay} disabled={busy || phase === "loading" || phase === "nowallet" || short_} className="btn btn-brand btn-sm mt-4 w-full disabled:opacity-50 disabled:shadow-none">
             {phase === "paying" ? "Waiting for signature…" : phase === "sending" ? "Sending…" : phase === "confirming" ? "Confirming on Solana…" : phase === "verifying" ? "Checking the payment…" : `Pay ${sol(req.lamports)}`}
