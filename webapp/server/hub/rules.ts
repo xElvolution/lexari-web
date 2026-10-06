@@ -2,7 +2,7 @@
  * How far each quest is, from data the server trusts: confirmed chain instructions (chain_ledger),
  * server-recorded events (chat replies, saved memories, finished jobs), verified hires and referrals.
  */
-import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { eq, sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
 import { agents, chainLedger, hires, hubPlayers, jobs, memories, questEvents, referrals } from "../db/schema";
 import type { QuestRule } from "./catalog";
@@ -32,42 +32,54 @@ export async function qualifiedReferrals(userId: string) {
 
 export type Facts = { streak: number; maxLevel: number };
 
-export async function questProgress(userId: string, rule: QuestRule, facts: Facts): Promise<number> {
-  const database = db();
-  const from = periodStart(rule.period);
-  const ledger = (kind: string) => database.select({ n: sql<number>`count(*)::int` }).from(chainLedger).where(and(eq(chainLedger.userId, userId), eq(chainLedger.kind, kind), gte(chainLedger.createdAt, from)));
-  const events = (kind: string) => database.select({ n: sql<number>`coalesce(sum(greatest(${questEvents.amount}, 1)), 0)::int` }).from(questEvents).where(and(eq(questEvents.userId, userId), eq(questEvents.kind, kind), gte(questEvents.createdAt, from)));
+/** Every count the quests need, in one database round trip (the Hub used to make ~17, which took ~0.7 s). */
+export type QuestCounts = {
+  checkinD: number; checkinW: number; boxD: number; levelW: number; msgD: number; msgW: number; memD: number; memAll: number;
+  jobsW: number; hires: number; team: number; agents: number; storeW: number; storeAll: number; style: number; referrals: number; claimedTotal: number;
+};
+export async function questCounts(userId: string, now = new Date()): Promise<QuestCounts> {
+  const d = sql`${periodStart("daily", now).toISOString()}::timestamptz`;
+  const w = sql`${periodStart("weekly", now).toISOString()}::timestamptz`;
+  const L = (kind: string, from?: SQL) => sql`(select count(*)::int from ${chainLedger} where ${chainLedger.userId} = ${userId} and ${chainLedger.kind} = ${kind}${from ? sql` and ${chainLedger.createdAt} >= ${from}` : sql``})`;
+  const E = (kind: string, from: SQL) => sql`(select coalesce(sum(greatest(${questEvents.amount}, 1)), 0)::int from ${questEvents} where ${questEvents.userId} = ${userId} and ${questEvents.kind} = ${kind} and ${questEvents.createdAt} >= ${from})`;
+  const M = (from?: SQL) => sql`(select count(distinct ${memories.contentHash})::int from ${memories} where ${memories.userId} = ${userId} and ${memories.deletedAt} is null${from ? sql` and ${memories.createdAt} >= ${from}` : sql``})`;
+  const rows = await db().execute<Record<keyof QuestCounts, number>>(sql`select
+    ${L("check_in", d)} as "checkinD", ${L("check_in", w)} as "checkinW", ${L("open_box", d)} as "boxD",
+    ${E("level", w)} as "levelW", ${E("message", d)} as "msgD", ${E("message", w)} as "msgW",
+    ${M(d)} as "memD", ${M()} as "memAll",
+    (select count(*)::int from ${jobs} where ${jobs.userId} = ${userId} and ${jobs.status} = 'done' and ${jobs.createdAt} >= ${w}) as "jobsW",
+    (select count(*)::int from ${hires} where ${hires.buyerId} = ${userId}) as "hires",
+    (select count(*)::int from ${agents} where ${agents.userId} = ${userId} and ${agents.kind} in ('home', 'custom', 'hired')) as "team",
+    (select count(*)::int from ${agents} where ${agents.userId} = ${userId}) as "agents",
+    ${L("store_buy", w)} as "storeW", ${L("store_buy")} as "storeAll",
+    coalesce((select (case when coalesce(length(${hubPlayers.cosmetics}->>'bg'), 0) > 0 then 1 else 0 end) + (case when coalesce(length(${hubPlayers.cosmetics}->>'bubble'), 0) > 0 then 1 else 0 end) from ${hubPlayers} where ${hubPlayers.userId} = ${userId}), 0)::int as "style",
+    (select count(*)::int from ${referrals} where ${referrals.referrerId} = ${userId} and exists (select 1 from ${chainLedger} where ${chainLedger.userId} = ${referrals.refereeId})) as "referrals",
+    ${L("claim_quest")} as "claimedTotal"`);
+  const r = (rows as unknown as Record<string, unknown>[])[0] || {};
+  const out = {} as QuestCounts;
+  for (const k of ["checkinD", "checkinW", "boxD", "levelW", "msgD", "msgW", "memD", "memAll", "jobsW", "hires", "team", "agents", "storeW", "storeAll", "style", "referrals", "claimedTotal"] as (keyof QuestCounts)[]) out[k] = Number(r[k] ?? 0);
+  return out;
+}
+
+/** How far a quest is, from the counts above (the same numbers the Hub shows and a claim checks). */
+export function progressFrom(c: QuestCounts, rule: QuestRule, facts: Facts): number {
+  const daily = rule.period === "daily", hard = rule.period === "hard";
   switch (rule.count) {
-    case "checkin":
-      return rule.period === "hard" ? facts.streak : n(await ledger("check_in"));
-    case "box":
-      return n(await ledger("open_box"));
-    case "level":
-      return rule.period === "hard" ? facts.maxLevel : n(await events("level"));
-    case "message":
-      return n(await events("message"));
-    case "memory": {
-      const where = rule.period === "hard"
-        ? and(eq(memories.userId, userId), isNull(memories.deletedAt))
-        : and(eq(memories.userId, userId), isNull(memories.deletedAt), gte(memories.createdAt, from));
-      return n(await database.select({ n: sql<number>`count(distinct ${memories.contentHash})::int` }).from(memories).where(where));
-    }
-    case "job":
-      return n(await database.select({ n: sql<number>`count(*)::int` }).from(jobs).where(and(eq(jobs.userId, userId), eq(jobs.status, "done"), gte(jobs.createdAt, from))));
-    case "hire":
-      return n(await database.select({ n: sql<number>`count(*)::int` }).from(hires).where(eq(hires.buyerId, userId)));
-    case "team":
-      return n(await database.select({ n: sql<number>`count(*)::int` }).from(agents).where(and(eq(agents.userId, userId), inArray(agents.kind, ["home", "custom", "hired"]))));
-    case "referral":
-      return qualifiedReferrals(userId);
-    case "store_buy": // Store purchases (offchain ledger rows), this week or ever
-      return n(await ledger("store_buy"));
-    case "store_style": { // wearing a chat background and a bubble style right now: one point each
-      const [p] = await database.select({ c: hubPlayers.cosmetics }).from(hubPlayers).where(eq(hubPlayers.userId, userId)).limit(1);
-      const c = (p?.c || {}) as { bg?: string | null; bubble?: string | null };
-      return (c.bg ? 1 : 0) + (c.bubble ? 1 : 0);
-    }
-    case "agent":
-      return n(await database.select({ n: sql<number>`count(*)::int` }).from(agents).where(eq(agents.userId, userId)));
+    case "checkin": return hard ? facts.streak : daily ? c.checkinD : c.checkinW;
+    case "box": return c.boxD;
+    case "level": return hard ? facts.maxLevel : c.levelW;
+    case "message": return daily ? c.msgD : c.msgW;
+    case "memory": return hard ? c.memAll : c.memD;
+    case "job": return c.jobsW;
+    case "hire": return c.hires;
+    case "team": return c.team;
+    case "referral": return c.referrals;
+    case "store_buy": return hard ? c.storeAll : c.storeW; // Store purchases (offchain ledger rows), this week or ever
+    case "store_style": return c.style; // wearing a chat background and a bubble style right now: one point each
+    case "agent": return c.agents;
   }
+}
+
+export async function questProgress(userId: string, rule: QuestRule, facts: Facts): Promise<number> {
+  return progressFrom(await questCounts(userId), rule, facts);
 }

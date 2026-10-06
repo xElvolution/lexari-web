@@ -192,13 +192,15 @@ export function MysteryBox({ s, now }: { s: State; now: number }) {
   useLayoutEffect(() => {
     const el = lid.current; if (!el) return;
     if (!opened) { gsap.set(el, { clearProps: "all" }); el.removeAttribute("transform"); setPhase("idle"); return; }
-    if (!gsap.isTweening(el)) gsap.set(el, LID_OPEN);
+    if (!gsap.isTweening(el) && phase !== "shaking") gsap.set(el, LID_OPEN); // mid-shake, the reveal pops the lid itself
   }, [opened]);
   const open = () => {
     if (phase !== "idle") return;
     setPhase("shaking");
+    // Ask the server right away; the shake still plays for its 850 ms before the reveal.
+    const opening = hub.openBox(now || Date.now());
     setTimeout(() => {
-      void hub.openBox(now || Date.now()).then((r) => {
+      void opening.then((r) => {
         if (!r.ok) { setPhase("idle"); toast({ text: r.error || "The box did not open.", face: "home" }); return; }
         setPhase("open");
         if (lid.current) gsap.fromTo(lid.current, { y: 0, rotate: 0 }, { ...LID_OPEN, duration: 0.5, ease: "back.out(2)" });

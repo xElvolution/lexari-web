@@ -5,7 +5,7 @@ import { Connection, PublicKey, SystemProgram, Transaction } from "@solana/web3.
 import { SOLANA_RPC } from "./nft";
 import { CARD_LAMPORTS, HIRE_LAMPORTS, TREASURY } from "./prices";
 import { api, friendly } from "./api";
-import { ackTx, get, logTx } from "./store";
+import { ackTx, get, logTx, refreshHub } from "./store";
 import { ensureBridge, type WalletBridge } from "./walletBridge";
 
 /** Network fee plus what Solana keeps in an account (rent), so a payment never fails for "insufficient funds for rent". */
@@ -98,7 +98,7 @@ export async function verifyWithRetry<T>(run: () => Promise<T>) {
 export async function payForHire(slug: string, name: string): Promise<{ ok: true; tx: string; mint: "SOL"; price: number } | { ok: false; error: string; cancelled?: boolean }> {
   const r = await requestPayment({
     title: `Hire ${name}`, what: "One-time hire. Release and rehire for free.", lamports: HIRE_LAMPORTS, receipt: { convo: slug, kind: "hire", label: `hiring ${name}`, speaker: slug },
-    record: (sig) => verifyWithRetry(() => api("/api/hires", { method: "POST", body: { slug, tx: sig, mint: "SOL" } })),
+    record: (sig) => verifyWithRetry(() => api("/api/hires", { method: "POST", body: { slug, tx: sig, mint: "SOL" } })).then((r) => { void refreshHub(); return r; }), // hire and team quests
   });
   return r.ok ? { ok: true, tx: r.tx, mint: "SOL", price: HIRE_LAMPORTS } : r;
 }

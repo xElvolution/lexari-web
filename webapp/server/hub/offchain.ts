@@ -18,7 +18,7 @@ import { QUEST_RULES, periodNumber } from "./catalog";
 import { fetchMany, utcDay } from "./chain";
 import { boxRoll } from "./claims";
 import { boxDayFor } from "./state";
-import { qualifiedReferrals, questProgress } from "./rules";
+import { progressFrom, qualifiedReferrals, questCounts } from "./rules";
 
 type User = { userId: string; wallet: string; referralCode: string };
 export const MAX_LEVEL = 10;
@@ -78,28 +78,29 @@ export async function offchainState(user: User) {
   await ensurePlayer(user);
   const database = db();
   const today = utcDay();
-  const [[p], levelRows, agentRows, claimRows, boxDay, friends, ledgerRows, [{ n: claimedTotal }]] = await Promise.all([
+  // One round trip: every read goes out together, and all quest counts are a single query.
+  const [[p], levelRows, agentRows, claimRows, boxDay, counts, ledgerRows] = await Promise.all([
     database.select().from(hubPlayers).where(eq(hubPlayers.userId, user.userId)).limit(1),
     database.select().from(hubLevels).where(eq(hubLevels.userId, user.userId)),
     database.select({ slug: agents.slug, name: agents.name, asset: agents.asset, kind: agents.kind }).from(agents).where(eq(agents.userId, user.userId)),
     database.select({ key: hubClaims.key, coins: hubClaims.coins }).from(hubClaims).where(eq(hubClaims.userId, user.userId)),
     boxDayFor(user.userId, today),
-    qualifiedReferrals(user.userId),
+    questCounts(user.userId),
     database.select({ kind: chainLedger.kind, amount: chainLedger.amount, data: chainLedger.data, at: chainLedger.createdAt, signature: chainLedger.signature })
       .from(chainLedger).where(eq(chainLedger.userId, user.userId)).orderBy(desc(chainLedger.createdAt)).limit(60),
-    database.select({ n: sql<number>`count(*)::int` }).from(chainLedger).where(and(eq(chainLedger.userId, user.userId), eq(chainLedger.kind, "claim_quest"))),
   ]);
+  const friends = counts.referrals, claimedTotal = counts.claimedTotal;
   const claimed = new Map(claimRows.map((c) => [c.key, c.coins]));
   const streak = p ? streakNow(p, today) : 0;
   const checkedInToday = claimed.has(`checkin:${today}`) || (!!p && p.lastCheckIn > 0 && Math.floor(p.lastCheckIn / 86_400) === today);
   const lv = new Map(levelRows.map((l) => [l.slug, l]));
   const levels = agentRows.filter((a) => a.kind === "home" || a.kind === "custom").map((a) => ({ slug: a.slug, name: a.name, asset: a.asset ?? "", level: lv.get(a.slug)?.level ?? 1, xp: lv.get(a.slug)?.xp ?? 0, owned: true }));
   const maxLevel = levels.reduce((m, l) => Math.max(m, l.level), 0);
-  const quests = await Promise.all(QUEST_RULES.map(async (rule) => ({
+  const quests = QUEST_RULES.map((rule) => ({
     id: rule.id, period: rule.period, goal: rule.goal, reward: rule.reward,
-    progress: Math.min(rule.goal, await questProgress(user.userId, rule, { streak, maxLevel })),
+    progress: Math.min(rule.goal, progressFrom(counts, rule, { streak, maxLevel })),
     claimed: claimed.has(questKey(rule.id, rule.period)),
-  })));
+  }));
   const boxKey = `box:${boxDay}`;
   return {
     program: { live: true, attestorReady: true },
@@ -119,7 +120,7 @@ export async function offchainState(user: User) {
 
 type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
 /** Locks the person's row, runs `fn`, and writes a ledger line. A unique claim key makes it pay once. */
-async function act<T>(user: User, kind: string, fn: (tx: Tx, p: typeof hubPlayers.$inferSelect) => Promise<{ delta: number; earned?: boolean; claim?: string; data?: Record<string, unknown>; out: T }>) {
+async function act<T>(user: User, kind: string, fn: (tx: Tx, p: typeof hubPlayers.$inferSelect) => Promise<{ delta: number; earned?: boolean; claim?: string; data?: Record<string, unknown>; set?: Partial<typeof hubPlayers.$inferInsert>; out: T }>) {
   await ensurePlayer(user);
   const sig = `off:${randomUUID()}`;
   return db().transaction(async (tx) => {
@@ -132,6 +133,7 @@ async function act<T>(user: User, kind: string, fn: (tx: Tx, p: typeof hubPlayer
     }
     if (r.delta < 0 && Number(p.coins) + r.delta < 0) throw new HttpError(400, "Not enough coins.");
     await tx.update(hubPlayers).set({
+      ...(r.set || {}),
       coins: sql`${hubPlayers.coins} + ${r.delta}`,
       ...(r.earned !== false && r.delta > 0 ? { lifetime: sql`${hubPlayers.lifetime} + ${r.delta}` } : {}),
       updatedAt: new Date(),
@@ -148,23 +150,23 @@ export async function checkIn(user: User) {
     if (last >= today) throw new HttpError(409, "You already checked in today.");
     const streak = last === today - 1 ? p.streak + 1 : 1;
     const pay = STREAK_PAY[Math.min(STREAK_PAY.length, streak) - 1];
-    await tx.update(hubPlayers).set({ streak, lastCheckIn: Math.floor(Date.now() / 1000) }).where(eq(hubPlayers.userId, user.userId));
-    return { delta: pay, claim: `checkin:${today}`, data: { streak }, out: { pay, day: streak } };
+    return { delta: pay, claim: `checkin:${today}`, data: { streak }, set: { streak, lastCheckIn: Math.floor(Date.now() / 1000) }, out: { pay, day: streak } };
   });
-  void recordEvent(user.userId, "checkin", { ref: res.tx });
+  await recordEvent(user.userId, "checkin", { ref: res.tx }).catch((e) => console.error("[hub] checkin event", (e as Error).message));
   return res;
 }
 
 export async function claimQuest(user: User, questId: string) {
   const rule = QUEST_RULES.find((q) => q.id === questId);
   if (!rule) throw new HttpError(404, "There is no such quest.");
-  const [p] = await db().select().from(hubPlayers).where(eq(hubPlayers.userId, user.userId)).limit(1);
-  let maxLevel = 0;
-  if (rule.count === "level" && rule.period === "hard") {
-    const [r] = await db().select({ m: sql<number>`coalesce(max(${hubLevels.level}), 1)::int` }).from(hubLevels).where(eq(hubLevels.userId, user.userId));
-    maxLevel = Number(r?.m ?? 1);
-  }
-  const progress = await questProgress(user.userId, rule, { streak: p ? streakNow(p) : 0, maxLevel });
+  const [[p], counts, maxLevel] = await Promise.all([
+    db().select().from(hubPlayers).where(eq(hubPlayers.userId, user.userId)).limit(1),
+    questCounts(user.userId),
+    rule.count === "level" && rule.period === "hard"
+      ? db().select({ m: sql<number>`coalesce(max(${hubLevels.level}), 1)::int` }).from(hubLevels).where(eq(hubLevels.userId, user.userId)).then(([r]) => Number(r?.m ?? 1))
+      : Promise.resolve(0),
+  ]);
+  const progress = progressFrom(counts, rule, { streak: p ? streakNow(p) : 0, maxLevel });
   if (progress < rule.goal) throw new HttpError(400, "That quest is not finished yet.");
   return act(user, "claim_quest", async () => ({ delta: rule.reward, claim: questKey(rule.id, rule.period), data: { questId: rule.chainId, quest: rule.id, period: periodNumber(rule.period), coins: rule.reward }, out: { reward: rule.reward } }));
 }
@@ -173,7 +175,7 @@ export async function openBox(user: User) {
   const day = await boxDayFor(user.userId, utcDay());
   const roll = await boxRoll(user.userId, day);
   const res = await act(user, "open_box", async () => ({ delta: roll, claim: `box:${day}`, data: { day, coins: roll }, out: { won: roll } }));
-  void recordEvent(user.userId, "box", { ref: res.tx });
+  await recordEvent(user.userId, "box", { ref: res.tx }).catch((e) => console.error("[hub] box event", (e as Error).message));
   return res;
 }
 
@@ -239,8 +241,7 @@ export async function buy(user: User, item: string) {
     if (cos.owned?.includes(it.id)) throw new HttpError(409, "You already own this.");
     cos.owned = [...(cos.owned || []), it.id];
     cos[it.kind] = it.id; // wear it right away
-    await tx.update(hubPlayers).set({ cosmetics: cos }).where(eq(hubPlayers.userId, user.userId));
-    return { delta: -it.price, claim: `store:${it.id}`, data: { item: it.id, coins: it.price }, out: { cosmetics: cos } };
+    return { delta: -it.price, claim: `store:${it.id}`, data: { item: it.id, coins: it.price }, set: { cosmetics: cos }, out: { cosmetics: cos } };
   });
 }
 export async function applyCosmetic(user: User, kind: "bg" | "bubble", item: string | null) {

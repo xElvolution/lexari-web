@@ -4,7 +4,7 @@ import { db } from "./db";
 import { chainLedger, notifications, pushSubs, users } from "./db/schema";
 import { QUEST_RULES } from "./hub/catalog";
 import { periodNumber } from "./hub/catalog";
-import { questProgress } from "./hub/rules";
+import { progressFrom, questCounts } from "./hub/rules";
 
 export type NoteKind = "quest" | "box" | "hire" | "payment" | "card" | "reply" | "faucet";
 export type Note = { kind: NoteKind; title: string; body?: string; url?: string; key?: string };
@@ -67,9 +67,13 @@ const KIND_TO_COUNT: Record<string, string[]> = { message: ["message"], memory: 
 export async function questReadyCheck(userId: string, kind: string) {
   const counts = KIND_TO_COUNT[kind];
   if (!counts) return;
-  for (const rule of QUEST_RULES.filter((r) => counts.includes(r.count))) {
+  const rules = QUEST_RULES.filter((r) => counts.includes(r.count));
+  if (!rules.length) return;
+  const c = await questCounts(userId).catch(() => null);
+  if (!c) return;
+  for (const rule of rules) {
     try {
-      const have = await questProgress(userId, rule, { streak: 0, maxLevel: 0 });
+      const have = progressFrom(c, rule, { streak: 0, maxLevel: 0 });
       if (have < rule.goal) continue;
       await notify(userId, {
         kind: "quest", title: "Quest ready to claim", body: `${QUEST_NAMES[rule.id] || "A quest"} is done. Claim ${rule.reward} coins in the Hub.`,

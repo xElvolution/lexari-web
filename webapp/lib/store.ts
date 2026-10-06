@@ -348,14 +348,31 @@ export const hubReady = () => hubTried;
 /** A number for a Hub fetch you are about to start (answers are applied newest-first). */
 export const nextHubSeq = () => ++hubSeq;
 let hubAgain = false;
+let hubActs = 0;
+let hubIdleWaiters: (() => void)[] = [];
+/**
+ * Runs a Hub action. While one is on its way, background fetches wait (one could read the database before the action
+ * is saved and put old numbers back over the instant update); the action's answer carries the new state instead.
+ */
+export async function hubAct<T>(run: () => Promise<T>): Promise<T> {
+  hubActs++;
+  hubShown = nextHubSeq(); // answers to fetches already in flight are older than this action
+  try { return await run(); } finally {
+    hubActs--;
+    if (!hubActs) { hubIdleWaiters.forEach((f) => f()); hubIdleWaiters = []; if (hubAgain && !hubLoading) { hubAgain = false; void refreshHub(); } }
+  }
+}
+/** Resolves once no Hub action is on its way (a claim waits for a training still being saved, for example). */
+export const hubIdle = () => (hubActs ? new Promise<void>((r) => hubIdleWaiters.push(r)) : Promise.resolve());
 export function refreshHub(): Promise<HubState | null> {
+  if (hubActs) { hubAgain = true; return Promise.resolve(state?.live ?? null); }
   // A fetch already in flight may have started before what you just did was recorded: fetch once more after it.
   if (hubLoading) { hubAgain = true; return hubLoading; }
   const seq = nextHubSeq();
   hubLoading = api<HubState>("/api/hub/state")
     .then((live) => { applyHub(live, seq); return live; })
     .catch(() => null)
-    .finally(() => { hubLoading = null; if (!hubTried) { hubTried = true; emit(); } if (hubAgain) { hubAgain = false; void refreshHub(); } });
+    .finally(() => { hubLoading = null; if (!hubTried) { hubTried = true; emit(); } if (hubAgain && !hubActs) { hubAgain = false; void refreshHub(); } });
   return hubLoading;
 }
 /** Is this claim already in the chain state? (The flags come from the same account read as the coins.) */
@@ -1005,7 +1022,7 @@ export function createAgent(a: Omit<CustomAgent, "id" | "at">) {
   const you = get().agent?.you;
   const hi = customHi(c, you);
   set((x) => ({ ...x, custom: [...x.custom, c], born: { ...x.born, [c.id]: c.at }, active: c.id, threads: { ...x.threads, [c.id]: [{ id: "hello", from: c.id, at: Date.now(), text: hi }] } }));
-  sync(api("/api/agents", { body: customBody(c) }), () => set((x) => ({ ...x, custom: x.custom.filter((y) => y.id !== c.id) })));
+  sync(api("/api/agents", { body: customBody(c) }).then(() => { void refreshHub(); }), () => set((x) => ({ ...x, custom: x.custom.filter((y) => y.id !== c.id) }))); // team quests
   return c.id;
 }
 export function updateCustom(id: string, p: Partial<CustomAgent>) {
