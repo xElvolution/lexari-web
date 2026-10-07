@@ -25,7 +25,8 @@ import { mergeThreads } from "./threadMerge";
 
 export type Msg = {
   id: string; from: string; text: string; at: number; jobId?: number;
-  file?: { name: string; size: string }; // an attachment: only its name and size are sent
+  file?: import("./files").SentFile; // a file you attached (uploaded first; the message carries its id, name and size)
+  files?: import("./files").FileView[]; // files an agent attached to its reply
   voice?: number; // a voice note, length in seconds
   call?: number; // a call log line, length in seconds
   re?: Record<string, string[]>; // reactions: emoji → who reacted ("you" or an agent id)
@@ -694,10 +695,12 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
             const trimmed = line.trim();
             if (computerEvent(convo, bubble, trimmed)) { typingWho.set(convo, speaker); continue; }
             if (!trimmed.startsWith("data:")) continue;
-            let payload: { token?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"] } = {};
+            let payload: { token?: string; replace?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"]; files?: Msg["files"] } = {};
             try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
             if (payload.error) { error = payload.error; break read; }
             if (payload.send) { const sd = payload.send; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, send: sd } : mm)) } })); }
+            if (payload.files?.length) { const fl = payload.files; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, files: fl } : mm)) } })); }
+            if (typeof payload.replace === "string") { full = payload.replace; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
             if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
             if (payload.remember && memoryOn) addNote(payload.remember, "About you", "Chat", true, isCustom(speaker) ? speaker : "home");
             if (payload.done && event) set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, about: event } : mm)) } }));

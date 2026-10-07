@@ -40,3 +40,8 @@ export function runRequests(text: string) {
 }
 /** A PNG screenshot of the agent's screen (base64), taken inside the container. */
 export const shotDesktop = (userId: string) => call<{ png?: string; error?: string }>("/shot", { user: desktopUser(userId) }, 20_000);
+
+/** One file from the agent's computer (base64), or why not. Paths must be under /home/agent. */
+export const pullDesktop = (userId: string, path: string) => call<{ b64?: string; size?: number; error?: string }>("/pull", { user: desktopUser(userId), path }, 45_000);
+/** Puts an upload on the agent's computer, in ~/Uploads only. */
+export const pushDesktop = (userId: string, path: string, data: Buffer) => call<{ ok?: boolean; path?: string; error?: string }>("/push", { user: desktopUser(userId), path, b64: data.toString("base64") }, 45_000);

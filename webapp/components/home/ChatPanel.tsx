@@ -19,6 +19,7 @@ import { CHAT_BG, MY_BUBBLE } from "@/lib/cosmetics";
 import { openAgent, openUpgrade } from "../overlays";
 import ModelChip from "../billing/ModelChip";
 import { shotUrl, stopComputer, useComputer } from "@/lib/computer";
+import FileCard, { FileCards } from "./FileCard";
 
 /** Screenshots the agent attached after using its computer: the last one (the final screen) large, the others small. Tap to view. */
 function Shots({ m }: { m: Msg }) {
@@ -98,7 +99,7 @@ function Body({ m, mine, s, convo }: { m: Msg; mine: boolean; s: State; convo?: 
           <span className="line-clamp-2">{m.reply.text || "Attachment"}</span>
         </button>
       )}
-      {m.file && (
+      {m.file && !m.file.id && (
         <span className={`mb-1 flex items-center gap-2.5 rounded-2xl p-1.5 pr-3 ${mine ? "bg-white/15" : "bg-tint"}`}>
           <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${mine ? "bg-white text-grape" : "bg-grape text-white"}`}><Icon name="file" size={17} /></span>
           <span className="min-w-0"><span className="block truncate text-[14px] font-semibold">{m.file.name}</span><span className={`block text-[11.5px] ${mine ? "text-white/75" : "text-ink/55"}`}>{m.file.size}</span></span>
@@ -245,7 +246,8 @@ function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
   const cls = mine ? `${myStyle || "bg-grape text-white"} ${lastOfRun ? "rounded-br-md" : ""}` : `bg-card text-ink ring-1 ring-line ${lastOfRun ? "rounded-bl-md" : ""}`;
   return (
     <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`} data-msg-hold={m.id}>
-      {(m.text || m.file || m.voice) ? <div ref={box} className="group/msg relative max-w-full">
+      {m.file?.id && <div className={`flex w-full ${mine ? "justify-end" : ""} ${m.text ? "mb-1" : ""}`}><FileCard f={{ ...m.file, id: m.file.id }} /></div>}
+      {(m.text || (m.file && !m.file.id) || m.voice) ? <div ref={box} className="group/msg relative max-w-full">
         <span aria-hidden className="pointer-events-none absolute left-0 top-1/2 grid h-9 w-9 -translate-x-[130%] -translate-y-1/2 place-items-center rounded-full bg-tint text-brand-ink" style={{ opacity: gesture.shift > 24 ? 1 : 0 }}><Icon name="reply" size={16} /></span>
         <div {...gesture.handlers} title={shortTime(m.at, now)} className={`relative select-text rounded-[20px] px-4 py-2.5 text-[15.5px] leading-snug max-[430px]:rounded-[18px] max-[430px]:px-3.5 max-[430px]:py-2 max-[430px]:leading-[1.4] ${cls} ${open ? "ring-2 ring-grape" : ""} [-webkit-touch-callout:none]`} style={{ transform: `translateX(${gesture.shift}px)`, transition: gesture.shift ? "none" : "transform .2s ease", touchAction: "pan-y" }}>
           <Body m={m} mine={mine} s={s} convo={convo} />
@@ -255,6 +257,7 @@ function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
       </div> : null}
       {m.send && <SendCard convo={convo} m={m as Msg & { send: NonNullable<Msg["send"]> }} />}
       <Shots m={m} />
+      {m.files?.length ? <FileCards files={m.files} /> : null}
       <Pills m={m} s={s} convo={convo} mine={mine} />
     </div>
   );
@@ -365,7 +368,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
               const lastOfRun = !next || next.from !== m.from;
               const day = newDay && now > 0 ? <div className="label my-5 text-center text-[9px] text-ink/45">{dayLabel(m.at, now)}</div> : null;
               // The reply bubble is empty until the first words arrive; the typing dots stand in for it (one bubble, not two).
-              if (m.from !== "system" && !m.text && !m.file && !m.voice && !m.send) return null;
+              if (m.from !== "system" && !m.text && !m.file && !m.files?.length && !m.voice && !m.send) return null;
               if (m.from === "system" && m.tx) return <div key={m.id} id={`m-${m.id}`} data-msg>{day}<TxReceipt tx={m.tx} /></div>;
               if (m.from === "system") return (
                 <div key={m.id} data-msg>{day}

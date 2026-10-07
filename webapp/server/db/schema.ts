@@ -319,3 +319,21 @@ export const socialSeen = pgTable("social_seen", {
   firstUserId: uuid("first_user_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.provider, t.subject] })]);
+
+/** Files in chat: sent by an agent from its computer, made by the image tool, or uploaded by you. Owner-only. */
+export const agentFiles = pgTable("agent_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** agent | upload | generated */
+  source: text("source").notNull(),
+  agentSlug: text("agent_slug").notNull().default(""),
+  convo: text("convo").notNull().default(""),
+  messageId: text("message_id").notNull().default(""),
+  name: text("name").notNull(),
+  mime: text("mime").notNull(),
+  size: integer("size").notNull(),
+  /** where it lives on the agent's computer */
+  path: text("path").notNull().default(""),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

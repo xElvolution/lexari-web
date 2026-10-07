@@ -19,7 +19,7 @@ import pty from "node-pty";
 
 const PORT = Number(process.env.PORT || 3295);
 const SECRET = process.env.DESKTOP_SECRET || "";
-const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:4";
+const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:5";
 const SOCKS = process.env.DESKTOP_SOCKS || "/opt/lexari-desktop/socks";
 const IDLE_MS = Number(process.env.DESKTOP_IDLE_MS || 15 * 60_000);
 if (SECRET.length < 32) { console.error("DESKTOP_SECRET missing"); process.exit(1); }
@@ -211,9 +211,44 @@ async function listFiles(user, path) {
   return { path: p, entries };
 }
 
-async function readBody(req) {
-  let raw = ""; for await (const ch of req) { raw += ch; if (raw.length > 20_000) break; }
+async function readBody(req, max = 20_000) {
+  let raw = ""; for await (const ch of req) { raw += ch; if (raw.length > max) return {}; }
   try { return JSON.parse(raw || "{}"); } catch { return {}; }
+}
+
+// Files in chat. Paths stay under /home/agent (no "..", no symlink games: realpath must stay inside too).
+const FILE_MAX = Number(process.env.DESKTOP_FILE_MAX || 10 * 1024 * 1024);
+const okPath = (p) => typeof p === "string" && p.startsWith("/home/agent/") && !p.includes("..") && !/[\0\n]/.test(p) && p.length < 400;
+/** Reads one file the agent made (base64), at most FILE_MAX bytes. */
+async function pullFile(user, p) {
+  if (!okPath(p)) return { error: "bad path" };
+  const c = await ensure(user);
+  const st = await sh(["exec", c, "bash", "-c", 'r=$(realpath -e -- "$1") && case "$r" in /home/agent/*) [ -f "$r" ] && stat -c %s -- "$r";; *) exit 3;; esac', "_", p]);
+  if (st.code !== 0) return { error: "not found" };
+  const size = Number(st.out.trim());
+  if (!(size >= 0)) return { error: "not found" };
+  if (size > FILE_MAX) return { error: "too big", size };
+  const r = await new Promise((resolve) => {
+    // read the resolved path (checked again) so a symlink can't point the read outside /home/agent
+    execFile("docker", ["exec", c, "bash", "-c", 'r=$(realpath -e -- "$1") && case "$r" in /home/agent/*) exec base64 -w0 -- "$r";; *) exit 3;; esac', "_", p], { timeout: 30_000, maxBuffer: Math.ceil(FILE_MAX * 1.4) + 1024 }, (err, stdout) => resolve(err ? null : String(stdout)));
+  });
+  last.set(c, Date.now());
+  return r === null ? { error: "read failed" } : { b64: r, size };
+}
+/** Writes an upload into ~/Uploads (only there), creating the folder. */
+async function pushFile(user, p, b64) {
+  if (!okPath(p) || !p.startsWith("/home/agent/Uploads/") || p.slice(20).includes("/")) return { error: "bad path" };
+  const buf = Buffer.from(String(b64 || ""), "base64");
+  if (!buf.length || buf.length > FILE_MAX) return { error: "bad size" };
+  const c = await ensure(user);
+  const r = await new Promise((resolve) => {
+    const k = spawn("docker", ["exec", "-i", c, "bash", "-c", 'mkdir -p /home/agent/Uploads && cat > "$1"', "_", p], { stdio: ["pipe", "ignore", "pipe"] });
+    const t = setTimeout(() => k.kill("SIGKILL"), 30_000);
+    k.on("close", (code) => { clearTimeout(t); resolve(code); });
+    k.stdin.end(buf);
+  });
+  last.set(c, Date.now());
+  return r === 0 ? { ok: true, path: p, size: buf.length } : { error: "write failed" };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -222,8 +257,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/health") return send(200, { ok: true });
     const key = String(req.headers["x-desktop-secret"] || "");
     if (key.length !== SECRET.length || !crypto.timingSafeEqual(Buffer.from(key), Buffer.from(SECRET))) return send(401, { error: "unauthorized" });
-    const body = await readBody(req);
+    const body = await readBody(req, req.url === "/push" ? Math.ceil(FILE_MAX * 1.4) + 4096 : 20_000);
     if (!okUser(body.user)) return send(400, { error: "bad user" });
+    if (req.url === "/pull" && req.method === "POST") return send(200, await pullFile(body.user, String(body.path || "")));
+    if (req.url === "/push" && req.method === "POST") return send(200, await pushFile(body.user, String(body.path || ""), body.b64));
     if (req.url === "/exec" && req.method === "POST") return send(200, await execCmd(body.user, String(body.cmd || "").slice(0, 2000), !!body.quiet));
     if (req.url === "/shot" && req.method === "POST") return send(200, await screenshot(body.user));
     if (req.url === "/files" && req.method === "POST") return send(200, await listFiles(body.user, body.path));

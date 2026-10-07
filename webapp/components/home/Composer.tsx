@@ -6,6 +6,7 @@ import { AgentTile } from "../faces";
 import { ensureMic, transcribe, type Transcriber } from "@/lib/voice";
 import Icon from "../Icon";
 import { fmtSecs } from "../agents";
+import { uploadFile, type SentFile } from "@/lib/files";
 
 const kb = (n: number) => (n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
 const BARS = 36;
@@ -15,7 +16,19 @@ type Reply = { id: string; from: string; text: string };
 export default function Composer({ id, name, members, suggestions, onCall, onDesktop, desktopOpen, reply = null, replyName = "", onClearReply }: { id: string; name: string; members?: { id: string; name: string }[]; suggestions: string[]; onCall: () => void; onDesktop: () => void; desktopOpen: boolean; reply?: Reply | null; replyName?: string; onClearReply?: () => void }) {
   const app = useApp();
   const [text, setText] = useState("");
-  const [file, setFile] = useState<{ name: string; size: string } | null>(null);
+  // An attachment is uploaded as soon as you pick it (it lands on the agent's computer in ~/Uploads); Send waits for it.
+  const [file, setFile] = useState<(SentFile & { uploading?: boolean; preview?: string }) | null>(null);
+  const picking = useRef(0);
+  useEffect(() => () => { if (file?.preview) URL.revokeObjectURL(file.preview); }, [file?.preview]);
+  const attach = (f: File) => {
+    const n = ++picking.current;
+    setFile({ name: f.name, size: kb(f.size), uploading: true, preview: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined });
+    uploadFile(f, id).then(
+      (up) => { if (picking.current === n) setFile((cur) => (cur ? { ...up, preview: cur.preview } : cur)); },
+      (e: Error) => { if (picking.current === n) { setFile(null); toast({ text: e.message }); } },
+    );
+  };
+  const dropFile = () => { picking.current++; setFile(null); };
   const [rec, setRec] = useState<number | null>(null); // seconds recorded, null when not recording
   const [heard, setHeard] = useState(""); // live transcript while recording
   const tr = useRef<Transcriber | null>(null);
@@ -36,8 +49,9 @@ export default function Composer({ id, name, members, suggestions, onCall, onDes
   const grow = () => { const t = input.current; if (!t) return; if (!t.value) setMulti(false); t.style.height = "auto"; if (t.value && t.scrollHeight > 48) setMulti(true); t.style.height = `${Math.min(160, t.scrollHeight)}px`; };
   useEffect(() => { requestAnimationFrame(grow); }, [multi]); // eslint-disable-line react-hooks/exhaustive-deps
   const send = (v = text) => {
-    if (!v.trim() && !file) return;
-    sendTo(id, v, { ...(file ? { file } : {}), ...(reply ? { reply } : {}) }); setText(""); setFile(null); onClearReply?.(); requestAnimationFrame(grow); input.current?.focus();
+    if ((!v.trim() && !file) || file?.uploading) return;
+    const sent = file ? { name: file.name, size: file.size, ...(file.id ? { id: file.id, mime: file.mime, kind: file.kind } : {}) } : null;
+    sendTo(id, v, { ...(sent ? { file: sent } : {}), ...(reply ? { reply } : {}) }); setText(""); setFile(null); onClearReply?.(); requestAnimationFrame(grow); input.current?.focus();
   };
   /* Voice note: ask for the mic, transcribe while recording, then put the text in the box to check before sending. */
   const startVoice = async () => {
@@ -60,7 +74,7 @@ export default function Composer({ id, name, members, suggestions, onCall, onDes
   };
   function cancelVoice() { tr.current?.abort(); tr.current = null; setRec(null); setHeard(""); }
   useEffect(() => { if (reply) input.current?.focus(); }, [reply]);
-  const ready = !!text.trim() || !!file;
+  const ready = (!!text.trim() || !!file) && !file?.uploading;
   // Group chats: "@" opens a picker of the members to mention.
   const [caret, setCaret] = useState(0);
   const q = members ? /(?:^|\s)@([\p{L}\p{N}]*)$/u.exec(text.slice(0, caret))?.[1] : undefined;
@@ -100,15 +114,18 @@ export default function Composer({ id, name, members, suggestions, onCall, onDes
           {file && rec === null && (
             <div className="flex px-3 pt-3">
               <span className="flex max-w-full items-center gap-2 rounded-2xl bg-tint py-1.5 pl-2 pr-1.5 text-[13px] text-ink">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-grape text-white"><Icon name="file" size={16} /></span>
-                <span className="min-w-0"><span className="block truncate font-semibold">{file.name}</span><span className="block text-[11.5px] text-ink/60">{file.size}</span></span>
-                <button onClick={() => setFile(null)} aria-label="Remove attachment" className="ml-1 grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-line"><Icon name="x" size={14} /></button>
+                {file.preview
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={file.preview} alt="" className="h-8 w-8 shrink-0 rounded-xl object-cover" />
+                  : <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-grape text-white"><Icon name="file" size={16} /></span>}
+                <span className="min-w-0"><span className="block truncate font-semibold">{file.name}</span><span data-upload-state={file.uploading ? "uploading" : "ready"} className="block text-[11.5px] text-ink/60">{file.uploading ? "Uploading…" : file.size}</span></span>
+                <button type="button" onClick={dropFile} aria-label="Remove attachment" className="ml-1 grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-line"><Icon name="x" size={14} /></button>
               </span>
             </div>
           )}
           {rec === null ? (
             <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex flex-wrap items-end gap-1 p-1.5">
-              <input ref={picker} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile({ name: f.name, size: kb(f.size) }); e.target.value = ""; }} />
+              <input ref={picker} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) attach(f); e.target.value = ""; }} />
               <button type="button" onClick={onDesktop} data-tour="desktop-btn" aria-pressed={desktopOpen} aria-label={`Open ${name}'s desktop`} title="Desktop" className={desktopOpen ? "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition" : iconBtn}><Icon name="monitor" size={19} /></button>
               <button type="button" onClick={() => picker.current?.click()} aria-label="Attach a file" title="Attach a file" className={iconBtn}><Icon name="clip" size={19} /></button>
               <textarea ref={input} value={text} rows={1} onChange={(e) => { setText(e.target.value.slice(0, 2000)); setCaret(e.target.selectionStart ?? e.target.value.length); grow(); }} onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)} onKeyDown={(e) => { if (matches.length && (e.key === "Enter" || e.key === "Tab") && !e.shiftKey) { e.preventDefault(); pickMention(matches[0]); } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } else if (e.key === "Escape" && reply) onClearReply?.(); }} placeholder={`Message ${name}`} aria-label={`Message ${name}`} className={`${multi ? "order-first basis-full px-3" : "flex-1 px-1.5"} max-h-40 min-h-[40px] min-w-0 resize-none bg-transparent py-2 text-[16px] leading-6 text-ink outline-none placeholder:text-ink/45`} />

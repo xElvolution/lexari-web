@@ -22,6 +22,10 @@ import { desktopOn, runInDesktop, runRequests } from "@/server/desktop";
 import { DESKTOP_MARK } from "@/server/engram/grokCli";
 import { CU_BUDGET_MS, computerOn, computerTask, runComputer, stripComputer } from "@/server/computer";
 import { agentLevel, takeShift } from "@/server/hub/levels";
+import { attachFromComputer, fileTags, ownFiles, saveGenerated, stripFileTags, type FileItem } from "@/server/agentFiles";
+import { generateImage, imageGenOn, imagineTask, stripImagine } from "@/server/imageGen";
+import { grokVision, visionOn, type VisionImage } from "@/server/engram/grokCli";
+import type { ModelInfo } from "@/content/models";
 import { queuePriority, recallSize, shifts } from "@/lib/perks";
 
 export const runtime = "nodejs";
@@ -29,6 +33,7 @@ export const runtime = "nodejs";
 const PER_MINUTE = Number(process.env.CHAT_PER_MINUTE || 12);
 const PER_DAY = Number(process.env.CHAT_PER_DAY || 300);
 const CU_PER_HOUR = Number(process.env.CU_PER_HOUR || 10); // computer-use tasks per person per hour
+const IMAGES_PER_HOUR = Number(process.env.IMAGES_PER_HOUR || 20); // pictures from the image tool per person per hour
 
 /** One reply from the agent, streamed as SSE. Needs a session; the agent's settings come from the database. */
 export async function POST(req: Request) {
@@ -90,7 +95,9 @@ export async function POST(req: Request) {
   }
   const history = isGroupChat ? body.history.map((t) => (t.from !== "you" && t.from !== body.speaker ? { ...t, text: `${nameFor(t.from)} said: ${t.text}` } : t)) : body.history;
   const peers = (body.peers || []).filter((p) => p.from !== body.speaker);
-  const text = peers.length ? `${body.text}\n\n(Already answered in the group:\n${peers.map((p) => `${nameFor(p.from)}: ${p.text}`).join("\n")}\nNow give YOUR answer as ${speakerName}. Add something of your own; don't repeat them or speak for them.)` : body.text;
+  const upload = !body.call ? await uploadNote(userId, body.meta) : "";
+  const said = `${body.text}${upload}`;
+  const text = peers.length ? `${said}\n\n(Already answered in the group:\n${peers.map((p) => `${nameFor(p.from)}: ${p.text}`).join("\n")}\nNow give YOUR answer as ${speakerName}. Add something of your own; don't repeat them or speak for them.)` : said;
   // Level perks: Quick replies / Priority desk jump the model queue, Bigger memory reads more notes, Second shift runs two at once.
   const level = speakerRow && speakerRow.kind !== "hired" ? await agentLevel(userId, speakerRow.slug) : body.speaker === "home" ? await agentLevel(userId, "home") : 1;
   const priority = queuePriority(level);
@@ -105,7 +112,10 @@ export async function POST(req: Request) {
   const call = body.call === true;
   if (call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${CALL_HINT}${cutOff(body.history) ? `\n${INTERRUPT_HINT}` : ""}` };
   const tools = !call && desktopOn();
-  if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}` };
+  if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}\n${FILES_HINT}` };
+  // The image tool (a new picture from a description) only exists when an image key is set; otherwise the agent says so.
+  const imagineOn = !call && imageGenOn();
+  if (!call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${imagineOn ? IMAGINE_HINT : IMAGINE_OFF}` };
   const event = !call && body.event ? body.event : null;
   // The wallet tools (send, read) are for chat turns; every turn (calls too) reads the wallet history below.
   const owner = session.wallet || "";
@@ -114,7 +124,7 @@ export async function POST(req: Request) {
   // wallet and asks you to fund it for a task.
   const hiredSpeaker = speakerRow?.kind === "hired";
   if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${hiredSpeaker ? FUND_HINT(speakerName) : WALLET_HINT}` };
-  const hold = tools || !!wallet;
+  const hold = tools || !!wallet || imagineOn;
   const tz = body.tz || "UTC";
   const savingUser: Promise<boolean> = !call && !(body.follow === true || !!event)
     ? saveUserMsg(userId, body).then(() => true, (error) => { console.error(`[chat] save user message: ${(error as Error).message}`); return false; })
@@ -163,6 +173,8 @@ export async function POST(req: Request) {
     async start(controller) {
       const send = (payload: unknown) => { try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)); } catch {} };
       let full = "";
+      let shownText = "";
+      const show = (t: string) => { if (t) { shownText += t; send({ token: t }); } };
       // Second shift: one agent answers one turn at a time (two from level 5); a call turn never waits.
       let leave: (() => void) | null = null;
       try {
@@ -172,7 +184,7 @@ export async function POST(req: Request) {
         for await (const token of streamCompletion(prompt, abort.signal, { fast: call, priority, ...usage })) {
           full += token;
           const cut = hold ? (full.indexOf("<") >= 0 ? full.indexOf("<") : full.length) : full.length;
-          if (cut > shown) { send({ token: full.slice(shown, cut) }); shown = cut; }
+          if (cut > shown) { show(full.slice(shown, cut)); shown = cut; }
         }
         // A task for the agent's computer: it looks at its screen and clicks/types step by step (server/computer.ts),
         // with live progress ({cu}) and the screenshots it took attached to this reply ({shots}).
@@ -189,9 +201,10 @@ export async function POST(req: Request) {
           if (r.shots.length) send({ shots: { id: body.replyMsgId, n: r.shots } });
           send({ cu: null });
           full = `${before && shown > 0 ? before + "\n\n" : ""}${r.text}`;
-          send({ token: full.slice(shown) });
+          show(full.slice(shown));
           shown = full.length;
         }
+        const askedFiles = tools ? fileTags(full) : [];
         const cmds = tools && !task ? runRequests(full) : [];
         if (cmds.length) {
           // The agent asked to use its computer: run the commands in this person's container, then let it answer with the output.
@@ -204,8 +217,13 @@ export async function POST(req: Request) {
           const before = full.slice(0, full.indexOf("<run>")).trim();
           const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Output from your computer:\n${results.join("\n\n")}\n\nNow answer the person in plain sentences. Do not write <run> again.` }];
           let answer = "";
-          if (before && shown > 0) send({ token: "\n\n" });
-          for await (const token of streamCompletion(follow, abort.signal, { priority, ...usage })) { answer += token; send({ token }); }
+          if (before && shown > 0) show("\n\n");
+          let sentA = 0;
+          for await (const token of streamCompletion(follow, abort.signal, { priority, ...usage })) {
+            answer += token;
+            const cut = answer.indexOf("<") >= 0 ? answer.indexOf("<") : answer.length;
+            if (cut > sentA) { show(answer.slice(sentA, cut)); sentA = cut; }
+          }
           full = `${before && shown > 0 ? before + "\n\n" : ""}${answer.replace(/<run>[\s\S]*?<\/run>/g, "").trim()}`;
         }
         // Wallet tags: reads are answered with real chain data; a send becomes a confirm card only you can approve.
@@ -213,7 +231,7 @@ export async function POST(req: Request) {
         if (wallet && hiredSpeaker) {
           const f = event ? null : fundRequest(full);
           const visible = stripFundTags(stripWalletTags(full));
-          if (visible.length > shown) send({ token: visible.slice(shown) });
+          if (visible.length > shown) show(visible.slice(shown));
           full = visible;
           if (f) {
             pay = { to: hireWallet(userId, speakerRow!.slug).publicKey.toBase58(), sol: 0, usd: f.usd, status: "pending", kind: "fund", agent: speakerRow!.slug, reason: f.reason };
@@ -227,10 +245,10 @@ export async function POST(req: Request) {
             const before = stripWalletTags(full.slice(0, full.search(/<wallet>/i))).trim();
             const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Lexari wallet data:\n${facts}\n\nNow answer the person in plain sentences using this data. Do not write <wallet> again.` }];
             let answer = "";
-            if (before && shown > 0) send({ token: "\n\n" });
+            if (before && shown > 0) show("\n\n");
             for await (const token of streamCompletion(follow, abort.signal, { priority, ...usage })) { answer += token; }
             const clean = stripWalletTags(answer);
-            send({ token: clean });
+            show(clean);
             full = `${before && shown > 0 ? before + "\n\n" : ""}${clean}${w.sends.length ? full.slice(full.search(/<send/i)) : ""}`;
             shown = full.length;
           }
@@ -238,20 +256,45 @@ export async function POST(req: Request) {
           if (w.sends.length) {
             const c = checkSend(w.sends[0], wallet);
             if (c.ok) { pay = c.send; send({ send: pay }); }
-            else { const note = `\n\n(I couldn't prepare that transfer: ${c.why})`; full += note; send({ token: note }); }
+            else { const note = `\n\n(I couldn't prepare that transfer: ${c.why})`; full += note; show(note); }
           }
           const visible = stripWalletTags(full);
-          if (visible.length > shown && !w.reads.length) send({ token: visible.slice(shown) });
+          if (visible.length > shown && !w.reads.length) show(visible.slice(shown));
           full = visible;
           if (!full && pay) full = `I've prepared ${pay.sol} SOL to ${pay.to.slice(0, 4)}…${pay.to.slice(-4)}. Tap Confirm to send it.`;
         } else if (tools && shown < full.length) {
-          send({ token: full.slice(shown) });
+          show(full.slice(shown));
         }
+        // Files: the ones the agent named come off its computer, and <imagine> makes a new picture (metered as premium).
+        const files: FileItem[] = [];
+        if (!call && !event) {
+          const paths = [...new Set([...askedFiles, ...(tools ? fileTags(full) : [])])].slice(0, 4);
+          const idea = imagineOn ? imagineTask(full) : null;
+          full = stripFileTags(stripImagine(full));
+          const ctx = { agent: speakerRow?.slug || "home", convo: body.convo, messageId: body.replyMsgId };
+          const notes: string[] = [];
+          if (paths.length) {
+            send({ tool: { files: paths.length } });
+            const r = await attachFromComputer(userId, ctx, paths).catch((e: Error) => { console.error(`[files] ${e.message}`); return { items: [] as FileItem[], notes: ["my computer didn't hand the file over"] }; });
+            files.push(...r.items); notes.push(...r.notes);
+          }
+          if (idea) {
+            send({ tool: { imagine: true } });
+            const made = await imagine(userId, body.convo, ctx, idea, abort.signal);
+            if (made.item) files.push(made.item); else notes.push(made.note);
+          }
+          if (notes.length) full = `${full}${full ? "\n\n" : ""}(${notes.join("; ")}.)`;
+          if (!full.trim() && files.length) full = files.length === 1 ? `Here's ${files[0].name}.` : `Here are the ${files.length} files.`;
+          if (files.length) send({ files });
+        }
+        // What reached the screen must match the saved reply: add what's missing, or replace it when they differ.
+        if (full.startsWith(shownText)) show(full.slice(shownText.length));
+        else { shownText = full; send({ replace: full }); }
         const split = splitRemember(full);
         if (!split.reply) throw new ModelError("The agent sent an empty reply. Try again.");
         if (split.remember) send({ remember: split.remember });
         if (call) { send({ done: true }); return; } // a call is not saved as chat messages
-        await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay ? { send: pay } : event ? { about: event.tx } : null, userSaved);
+        await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay || files.length ? { ...(pay ? { send: pay } : {}), ...(files.length ? { files } : {}) } : event ? { about: event.tx } : null, userSaved);
         if (!body.follow && !event && !(await counted)) await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).
         await notify(userId, { kind: "reply", title: speakerName || "Your agent", body: split.reply.replace(/\s+/g, " ").slice(0, 140), url: `/agents/${encodeURIComponent(body.convo)}`, key: `reply:${body.replyMsgId}` });
@@ -337,6 +380,55 @@ const INTERRUPT_HINT = `The person just talked over you, so your previous reply 
 function cutOff(history: { from: string; text: string }[]) {
   for (let i = history.length - 1; i >= 0; i--) if (history[i].from !== "you") return history[i].text.includes(INTERRUPTED);
   return false;
+}
+
+const FILES_HINT = [
+  "To send the person a file from your computer (a script, CSV, image, PDF and so on), put <file>/home/agent/path/to/file</file> at the end of your reply, one tag per file, at most four. Lexari attaches it as a file card they can preview and download.",
+  "Do this whenever they ask you to send, share, attach or give them a file, and after you make or edit one for them. Make the file first with <run>, then attach it in your answer. Save new files in /home/agent/Outputs (mkdir -p it first).",
+  "Photos and files the person uploads are on your computer in /home/agent/Uploads. To edit images use Python with Pillow (python3 -c \"from PIL import Image, ImageDraw, ImageFont; ...\") or ImageMagick (convert, identify), save the result in /home/agent/Outputs and send it back with <file>.",
+].join(" ");
+const IMAGINE_HINT = "To make a brand new picture from a description (not an edit of a photo), write <imagine>a detailed description of the picture</imagine>, at most one per reply. The picture is attached to your reply. Don't say which tool or company makes it.";
+const IMAGINE_OFF = "If the person asks you to generate, draw or create a brand new AI image from a description, tell them AI image generation isn't switched on yet. You can still edit photos they upload and make charts or graphics with code.";
+
+/** Usage for one picture from the image tool: premium usage first, then credits (never the free Lamina pool). */
+const IMAGES: ModelInfo = { id: "images", label: "Image making", short: "Images", maker: "", blurb: "", pool: "premium", price: { in: 0, out: 0 } };
+async function imagine(userId: string, convo: string, ctx: { agent: string; convo: string; messageId: string }, idea: string, signal: AbortSignal): Promise<{ item?: FileItem; note: string }> {
+  const ok = await rateLimit(`img:h:${userId}`, IMAGES_PER_HOUR, 3_600_000).catch(() => false);
+  if (!ok) return { note: "I've made a lot of pictures this hour, so try again in a bit" };
+  const t = await beginTurn({ userId, model: IMAGES, convo, agent: ctx.agent, kind: "chat", prompt: [{ content: idea }] }).catch(() => null);
+  if (!t) return { note: "I couldn't make the picture right now" };
+  if (isBlocked(t)) return { note: t.reason === "premium_locked" ? "making pictures needs Pro or credits, so I couldn't make it" : "you're out of premium usage and credits for pictures, so I couldn't make it" };
+  try {
+    const g = await generateImage(idea, signal);
+    t.add({ model: "images", promptTokens: 0, completionTokens: 0, costUsd: g.costUsd, estimated: false });
+    const ext = g.data[0] === 0xff ? "jpg" : "png";
+    const name = `${idea.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "picture"}.${ext}`;
+    return { item: await saveGenerated(userId, ctx, name, g.data), note: "" };
+  } catch (e) {
+    console.error(`[imagine] ${e instanceof ModelError ? e.message : (e as Error).message}`);
+    return { note: "the picture couldn't be made right now" };
+  } finally {
+    await t.settle().catch((e: Error) => console.error(`[billing] image settle: ${e.message}`));
+  }
+}
+
+/** A file you attached to this message: where it is on the agent's computer and, for a photo, what it shows. */
+async function uploadNote(userId: string, meta: Record<string, unknown> | undefined) {
+  const f = (meta as { file?: { id?: string } } | undefined)?.file;
+  if (!f?.id) return "";
+  const [row] = await ownFiles(userId, [f.id]).catch(() => []);
+  if (!row) return "";
+  const kb = row.size >= 1048576 ? `${(row.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(row.size / 1024))} KB`;
+  const img = row.mime === "image/png" || row.mime === "image/jpeg";
+  let seen = "";
+  if (img && visionOn() && row.size <= 4 * 1048576) {
+    const pic: VisionImage = { mime: row.mime as VisionImage["mime"], data: Buffer.from(row.data).toString("base64") };
+    seen = await grokVision("You describe images for an assistant that will edit them. In two or three plain sentences say what the picture shows, its layout and orientation, main colours, and any text in it.", "Describe this image.", [pic], AbortSignal.timeout(30_000))
+      .then((t) => t.replace(/\s+/g, " ").trim().slice(0, 700)).catch(() => "");
+  }
+  const where = row.path ? `It is on your computer at ${row.path}.` : "It couldn't be copied to your computer.";
+  const look = seen ? ` What it shows: ${seen}` : row.mime.startsWith("image/") ? " You can't see the picture itself right now, but you can still edit it with code." : "";
+  return `\n\n[The person attached ${row.name} (${kb}). ${where}${look}]`;
 }
 
 const DESKTOP_HINT = [
