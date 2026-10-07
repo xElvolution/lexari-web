@@ -5,10 +5,13 @@ import { db, DbMissingError } from "./db";
 
 export class HttpError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** Extra JSON fields sent with the error (for example { billing: { reason: "short_balance", ... } }). */
+  extra?: Record<string, unknown>;
+  constructor(status: number, message: string, extra?: Record<string, unknown>) {
     super(message);
     this.name = "HttpError";
     this.status = status;
+    this.extra = extra;
   }
 }
 
@@ -45,7 +48,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: string) => UUID.test(v);
 
 export function toErrorResponse(error: unknown) {
-  if (error instanceof HttpError) return jsonError(error.status, error.message);
+  if (error instanceof HttpError) return jsonError(error.status, error.message, error.extra);
   if (error instanceof DbMissingError) { configError(); return jsonError(503, "Lexari is not set up on this server yet. Try again later."); }
   const message = error instanceof Error ? error.message : "";
   console.error(message && !/postgres(ql)?:\/\//.test(message) ? message : "request failed");

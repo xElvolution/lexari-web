@@ -116,7 +116,7 @@ export default function TeamPage() {
       </div>
       <section data-rise id="plans" className="mt-8">
         <h2 className="text-[22px] font-bold tracking-tight text-ink">Plans</h2>
-        <p className="mt-0.5 text-[14px] text-ink/55">More seats for more agents. Monthly or yearly (2 months free), paid in devnet SOL.</p>
+        <p className="mt-0.5 text-[14px] text-ink/55">More seats for more agents. Pay by card or USDC.</p>
         <div className="mt-4"><PlanSummary /></div>
       </section>
     </>

@@ -276,7 +276,7 @@ function Billing({ s }: { s: State }) {
   return (
     <BillingSection>
       <Group title="Hires">
-        <Row title="Specialists" desc={s.paid.length ? `${s.paid.length} specialist${s.paid.length === 1 ? "" : "s"} paid for, a one-time ${hirePriceLabel()} each. Released ones come back for free.` : `Specialists are a one-time ${hirePriceLabel()} hire each, paid from your wallet.`}><Link href="/wallets" className={smallBtn}>Wallet</Link></Row>
+        <Row title="Specialists" desc={s.paid.length ? `${s.paid.length} specialist${s.paid.length === 1 ? "" : "s"} hired, a one-time ${hirePriceLabel()} each from your balance. Released ones come back for free.` : `Specialists are a one-time ${hirePriceLabel()} hire each, paid from your Lexari balance.`}><Link href="/wallets" className={smallBtn}>Wallet</Link></Row>
       </Group>
     </BillingSection>
   );

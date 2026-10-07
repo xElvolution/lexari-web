@@ -9,11 +9,86 @@ import { txUrl } from "@/lib/nft";
 import { ackTx, get, logTx, refreshReceipts, set, useApp, type Msg } from "@/lib/store";
 import { nameOf } from "../agents";
 import Icon from "../Icon";
+import { friendly } from "@/lib/api";
+import { shortOf, topUpFor } from "@/lib/balance";
+import { refreshBilling } from "@/lib/billing";
+import { returnToBalance } from "../wallet/agentWallet";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
-/** A SOL transfer your agent prepared in chat. Nothing is sent until you tap Confirm and your wallet signs it. */
+/** A Confirm card in chat: a hired agent asking to be funded from your balance, or a transfer your agent prepared. */
 export default function SendCard({ convo, m }: { convo: string; m: Msg & { send: NonNullable<Msg["send"]> } }) {
+  if (m.send.kind === "fund") return <FundCard convo={convo} m={m} />;
+  return <TransferCard convo={convo} m={m} />;
+}
+
+/**
+ * A hired agent asks for money for a task, in dollars. Confirm debits your balance and the agent's wallet gets test
+ * USDC on devnet. Short balance: Top up opens with the shortfall, then the funding goes through.
+ */
+function FundCard({ convo, m }: { convo: string; m: Msg & { send: NonNullable<Msg["send"]> } }) {
+  const sd = m.send;
+  const st = useApp();
+  const who = st && sd.agent ? nameOf(st, sd.agent) : "your agent";
+  const usd = sd.usd ?? 0;
+  const [busy, setBusy] = useState(false);
+  const [back, setBack] = useState(false);
+  const [err, setErr] = useState(sd.error || "");
+  const key = `chat-${m.id}`.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
+  const update = (patch: Partial<NonNullable<Msg["send"]>>) => {
+    set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === m.id && mm.send ? { ...mm, send: { ...mm.send, ...patch } } : mm)) } }));
+    const { status, sig, error } = { ...sd, ...patch };
+    if (status !== "pending") void api("/api/messages", { method: "PATCH", body: { convo, clientId: m.id, send: { status, ...(sig ? { sig } : {}), ...(error ? { error: error.slice(0, 200) } : {}) } } }).catch(() => {});
+  };
+  const confirm = async (): Promise<void> => {
+    setErr(""); setBusy(true);
+    try {
+      const r = await api<{ funding: { status: string; sig: string | null } }>("/api/wallet/fund", { body: { agent: sd.agent, usd, key } });
+      if (r.funding.status !== "sent") throw new Error("That transfer didn't go through. Your balance was refunded.");
+      update({ status: "sent", ...(r.funding.sig ? { sig: r.funding.sig } : {}) });
+      void refreshBilling();
+    } catch (e) {
+      const s = shortOf(e);
+      if (s) { setBusy(false); topUpFor(s, `Funding ${who}`, () => void confirm()); return; }
+      setErr(friendly(e, "That didn't go through. Nothing was charged."));
+    } finally { setBusy(false); }
+  };
+  const giveBack = async () => {
+    setBack(true);
+    const r = await returnToBalance(sd.agent || "", who);
+    if (r) set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === m.id && mm.send ? { ...mm, send: { ...mm.send, returned: { sig: r.sig || "", sol: 0, usd: r.micros / 1e6 } } } : mm)) } }));
+    setBack(false);
+  };
+  const legacy = !sd.usd; // an older request in SOL: shown for the record only
+  const done = sd.status !== "pending";
+  return (
+    <div data-send-card data-fund-card className="mt-2 w-[min(300px,100%)] rounded-2xl bg-tint p-3.5 ring-1 ring-line">
+      <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-grape text-white"><Icon name="wallet" size={15} /></span><span className="text-[14px] font-bold text-ink">Fund {who}</span><span className="label ml-auto rounded-full bg-[#ffd84d] px-2 py-0.5 text-[8px] text-[#0a0a0a]">Test funds</span></div>
+      <dl className="mt-3 space-y-1.5 text-[13.5px]">
+        <div className="flex justify-between gap-3"><dt className="text-ink/60">Amount</dt><dd className="tab-num font-bold text-ink">{legacy ? `${sd.sol} SOL` : `$${usd.toFixed(2)}`}</dd></div>
+        {sd.reason && <div className="flex justify-between gap-3"><dt className="text-ink/60">For</dt><dd className="min-w-0 text-right text-ink">{sd.reason}</dd></div>}
+        <div className="flex justify-between gap-3"><dt className="text-ink/60">From</dt><dd className="text-ink">{legacy ? "Your wallet" : "Your Lexari balance"}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="text-ink/60">To</dt><dd title={sd.to} className="text-ink">{who}&apos;s wallet</dd></div>
+      </dl>
+      {!legacy && !done && <p className="mt-2 text-[12px] leading-snug text-ink/55">Arrives as test USDC on Solana devnet. Anything unused can go back to your balance.</p>}
+      {sd.status === "sent" && sd.sig && <a data-send-sig href={txUrl(sd.sig)} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 rounded-xl bg-[#e7f8ee] px-3 py-2 text-[13px] font-bold text-[#137a3d]"><Icon name="check" size={14} />Funded · receipt {short(sd.sig)}<Icon name="arrow" size={13} className="ml-auto" /></a>}
+      {!legacy && sd.status === "sent" && (sd.returned ? <p data-fund-returned className="mt-2 text-[12.5px] font-semibold text-ink/65">{sd.returned.usd ? `$${sd.returned.usd.toFixed(2)} went back to your balance` : "Nothing was left to send back."}</p>
+        : <button data-fund-return onClick={() => void giveBack()} disabled={back} className="btn btn-line btn-sm !h-9 mt-2 w-full text-ink disabled:opacity-60">{back ? "Sending back…" : "Task done · leftover to balance"}</button>)}
+      {sd.status === "cancelled" && <p className="mt-3 text-[13px] font-semibold text-ink/55">Cancelled. Nothing was sent.</p>}
+      {legacy && !done && <p className="mt-3 text-[12.5px] text-ink/55">This older request has expired. Ask {who} again.</p>}
+      {err && !done && <p role="alert" className="mt-2 text-[12.5px] text-[#e5484d]">{err}</p>}
+      {!legacy && !done && (
+        <div className="mt-3 flex gap-2">
+          <button onClick={() => update({ status: "cancelled" })} disabled={busy} className="btn btn-line btn-sm !h-9 text-ink">Cancel</button>
+          <button data-send-confirm onClick={() => void confirm()} disabled={busy} className="btn btn-brand btn-sm !h-9 flex-1 disabled:opacity-60">{busy ? "Sending…" : `Confirm $${usd.toFixed(2)}`}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A SOL transfer your agent prepared from your sign-in wallet. Nothing is sent until you tap Confirm and sign it. */
+function TransferCard({ convo, m }: { convo: string; m: Msg & { send: NonNullable<Msg["send"]> } }) {
   const sd = m.send;
   const [busy, setBusy] = useState<"" | "sign" | "confirm">("");
   const [err, setErr] = useState(sd.error || "");

@@ -15,10 +15,10 @@ import Toaster from "./Toaster";
 import Tour from "./Tour";
 import AgentPanel from "./agent/AgentPanel";
 import AddAgentDialog from "./agent/AddAgentDialog";
-import PaySheet from "./PaySheet";
 import { setSeatGate } from "./overlays";
 import UpgradeSheet from "./UpgradeSheet";
 import BillingSheets from "./billing/BillingSheets";
+import BalancePaySheet from "./billing/BalancePaySheet";
 import Celebrate from "./Celebrate";
 import AppLock from "./lock/AppLock";
 import MemoryChain from "./MemoryChain";
@@ -210,7 +210,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <AgentPanel />
       <AddAgentDialog />
       <UpgradeSheet />
-      <PaySheet />
+      <BalancePaySheet />
       <BillingSheets />
       <Celebrate />
       <AppLock />

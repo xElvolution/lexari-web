@@ -1,122 +1,74 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { PublicKey, type ConfirmedSignatureInfo } from "@solana/web3.js";
-import { CHAIN_NAME, SOLANA_CLUSTER, tokenUrl, txUrl } from "@/lib/nft";
-import { rpcConnection } from "@/lib/rpc";
-import { shortAddr } from "@/content/appData";
-import { isCreated, toast, useApp, type State } from "@/lib/store";
-import { useWalletBridge } from "@/lib/walletBridge";
+import { isCreated, useApp, type State } from "@/lib/store";
+import { openTopUp } from "@/lib/billing";
 import Icon from "../Icon";
-import { AgentTile } from "../faces";
 import { myAgents, type MyAgent } from "../agents";
 import { openAdd } from "../overlays";
+import { money } from "../billing/parts";
 import CardVisual from "./CardVisual";
 import GetCardDialog from "./GetCardDialog";
 import { cardFor, useCards } from "./useCards";
 import type { Card } from "@/lib/pay";
 import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
 import CardSheet from "./CardSheet";
+import { AgentWalletCard, useWallet, type HistoryRow, type WalletData } from "./agentWallet";
 
-const copy = (addr: string, what: string) => { navigator.clipboard?.writeText(addr).catch(() => {}); toast({ text: `Copied ${what}` }); };
-const ago = (t: number) => { const s = Math.max(1, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`; };
+const when = (t: number) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const ICON: Record<string, string> = { topup_card: "plus", topup_crypto: "plus", dev_grant: "plus", refund: "check", fund_refund: "check", fund_return: "check", hire: "user", card: "file", fund: "wallet", plan: "star", usage: "spark" };
 
-function TxRow({ t }: { t: ConfirmedSignatureInfo }) {
+function HistoryItem({ r }: { r: HistoryRow }) {
+  const up = r.delta > 0;
   return (
-    <li>
-      <a href={txUrl(t.signature)} target="_blank" rel="noreferrer" className="flex items-center gap-3 py-3">
-        <span className={`grid h-9 w-9 place-items-center rounded-xl ${t.err ? "bg-[#e5484d]/15 text-[#e5484d]" : "bg-tint text-ink/70"}`}><Icon name={t.err ? "x" : "check"} size={15} /></span>
-        <span className="min-w-0 flex-1"><span className="block truncate font-mono text-[13px] text-ink">{shortAddr(t.signature)}</span><span className="block text-[12px] text-ink/50">{t.blockTime ? ago(t.blockTime * 1000) : "pending"}{t.err ? " · failed" : ""}</span></span>
-        <Icon name="arrow" size={14} className="text-ink/40" />
-      </a>
+    <li data-history={r.kind} className="flex items-center gap-3 py-2.5">
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${up ? "bg-[#e7f8ee] text-[#137a3d]" : "bg-tint text-ink/70"}`}><Icon name={(ICON[r.kind] || "wallet") as never} size={15} /></span>
+      <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-semibold text-ink">{r.label}</span><span className="block text-[12px] text-ink/50">{when(r.at)}{r.kind === "plan" && r.paid ? ` · paid ${money(r.paid, { cents: true })} at Top up` : ""}</span></span>
+      <span className={`tab-num shrink-0 text-[14px] font-bold ${up ? "text-[#137a3d]" : "text-ink"}`}>{r.delta === 0 ? "" : `${up ? "+" : "\u2212"}${money(Math.abs(r.delta), { cents: true })}`}</span>
     </li>
   );
 }
 
-/** Every recent transaction (up to 25 from the chain) in a sheet, with the explorer one tap away. */
-function AllTxs({ txs, addr, onClose }: { txs: ConfirmedSignatureInfo[]; addr: string; onClose: () => void }) {
-  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-[85] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-5" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-label="All transactions" data-all-txs className="pop pb-safe-dlg flex max-h-[88dvh] w-full max-w-[460px] flex-col rounded-t-[26px] bg-card p-5 ring-1 ring-line sm:rounded-[26px]">
-        <div className="flex items-center justify-between"><h2 className="display text-[24px] text-ink">Transactions</h2><button onClick={onClose} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={19} /></button></div>
-        <p className="mt-1 text-[13px] text-ink/55">Your latest {txs.length} on Solana devnet.</p>
-        <ul className="no-bar mt-2 min-h-0 flex-1 divide-y divide-[var(--line)] overflow-y-auto overscroll-contain">{txs.map((t) => <TxRow key={t.signature} t={t} />)}</ul>
-        <a href={tokenUrl(addr)} target="_blank" rel="noreferrer" className="mt-3 rounded-full bg-tint py-3 text-center text-[14px] font-bold text-brand-ink">Open in Solana Explorer</a>
-      </div>
-    </div>
-  );
-}
-
-/** The Solana wallet you signed in with: its devnet balance and latest transactions, read from the chain. */
-function PersonalWallet({ s }: { s: State }) {
-  const bridge = useWalletBridge();
-  const addr = s.auth?.address || "";
-  const [sol, setSol] = useState<string>("…");
-  const [txs, setTxs] = useState<ConfirmedSignatureInfo[] | null>(null);
-  const [n, setN] = useState(0);
+/** Your Lexari balance in dollars: Top up by card or USDC, and everything it paid for. */
+function Balance({ d }: { d: WalletData | null | undefined }) {
+  const hide = useHideBalance();
   const [all, setAll] = useState(false);
-  useEffect(() => {
-    if (!addr) return;
-    const conn = rpcConnection();
-    const pk = new PublicKey(addr);
-    conn.getBalance(pk).then((b) => setSol((b / 1e9).toFixed(4))).catch(() => setSol("—"));
-    conn.getSignaturesForAddress(pk, { limit: 25 }).then(setTxs).catch(() => setTxs([]));
-  }, [addr, n]);
-  const home = myAgents(s)[0];
-  const hide = useHideBalance();
-  const connected = !!bridge && bridge.publicKey.toBase58() === addr;
-
+  const hist = d?.history ?? [];
   return (
-    <>
-      <section data-rise className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <div className="grain relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#6a3dff,#5b2bff_45%,#2a0f9a)] p-6 text-white shadow-[0_24px_50px_-28px_rgba(91,43,255,.9)] sm:p-7">
-          <div className="flex items-center gap-3">
-            <AgentTile id="home" look={s.agent?.look} size={48} className="!bg-white/15" />
-            <div className="min-w-0 flex-1"><div className="text-[17px] font-bold">{home?.name || "Your agent"}</div><div className="text-[13px] text-white/75">{connected ? `${bridge!.name} · connected` : "Not connected on this device"}</div></div>
-            <span className="label rounded-full bg-white/15 px-2.5 py-1 text-[8.5px]">{CHAIN_NAME}</span>
-          </div>
-          <div className="mt-7"><div className="flex items-center gap-2"><span className="label text-[9px] text-white/70">SOL balance</span><button data-hide-balance onClick={() => setHideBalance(!hide)} aria-label={hide ? "Show balance" : "Hide balance"} aria-pressed={hide} className="grid h-7 w-7 place-items-center rounded-full bg-white/15 hover:bg-white/25"><Icon name={hide ? "eyeoff" : "eye"} size={14} /></button></div><div data-balance className="display tab-num mt-2 text-[56px] leading-none">{hide ? MASK : sol}</div></div>
-          <div className="mt-6 flex flex-wrap items-center gap-2">
-            {addr && <button onClick={() => copy(addr, "wallet address")} title={addr} className="flex min-w-0 items-center gap-2 rounded-full bg-white/15 py-2 pl-3.5 pr-4 font-mono text-[12.5px] transition hover:bg-white/25"><Icon name="wallet" size={15} /><span className="truncate">{shortAddr(addr)}</span><Icon name="copy" size={14} /></button>}
-            {addr && <a href={tokenUrl(addr)} target="_blank" rel="noreferrer" className="rounded-full bg-white/15 px-4 py-2 text-[12.5px] font-semibold transition hover:bg-white/25">Explorer</a>}
-            {SOLANA_CLUSTER === "devnet" && <a href="https://faucet.solana.com" target="_blank" rel="noreferrer" className="rounded-full bg-white px-4 py-2 text-[12.5px] font-bold text-[#3514b0]">Get devnet SOL</a>}
-            <button onClick={() => setN((x) => x + 1)} className="rounded-full bg-white/15 px-4 py-2 text-[12.5px] font-semibold transition hover:bg-white/25">Refresh</button>
-          </div>
-          {!connected && <p className="mt-4 text-[13px] text-white/80">{s.auth?.method === "google" ? "Your wallet loads after Google or email sign-in finishes." : "Open your wallet app or extension to sign from this device."}</p>}
+    <section data-rise className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <div data-lexari-balance className="grain relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#6a3dff,#5b2bff_45%,#2a0f9a)] p-6 text-white shadow-[0_24px_50px_-28px_rgba(91,43,255,.9)] sm:p-7">
+        <div className="flex items-center gap-2"><span className="label text-[9px] text-white/75">Lexari balance</span><button data-hide-balance onClick={() => setHideBalance(!hide)} aria-label={hide ? "Show balance" : "Hide balance"} aria-pressed={hide} className="grid h-7 w-7 place-items-center rounded-full bg-white/15 hover:bg-white/25"><Icon name={hide ? "eyeoff" : "eye"} size={14} /></button></div>
+        <div data-balance className="display tab-num mt-3 text-[56px] leading-none">{d === undefined ? "…" : hide ? MASK : money(d?.balance ?? 0, { cents: true })}</div>
+        <p className="mt-3 max-w-[28rem] text-[13.5px] leading-snug text-white/80">Pays for AI usage past your plan, hires, agent cards and funding your agents.</p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button data-open-topup onClick={() => openTopUp({ product: "credits" })} className="btn btn-white btn-sm !h-11"><Icon name="plus" size={16} />Top up</button>
+          <span className="inline-flex h-11 items-center rounded-full bg-white/15 px-4 text-[12.5px] font-semibold">Card or USDC</span>
         </div>
-        <div className="rounded-[28px] bg-card p-5 ring-1 ring-line sm:p-6">
-          <div className="flex items-center justify-between"><h3 className="text-[16px] font-bold text-ink">Recent transactions</h3>{addr && !!txs?.length && <button data-view-all onClick={() => setAll(true)} className="text-[13px] font-bold text-brand-ink hover:underline">View all</button>}</div>
-          {txs === null ? <p className="mt-3 text-[14px] text-ink/60">Loading…</p> : !txs.length ? <p className="mt-3 text-[14px] text-ink/60">Nothing yet. A check-in on the Hub is a good first one.</p> : (
-            <ul data-tx-list className="no-bar mt-3 max-h-[250px] divide-y divide-[var(--line)] overflow-y-auto overscroll-contain [mask-image:linear-gradient(to_bottom,black_86%,transparent)]">
-              {txs.slice(0, 5).map((t) => <TxRow key={t.signature} t={t} />)}
-            </ul>
-          )}
-        </div>
-      </section>
-      {all && txs && <AllTxs txs={txs} addr={addr} onClose={() => setAll(false)} />}
-    </>
+      </div>
+      <div className="rounded-[28px] bg-card p-5 ring-1 ring-line sm:p-6">
+        <div className="flex items-center justify-between"><h3 className="text-[16px] font-bold text-ink">History</h3>{hist.length > 5 && <button data-view-all onClick={() => setAll((x) => !x)} className="text-[13px] font-bold text-brand-ink hover:underline">{all ? "Less" : "View all"}</button>}</div>
+        {d === undefined ? <p className="mt-3 text-[14px] text-ink/60">Loading…</p> : !hist.length ? <p className="mt-3 text-[14px] text-ink/60">Nothing yet. Top ups, plans, hires and refunds show here.</p> : (
+          <ul data-history-list className="mt-1 divide-y divide-[var(--line)]">{(all ? hist : hist.slice(0, 5)).map((r) => <HistoryItem key={r.id} r={r} />)}</ul>
+        )}
+      </div>
+    </section>
   );
 }
 
-/** An agent you made: it spends from your wallet, inside its card limit. */
-function OtherWallet({ s, a, card, onCard }: { s: State; a: MyAgent; card: Card | null; onCard: () => void }) {
-  const hide = useHideBalance();
-  const left = card ? Math.max(0, card.limit - card.spent) : 0;
+/** Every agent on your team has its own wallet, separate from your balance. */
+function AgentWallets({ s, d }: { s: State; d: WalletData | null | undefined }) {
+  const names = new Map(myAgents(s).map((a) => [a.id, a.name]));
+  const list = d?.agents ?? [];
   return (
-    <li data-agent-wallet={a.id} className="rounded-[22px] bg-card p-4 ring-1 ring-line">
-      <div className="flex items-center gap-3">
-        <AgentTile id={a.id} look={s.agent?.look} size={44} />
-        <div className="min-w-0 flex-1"><div className="truncate text-[15.5px] font-bold text-ink">{a.name}&apos;s wallet</div><div className="truncate text-[12.5px] text-ink/60">Spends from your wallet{s.auth?.address ? ` · ${shortAddr(s.auth.address)}` : ""}</div></div>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-xl bg-tint p-2"><div className="label text-[8px] text-ink/50">Can spend</div><div className="tab-num mt-0.5 text-[15px] font-bold text-ink">{card ? (hide ? MASK : `$${left}`) : "—"}</div></div>
-        <div className="rounded-xl bg-tint p-2"><div className="label text-[8px] text-ink/50">Spent</div><div className="tab-num mt-0.5 text-[15px] font-bold text-ink">{card ? (hide ? MASK : `$${card.spent}`) : "$0"}</div></div>
-        <div className="rounded-xl bg-tint p-2"><div className="label text-[8px] text-ink/50">Card</div><div className="mt-0.5 text-[15px] font-bold text-ink">{card ? `··${card.last4}` : "None"}</div></div>
-      </div>
-      <button onClick={onCard} className="btn btn-line btn-sm mt-3 w-full text-ink">{card ? "Open card" : "Get a card"}</button>
-    </li>
+    <section data-rise className="min-w-0">
+      <div className="flex items-baseline justify-between gap-3"><h2 className="text-[17px] font-bold text-ink">Your agents&apos; wallets</h2><span className="text-[12.5px] text-ink/55">One per agent</span></div>
+      <p className="mt-1 text-[13px] leading-snug text-ink/60">Each agent holds its own funds for tasks. Fund one from your balance; what&apos;s left can come back.</p>
+      {d === undefined ? <p className="mt-3 text-[14px] text-ink/60">Loading…</p> : !list.length ? <p className="mt-3 text-[14px] text-ink/60">No agents yet. <button onClick={() => openAdd("create")} className="font-bold text-brand-ink">Create an agent</button></p> : (
+        <ul className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2.5 sm:grid-cols-2">{list.map((a) => <AgentWalletCard key={a.slug} a={a} name={names.get(a.slug) || a.name || "Agent"} look={a.slug === "home" ? s.agent?.look : undefined} funding={d!.funding} fundings={d!.fundings} />)}</ul>
+      )}
+      {d && <p className="mt-3 text-[12px] leading-snug text-ink/50">{d.funding.network === "devnet" ? "Test funds on Solana devnet, not real money. " : ""}Base and Ethereum wallets are coming later.</p>}
+    </section>
   );
 }
 
@@ -141,41 +93,36 @@ function CardRow({ a, card, onGet, onOpen }: { a: MyAgent; card: Card | null; on
   );
 }
 
-/** Money: each agent can have a wallet and a card. Your personal agent uses your wallet. */
+/** Money: your Lexari balance on top, then each agent's own wallet. Cards live on their own tab. */
 export default function WalletsView() {
   const s = useApp()!;
   const params = useSearchParams();
   const [tab, setTab] = useState<"wallets" | "cards">(params.get("tab") === "cards" ? "cards" : "wallets");
   const [getFor, setGetFor] = useState<string | null>(null);
   const [openFor, setOpenFor] = useState<string | null>(null);
-  // Wallets and cards belong to the agents you made. A hired specialist has its own task wallet (see its profile).
+  const d = useWallet();
+  // Cards belong to the agents you made. A hired specialist uses its own wallet instead.
   const agents = myAgents(s).filter((a) => isCreated(s, a.id));
   const cards = useCards();
   const go = (t: "wallets" | "cards") => { setTab(t); window.history.replaceState(null, "", t === "cards" ? "/wallets?tab=cards" : "/wallets"); };
-  const how = s.auth?.method === "google" ? "Your personal agent uses the wallet made for you when you signed in." : "Your personal agent uses the wallet you signed in with.";
   return (
     <>
       <div data-rise className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <span className="label text-brand-ink">Money</span>
-          <h1 className="display mt-3 text-[44px] text-ink sm:text-[60px]">{tab === "wallets" ? "Wallets." : "Cards."}</h1>
-          <p className="mt-2 max-w-[38rem] text-[16px] text-ink/70">{tab === "wallets" ? `${how} Your other agents pay with it too.` : "A card lets an agent pay for tools and compute inside a limit you set. Each agent buys its own."}</p>
+          <h1 className="display mt-3 text-[44px] text-ink sm:text-[60px]">{tab === "wallets" ? "Wallet." : "Cards."}</h1>
+          <p className="mt-2 max-w-[38rem] text-[16px] text-ink/70">{tab === "wallets" ? "Your Lexari balance, and the wallets your agents hold." : "A card lets an agent pay for tools and compute inside a limit you set. Each agent gets its own."}</p>
         </div>
-        <div className="inline-flex shrink-0 self-start rounded-full bg-tint p-1 sm:self-end" role="tablist" aria-label="Wallets or cards">
-          {([["wallets", "wallet", "Wallets"], ["cards", "file", "Cards"]] as const).map(([id, ic, l]) => (
+        <div className="inline-flex shrink-0 self-start rounded-full bg-tint p-1 sm:self-end" role="tablist" aria-label="Wallet or cards">
+          {([["wallets", "wallet", "Wallet"], ["cards", "file", "Cards"]] as const).map(([id, ic, l]) => (
             <button key={id} role="tab" aria-selected={tab === id} onClick={() => go(id)} className={`flex items-center gap-2 rounded-full px-4 py-2 text-[14px] font-bold transition ${tab === id ? "bg-card text-ink shadow-[0_2px_0_var(--color-grape)]" : "text-ink/65 hover:text-ink"}`}><Icon name={ic} size={15} />{l}</button>
           ))}
         </div>
       </div>
       {tab === "wallets" ? (
-        <div className="mt-6 grid gap-6">
-          <PersonalWallet s={s} />
-          <section data-rise>
-            <div className="flex items-baseline justify-between gap-3"><h2 className="text-[17px] font-bold text-ink">Agent wallets</h2><span className="text-[12.5px] text-ink/55">Agents you made</span></div>
-            {agents.length > 1 ? <ul className="mt-3 grid gap-2">{agents.slice(1).map((a) => { const c = cardFor(cards, a.id); return <OtherWallet key={a.id} s={s} a={a} card={c} onCard={() => (c ? setOpenFor(a.id) : setGetFor(a.id))} />; })}</ul>
-              : <p className="mt-3 text-[14px] text-ink/60">Agents you make get a wallet here. <button onClick={() => openAdd("create")} className="font-bold text-brand-ink">Create an agent</button></p>}
-            {s.hired.length > 0 && <p data-hired-wallet-note className="mt-3 text-[12.5px] leading-snug text-ink/55">Hired specialists don&apos;t use your wallet. Each has its own task wallet and asks you in chat when a task needs funds.</p>}
-          </section>
+        <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6">
+          <Balance d={d} />
+          <AgentWallets s={s} d={d} />
         </div>
       ) : (
         <div className="mt-6 grid gap-3">{agents.map((a) => <CardRow key={a.id} a={a} card={cardFor(cards, a.id)} onGet={() => setGetFor(a.id)} onOpen={() => setOpenFor(a.id)} />)}</div>

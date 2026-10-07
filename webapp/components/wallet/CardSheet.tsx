@@ -18,6 +18,7 @@ const b64 = (u: Uint8Array) => { let s = ""; u.forEach((x) => { s += String.from
 /** Card details: masked until you view it with your PIN (or a wallet confirm when no PIN is set). Auto-hides after 30 s. */
 export default function CardSheet({ agent, name, card, onClose }: { agent: string; name: string; card: Card; onClose: () => void }) {
   const s = useApp()!;
+  const fromBalance = card.tx?.startsWith("balance:");
   const [full, setFull] = useState<Card | null>(null);
   const [left, setLeft] = useState(0);
   const [pin, setPin] = useState(false);
@@ -99,8 +100,8 @@ export default function CardSheet({ agent, name, card, onClose }: { agent: strin
             <ul className="mt-2 divide-y divide-[var(--line)] rounded-2xl px-4 ring-1 ring-line">
               <li className="flex items-center gap-3 py-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-tint text-brand-ink"><Icon name="file" size={16} /></span>
-                <span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold text-ink">Card bought</span><span className="block text-[12px] text-ink/55">{card.createdAt ? new Date(card.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "Paid on Solana"}{card.tx ? " · " : ""}{card.tx && <a href={txUrl(card.tx)} target="_blank" rel="noreferrer" className="font-semibold hover:text-brand-ink">View on Solana</a>}</span></span>
-                <span className="tab-num shrink-0 font-mono text-[13px] font-semibold text-ink">{card.amount ? `−${(card.amount / 1e9).toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL` : ""}</span>
+                <span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold text-ink">Card bought</span><span className="block text-[12px] text-ink/55">{card.createdAt ? new Date(card.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : ""}{fromBalance ? " · from your balance" : card.tx ? <> · <a href={txUrl(card.tx)} target="_blank" rel="noreferrer" className="font-semibold hover:text-brand-ink">Chain receipt</a></> : ""}</span></span>
+                <span className="tab-num shrink-0 font-mono text-[13px] font-semibold text-ink">{card.amount ? (fromBalance ? `−$${(card.amount / 1e6).toFixed(2)}` : `−${(card.amount / 1e9).toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL`) : ""}</span>
               </li>
             </ul>
             <p className="mt-2 text-[12.5px] text-ink/55">{card.spent ? `$${card.spent} spent this month.` : `No purchases yet. When ${name} buys a tool or compute, it shows here.`}</p>

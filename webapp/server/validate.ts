@@ -41,11 +41,11 @@ export const agentBody = z.object({
 export const agentNotes = z.object({ nick: z.string().max(40).optional(), notes: z.string().max(2000).optional(), memoryOn: z.boolean().optional(), voice: voiceBody.nullable().optional() }).strict();
 export const rehireBody = z.object({ slug: z.string().min(1).max(40) }).strict();
 
-export const hireBody = z.object({
-  slug: z.string().min(1).max(40),
-  tx: z.string().min(64).max(100),
-  mint: z.enum(["SOL", "USDC"]),
-}).strict();
+export const hireBody = z.union([
+  z.object({ slug: z.string().min(1).max(40), pay: z.literal("balance") }).strict(),
+  /** legacy: a payment already made on chain */
+  z.object({ slug: z.string().min(1).max(40), tx: z.string().min(64).max(100), mint: z.enum(["SOL", "USDC"]) }).strict(),
+]);
 
 export const mePatch = z.object({
   profile: z.object({ name: z.string().max(60), username: z.string().max(30), bio: z.string().max(300), coverFit: z.string().max(20) }).partial().optional(),
@@ -102,11 +102,18 @@ export const claimBody = z.discriminatedUnion("kind", [
 ]);
 export const signatureBody = z.object({ signature: z.string().min(64).max(100) }).strict();
 
-export const cardBuyBody = z.object({
+export const cardBuyBody = z.union([
+  z.object({ agent: z.string().regex(/^[a-z0-9-]{1,40}$/), pay: z.literal("balance"), limit: z.number().int().min(10).max(5000) }).strict(),
+  /** legacy: a payment already made on chain */
+  z.object({ agent: z.string().regex(/^[a-z0-9-]{1,40}$/), tx: z.string().min(64).max(100), limit: z.number().int().min(10).max(5000) }).strict(),
+]);
+
+export const fundAgentBody = z.object({
   agent: z.string().regex(/^[a-z0-9-]{1,40}$/),
-  tx: z.string().min(64).max(100),
-  limit: z.number().int().min(10).max(5000),
+  usd: z.number().min(1).max(25),
+  key: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
 }).strict();
+export const agentReturnBody = z.object({ agent: z.string().regex(/^[a-z0-9-]{1,40}$/) }).strict();
 
 export const cardPatchBody = z.object({
   agent: z.string().regex(/^[a-z0-9-]{1,40}$/),

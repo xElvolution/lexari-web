@@ -2,7 +2,7 @@
 
 /** A failed API call, with the server's friendly message. */
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public data?: unknown) { super(message); }
 }
 
 /** JSON call to the app's own API. Throws ApiError with a message you can show. */
@@ -21,7 +21,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
     throw new ApiError(0, "Could not reach Lexari. Check your connection.");
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, typeof (data as { error?: unknown }).error === "string" ? (data as { error: string }).error : "Something went wrong. Try again.");
+  if (!res.ok) throw new ApiError(res.status, typeof (data as { error?: unknown }).error === "string" ? (data as { error: string }).error : "Something went wrong. Try again.", data);
   return data as T;
 }
 

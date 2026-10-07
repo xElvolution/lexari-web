@@ -5,13 +5,13 @@ import { PLANS } from "@/content/appData";
 import { TOPUP_PACKS } from "@/content/billing";
 import { PREMIUM, turnCostUsd } from "@/content/models";
 import { api, friendly } from "@/lib/api";
-import { closeBillingSheet, payCrypto, startCard, startCrypto, usdcBalance, verifyPayment, useBilling, type CryptoRequest, type PayStep, type TopUpIntent } from "@/lib/billing";
+import { closeBillingSheet, payCrypto, startCard, startCrypto, usdcBalance, verifyPayment, useBilling, type CryptoRequest, type BuyIntent, type PayStep, type TopUpIntent } from "@/lib/billing";
 import { balanceOf, isEmbedded, payer } from "@/lib/pay";
 import { setPlan, toast } from "@/lib/store";
 import type { PlanId } from "@/content/appData";
 import { celebrate } from "../Celebrate";
 import Icon from "../Icon";
-import { CardGlyph, Sheet, Spinner, UsdcGlyph, dateShort } from "./parts";
+import { CardGlyph, Sheet, Spinner, UsdcGlyph, dateShort, money } from "./parts";
 
 type Rail = "card" | "crypto";
 const SELLABLE = PLANS.filter((p) => p.usd > 0 && !p.later);
@@ -30,6 +30,9 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
   const cardReady = !!state?.rails.card.ready;
   const [rail, setRail] = useState<Rail>("card");
   const [busy, setBusy] = useState(false);
+  const need = intent.need;
+  const close = () => { closeBillingSheet(); intent.cancel?.(); };
+  const after = intent.then ? () => intent.then?.() : undefined;
   const usd = product === "plan" ? SELLABLE.find((p) => p.id === planId)!.usd : pack;
   const id = product === "plan" ? planId : String(pack);
   const plan = SELLABLE.find((p) => p.id === planId)!;
@@ -38,16 +41,22 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
   const smaller = product === "plan" && curPlan && curPlan !== "free" && (PLANS.find((p) => p.id === curPlan)?.seats ?? 0) > plan.seats;
 
   return (
-    <Sheet label="topup" wide title="Top up" sub="Pay Lexari for a plan or extra credits. Your agents' wallets stay separate." icon={<Icon name="wallet" size={20} />} onClose={closeBillingSheet} closable={!busy}>
+    <Sheet label="topup" wide title="Top up" sub={need ? "Add to your balance and the purchase goes through." : "Add to your Lexari balance, or pick a plan."} icon={<Icon name="wallet" size={20} />} onClose={close} closable={!busy}>
+      {need && (
+        <div data-shortfall className="mb-3 rounded-[18px] bg-[#fff4d6] p-3.5 text-[13.5px] leading-snug text-[#5c4300] ring-1 ring-[#f5d27a]">
+          <div className="font-bold">{need.what} costs {money(need.needMicros, { cents: true })}</div>
+          <div className="mt-0.5">Your balance is {money(need.haveMicros, { cents: true })}. Add at least <b>{money(need.shortMicros, { cents: true })}</b> to continue.</div>
+        </div>
+      )}
       <div className="inline-flex w-full rounded-full bg-tint p-1" role="radiogroup" aria-label="What to buy">
-        {([["credits", "Extra credits"], ["plan", "Plan"]] as const).map(([k, l]) => (
+        {([["credits", "Balance"], ["plan", "Plan"]] as const).filter(([k]) => !need || k === "credits").map(([k, l]) => (
           <button key={k} role="radio" aria-checked={product === k} disabled={busy} onClick={() => setProduct(k)} className={`h-9 flex-1 rounded-full text-[13.5px] font-bold transition ${product === k ? "bg-card text-ink shadow-sm" : "text-ink/60 hover:text-ink"}`}>{l}</button>
         ))}
       </div>
 
       {product === "credits" ? (
         <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Credit pack">
-          {TOPUP_PACKS.map((v) => (
+          {TOPUP_PACKS.filter((v) => !need || v * 1e6 >= need.shortMicros).map((v) => (
             <button key={v} role="radio" aria-checked={pack === v} data-pack={v} disabled={busy} onClick={() => setPack(v)} className={`rounded-[18px] p-3 text-left transition max-[430px]:p-2.5 ${pack === v ? "bg-grape text-white ring-1 ring-grape" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
               <span className="display block text-[28px] leading-none tabular-nums max-[430px]:text-[24px]">${v}</span>
               <span className={`mt-1.5 block text-[11.5px] leading-tight ${pack === v ? "text-white/80" : "text-ink/55"}`}>about {sonnetTurns(v).toLocaleString()} Sonnet replies</span>
@@ -81,14 +90,14 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
       <div className="mt-4">
         {rail === "card"
           ? <CardPay ready={cardReady} usd={usd} intent={{ product, id }} onCrypto={() => setRail("crypto")} setBusy={setBusy} />
-          : <CryptoPay key={`${product}-${id}`} usd={usd} intent={{ product, id }} title={product === "plan" ? `${plan.name} plan, 30 days` : `$${pack} of extra credits`} setBusy={setBusy} />}
+          : <CryptoPay key={`${product}-${id}`} usd={usd} intent={{ product, id }} title={product === "plan" ? `${plan.name} plan, 30 days` : `$${pack} for your Lexari balance`} setBusy={setBusy} after={product === "credits" ? after : undefined} />}
       </div>
-      <p className="mt-3 text-center text-[11.5px] leading-snug text-ink/45">Credits are spent on Lexari plans and AI usage only. They can&apos;t be withdrawn or sent.</p>
+      <p className="mt-3 text-center text-[11.5px] leading-snug text-ink/45">Your balance pays for AI usage, hires, agent cards and funding agents. It can&apos;t be withdrawn.</p>
     </Sheet>
   );
 }
 
-function CardPay({ ready, usd, intent, onCrypto, setBusy }: { ready: boolean; usd: number; intent: Required<TopUpIntent>; onCrypto: () => void; setBusy: (b: boolean) => void }) {
+function CardPay({ ready, usd, intent, onCrypto, setBusy }: { ready: boolean; usd: number; intent: BuyIntent; onCrypto: () => void; setBusy: (b: boolean) => void }) {
   const [err, setErr] = useState("");
   const [going, setGoing] = useState(false);
   if (!ready) {
@@ -117,7 +126,7 @@ function CardPay({ ready, usd, intent, onCrypto, setBusy }: { ready: boolean; us
 
 type Phase = "loading" | "ready" | "nowallet" | "funding" | PayStep | "done";
 
-function CryptoPay({ usd, intent, title, setBusy }: { usd: number; intent: Required<TopUpIntent>; title: string; setBusy: (b: boolean) => void }) {
+function CryptoPay({ usd, intent, title, setBusy, after }: { usd: number; intent: BuyIntent; title: string; setBusy: (b: boolean) => void; after?: () => void }) {
   const { state } = useBilling();
   const rails = state?.rails.crypto;
   const need = Math.round(usd * 1e6);
@@ -159,8 +168,10 @@ function CryptoPay({ usd, intent, title, setBusy }: { usd: number; intent: Requi
       setPlan(s.plan.id as PlanId, s.plan.seats, s.plan.endsAt);
       const name = PLANS.find((p) => p.id === intent.id)?.name ?? "your plan";
       setTimeout(() => { closeBillingSheet(); celebrate({ confetti: "big", title: s.plan.id === intent.id ? `You're on ${name}` : `${name} is booked`, body: s.plan.id === intent.id ? `Lamina all month, $${PLANS.find((p) => p.id === intent.id)?.premiumUsd ?? 0} of premium models and ${s.plan.seats} seats, starting now.` : "It starts when your current plan ends. Nothing you have now is lost.", tx }); }, 700);
+    } else if (after) {
+      setTimeout(() => { closeBillingSheet(); toast({ text: `$${usd} added to your balance` }); after(); }, 500);
     } else {
-      setTimeout(() => { closeBillingSheet(); celebrate({ confetti: true, title: `$${usd} of credits added`, body: "They kick in after your included usage, within your spend limit.", tx }); }, 700);
+      setTimeout(() => { closeBillingSheet(); celebrate({ confetti: true, title: `$${usd} added to your balance`, body: "It pays for AI usage past your plan, hires, agent cards and funding agents.", tx }); }, 700);
     }
   };
   const pay = async () => {

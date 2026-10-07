@@ -12,7 +12,6 @@ import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from
 import { connection } from "./hub/chain";
 
 const FEE = 5000;
-export const MAX_FUND_SOL = 0.2;
 
 export function hireWallet(userId: string, slug: string) {
   const secret = process.env.SESSION_SECRET || "";
@@ -53,19 +52,21 @@ export async function returnLeftover(userId: string, slug: string, to: string) {
 }
 
 export const FUND_MARK = "[lexari-fund]";
+export const MAX_FUND_USD = 10;
 export const FUND_HINT = (name: string) => [
   FUND_MARK,
-  `You are a hired specialist with your own task wallet on Solana devnet. You never touch the person's wallet.`,
-  `If a task really needs money (paid API credits, compute, a domain, test tokens), ask for it with one tag: <fund sol="AMOUNT" for="what it pays for"/> (at most ${MAX_FUND_SOL} SOL; keep it small, like 0.01 to 0.05).`,
-  `Lexari shows the person a Confirm card; the SOL only moves if they approve it, and anything you don't use goes back to them.`,
+  `You are a hired specialist with your own task wallet on Solana devnet. You never touch the person's money directly.`,
+  `If a task really needs money (paid API credits, compute, a domain, test tokens), ask for it in US dollars with one tag: <fund usd="AMOUNT" for="what it pays for"/> (at most $${MAX_FUND_USD}; keep it small, like 1 to 3).`,
+  `Lexari shows the person a Confirm card. If they approve, the dollars come from their Lexari balance and arrive in your wallet as test USDC on devnet. Anything you don't use goes back to their balance.`,
   `After a fund tag say briefly what it is for and that they need to confirm. Never claim money arrived. Don't ask for funds unless the task needs them. You are ${name}.`,
 ].join(" ");
 
+/** A fund request in dollars. Old "sol" tags from earlier replies are read as dollars too, at most the cap. */
 export function fundRequest(text: string) {
-  const m = text.match(/<fund\s+sol=["']?([0-9.]+)["']?(?:\s+for=["']([^"']{1,120})["'])?\s*\/?>(?:\s*<\/fund>)?/i);
+  const m = text.match(/<fund\s+(?:usd|sol)=["']?\$?([0-9.]+)["']?(?:\s+for=["']([^"']{1,120})["'])?\s*\/?>(?:\s*<\/fund>)?/i);
   if (!m) return null;
-  const sol = Number(m[1]);
-  if (!(sol > 0)) return null;
-  return { sol: Math.min(MAX_FUND_SOL, Math.round(sol * 1e6) / 1e6), reason: (m[2] || "").trim() };
+  const usd = Number(m[1]);
+  if (!(usd > 0)) return null;
+  return { usd: Math.min(MAX_FUND_USD, Math.max(1, Math.round(usd * 100) / 100)), reason: (m[2] || "").trim() };
 }
 export const stripFundTags = (t: string) => t.replace(/<fund\b[^>]*\/?>(\s*<\/fund>)?/gi, "").replace(/[ \t]+\n/g, "\n").trim();

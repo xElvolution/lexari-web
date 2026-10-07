@@ -12,10 +12,12 @@ import type { Blocked } from "@/server/billing/meter";
 import { LAMINA, modelById, type ModelInfo } from "@/content/models";
 import { api, ApiError, friendly } from "./api";
 import { connection, payer } from "./pay";
+import { confirmSig } from "./rpc";
 
 export type { BillingState };
 export type OutInfo = (Blocked | { reason: "model_unavailable"; model: string; modelLabel: string }) & { convo?: string; agent?: string };
-export type TopUpIntent = { product: "plan" | "credits"; id?: string };
+/** need: a purchase was short, so the sheet shows the shortfall; then: runs after the top up lands (the purchase goes on). */
+export type TopUpIntent = { product: "plan" | "credits"; id?: string; need?: { needMicros: number; haveMicros: number; shortMicros: number; what: string }; then?: () => void; cancel?: () => void };
 export type BillingSheet =
   | { kind: "models"; convo: string; agent: string | null; group: boolean }
   | { kind: "topup"; intent: TopUpIntent }
@@ -101,11 +103,12 @@ export async function setSpend(mode: "disabled" | "fixed" | "unlimited", limitUs
 
 export type CryptoRequest = { id: string; recipient: string; mint: string; reference: string; amountMinor: number; decimals: number; cluster: string; title: string; url: string; expiresAt: number };
 
-export async function startCard(intent: Required<TopUpIntent>) {
+export type BuyIntent = { product: "plan" | "credits"; id: string };
+export async function startCard(intent: BuyIntent) {
   const r = await api<{ rail: "card"; card: { id: string; url: string } }>("/api/billing/checkout", { body: { rail: "card", product: intent.product, id: intent.id } });
   return r.card;
 }
-export async function startCrypto(intent: Required<TopUpIntent>) {
+export async function startCrypto(intent: BuyIntent) {
   const r = await api<{ rail: "crypto"; crypto: CryptoRequest }>("/api/billing/checkout", { body: { rail: "crypto", product: intent.product, id: intent.id } });
   return r.crypto;
 }
@@ -144,8 +147,8 @@ export async function payCrypto(req: CryptoRequest, onStep: (s: PayStep, sig?: s
   onStep("sending");
   const sig = await c.sendRawTransaction(signed.serialize());
   onStep("confirming", sig);
-  const res = await c.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-  if (res.value.err) throw new Error("The payment failed on Solana.");
+  // poll, like every other confirmation in the app (no websocket needed, works through the RPC proxy)
+  await confirmSig(c, sig, lastValidBlockHeight).catch((e: Error) => { throw /failed on Solana/.test(e.message) ? new Error("The payment failed on Solana.") : e; });
   onStep("verifying", sig);
   return verifyPayment(req.id, sig);
 }

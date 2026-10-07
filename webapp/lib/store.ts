@@ -30,7 +30,7 @@ export type Msg = {
   call?: number; // a call log line, length in seconds
   re?: Record<string, string[]>; // reactions: emoji → who reacted ("you" or an agent id)
   reply?: { id: string; from: string; text: string }; // the message this one answers
-  send?: { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; error?: string; kind?: "fund"; agent?: string; reason?: string; returned?: { sig: string; sol: number } }; // a SOL transfer the agent prepared; only you can confirm it
+  send?: { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; error?: string; kind?: "fund"; agent?: string; reason?: string; usd?: number; returned?: { sig: string; sol: number; usd?: number } }; // a SOL transfer the agent prepared; only you can confirm it
   tx?: TxReceipt; // a receipt row: what happened to a Confirm card (or SOL that arrived)
   about?: string; // an agent's follow-up on a receipt (its id)
 };

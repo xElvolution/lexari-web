@@ -216,9 +216,9 @@ export async function POST(req: Request) {
           if (visible.length > shown) send({ token: visible.slice(shown) });
           full = visible;
           if (f) {
-            pay = { to: hireWallet(userId, speakerRow!.slug).publicKey.toBase58(), sol: f.sol, status: "pending", kind: "fund", agent: speakerRow!.slug, reason: f.reason };
+            pay = { to: hireWallet(userId, speakerRow!.slug).publicKey.toBase58(), sol: 0, usd: f.usd, status: "pending", kind: "fund", agent: speakerRow!.slug, reason: f.reason };
             send({ send: pay });
-            if (!full) full = `I need ${f.sol} SOL${f.reason ? ` for ${f.reason}` : ""}. Tap Confirm to fund my task wallet; anything I don't use comes back to you.`;
+            if (!full) full = `I need $${f.usd}${f.reason ? ` for ${f.reason}` : ""}. Tap Confirm to send it from your balance to my wallet; anything I don't use goes back to your balance.`;
           }
         } else if (wallet) {
           const w = walletRequests(full);

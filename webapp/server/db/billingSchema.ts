@@ -96,3 +96,26 @@ export const payments = pgTable("payments", {
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   paidAt: timestamp("paid_at", { withTimezone: true }),
 });
+
+/**
+ * Money moved between the Lexari balance and an agent's own wallet (migration 0010_agent_funding.sql).
+ * in: the balance pays and test USDC goes to the agent's wallet. out: USDC comes back from the agent's wallet to the balance.
+ * Devnet test funds only; nothing here converts fiat to crypto on mainnet.
+ */
+export const agentFundings = pgTable("agent_fundings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  agentSlug: text("agent_slug").notNull(),
+  chain: text("chain").notNull().default("solana"),
+  direction: text("direction").notNull(),
+  asset: text("asset").notNull().default("USDC"),
+  amount: bigint("amount_micros", { mode: "number" }).notNull(),
+  /** pending | sent | failed | refunded */
+  status: text("status").notNull().default("pending"),
+  txSig: text("tx_sig").unique(),
+  clientKey: text("client_key").unique(),
+  address: text("address").notNull(),
+  error: text("error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  settledAt: timestamp("settled_at", { withTimezone: true }),
+});
