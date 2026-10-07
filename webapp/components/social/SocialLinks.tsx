@@ -7,8 +7,9 @@ import { LANDING_URL } from "@shared/sites";
 import Icon from "@/components/Icon";
 import { friendly } from "@/lib/api";
 import { DEV_SOCIAL, devLinkSocial, forgetSocial, loadSocial, syncSocial, useSocial } from "@/lib/social";
-import { SOCIALS, SOCIAL_NAME, SOCIAL_QUEST, enabledSocials, type Social } from "@/lib/socialInfo";
-import { toast, type State } from "@/lib/store";
+import { SOCIALS, SOCIAL_NAME, SOCIAL_QUEST, enabledSocials, socialStatus, type Social } from "@/lib/socialInfo";
+import { planOf, toast, useApp, type State } from "@/lib/store";
+import { openTopUp } from "@/lib/billing";
 import { ensureBridge } from "@/lib/walletBridge";
 
 const PRIVY_ON = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID;
@@ -30,20 +31,21 @@ type Actions = { ready: boolean; busy: Social | null; link: (p: Social) => void;
 /** The status card and one row per network. Works the same with Privy, the local test mode, or neither. */
 function Panel({ a }: { a: Actions }) {
   const s = useSocial();
-  const st = s.status;
-  const steps = [st.linked >= 1, st.linked >= 2];
+  const app = useApp();
+  // The badge follows the plan you are on right now, so it appears the moment you upgrade.
+  const st = socialStatus(s.links.length, !!app && planOf(app).id !== "free");
   return (
     <>
       <section data-social-status className="grain relative overflow-hidden rounded-[22px] bg-[linear-gradient(130deg,#2a0f9a,#5b2bff_60%,#8f6bff)] p-5 text-white">
         <div className="flex items-start gap-4">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15"><Icon name={st.tier === "member" ? "user" : "verified"} size={24} /></span>
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15"><Icon name={st.badge ? "verified" : "link"} size={24} /></span>
           <div className="min-w-0 flex-1">
             <div className="label text-[9.5px] text-white/70">Your status</div>
-            <div className="display mt-1 text-[30px] leading-none">{st.label}</div>
-            <p className="mt-2 text-[13.5px] leading-snug text-white/80">{st.next ?? "Two linked accounts. Your profile shows the Trusted badge."}</p>
+            <div data-status-label className="display mt-1 flex items-center gap-2 text-[30px] leading-none">{st.label}{st.badge && <Icon name="verified" size={24} stroke={2.2} />}</div>
+            <p className="mt-2 text-[13.5px] leading-snug text-white/80">{st.note}</p>
           </div>
         </div>
-        <div className="mt-4 flex gap-1.5" aria-hidden>{steps.map((on, i) => <i key={i} className={`h-1.5 flex-1 rounded-full ${on ? "bg-white" : "bg-white/25"}`} />)}</div>
+        {!st.paid && <button data-badge-pro onClick={() => openTopUp({ product: "plan", id: "pro" })} className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-white/15 px-3.5 text-[13px] font-bold transition hover:bg-white/25"><Icon name="verified" size={14} stroke={2.2} />Get the badge with Pro</button>}
         <p className="mt-3 text-[12.5px] text-white/75">Your first linked account also finishes the Verified quest in the Hub for {SOCIAL_QUEST.reward} coins. Each social account can earn it once.</p>
       </section>
 
@@ -58,7 +60,7 @@ function Panel({ a }: { a: Actions }) {
               <div key={p} data-social={p} className="flex items-center gap-3 py-3.5">
                 <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${on || link ? TILE[p] : "bg-tint text-ink/40"}`}><SocialMark provider={p} size={p === "twitter" ? 17 : 20} /></span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[15px] font-semibold text-ink">{SOCIAL_NAME[p]}{link && <span className="inline-flex items-center gap-1 rounded-full bg-grape/15 px-1.5 py-0.5 text-[10.5px] font-bold text-brand-ink"><Icon name="verified" size={11} stroke={2.4} />Verified</span>}</div>
+                  <div className="flex items-center gap-1.5 text-[15px] font-semibold text-ink">{SOCIAL_NAME[p]}{link && <span className="inline-flex items-center gap-1 rounded-full bg-tint px-1.5 py-0.5 text-[10.5px] font-bold text-ink/70"><Icon name="check" size={11} stroke={2.6} />Linked</span>}</div>
                   <div className="truncate text-[13px] text-ink/55">{link ? (link.handle ? `@${link.handle}` : "Linked") : on ? "Not linked" : p === "telegram" ? "Not switched on yet" : "Not available yet"}</div>
                 </div>
                 {link

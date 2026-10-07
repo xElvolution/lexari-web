@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { jsonError, noStore, rateLimit, readJson } from "@/server/http";
 import { withUser } from "@/server/route";
-import { devSocialEnabled, socialSummary, socialVerifier, syncSocial, unlinkSocial } from "@/server/social";
-import { isSocial, socialStatus } from "@/lib/socialInfo";
+import { devSocialEnabled, socialSummary, socialVerifier, statusFor, syncSocial, unlinkSocial } from "@/server/social";
+import { isSocial } from "@/lib/socialInfo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export const POST = withUser(async (user, req) => {
   const body = await readJson(req, syncBody);
   if (body instanceof Response) return body;
   const out = await syncSocial(user, body);
-  return Response.json({ ...out, status: socialStatus(out.links.length) }, { headers: noStore });
+  return Response.json({ ...out, status: await statusFor(user.userId, out.links.length) }, { headers: noStore });
 });
 
 /** Removes a linked account from Lexari (the browser unlinks it from Privy first). */
@@ -30,5 +30,5 @@ export const DELETE = withUser(async (user, req) => {
   const provider = new URL(req.url).searchParams.get("provider");
   if (!isSocial(provider)) return jsonError(400, "Unknown account type.");
   const links = await unlinkSocial(user.userId, provider);
-  return Response.json({ links, status: socialStatus(links.length) }, { headers: noStore });
+  return Response.json({ links, status: await statusFor(user.userId, links.length) }, { headers: noStore });
 });

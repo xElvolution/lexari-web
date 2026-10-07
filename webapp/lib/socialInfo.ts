@@ -7,12 +7,15 @@ export const SOCIAL_NAME: Record<Social, string> = { twitter: "X", discord: "Dis
 
 export type SocialLink = { provider: Social; handle: string | null; verifiedAt: number };
 
-/** Profile status from linked accounts. Verified unlocks the badge and the Hub quest; Trusted needs two. */
-export type SocialStatus = { tier: "member" | "verified" | "trusted"; label: string; linked: number; next: string | null };
-export function socialStatus(linked: number): SocialStatus {
-  if (linked >= 2) return { tier: "trusted", label: "Trusted", linked, next: null };
-  if (linked === 1) return { tier: "verified", label: "Verified", linked, next: "Link one more account to become Trusted." };
-  return { tier: "member", label: "Member", linked, next: "Link an account to get verified." };
+/**
+ * One verified badge: it shows when at least one social account is linked AND the person is on a paid plan (Pro or
+ * Max). Linking on any plan still finishes the one-time Verified quest in the Hub.
+ */
+export type SocialStatus = { badge: boolean; linked: number; paid: boolean; label: string; note: string };
+export function socialStatus(linked: number, paid: boolean): SocialStatus {
+  if (linked > 0 && paid) return { badge: true, linked, paid, label: "Verified", note: "Your profile shows the verified badge." };
+  if (linked > 0) return { badge: false, linked, paid, label: "Linked", note: "Your accounts are linked. The verified badge comes with Pro." };
+  return { badge: false, linked, paid, label: "Not linked", note: paid ? "Link an account to get the verified badge on your profile." : "Link an account to show it on your profile. The verified badge comes with Pro." };
 }
 
 /**

@@ -16,6 +16,7 @@ import { socialLinks, socialSeen, users } from "./db/schema";
 import { HttpError } from "./http";
 import { verifyPrivyJwt } from "./auth/privy";
 import { SOCIALS, SOCIAL_NAME, isSocial, socialStatus, type Social, type SocialLink } from "@/lib/socialInfo";
+import { currentPlan } from "./plans";
 
 type Found = { provider: Social; subject: string; handle: string | null };
 type Snapshot = { did: string | null; wallets: string[]; accounts: Found[] };
@@ -148,7 +149,13 @@ export async function devLink(userId: string, provider: string, handle: string) 
   return { links: await listSocial(userId), conflicts: conflicts.map((p) => `This ${SOCIAL_NAME[p]} account is already linked to another Lexari account.`) };
 }
 
+/** The badge needs a linked account and a paid plan. */
+export async function statusFor(userId: string, linked: number) {
+  const plan = await currentPlan(userId);
+  return socialStatus(linked, plan.id !== "free");
+}
+
 export async function socialSummary(userId: string) {
   const links = await listSocial(userId);
-  return { links, status: socialStatus(links.length) };
+  return { links, status: await statusFor(userId, links.length) };
 }

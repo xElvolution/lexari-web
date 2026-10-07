@@ -8,7 +8,7 @@ import { socialStatus, type Social, type SocialLink, type SocialStatus } from ".
 export type SocialState = { links: SocialLink[]; status: SocialStatus; dev?: boolean; verifier?: string; loaded: boolean; error?: string };
 type Reply = { links: SocialLink[]; status: SocialStatus; conflicts?: string[]; dev?: boolean; verifier?: string };
 
-const EMPTY: SocialState = { links: [], status: socialStatus(0), loaded: false };
+const EMPTY: SocialState = { links: [], status: socialStatus(0, false), loaded: false };
 let state: SocialState = EMPTY;
 let inflight: Promise<void> | null = null;
 const subs = new Set<() => void>();

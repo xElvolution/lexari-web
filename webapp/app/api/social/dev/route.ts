@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { jsonError, noStore, readJson } from "@/server/http";
 import { withUser } from "@/server/route";
-import { devLink, devSocialEnabled } from "@/server/social";
-import { socialStatus } from "@/lib/socialInfo";
+import { devLink, devSocialEnabled, statusFor } from "@/server/social";
 
 export const runtime = "nodejs";
 
@@ -12,5 +11,5 @@ export const POST = withUser(async (user, req) => {
   const body = await readJson(req, z.object({ provider: z.string(), handle: z.string().max(40) }));
   if (body instanceof Response) return body;
   const out = await devLink(user.userId, body.provider, body.handle);
-  return Response.json({ ...out, status: socialStatus(out.links.length) }, { headers: noStore });
+  return Response.json({ ...out, status: await statusFor(user.userId, out.links.length) }, { headers: noStore });
 });

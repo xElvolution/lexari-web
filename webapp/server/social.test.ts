@@ -27,11 +27,14 @@ test("ignores junk and accounts without an id", () => {
   assert.equal(parseLinked([{ type: "twitter_oauth", subject: "1" }, { type: "twitter_oauth", subject: "2" }]).accounts.length, 1);
 });
 
-test("status tiers", () => {
-  assert.equal(socialStatus(0).tier, "member");
-  assert.equal(socialStatus(1).tier, "verified");
-  assert.equal(socialStatus(2).tier, "trusted");
-  assert.equal(socialStatus(3).next, null);
+test("one verified badge: a linked account on a paid plan", () => {
+  assert.equal(socialStatus(0, false).badge, false);
+  assert.equal(socialStatus(0, true).badge, false);
+  assert.equal(socialStatus(1, false).badge, false); // Free with links: chips, no badge
+  assert.match(socialStatus(1, false).note, /comes with Pro/);
+  assert.equal(socialStatus(1, true).badge, true);
+  assert.equal(socialStatus(3, true).label, "Verified");
+  for (const n of [0, 1, 2, 3]) for (const paid of [false, true]) assert.doesNotMatch(JSON.stringify(socialStatus(n, paid)), /trusted|member/i);
 });
 
 test("Telegram stays off unless listed", () => {
