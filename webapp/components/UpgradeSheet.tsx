@@ -24,7 +24,7 @@ export default function UpgradeSheet() {
           <div className="min-w-0 flex-1"><h2 id="up-title" className="display text-[24px] leading-[1.05] text-ink">{title}</h2><p className="mt-1 text-[14px] text-ink/65">{body}</p></div>
           <button onClick={closeUpgrade} aria-label="Close" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={19} /></button>
         </div>
-        <div className="no-bar min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-6"><PlansGrid onPick={closeUpgrade} /></div>
+        <div className="no-bar min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6 pt-1 sm:px-6"><PlansGrid onPick={closeUpgrade} /></div>
       </div>
     </div>
   );
