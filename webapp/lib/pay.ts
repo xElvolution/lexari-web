@@ -18,7 +18,7 @@ export type PayRequest = {
   /** Server verification after the payment confirmed. Throw to show the error in the sheet. */
   record: (sig: string) => Promise<unknown>;
   /** The receipt this payment writes into a chat (the agent then follows up there). */
-  receipt?: { convo: string; kind: "hire" | "plan" | "card"; label: string; speaker?: string };
+  receipt?: { convo: string; kind: "hire" | "card"; label: string; speaker?: string };
 };
 /** A failure can still carry `tx`: the SOL was sent (or may have been) but Lexari has not verified it yet. */
 export type PayResult = { ok: true; tx: string; result: unknown } | { ok: false; error: string; cancelled?: boolean; tx?: string };
@@ -118,16 +118,6 @@ export async function payForCard(agent: string, limit: number, name = "your agen
     record: (sig) => verifyWithRetry(() => api<{ card: Card }>("/api/cards", { method: "POST", body: { agent, tx: sig, limit } })),
   });
   return r.ok ? { ok: true, tx: r.tx, card: (r.result as { card: Card }).card } : r;
-}
-
-export type PlanState = { id: string; name: string; seats: number; expiresAt: number | null };
-export async function payForPlan(plan: { id: string; name: string; lamports: number; seats: number }, period: "month" | "year" = "month"): Promise<{ ok: true; tx: string; plan: PlanState } | { ok: false; error: string; cancelled?: boolean }> {
-  const year = period === "year";
-  const r = await requestPayment({
-    title: `Upgrade to ${plan.name}`, what: `${plan.seats} seats for ${year ? "a year (2 months free)" : "30 days"}, on devnet.`, lamports: year ? plan.lamports * 10 : plan.lamports, receipt: { convo: "home", kind: "plan", label: `the ${plan.name} plan (${year ? "a year" : "30 days"})`, speaker: "home" },
-    record: (sig) => verifyWithRetry(() => api<{ plan: PlanState }>("/api/plans", { method: "POST", body: { plan: plan.id, tx: sig, period } })),
-  });
-  return r.ok ? { ok: true, tx: r.tx, plan: (r.result as { plan: PlanState }).plan } : r;
 }
 
 export { friendly };
