@@ -5,7 +5,7 @@ import { PLANS, type PlanId } from "@/content/appData";
 import { MICROS } from "@/content/billing";
 import { LAMINA, PREMIUM, modelById } from "@/content/models";
 import { friendly } from "@/lib/api";
-import { devBilling, openSpend, openTopUp, refreshBilling, useBilling, verifyPayment, type BillingState } from "@/lib/billing";
+import { devBilling, openModels, openSpend, openTopUp, refreshBilling, useBilling, verifyPayment, type BillingState } from "@/lib/billing";
 import { setPlan, toast } from "@/lib/store";
 import { celebrate } from "../Celebrate";
 import Icon from "../Icon";
@@ -31,6 +31,7 @@ export default function BillingSection({ children }: { children?: ReactNode }) {
       : <div className={`${box} grid h-48 place-items-center`}><Spinner className="text-brand-ink" /></div>;
   }
   const paid = s.plan.id !== "free";
+  const home = modelById(s.models.agents.home) ?? LAMINA;
   const nextPlan = s.plan.next ? PLANS.find((p) => p.id === s.plan.next!.id) : null;
 
   return (
@@ -52,11 +53,11 @@ export default function BillingSection({ children }: { children?: ReactNode }) {
         </div>
       </section>
 
-      <H right={<span className="text-[12px] font-semibold text-ink/50">{paid ? `Cycle ${dateShort(s.usage.cycleStart)} to ${dateShort(s.usage.cycleEnd)}` : "Free resets every day"}</span>}>Usage</H>
+      <H right={<span className="text-[12px] font-semibold text-ink/50">{paid ? `Cycle ${dateShort(s.usage.cycleStart)} to ${dateShort(s.usage.cycleEnd)}` : "Free refills every day"}</span>}>Usage</H>
       <div className={`${box} p-5`}><UsageMeters s={s} /></div>
 
       <div className={`${box} mt-3 divide-y divide-[var(--line)] px-5`}>
-        <Line title="Spend limit" desc={s.spend.mode === "fixed" ? `Extra credits can spend up to ${money(s.spend.limit)} each cycle.` : s.spend.mode === "unlimited" ? "Extra credits run until the balance is used." : "Extra credits are never used automatically."}>
+        <Line title="Spend limit" desc={s.spend.mode === "fixed" ? `Extra credits can spend up to ${money(s.spend.limit)} each ${paid ? "cycle" : "month"}.` : s.spend.mode === "unlimited" ? "Extra credits run until the balance is used." : "Extra credits are never used automatically."}>
           <button data-open-spend onClick={openSpend} className={smallBtn}>{s.spend.mode === "fixed" ? money(s.spend.limit) : s.spend.mode === "unlimited" ? "Unlimited" : "Disabled"}<Icon name="right" size={14} /></button>
         </Line>
         <Line title="Extra credits" desc="$5, $10 or $25 by card or USDC. Used after your included usage. Credits stay on Lexari and can't be withdrawn.">
@@ -66,6 +67,9 @@ export default function BillingSection({ children }: { children?: ReactNode }) {
 
       <H>Models</H>
       <div className={`${box} divide-y divide-[var(--line)] px-5`}>
+        <Line title="Default model" desc={`Your agent answers with ${home.label} unless a chat picks another. Change it here or from the model chip in any chat.`}>
+          <button data-default-model={home.id} onClick={() => openModels("home", "home", false)} className={smallBtn}>{home.pool === "lamina" ? <LaminaMark size={14} /> : <ModelMark m={home} size={18} />}{home.short}<Icon name="right" size={14} className="rotate-90" /></button>
+        </Line>
         <div className="flex items-center gap-3 py-4">
           <ModelMark m={LAMINA} size={40} />
           <div className="min-w-0 flex-1"><div className="flex items-center gap-2 text-[15px] font-semibold text-ink">Lamina<span className="label rounded-full bg-grape px-1.5 py-0.5 text-[8px] text-white">Default</span></div><div className="text-[13px] leading-snug text-ink/60">{LAMINA.blurb}</div></div>
@@ -160,7 +164,7 @@ function DevTools({ s }: { s: BillingState }) {
       <div className="mt-3 flex flex-wrap gap-2">
         {b("free", "Free", { action: "free" })}{b("pro", "Grant Pro", { action: "plan", id: "pro" })}{b("plus", "Grant Max", { action: "plan", id: "plus" })}
         {b("c10", "+$10 credits", { action: "credits", usd: 10 })}
-        {s.usage.free ? <>{b("f29", "29 of 30 today", { action: "use", pool: "free", share: 29 / 30 })}{b("f30", "Use all today", { action: "use", pool: "free", share: 1 })}</>
+        {s.usage.free ? <>{b("f90", "Today 90%", { action: "use", pool: "lamina", share: 0.9 })}{b("f100", "Use all today", { action: "use", pool: "lamina", share: 1 })}</>
           : <>{b("l90", "Lamina 90%", { action: "use", pool: "lamina", share: 0.9 })}{b("l100", "Lamina 100%", { action: "use", pool: "lamina", share: 1 })}{b("p100", "Premium 100%", { action: "use", pool: "premium", share: 1 })}</>}
         {b("reset", "Reset usage", { action: "reset" })}
       </div>

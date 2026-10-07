@@ -145,6 +145,7 @@ function Panel({ s, id }: { s: State; id: string }) {
                   <h3 className="label text-[9.5px] text-ink/55">{k === "hired" ? "Skills" : "Can do"}</h3>
                   <div className="mt-2 flex flex-wrap gap-1.5">{(k === "hired" ? sp?.skills.map((x) => x[0]) ?? [] : info.chips).map((x) => <span key={x} className="rounded-full bg-tint px-3 py-1.5 text-[13px] font-semibold text-ink/80">{x}</span>)}</div>
                 </section>
+                <AgentModelRow agent={id} name={info.name} />
                 <AgentMoney s={s} id={id} name={info.name} />
                 {k !== "hired" && <OnchainCard s={s} id={id} name={info.name} role={info.role} bg={info.bg}
                   v={k === "home" ? lookVariant(s.agent?.look) : variant({ shape: c!.shape, color: c!.color, eyes: c!.eyes, mouth: c!.mouth, extra: c!.extra, blush: c!.blush ?? (c!.tone === "warm" || c!.tone === "playful"), brows: c!.brows, orbit: c!.orbit, dots: c!.dots, bg: c!.bg })} />}
@@ -171,7 +172,6 @@ function Panel({ s, id }: { s: State; id: string }) {
                   </>
                 )}
                 <VoicePicker value={voice} onChange={setVoice} name={k === "hired" ? nick.trim() || sp?.name || info.name : name.trim() || info.name} />
-                <AgentModelRow agent={id} name={info.name} />
                 <div className="flex items-center gap-3 rounded-2xl bg-card p-3.5 ring-1 ring-line">
                   <span className="min-w-0 flex-1"><span className="block text-[14px] font-bold text-ink">Memory</span><span className="block text-[12.5px] text-ink/60">{memory ? "Remembers what you tell it." : "Starts fresh every chat."}</span></span>
                   <Toggle on={memory} onChange={setMemory} label="Memory" />
