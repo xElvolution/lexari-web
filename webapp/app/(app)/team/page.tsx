@@ -109,7 +109,7 @@ export default function TeamPage() {
           <span className="label text-white/80">{plan.name} plan</span>
           <div className="mt-3 flex items-baseline gap-2"><span className="display text-[88px] leading-[0.8]">{plan.seats}</span><span className="text-white/80">{plan.seats === 1 ? "agent: your own" : "seats"}</span></div>
           <p className="mt-5 text-[16px] leading-relaxed text-white/90">{plan.id === "free" ? "Free plan includes one agent: your own. Upgrade to Pro to hire specialists from the marketplace." : `${used} of ${plan.seats} seats used. Each specialist is a one-time ${hirePriceLabel()} hire.`}</p>
-          {plan.id !== "max" && <button data-upgrade-plan onClick={() => openUpgrade("plans")} className="btn btn-white relative z-10 mt-5">Upgrade plan</button>}
+          {plan.id !== "plus" && plan.id !== "max" && <button data-upgrade-plan onClick={() => openUpgrade("plans")} className="btn btn-white relative z-10 mt-5">Upgrade plan</button>}
           {free.length > 0 && <p className="relative z-10 mt-5 text-[13.5px] text-white/85">{free.length} paid specialist{free.length === 1 ? " is" : "s are"} off the floor. Add them back from the marketplace for free.</p>}
           <Link href="/marketplace" className="btn btn-white relative z-10 mt-8 lg:mt-auto">Open the marketplace</Link>
         </div>

@@ -4,7 +4,13 @@
  *   xai      - xAI's API (XAI_API_KEY, XAI_MODEL)
  *   grok-cli - the Grok CLI already logged in on this server (GROK_CLI_*). No API key in the app.
  * Without LLM_PROVIDER: xai if XAI_API_KEY is set, else openai.
+ *
+ * On top of that, a turn can name a model from content/models.ts (Lamina or a premium model). With OPENROUTER_API_KEY
+ * set, those go through the gateway (server/engram/gateway.ts); Lamina falls back to the provider above when the
+ * gateway fails before any text arrives. Without the key, Lamina is the provider above and premium models are off.
  */
+import type { ModelInfo } from "@/content/models";
+import { gatewayReady, streamGateway, type Usage } from "./gateway";
 import { grokCliConfig, streamGrokCli } from "./grokCli";
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -86,10 +92,50 @@ async function* streamApi(messages: ChatMessage[], signal?: AbortSignal): AsyncG
   }
 }
 
-/** fast: a live voice call turn, where the first words matter most (Grok CLI uses GROK_CLI_CALL_MODEL, default grok-4.7-build-fast). */
-export async function* streamCompletion(messages: ChatMessage[], signal?: AbortSignal, opts: { fast?: boolean; priority?: number } = {}): AsyncGenerator<string> {
-  if (provider() === "grok-cli") yield* streamGrokCli(messages, signal, opts.fast ? (process.env.GROK_CLI_CALL_MODEL ?? "grok-4.7-build-fast") : undefined, opts.priority ?? 0);
-  else yield* streamApi(messages, signal);
+export type StreamOpts = {
+  /** a live voice call turn, where the first words matter most (Grok CLI uses GROK_CLI_CALL_MODEL, default grok-4.7-build-fast) */
+  fast?: boolean;
+  priority?: number;
+  /** the model for this turn (content/models.ts); omitted = the provider above, as before */
+  model?: ModelInfo;
+  /** output cap for gateway calls */
+  maxTokens?: number;
+  /** called once per completion with what it used, for the meter */
+  onUsage?: (u: Usage) => void;
+};
+
+/** True when a model can answer on this server right now. */
+export function modelReady(model: ModelInfo) {
+  if (gatewayReady()) return true;
+  return model.pool === "lamina" && llmConfig().ready;
+}
+
+export async function* streamCompletion(messages: ChatMessage[], signal?: AbortSignal, opts: StreamOpts = {}): AsyncGenerator<string> {
+  const model = opts.model;
+  if (model && gatewayReady()) {
+    let any = false;
+    try {
+      for await (const t of streamGateway(messages, model, { signal, maxTokens: opts.maxTokens ?? (opts.fast ? 300 : 1200), onUsage: opts.onUsage })) { any = true; yield t; }
+      return;
+    } catch (e) {
+      // Lamina's last resort is the provider above (the Grok relay in production), only before any text reached the person.
+      // A premium model is never swapped for another one behind the person's back.
+      if (any || model.pool !== "lamina" || signal?.aborted || !llmConfig().ready) throw e;
+      console.error(`[lamina] gateway failed, answering with ${provider()}: ${(e as Error).message}`);
+    }
+  } else if (model && model.pool !== "lamina") {
+    throw new ModelError(`${model.label} is not available on this server yet.`, "premium model without OPENROUTER_API_KEY");
+  }
+  const inner = provider() === "grok-cli"
+    ? streamGrokCli(messages, signal, opts.fast ? (process.env.GROK_CLI_CALL_MODEL ?? "grok-4.7-build-fast") : undefined, opts.priority ?? 0)
+    : streamApi(messages, signal);
+  let out = "";
+  try {
+    for await (const t of inner) { out += t; yield t; }
+  } finally {
+    // These providers report no cost here: the meter prices the estimated tokens at the turn's model price.
+    if (opts.onUsage && out) opts.onUsage({ model: provider() === "grok-cli" ? "grok-cli" : llmConfig().model, promptTokens: Math.ceil(messages.reduce((n, m) => n + m.content.length, 0) / 4), completionTokens: Math.ceil(out.length / 4), costUsd: null, estimated: true });
+  }
 }
 
 /** Whole reply as one string (jobs). */

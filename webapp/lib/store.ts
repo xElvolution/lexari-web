@@ -678,7 +678,8 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) { void hydrate(); return fail("You're signed out. Sign in again."); }
         error = typeof data.error === "string" ? data.error : "The agent could not answer.";
-        if (res.status === 429 || res.status === 402 || res.status === 403 || res.status === 400) return fail(error);
+        if ((res.status === 402 || res.status === 409) && data.billing) void import("./billing").then((b) => b.billingBlocked({ ...data.billing, convo, agent: speaker }));
+        if (res.status === 429 || res.status === 402 || res.status === 403 || res.status === 400 || res.status === 409) return fail(error);
       } else {
         const reader = res.body.getReader();
         const dec = new TextDecoder();
@@ -702,6 +703,7 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
             if (payload.done && event) set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, about: event } : mm)) } }));
             if (payload.done && !event && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
             if (payload.done && !event) void refreshHub(); // quest progress (messages, jobs) is recorded by now
+            if (payload.done) void import("./billing").then((b) => b.billingTurnDone());
             // You saw this reply arrive, so it doesn't need to sit in the bell.
             if (payload.done && document.visibilityState === "visible") void api("/api/notifications", { method: "POST", body: { keys: [`reply:${bubble}`] } }).catch(() => {});
           }
@@ -753,7 +755,11 @@ export async function callTurn(convo: string, text: string, history: { from: str
     method: "POST", signal, headers: { "content-type": "application/json" },
     body: JSON.stringify({ convo, text: text.slice(0, 4000), speaker, history: history.slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) })), recall, userMsgId: uid(), replyMsgId: uid(), meta: {}, call: true, tz: tzName() }),
   });
-  if (!res.ok || !res.body) { const d = await res.json().catch(() => ({})); throw new Error(typeof d.error === "string" ? d.error : "The agent could not answer."); }
+  if (!res.ok || !res.body) {
+    const d = await res.json().catch(() => ({}));
+    if ((res.status === 402 || res.status === 409) && d.billing) void import("./billing").then((b) => b.billingBlocked({ ...d.billing, convo, agent: speaker }));
+    throw new Error(typeof d.error === "string" ? d.error : "The agent could not answer.");
+  }
   const reader = res.body.getReader(); const dec = new TextDecoder();
   let buf = "", full = "";
   while (true) {
