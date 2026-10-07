@@ -4,7 +4,7 @@
  * Pools, in the order a turn draws from them:
  *   Lamina on a paid plan:   Lamina pool (engine cost)  ->  premium pool (Lexari rate)  ->  extra credits (Lexari rate)
  *   Premium on a paid plan:  premium pool               ->  extra credits
- *   Lamina on Free:          the daily message allowance (free to the person)  ->  extra credits
+ *   Lamina on Free:          the daily Lamina allowance (engine cost, resets 00:00 UTC)  ->  extra credits
  *   Premium on Free:         extra credits (when CREDITS_ON_FREE)
  * Extra credits are capped by the spend limit for the cycle. Lamina keeps running on a paid plan while any pool or
  * credit remains. A premium model is never silently swapped for a cheaper one.
@@ -42,9 +42,6 @@ export type MeterSnapshot = {
   creditsSpent: number;
   spendMode: SpendMode;
   spendLimit: number;
-  /** Free plan: Lamina messages used today (including holds) and the daily allowance */
-  freeUsed: number;
-  freePerDay: number;
   /** Free accounts may use credits (CREDITS_ON_FREE) */
   creditsOnFree?: boolean;
 };
@@ -59,12 +56,12 @@ export function creditsAvailable(s: Pick<MeterSnapshot, "credits" | "creditsSpen
 /** The pools a turn may draw from, in order. */
 export function chainFor(paid: boolean, pool: ModelPool, creditsOnFree = CREDITS_ON_FREE): Pool[] {
   if (paid) return pool === "lamina" ? ["lamina", "premium", "credits"] : ["premium", "credits"];
-  if (pool === "lamina") return creditsOnFree ? ["free", "credits"] : ["free"];
+  if (pool === "lamina") return creditsOnFree ? ["lamina", "credits"] : ["lamina"];
   return creditsOnFree ? ["credits"] : [];
 }
 
 function room(s: MeterSnapshot, p: Pool) {
-  if (p === "free") return s.freeUsed < s.freePerDay ? Infinity : 0;
+  if (p === "free") return 0; // "free" only marks turns Lexari absorbs (receipts), never a pool a turn picks
   if (p === "lamina") return Math.max(0, s.laminaLeft);
   if (p === "premium") return Math.max(0, s.premiumLeft);
   return creditsAvailable(s);
@@ -84,7 +81,7 @@ export function decide(s: MeterSnapshot, pool: ModelPool, estimate: number): Dec
     const p = chain[i];
     const r = room(s, p);
     if (r <= 0) continue;
-    const hold = p === "free" ? 0 : Math.min(r, billedFor(p, estimate));
+    const hold = Math.min(r, billedFor(p, estimate));
     return { ok: true, pool: p, chain: chain.slice(i), hold };
   }
   let reason: BlockReason;

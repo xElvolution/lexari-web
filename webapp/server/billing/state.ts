@@ -1,7 +1,7 @@
 /** Everything the app shows about models and billing, in one read. */
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { PLANS } from "@/content/appData";
-import { FREE_LAMINA_PER_DAY, RENEW_REMIND_DAYS, type SpendMode } from "@/content/billing";
+import { RENEW_REMIND_DAYS, type SpendMode } from "@/content/billing";
 import { LAMINA, MODELS } from "@/content/models";
 import { cluster, treasury, usdcMint } from "../config";
 import { db } from "../db";
@@ -12,7 +12,7 @@ import { gatewayReady } from "../engram/gateway";
 import { notify } from "../notify";
 import { cryptoReady } from "./crypto";
 import { creditsAvailable } from "./math";
-import { cycleFor, nextUtcMidnight, snapshot } from "./meter";
+import { cycleFor, snapshot } from "./meter";
 import { cardProvider } from "./payments/card";
 
 export async function billingState(userId: string) {
@@ -40,10 +40,11 @@ export async function billingState(userId: string) {
     usage: {
       lamina: { used: period.laminaUsed, limit: period.laminaLimit },
       premium: { used: period.premiumUsed, limit: period.premiumLimit },
-      free: cycle.paid ? null : { used: meter.freeUsed, limit: FREE_LAMINA_PER_DAY, resetsAt: nextUtcMidnight().getTime() },
+      // Free: the Lamina meter above is today's allowance (shown as a percentage); it refills at resetsAt.
+      free: cycle.paid ? null : { resetsAt: cycle.end.getTime() },
       cycleStart: cycle.start.getTime(), cycleEnd: cycle.end.getTime(),
     },
-    credits: { balance: Math.max(0, settings.creditMicros), spent: period.creditsUsed, available: creditsAvailable(meter) },
+    credits: { balance: Math.max(0, settings.creditMicros), spent: cycle.paid ? period.creditsUsed : meter.creditsSpent, available: creditsAvailable(meter) },
     spend: { mode: settings.spendMode as SpendMode, limit: settings.spendLimit },
     models: {
       gateway: gatewayReady(),

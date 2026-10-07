@@ -6,8 +6,11 @@ export const MICROS = 1_000_000;
 
 /** Premium models (and Lamina once its own pool is empty) are billed at the API price plus this markup. 0.2 = +20%. */
 export const LEXARI_MARKUP = 0.2;
-/** Lamina messages a day on the Free plan. Resets at 00:00 UTC. */
-export const FREE_LAMINA_PER_DAY = 30;
+/**
+ * Free plan: a small Lamina allowance each day, metered in dollars like the paid pools and shown only as a percentage.
+ * $0.08 is about 30 typical Lamina turns. Resets at 00:00 UTC.
+ */
+export const FREE_LAMINA_USD_PER_DAY = 0.08;
 /** Free accounts may buy extra credits and spend them on premium models and on Lamina past the daily limit. */
 export const CREDITS_ON_FREE = true;
 /** Days in a paid billing cycle. Lexari runs the cycle itself (no card subscription engine is assumed). */

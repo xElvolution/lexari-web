@@ -5,7 +5,7 @@
  */
 import { and, eq, gt, sql } from "drizzle-orm";
 import { PLAN_DAYS, planById, type PlanId } from "@/content/appData";
-import { ALERT_AT, DEFAULT_SPEND_LIMIT_USD, FREE_LAMINA_PER_DAY, HOLD_OUT_TOKENS, HOLD_TTL_MS, MICROS, type SpendMode } from "@/content/billing";
+import { ALERT_AT, DEFAULT_SPEND_LIMIT_USD, FREE_LAMINA_USD_PER_DAY, HOLD_OUT_TOKENS, HOLD_TTL_MS, MICROS, type SpendMode } from "@/content/billing";
 import type { ModelInfo } from "@/content/models";
 import { ENGINE_PRICES, routeFor } from "../engram/engines";
 import type { Usage } from "@/server/engram/gateway";
@@ -24,17 +24,14 @@ const DAY = 86_400_000;
 export const utcDayStart = (now = Date.now()) => new Date(Math.floor(now / DAY) * DAY);
 export const nextUtcMidnight = (now = Date.now()) => new Date(utcDayStart(now).getTime() + DAY);
 
-/** The current billing cycle: the active paid purchase's window, or the calendar month (UTC) on Free. */
+/** The current billing cycle: the active paid purchase's window, or the UTC day on Free (its daily Lamina allowance). */
 export async function cycleFor(userId: string, plan?: CurrentPlan): Promise<Cycle> {
   const p = plan ?? (await currentPlan(userId));
   const info = planById(p.id);
   if (p.id !== "free" && p.startsAt && p.expiresAt) {
     return { plan: p, paid: true, start: new Date(p.startsAt), end: new Date(Math.min(p.expiresAt, p.startsAt + PLAN_DAYS * DAY)), laminaLimit: usdToMicros(info.laminaUsd), premiumLimit: usdToMicros(info.premiumUsd) };
   }
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return { plan: p, paid: false, start, end, laminaLimit: 0, premiumLimit: 0 };
+  return { plan: p, paid: false, start: utcDayStart(), end: nextUtcMidnight(), laminaLimit: usdToMicros(FREE_LAMINA_USD_PER_DAY), premiumLimit: 0 };
 }
 
 /** The cycle's usage row, created on first use (one round trip). */
@@ -50,13 +47,14 @@ export async function ensureSettings(x: Exec, userId: string) {
   return row;
 }
 
-/** Lamina messages counted today on Free (UTC day), plus turns holding a place right now. */
-async function freeUsedToday(x: Exec, userId: string) {
-  const day = utcDayStart();
-  const [r] = await x.select({
-    n: sql<number>`(select count(*) from ${usageLedger} where ${usageLedger.userId} = ${userId} and ${usageLedger.pool} = 'free' and ${usageLedger.kind} in ('chat', 'call') and ${usageLedger.createdAt} > ${day.toISOString()}::timestamptz)
-      + (select count(*) from ${usageHolds} where ${usageHolds.userId} = ${userId} and ${usageHolds.pool} = 'free' and ${usageHolds.expiresAt} > now())`,
-  }).from(sql`(select 1) as one`);
+export const utcMonthStart = (now = new Date()) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+/**
+ * Credits spent this cycle, for the spend limit. On a paid plan that is the period row; Free periods are a day long,
+ * so Free sums the calendar month (UTC) from the ledger and the limit still means "per month".
+ */
+async function creditsSpentThisMonth(x: Exec, userId: string) {
+  const [r] = await x.select({ n: sql<number>`coalesce(sum(${usageLedger.creditsMicros}), 0)::bigint` }).from(usageLedger)
+    .where(and(eq(usageLedger.userId, userId), gt(usageLedger.createdAt, utcMonthStart())));
   return Number(r?.n ?? 0);
 }
 
@@ -71,17 +69,15 @@ async function heldByPool(x: Exec, userId: string) {
 export type Snapshot = { cycle: Cycle; period: typeof usagePeriods.$inferSelect; settings: typeof billingSettings.$inferSelect; meter: MeterSnapshot; held: Record<string, number> };
 
 export async function snapshot(x: Exec, userId: string, cycle: Cycle): Promise<Snapshot> {
-  const [period, settings, held, freeUsed] = await Promise.all([ensurePeriod(x, userId, cycle), ensureSettings(x, userId), heldByPool(x, userId), cycle.paid ? Promise.resolve(0) : freeUsedToday(x, userId)]);
+  const [period, settings, held, monthCredits] = await Promise.all([ensurePeriod(x, userId, cycle), ensureSettings(x, userId), heldByPool(x, userId), cycle.paid ? Promise.resolve(0) : creditsSpentThisMonth(x, userId)]);
   const meter: MeterSnapshot = {
     paid: cycle.paid,
     laminaLeft: period.laminaLimit - period.laminaUsed - (held.lamina || 0),
     premiumLeft: period.premiumLimit - period.premiumUsed - (held.premium || 0),
     credits: settings.creditMicros - (held.credits || 0),
-    creditsSpent: period.creditsUsed + (held.credits || 0),
+    creditsSpent: (cycle.paid ? period.creditsUsed : monthCredits) + (held.credits || 0),
     spendMode: (settings.spendMode as SpendMode) || "fixed",
     spendLimit: settings.spendLimit,
-    freeUsed,
-    freePerDay: FREE_LAMINA_PER_DAY,
   };
   return { cycle, period, settings, meter, held };
 }
@@ -95,7 +91,7 @@ export type Blocked = {
 
 export type TurnInput = {
   userId: string; model: ModelInfo; convo: string; agent: string;
-  /** chat | call | event | follow. Only chat and call count as Free messages. */
+  /** chat | call | event | follow (a later group member answering the same message) */
   kind: "chat" | "call" | "event" | "follow";
   /** the prompt, for the hold estimate */
   prompt: { content: string }[];
@@ -162,26 +158,21 @@ export async function beginTurn(input: TurnInput): Promise<Turn | Blocked> {
   const cycle = await cycleFor(userId);
   const out = input.kind === "call" ? HOLD_OUT_TOKENS.call : HOLD_OUT_TOKENS.chat;
   const estimate = costMicros(model.price, estimateTokens(input.prompt), out);
-  const counts = input.kind === "chat" || input.kind === "call";
   return db().transaction(async (tx) => {
     await lock(tx, userId);
     const snap = await snapshot(tx, userId, cycle);
-    // A group member answering after the first one, or a receipt, rides on the message that already counted.
-    const meter = counts ? snap.meter : { ...snap.meter, freeUsed: Math.max(0, snap.meter.freeUsed - 1) };
+    const meter = snap.meter;
     const d = decide(meter, model.pool, estimate);
     if (!d.ok) {
       if (input.kind === "event") return new Turn(input, "free", ["free"], null, true);
       return {
         reason: d.reason, model: model.id, modelLabel: model.label, plan: cycle.plan.id, planName: cycle.plan.name,
-        resetsAt: !cycle.paid && model.pool === "lamina" ? nextUtcMidnight().getTime() : cycle.paid ? cycle.end.getTime() : null,
+        resetsAt: !cycle.paid ? (model.pool === "lamina" ? cycle.end.getTime() : null) : cycle.end.getTime(),
         credits: Math.max(0, snap.settings.creditMicros), spendMode: meter.spendMode, spendLimit: meter.spendLimit,
       } satisfies Blocked;
     }
-    let holdId: string | null = null;
-    if (d.pool !== "free" || counts) {
-      const [h] = await tx.insert(usageHolds).values({ userId, pool: d.pool, micros: d.hold, expiresAt: new Date(Date.now() + HOLD_TTL_MS) }).returning({ id: usageHolds.id });
-      holdId = h.id;
-    }
+    const [h] = await tx.insert(usageHolds).values({ userId, pool: d.pool, micros: d.hold, expiresAt: new Date(Date.now() + HOLD_TTL_MS) }).returning({ id: usageHolds.id });
+    const holdId = h.id;
     if (Math.random() < 0.02) await tx.delete(usageHolds).where(sql`${usageHolds.expiresAt} < now() - interval '1 hour'`);
     return new Turn(input, d.pool, d.chain, holdId, false);
   });
@@ -189,7 +180,7 @@ export async function beginTurn(input: TurnInput): Promise<Turn | Blocked> {
 
 export const isBlocked = (t: Turn | Blocked): t is Blocked => !(t instanceof Turn);
 
-/** 80% and 100% alerts for the included pools, and the Free daily limit. Each fires once per cycle (or day). */
+/** 80% and 100% alerts for the included pools (each once per cycle), and Free's daily Lamina running out (once a day). */
 async function alerts(userId: string, cycle: Cycle, before: Snapshot, s: { lamina: number; premium: number; free: boolean }) {
   const key = cycle.start.toISOString().slice(0, 10);
   if (cycle.paid) {
@@ -208,7 +199,7 @@ async function alerts(userId: string, cycle: Cycle, before: Snapshot, s: { lamin
         body: pct >= 100 ? (id === "lamina" ? "Lamina keeps going on your premium usage, then extra credits." : "Top up extra credits or move up a plan to keep using premium models.") : `Your plan renews on ${cycle.end.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}.`,
       });
     }
-  } else if (s.free && before.meter.freeUsed + 1 >= FREE_LAMINA_PER_DAY) {
-    await notify(userId, { kind: "payment", key: `free:${utcDayStart().toISOString().slice(0, 10)}`, url: "/settings#billing", title: "That was today's last free Lamina message", body: "It resets at midnight UTC. Pro keeps Lamina going all month." });
+  } else if (s.lamina > 0 && before.period.laminaUsed + s.lamina >= before.period.laminaLimit) {
+    await notify(userId, { kind: "payment", key: `free:${key}`, url: "/settings#billing", title: "You've used today's free Lamina", body: "It refills tomorrow. Pro keeps Lamina going all month, with premium models too." });
   }
 }

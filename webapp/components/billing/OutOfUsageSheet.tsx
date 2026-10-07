@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CREDITS_ON_FREE, FREE_LAMINA_PER_DAY } from "@/content/billing";
+import { CREDITS_ON_FREE } from "@/content/billing";
 import { LAMINA, modelById } from "@/content/models";
 import { friendly } from "@/lib/api";
 import { closeBillingSheet, openSpend, openTopUp, setModel, useBilling, type OutInfo } from "@/lib/billing";
@@ -20,13 +20,13 @@ export default function OutOfUsageSheet({ info }: { info: OutInfo }) {
   const premium = model.pool === "premium";
   const plan = state?.plan.id ?? ("plan" in info ? info.plan : "free");
   const free = plan === "free";
-  const laminaLeft = state ? (free ? (state.usage.free?.used ?? 0) < FREE_LAMINA_PER_DAY : state.usage.lamina.used < state.usage.lamina.limit || state.usage.premium.used < state.usage.premium.limit || state.credits.available > 0) : true;
+  const laminaLeft = state ? (free ? state.usage.lamina.used < state.usage.lamina.limit : state.usage.lamina.used < state.usage.lamina.limit || state.usage.premium.used < state.usage.premium.limit || state.credits.available > 0) : true;
   const canLamina = premium && !!info.convo && laminaLeft;
   const resets = "resetsAt" in info && info.resetsAt ? info.resetsAt : null;
 
   const copy = (() => {
     switch (info.reason) {
-      case "free_daily": return { title: "That's today's free Lamina", body: `Free includes ${FREE_LAMINA_PER_DAY} Lamina messages a day.${resets ? ` They come back at ${timeShort(resets)}.` : ""} Pro keeps Lamina going all month, with $20 of premium models.` };
+      case "free_daily": return { title: "You've used today's free Lamina", body: `Free comes with a small Lamina allowance every day.${resets ? ` It refills at ${timeShort(resets)}.` : ""} Pro keeps Lamina going all month, with $20 of premium models.` };
       case "premium_locked": return { title: `${model.label} is a premium model`, body: free ? (CREDITS_ON_FREE ? "Premium models run on Pro's included usage, or on extra credits. Lamina stays free for your daily messages." : "Premium models come with Pro. Lamina stays free for your daily messages.") : "Your plan's premium usage covers it." };
       case "spend_limit": return { title: "You've hit your spend limit", body: `Extra credits are capped at ${state ? money(state.spend.limit) : "your limit"} a cycle and that's used. Raise the limit, or wait for the next cycle${state?.plan.endsAt ? ` on ${dateShort(state.plan.endsAt)}` : ""}.` };
       case "model_unavailable": return { title: `${model.label} isn't available yet`, body: "Premium models are coming soon on this server. Lamina is ready right now." };
@@ -49,7 +49,7 @@ export default function OutOfUsageSheet({ info }: { info: OutInfo }) {
     <Sheet label="out-of-usage" title={copy.title} sub={copy.body} icon={premium ? <ModelMark m={model} size={26} /> : <LaminaMark size={20} />} onClose={closeBillingSheet}>
       <div data-out-reason={info.reason} className="grid gap-2">
         {canLamina && (
-          <Choice icon={<LaminaMark size={18} />} title="Continue on Lamina" body={free ? "Your free daily messages, included." : "Included in your plan. Fast and tuned for your agents."} onClick={lamina} disabled={busy} primary />
+          <Choice icon={<LaminaMark size={18} />} title="Continue on Lamina" body={free ? "Your free daily allowance, included." : "Included in your plan. Fast and tuned for your agents."} onClick={lamina} disabled={busy} primary />
         )}
         {info.reason === "spend_limit" && <Choice icon={<Icon name="settings" size={18} />} title="Raise your spend limit" body="Pick a higher monthly cap, or none." onClick={openSpend} primary={!canLamina} />}
         {showTopUp && <Choice icon={<Icon name="wallet" size={18} />} title="Top up extra credits" body="$5, $10 or $25, by card or USDC. Used after your included usage." onClick={() => openTopUp({ product: "credits" })} primary={!canLamina && info.reason !== "free_daily"} />}

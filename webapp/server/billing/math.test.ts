@@ -4,8 +4,9 @@ import { billedFor, chainFor, costMicros, creditsAvailable, decide, estimateToke
 import { LAMINA, PREMIUM, burnVsSonnet, turnCostUsd } from "@/content/models";
 
 const $ = usdToMicros;
-const paid = (o: Partial<MeterSnapshot> = {}): MeterSnapshot => ({ paid: true, laminaLeft: $(3), premiumLeft: $(20), credits: 0, creditsSpent: 0, spendMode: "fixed", spendLimit: $(25), freeUsed: 0, freePerDay: 30, ...o });
-const free = (o: Partial<MeterSnapshot> = {}): MeterSnapshot => ({ ...paid(), paid: false, laminaLeft: 0, premiumLeft: 0, creditsOnFree: true, ...o });
+const paid = (o: Partial<MeterSnapshot> = {}): MeterSnapshot => ({ paid: true, laminaLeft: $(3), premiumLeft: $(20), credits: 0, creditsSpent: 0, spendMode: "fixed", spendLimit: $(25), ...o });
+// Free: today's Lamina allowance ($0.08) in the Lamina pool, no premium pool
+const free = (o: Partial<MeterSnapshot> = {}): MeterSnapshot => ({ ...paid(), paid: false, laminaLeft: $(0.08), premiumLeft: 0, creditsOnFree: true, ...o });
 
 test("engine cost in micro dollars from per-million prices", () => {
   // 3,000 in + 400 out at Lamina's list price (0.45 / 2.25 per M) = $0.00135 + $0.0009 = $0.00225
@@ -35,19 +36,25 @@ test("burn chips against Sonnet", () => {
 test("pool chains", () => {
   assert.deepEqual(chainFor(true, "lamina"), ["lamina", "premium", "credits"]);
   assert.deepEqual(chainFor(true, "premium"), ["premium", "credits"]);
-  assert.deepEqual(chainFor(false, "lamina", true), ["free", "credits"]);
-  assert.deepEqual(chainFor(false, "lamina", false), ["free"]);
+  assert.deepEqual(chainFor(false, "lamina", true), ["lamina", "credits"]);
+  assert.deepEqual(chainFor(false, "lamina", false), ["lamina"]);
   assert.deepEqual(chainFor(false, "premium", false), []);
 });
 
-test("Free: 30 Lamina messages a day, then credits or a block", () => {
-  const ok = decide(free({ freeUsed: 29 }), "lamina", 5000);
-  assert.deepEqual(ok, { ok: true, pool: "free", chain: ["free", "credits"], hold: 0 });
-  const out = decide(free({ freeUsed: 30 }), "lamina", 5000);
+test("Free: a daily Lamina allowance in dollars (engine cost), then credits or a block", () => {
+  const ok = decide(free(), "lamina", 2250);
+  assert.deepEqual(ok, { ok: true, pool: "lamina", chain: ["lamina", "credits"], hold: 2250 });
+  // the last bit of the allowance still answers; the hold is capped at what is left
+  assert.deepEqual(decide(free({ laminaLeft: 900 }), "lamina", 2250), { ok: true, pool: "lamina", chain: ["lamina", "credits"], hold: 900 });
+  const out = decide(free({ laminaLeft: 0 }), "lamina", 2250);
   assert.equal(out.ok, false);
   assert.equal(!out.ok && out.reason, "free_daily");
-  const withCredits = decide(free({ freeUsed: 30, credits: $(5) }), "lamina", 5000);
+  const withCredits = decide(free({ laminaLeft: 0, credits: $(5) }), "lamina", 5000);
   assert.deepEqual(withCredits, { ok: true, pool: "credits", chain: ["credits"], hold: 6000 });
+  // the allowance is about 30 typical turns
+  assert.equal(Math.floor($(0.08) / costMicros(LAMINA.price, 3000, 400)), 35);
+  // a Free turn that runs past the allowance spills to credits at the Lexari rate
+  assert.deepEqual(split(free({ laminaLeft: 1000, credits: $(5) }), ["lamina", "credits"], 2250), { lamina: 1000, premium: 0, credits: 1500, billed: 2500, absorbed: 0, free: false });
 });
 
 test("Free: premium models need credits", () => {
@@ -99,8 +106,8 @@ test("settle splits real cost across the chain at each pool's rate", () => {
   const s = split(paid({ premiumLeft: 6000 }), ["premium", "credits"], 10_000);
   assert.equal(s.billed, 6000);
   assert.equal(s.absorbed, 5000);
-  // free turns are free
-  assert.deepEqual(split(free(), ["free", "credits"], 2250), { lamina: 0, premium: 0, credits: 0, billed: 0, absorbed: 0, free: true });
+  // receipts Lexari absorbs are never charged
+  assert.deepEqual(split(free(), ["free"], 2250), { lamina: 0, premium: 0, credits: 0, billed: 0, absorbed: 0, free: true });
 });
 
 test("token estimate and meter share", () => {

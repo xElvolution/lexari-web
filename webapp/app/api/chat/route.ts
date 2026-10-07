@@ -5,7 +5,6 @@ import { currentSession } from "@/server/auth/session";
 import { ModelError, llmConfig, modelReady, streamCompletion } from "@/server/engram/cortex";
 import { gatewayReady } from "@/server/engram/gateway";
 import { LAMINA, modelById } from "@/content/models";
-import { FREE_LAMINA_PER_DAY } from "@/content/billing";
 import { beginTurn, isBlocked, type Blocked, type Turn } from "@/server/billing/meter";
 import { splitRemember } from "@/server/engram/hippocampus";
 import { buildPrompt } from "@/server/engram/spinal";
@@ -282,7 +281,7 @@ export async function POST(req: Request) {
 
 /** What the person sees in the chat when a turn is out of usage (the app also opens the out-of-usage sheet). */
 function blockedText(b: Blocked) {
-  if (b.reason === "free_daily") return `You've used today's ${FREE_LAMINA_PER_DAY} free Lamina messages. They come back at midnight UTC, or upgrade to keep going.`;
+  if (b.reason === "free_daily") return "You've used today's free Lamina. It refills tomorrow, or upgrade to Pro to keep going.";
   if (b.reason === "premium_locked") return `${b.modelLabel} is a premium model. Upgrade to Pro, top up credits, or switch to Lamina.`;
   if (b.reason === "spend_limit") return "You've reached your monthly spend limit on extra credits. Raise it in Billing to keep going.";
   return `You've used the included usage for ${b.modelLabel} this cycle. Top up credits or move up a plan${b.model === "lamina" ? "" : ", or switch to Lamina"}.`;

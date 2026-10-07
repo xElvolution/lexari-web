@@ -46,7 +46,7 @@ export const KNOW_SUGGESTIONS = [
  * Ultra (100 seats), so purchases made before the rename keep their seats.
  */
 export const PLANS = [
-  { id: "free", name: "Free", seats: 1, usd: 0, laminaUsd: 0, premiumUsd: 0, later: false, for: "Your own agent on Lamina, with its computer and memory.", points: ["30 Lamina messages a day", "Your named agent", "Its own computer and memory"] },
+  { id: "free", name: "Free", seats: 1, usd: 0, laminaUsd: 0, premiumUsd: 0, later: false, for: "Your own agent on Lamina, with its computer and memory.", points: ["A daily Lamina allowance", "Your named agent", "Its own computer and memory"] },
   { id: "pro", name: "Pro", seats: 5, usd: 20, laminaUsd: 3, premiumUsd: 20, later: false, for: "Lamina all month, plus $20 of premium models.", points: ["Lamina usage included", "$20 of Claude Sonnet and more", "5 seats for your crew"] },
   { id: "plus", name: "Max", seats: 20, usd: 60, laminaUsd: 9, premiumUsd: 60, later: false, for: "Three times Pro, for heavy daily work.", points: ["3x the Lamina usage of Pro", "$60 of premium models", "20 seats and team chats"] },
   { id: "max", name: "Ultra", seats: 100, usd: 200, laminaUsd: 30, premiumUsd: 200, later: true, for: "A whole floor for big, parallel work.", points: ["10x the Lamina usage of Pro", "$200 of premium models", "100 seats"] },

@@ -21,7 +21,7 @@ const body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("plan"), id: z.enum(["pro", "plus"]) }),
   z.object({ action: z.literal("credits"), usd: z.number().int().min(1).max(100) }),
   z.object({ action: z.literal("free") }),
-  z.object({ action: z.literal("use"), pool: z.enum(["lamina", "premium", "free"]), share: z.number().min(0).max(1) }),
+  z.object({ action: z.literal("use"), pool: z.enum(["lamina", "premium"]), share: z.number().min(0).max(1) }),
   z.object({ action: z.literal("reset") }),
 ]);
 
@@ -38,14 +38,8 @@ export const POST = withUser(async (user, req) => {
   } else if (b.action === "free") {
     await database.delete(planPurchases).where(eq(planPurchases.userId, user.userId));
   } else if (b.action === "use") {
-    if (b.pool === "free") {
-      const n = Math.round(30 * b.share);
-      await database.delete(usageLedger).where(and(eq(usageLedger.userId, user.userId), eq(usageLedger.pool, "free")));
-      if (n) await database.insert(usageLedger).values(Array.from({ length: n }, () => ({ userId: user.userId, pool: "free", kind: "chat", requestedModel: "lamina", servedModel: "dev", convo: "dev" })));
-    } else {
-      const col = b.pool === "lamina" ? { laminaUsed: sql`round(${usagePeriods.laminaLimit} * ${b.share}::numeric)` } : { premiumUsed: sql`round(${usagePeriods.premiumLimit} * ${b.share}::numeric)` };
-      await database.update(usagePeriods).set(col).where(and(eq(usagePeriods.userId, user.userId), sql`${usagePeriods.periodEnd} > now()`));
-    }
+    const col = b.pool === "lamina" ? { laminaUsed: sql`round(${usagePeriods.laminaLimit} * ${b.share}::numeric)` } : { premiumUsed: sql`round(${usagePeriods.premiumLimit} * ${b.share}::numeric)` };
+    await database.update(usagePeriods).set(col).where(and(eq(usagePeriods.userId, user.userId), sql`${usagePeriods.periodEnd} > now()`));
   } else {
     await database.delete(usageLedger).where(eq(usageLedger.userId, user.userId));
     await database.delete(usageHolds).where(eq(usageHolds.userId, user.userId));
