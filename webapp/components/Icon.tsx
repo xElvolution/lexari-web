@@ -69,6 +69,7 @@ const P: Record<string, React.ReactNode> = {
   box: <><rect x="4" y="4" width="16" height="16" rx="4" strokeDasharray="3 3" /></>,
   verified: <><path d="M12 2.8l2.3 1.7 2.8-.2.9 2.7 2.3 1.6-.9 2.7.9 2.7-2.3 1.6-.9 2.7-2.8-.2L12 21.2l-2.3-1.7-2.8.2-.9-2.7-2.3-1.6.9-2.7-.9-2.7 2.3-1.6.9-2.7 2.8.2z" /><path d="m8.6 12.2 2.3 2.3 4.5-4.6" /></>,
   link: <><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" /></>,
+  plug: <><path d="M9 3.5V8M15 3.5V8" /><path d="M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0z" /><path d="M12 17v3.5" /></>,
 };
 
 export default function Icon({ name, size = 20, className = "", stroke = 2 }: { name: keyof typeof P | string; size?: number; className?: string; stroke?: number }) {

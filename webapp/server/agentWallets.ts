@@ -53,7 +53,7 @@ export function solanaKeypair(userId: string, slug: string, kind: string) {
 }
 
 /** Lexari's devnet payout wallet: holds test USDC and pays network fees. LEXARI_PAYOUT_KEY, else the faucet key. */
-function payoutKey() {
+export function payoutKey() {
   const raw = (process.env.LEXARI_PAYOUT_KEY || process.env.LEXARI_FAUCET_KEY || "").trim();
   if (!raw) return null;
   try {

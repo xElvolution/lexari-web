@@ -24,7 +24,7 @@ export function SocialMark({ provider, size = 18 }: { provider: Social; size?: n
   }[provider];
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d={d} /></svg>;
 }
-const TILE: Record<Social, string> = { twitter: "bg-ink text-[var(--bg)]", discord: "bg-[#5865f2] text-white", telegram: "bg-[#229ed9] text-white" };
+export const TILE: Record<Social, string> = { twitter: "bg-ink text-[var(--bg)]", discord: "bg-[#5865f2] text-white", telegram: "bg-[#229ed9] text-white" };
 
 type Actions = { ready: boolean; busy: Social | null; link: (p: Social) => void; unlink: (p: Social) => void; note?: string };
 
@@ -82,19 +82,20 @@ function Panel({ a }: { a: Actions }) {
 const report = (conflicts: string[], ok?: string) => { if (conflicts.length) conflicts.forEach((c) => toast({ text: c })); else if (ok) toast({ text: ok }); };
 
 /** Local testing: links pretend accounts through /api/social/dev (refused by the server in production builds). */
-function DevLinks({ s }: { s: State }) {
+function useDevActions(s: State): Actions {
   const [busy, setBusy] = useState<Social | null>(null);
   const run = async (p: Social, fn: () => Promise<string[]>, ok: string) => {
     setBusy(p);
     try { report(await fn(), ok); } catch (e) { toast({ text: friendly(e) }); } finally { setBusy(null); }
   };
-  return <Panel a={{
+  return {
     ready: true, busy,
     link: (p) => void run(p, () => devLinkSocial(p, s.profile?.username || "tester"), `${SOCIAL_NAME[p]} linked (test account)`),
     unlink: (p) => void run(p, () => forgetSocial(p), `${SOCIAL_NAME[p]} unlinked`),
     note: "Local test mode: links pretend accounts without Privy. This never runs in a production build.",
-  }} />;
+  };
 }
+function DevLinks({ s }: { s: State }) { return <Panel a={useDevActions(s)} />; }
 
 type Linked = { provider: Social; subject: string };
 function privyLinked(user: User | null): Linked[] {
@@ -109,7 +110,7 @@ function privyLinked(user: User | null): Linked[] {
 const PENDING = "lexari-social-pending";
 
 /** Real linking: Privy opens X, Discord or Telegram, then the server verifies the result from a Privy token. */
-function PrivyLinks({ s }: { s: State }) {
+function usePrivyActions(s: State): Actions {
   const social = useSocial();
   const { ready, authenticated, user, logout, getAccessToken } = usePrivy();
   const { refreshUser } = useUser();
@@ -182,8 +183,23 @@ function PrivyLinks({ s }: { s: State }) {
   useEffect(() => { if (ready && sessionStorage.getItem(PENDING) && !busy) setBusy(sessionStorage.getItem(PENDING) as Social); }, [ready, busy]);
   useEffect(() => { if (!busy) return; const t = setTimeout(() => { setBusy(null); sessionStorage.removeItem(PENDING); }, 90_000); return () => clearTimeout(t); }, [busy]);
 
-  return <Panel a={{ ready, busy, link: (p) => void link(p), unlink: (p) => void unlink(p), note: google ? undefined : "You signed in with a wallet, so linking first asks your wallet to confirm it's you (no transaction, no fee)." }} />;
+  return { ready, busy, link: (p) => void link(p), unlink: (p) => void unlink(p), note: google ? undefined : "You signed in with a wallet, so linking first asks your wallet to confirm it's you (no transaction, no fee)." };
 }
+function PrivyLinks({ s }: { s: State }) { return <Panel a={usePrivyActions(s)} />; }
+
+/**
+ * One-tap link buttons for other screens (Settings > Integrations while it is locked). Same linking as the
+ * Connected accounts section: Privy, the local test mode, or nothing when linking isn't set up here.
+ */
+export function SocialConnect({ s, children }: { s: State; children: (a: Actions, enabled: Social[]) => React.ReactNode }) {
+  if (DEV_SOCIAL) return <DevConnect s={s}>{children}</DevConnect>;
+  if (PRIVY_ON) return <PrivyConnect s={s}>{children}</PrivyConnect>;
+  return <>{children({ ready: false, busy: null, link: () => {}, unlink: () => {}, note: "Linking accounts is not set up on this server yet." }, [])}</>;
+}
+type ConnectProps = { s: State; children: (a: Actions, enabled: Social[]) => React.ReactNode };
+function DevConnect({ s, children }: ConnectProps) { return <>{children(useDevActions(s), ENABLED)}</>; }
+function PrivyConnect({ s, children }: ConnectProps) { return <>{children(usePrivyActions(s), ENABLED)}</>; }
+export type SocialActions = Actions;
 
 /** Settings > Connected accounts. */
 export default function SocialLinks({ s }: { s: State }) {

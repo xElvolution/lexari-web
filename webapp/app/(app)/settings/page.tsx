@@ -17,6 +17,7 @@ import { openAdd, openAgent } from "@/components/overlays";
 import BillingSection from "@/components/billing/BillingSection";
 import LockSettings from "@/components/lock/LockSettings";
 import SocialLinks from "@/components/social/SocialLinks";
+import IntegrationsSection from "@/components/integrations/IntegrationsSection";
 import { disablePush, enablePush, pushOnHere, pushPermission } from "@/lib/notifications";
 
 const SECTIONS = [
@@ -28,6 +29,7 @@ const SECTIONS = [
   { id: "security", label: "Security", icon: "pin" },
   { id: "accounts", label: "Account", icon: "globe" },
   { id: "social", label: "Connected accounts", icon: "link" },
+  { id: "integrations", label: "Integrations", icon: "plug" },
   { id: "billing", label: "Billing", icon: "wallet" },
   { id: "about", label: "About", icon: "list" },
 ] as const;
@@ -307,7 +309,7 @@ export default function SettingsPage() {
   useEffect(() => { const h = window.location.hash.slice(1) as Sec; if (SECTIONS.some((x) => x.id === h)) { setSec(h); setOpen(true); } }, []);
   const pick = (id: Sec) => { setSec(id); setOpen(true); window.history.replaceState(null, "", `#${id}`); window.scrollTo({ top: 0 }); };
   const cur = SECTIONS.find((x) => x.id === sec)!;
-  const body = { general: <General s={s} />, personal: <Personal s={s} />, agents: <Agents s={s} />, notifications: <Notifications s={s} />, data: <Data s={s} />, security: <Security s={s} />, accounts: <Accounts s={s} />, social: <SocialLinks s={s} />, billing: <Billing s={s} />, about: <About /> }[sec];
+  const body = { general: <General s={s} />, personal: <Personal s={s} />, agents: <Agents s={s} />, notifications: <Notifications s={s} />, data: <Data s={s} />, security: <Security s={s} />, accounts: <Accounts s={s} />, social: <SocialLinks s={s} />, integrations: <IntegrationsSection s={s} />, billing: <Billing s={s} />, about: <About /> }[sec];
 
   return (
     <div data-rise className="grid gap-6 lg:grid-cols-[240px_1fr] lg:gap-10">

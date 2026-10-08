@@ -27,6 +27,9 @@ import { generateImage, imageGenOn, imagineTask, stripImagine } from "@/server/i
 import { grokVision, visionOn, type VisionImage } from "@/server/engram/grokCli";
 import type { ModelInfo } from "@/content/models";
 import { queuePriority, recallSize, shifts } from "@/lib/perks";
+import { hasToolTag, runTurnTools, stripToolTags, turnTools } from "@/server/integrations/chat";
+import { agentRef } from "@/server/integrations/actions";
+import type { ActionCard, MarketsCard } from "@/content/integrations";
 
 export const runtime = "nodejs";
 
@@ -117,6 +120,9 @@ export async function POST(req: Request) {
   const imagineOn = !call && imageGenOn();
   if (!call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${imagineOn ? IMAGINE_HINT : IMAGINE_OFF}` };
   const event = !call && body.event ? body.event : null;
+  // Integrations (Settings > Integrations): only what the person added, switched on and granted to this agent.
+  const integ = !call && !event ? await turnTools(userId, speakerRow?.slug || "home").catch(() => null) : null;
+  if (integ) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${integ.hint}` };
   // The wallet tools (send, read) are for chat turns; every turn (calls too) reads the wallet history below.
   const owner = session.wallet || "";
   const wallet = call ? "" : owner;
@@ -124,7 +130,7 @@ export async function POST(req: Request) {
   // wallet and asks you to fund it for a task.
   const hiredSpeaker = speakerRow?.kind === "hired";
   if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${hiredSpeaker ? FUND_HINT(speakerName) : WALLET_HINT}` };
-  const hold = tools || !!wallet || imagineOn;
+  const hold = tools || !!wallet || imagineOn || !!integ;
   const tz = body.tz || "UTC";
   const savingUser: Promise<boolean> = !call && !(body.follow === true || !!event)
     ? saveUserMsg(userId, body).then(() => true, (error) => { console.error(`[chat] save user message: ${(error as Error).message}`); return false; })
@@ -226,6 +232,34 @@ export async function POST(req: Request) {
           }
           full = `${before && shown > 0 ? before + "\n\n" : ""}${answer.replace(/<run>[\s\S]*?<\/run>/g, "").trim()}`;
         }
+        // Integration tags: reads come back to the agent as live data; a trade or transfer becomes a confirm card.
+        let action: ActionCard | null = null;
+        let markets: MarketsCard | null = null;
+        if (integ && hasToolTag(full)) {
+          const r = await runTurnTools(userId, agentRef(userId, speakerRow ?? home), integ, full, { convo: body.convo, messageId: body.replyMsgId });
+          action = r.actions[0] ?? null;
+          markets = r.markets;
+          const before = stripToolTags(full.slice(0, full.search(/<tool\b/i))).trim();
+          if (r.reads) {
+            const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Lexari integration results:\n${r.facts.join("\n")}\n\nNow answer the person in plain sentences using these results. Do not write <tool> again.` }];
+            let answer = "";
+            if (before && shown > 0) show("\n\n");
+            let sentA = 0;
+            for await (const token of streamCompletion(follow, abort.signal, { priority, ...usage })) {
+              answer += token;
+              const cut = answer.indexOf("<") >= 0 ? answer.indexOf("<") : answer.length;
+              if (cut > sentA) { show(answer.slice(sentA, cut)); sentA = cut; }
+            }
+            full = `${before && shown > 0 ? before + "\n\n" : ""}${stripToolTags(answer)}`;
+            shown = full.length;
+          } else {
+            full = stripToolTags(full);
+          }
+          if (r.notes.length && !r.reads) full = `${full}${full ? "\n\n" : ""}(I couldn't do that: ${r.notes.join("; ")}.)`;
+          if (!full.trim() && action) full = "It's ready. Tap Confirm to run it.";
+          if (action) send({ action });
+          if (markets) send({ markets });
+        }
         // Wallet tags: reads are answered with real chain data; a send becomes a confirm card only you can approve.
         let pay: SendReq | null = null;
         if (wallet && hiredSpeaker) {
@@ -294,7 +328,8 @@ export async function POST(req: Request) {
         if (!split.reply) throw new ModelError("The agent sent an empty reply. Try again.");
         if (split.remember) send({ remember: split.remember });
         if (call) { send({ done: true }); return; } // a call is not saved as chat messages
-        await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, pay || files.length ? { ...(pay ? { send: pay } : {}), ...(files.length ? { files } : {}) } : event ? { about: event.tx } : null, userSaved);
+        const replyMeta = pay || files.length || action || markets ? { ...(pay ? { send: pay } : {}), ...(files.length ? { files } : {}), ...(action ? { action } : {}), ...(markets ? { markets } : {}) } : event ? { about: event.tx } : null;
+        await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, replyMeta, userSaved);
         if (!body.follow && !event && !(await counted)) await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).
         await notify(userId, { kind: "reply", title: speakerName || "Your agent", body: split.reply.replace(/\s+/g, " ").slice(0, 140), url: `/agents/${encodeURIComponent(body.convo)}`, key: `reply:${body.replyMsgId}` });
