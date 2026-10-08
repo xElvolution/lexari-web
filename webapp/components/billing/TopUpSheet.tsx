@@ -1,81 +1,55 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PLANS } from "@/content/appData";
-import { TOPUP_PACKS } from "@/content/billing";
+import { TOPUP_MAX_USD, TOPUP_PACKS } from "@/content/billing";
 import { PREMIUM, turnCostUsd } from "@/content/models";
 import { api, friendly } from "@/lib/api";
 import { closeBillingSheet, payCrypto, startCard, startCrypto, usdcBalance, verifyPayment, useBilling, type CryptoRequest, type BuyIntent, type PayStep, type TopUpIntent } from "@/lib/billing";
 import { balanceOf, isEmbedded, payer } from "@/lib/pay";
-import { setPlan, toast } from "@/lib/store";
-import type { PlanId } from "@/content/appData";
+import { toast } from "@/lib/store";
 import { celebrate } from "../Celebrate";
 import Icon from "../Icon";
-import { CardGlyph, Sheet, Spinner, UsdcGlyph, dateShort, money } from "./parts";
+import { CardGlyph, Sheet, Spinner, UsdcGlyph, money } from "./parts";
 
 type Rail = "card" | "crypto";
-const SELLABLE = PLANS.filter((p) => p.usd > 0 && !p.later);
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const sonnetTurns = (usd: number) => Math.floor(usd / (turnCostUsd(PREMIUM[0].price) * 1.2));
 /** SOL a USDC payment needs for fees and, the first time, the treasury's token account rent. */
 const SOL_FOR_FEES = 3_000_000;
 
-/** Top up: pay Lexari for a plan or extra credits, by card or with USDC on Solana. Separate from agent wallets. */
+/** Top up: add dollars to your Lexari balance, by card or with USDC on Solana. Plans are then paid from the balance. */
 export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
   const { state } = useBilling();
-  const [product, setProduct] = useState<"plan" | "credits">(intent.product);
-  const firstPlan = SELLABLE.find((p) => p.id === intent.id)?.id ?? (state?.plan.id === "pro" ? "plus" : "pro");
-  const [planId, setPlanId] = useState<string>(intent.product === "plan" ? firstPlan : "pro");
-  const [pack, setPack] = useState<number>(intent.product === "credits" && intent.id ? Number(intent.id) : 10);
+  const need = intent.need;
+  // Packs that cover a shortfall; when none does (a yearly plan), the shortfall itself in whole dollars.
+  const exact = need ? Math.min(TOPUP_MAX_USD, Math.ceil(need.shortMicros / 1e6)) : 0;
+  const covering = need ? TOPUP_PACKS.filter((v) => v * 1e6 >= need.shortMicros) : [...TOPUP_PACKS];
+  const amounts: number[] = covering.length ? covering : [exact];
+  const [pack, setPack] = useState<number>(() => { const want = intent.id ? Number(intent.id) : need ? amounts[0] : 10; return amounts.includes(want) ? want : amounts[0]; });
   const cardReady = !!state?.rails.card.ready;
   const [rail, setRail] = useState<Rail>("card");
   const [busy, setBusy] = useState(false);
-  const need = intent.need;
   const close = () => { closeBillingSheet(); intent.cancel?.(); };
   const after = intent.then ? () => intent.then?.() : undefined;
-  const usd = product === "plan" ? SELLABLE.find((p) => p.id === planId)!.usd : pack;
-  const id = product === "plan" ? planId : String(pack);
-  const plan = SELLABLE.find((p) => p.id === planId)!;
-  const curPlan = state?.plan.id;
-  const sameAsCurrent = product === "plan" && curPlan === planId;
-  const smaller = product === "plan" && curPlan && curPlan !== "free" && (PLANS.find((p) => p.id === curPlan)?.seats ?? 0) > plan.seats;
+  const usd = pack;
+  const id = String(pack);
 
   return (
-    <Sheet label="topup" wide title="Top up" sub={need ? "Add to your balance and the purchase goes through." : "Add to your Lexari balance, or pick a plan."} icon={<Icon name="wallet" size={20} />} onClose={close} closable={!busy}>
+    <Sheet label="topup" wide title="Top up" sub={need ? "Add to your balance and the purchase goes through." : "Add to your Lexari balance."} icon={<Icon name="wallet" size={20} />} onClose={close} closable={!busy}>
       {need && (
         <div data-shortfall className="mb-3 rounded-[18px] bg-[#fff4d6] p-3.5 text-[13.5px] leading-snug text-[#5c4300] ring-1 ring-[#f5d27a]">
           <div className="font-bold">{need.what} costs {money(need.needMicros, { cents: true })}</div>
           <div className="mt-0.5">Your balance is {money(need.haveMicros, { cents: true })}. Add at least <b>{money(need.shortMicros, { cents: true })}</b> to continue.</div>
         </div>
       )}
-      <div className="inline-flex w-full rounded-full bg-tint p-1" role="radiogroup" aria-label="What to buy">
-        {([["credits", "Balance"], ["plan", "Plan"]] as const).filter(([k]) => !need || k === "credits").map(([k, l]) => (
-          <button key={k} role="radio" aria-checked={product === k} disabled={busy} onClick={() => setProduct(k)} className={`h-9 flex-1 rounded-full text-[13.5px] font-bold transition ${product === k ? "bg-card text-ink shadow-sm" : "text-ink/60 hover:text-ink"}`}>{l}</button>
+      <div className={`grid gap-2 ${amounts.length === 1 ? "grid-cols-1" : "grid-cols-3"}`} role="radiogroup" aria-label="Amount">
+        {amounts.map((v) => (
+          <button key={v} role="radio" aria-checked={pack === v} data-pack={v} disabled={busy} onClick={() => setPack(v)} className={`rounded-[18px] p-3 text-left transition max-[430px]:p-2.5 ${pack === v ? "bg-grape text-white ring-1 ring-grape" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
+            <span className="display block text-[28px] leading-none tabular-nums max-[430px]:text-[24px]">${v}</span>
+            <span className={`mt-1.5 block text-[11.5px] leading-tight ${pack === v ? "text-white/80" : "text-ink/55"}`}>{amounts.length === 1 && need ? "Exactly what's missing, rounded up to the dollar" : `about ${sonnetTurns(v).toLocaleString()} Sonnet replies`}</span>
+          </button>
         ))}
       </div>
-
-      {product === "credits" ? (
-        <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Credit pack">
-          {TOPUP_PACKS.filter((v) => !need || v * 1e6 >= need.shortMicros).map((v) => (
-            <button key={v} role="radio" aria-checked={pack === v} data-pack={v} disabled={busy} onClick={() => setPack(v)} className={`rounded-[18px] p-3 text-left transition max-[430px]:p-2.5 ${pack === v ? "bg-grape text-white ring-1 ring-grape" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
-              <span className="display block text-[28px] leading-none tabular-nums max-[430px]:text-[24px]">${v}</span>
-              <span className={`mt-1.5 block text-[11.5px] leading-tight ${pack === v ? "text-white/80" : "text-ink/55"}`}>about {sonnetTurns(v).toLocaleString()} Sonnet replies</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-3 grid gap-2" role="radiogroup" aria-label="Plan">
-          {SELLABLE.map((p) => (
-            <button key={p.id} role="radio" aria-checked={planId === p.id} data-buy-plan={p.id} disabled={busy} onClick={() => setPlanId(p.id)} className={`flex items-center gap-3 rounded-[18px] p-3 text-left transition ${planId === p.id ? "bg-grape text-white ring-1 ring-grape" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
-              <span className="min-w-0 flex-1"><span className="display block text-[22px] leading-none">{p.name}</span><span className={`mt-1 block text-[12.5px] leading-snug ${planId === p.id ? "text-white/80" : "text-ink/60"}`}>{p.for}</span></span>
-              <span className="shrink-0 text-right"><span className="display block text-[24px] leading-none tabular-nums">${p.usd}</span><span className={`text-[11.5px] ${planId === p.id ? "text-white/75" : "text-ink/50"}`}>30 days</span></span>
-            </button>
-          ))}
-          {state?.plan.endsAt && (sameAsCurrent || smaller) && (
-            <p className="px-1 text-[12.5px] leading-snug text-ink/60">{sameAsCurrent ? `Renews ${plan.name} for 30 more days from ${dateShort(state.plan.endsAt)}. Nothing you have now is lost.` : `${plan.name} starts on ${dateShort(state.plan.endsAt)}, when your current plan ends.`}</p>
-          )}
-        </div>
-      )}
 
       <h3 className="label mb-2 mt-5 text-[9.5px] text-ink/50">Pay with</h3>
       <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Payment method">
@@ -89,8 +63,8 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
 
       <div className="mt-4">
         {rail === "card"
-          ? <CardPay ready={cardReady} usd={usd} intent={{ product, id }} onCrypto={() => setRail("crypto")} setBusy={setBusy} />
-          : <CryptoPay key={`${product}-${id}`} usd={usd} intent={{ product, id }} title={product === "plan" ? `${plan.name} plan, 30 days` : `$${pack} for your Lexari balance`} setBusy={setBusy} after={product === "credits" ? after : undefined} />}
+          ? <CardPay ready={cardReady} usd={usd} intent={{ product: "credits", id }} onCrypto={() => setRail("crypto")} setBusy={setBusy} />
+          : <CryptoPay key={`credits-${id}`} usd={usd} intent={{ product: "credits", id }} title={`$${pack} for your Lexari balance`} setBusy={setBusy} after={after} />}
       </div>
       <p className="mt-3 text-center text-[11.5px] leading-snug text-ink/45">Your balance pays for AI usage, hires, agent cards and funding agents. It can&apos;t be withdrawn.</p>
     </Sheet>
@@ -162,13 +136,9 @@ function CryptoPay({ usd, intent, title, setBusy, after }: { usd: number; intent
   const shortSol = sol !== null && sol < SOL_FOR_FEES;
 
   const request = async () => { if (req && req.expiresAt > Date.now() + 60_000) return req; const r = await startCrypto(intent); setReq(r); return r; };
-  const done = (s: { plan: { id: string; seats: number; endsAt: number | null; name: string } }, tx: string) => {
+  const done = (_s: unknown, tx: string) => {
     setPhase("done");
-    if (intent.product === "plan") {
-      setPlan(s.plan.id as PlanId, s.plan.seats, s.plan.endsAt);
-      const name = PLANS.find((p) => p.id === intent.id)?.name ?? "your plan";
-      setTimeout(() => { closeBillingSheet(); celebrate({ confetti: "big", title: s.plan.id === intent.id ? `You're on ${name}` : `${name} is booked`, body: s.plan.id === intent.id ? `Lamina all month, $${PLANS.find((p) => p.id === intent.id)?.premiumUsd ?? 0} of premium models and ${s.plan.seats} seats, starting now.` : "It starts when your current plan ends. Nothing you have now is lost.", tx }); }, 700);
-    } else if (after) {
+    if (after) {
       setTimeout(() => { closeBillingSheet(); toast({ text: `$${usd} added to your balance` }); after(); }, 500);
     } else {
       setTimeout(() => { closeBillingSheet(); celebrate({ confetti: true, title: `$${usd} added to your balance`, body: "It pays for AI usage past your plan, hires, agent cards and funding agents.", tx }); }, 700);

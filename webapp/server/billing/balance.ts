@@ -57,7 +57,7 @@ export async function credit(tx: Tx, userId: string, micros: number, reason: str
 
 const LABEL: Record<string, string> = {
   topup_card: "Top up by card", topup_crypto: "Top up with USDC", dev_grant: "Test top up", refund: "Refund",
-  hire: "Hired a specialist", card: "Agent card", fund: "Funded an agent", fund_refund: "Funding refunded", fund_return: "Back from an agent's wallet",
+  plan: "Plan", hire: "Hired a specialist", card: "Agent card", fund: "Funded an agent", fund_refund: "Funding refunded", fund_return: "Back from an agent's wallet",
 };
 /** The balance and its history (top ups, hires, cards, agent funding, refunds; AI usage folded into one row per day). */
 export async function balanceView(userId: string) {
@@ -78,14 +78,15 @@ export async function balanceView(userId: string) {
     return "";
   };
   const named = (r: { reason: string; ref: string | null }) => {
+    if (r.reason === "plan") { const [, , , id, period] = (r.ref || "").split(":"); return `${planById(id || "").name} plan, ${period === "yearly" ? "yearly" : "monthly"}`; }
     const n = agentFor(r);
     if (!n) return LABEL[r.reason] ?? r.reason;
     return r.reason === "hire" ? `Hired ${n}` : r.reason === "card" ? `Card for ${n}` : r.reason === "fund" ? `Funded ${n}'s wallet` : `Funding ${n} refunded`;
   };
   const history = [
     ...rows.map((r) => ({ id: r.id, kind: r.reason, label: named(r), ref: r.ref, delta: r.delta, at: r.createdAt.getTime() })),
-    // Plans are paid straight from Top up (not from the balance): listed for the record, the balance doesn't move.
-    ...plans.map((p) => ({ id: p.id, kind: "plan", label: `${planById(p.sku.split("-")[1] || "").name} plan, 30 days`, ref: null, delta: 0, paid: p.currency === "USD" ? p.amountMinor * 10_000 : p.amountMinor, at: (p.paidAt ?? p.createdAt).getTime() })),
+    // Plans paid straight by card or USDC (older flow): listed for the record, the balance doesn't move.
+    ...plans.map((p) => ({ id: p.id, kind: "plan", label: `${planById(p.sku.split("-")[1] || "").name} plan, ${p.sku.endsWith("-yearly") ? "yearly" : "monthly"}`, ref: null, delta: 0, paid: p.currency === "USD" ? p.amountMinor * 10_000 : p.amountMinor, at: (p.paidAt ?? p.createdAt).getTime() })),
     ...[...usage].map((u) => ({ id: `usage-${u.day}`, kind: "usage", label: "AI usage past your plan", ref: null, delta: Number(u.total), at: new Date(`${u.day}T12:00:00Z`).getTime() })),
   ].sort((a, b) => b.at - a.at).slice(0, 40);
   return { balance: Math.max(0, settings?.credit ?? 0), history };

@@ -4,7 +4,7 @@
  * spend the last dollar. Pool rules live in ./math.ts.
  */
 import { and, eq, gt, sql } from "drizzle-orm";
-import { PLAN_DAYS, planById, type PlanId } from "@/content/appData";
+import { planById, type PlanId } from "@/content/appData";
 import { ALERT_AT, DEFAULT_SPEND_LIMIT_USD, FREE_LAMINA_USD_PER_DAY, HOLD_OUT_TOKENS, HOLD_TTL_MS, MICROS, type SpendMode } from "@/content/billing";
 import type { ModelInfo } from "@/content/models";
 import { ENGINE_PRICES, routeFor } from "../engram/engines";
@@ -13,6 +13,7 @@ import { db } from "../db";
 import { billingSettings, creditLedger, usageHolds, usageLedger, usagePeriods } from "../db/billingSchema";
 import { notify } from "../notify";
 import { currentPlan, type CurrentPlan } from "../plans";
+import { cycleWindow } from "./schedule";
 import { costMicros, decide, estimateTokens, share, split, usdToMicros, type BlockReason, type MeterSnapshot, type Pool } from "./math";
 
 type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
@@ -24,12 +25,16 @@ const DAY = 86_400_000;
 export const utcDayStart = (now = Date.now()) => new Date(Math.floor(now / DAY) * DAY);
 export const nextUtcMidnight = (now = Date.now()) => new Date(utcDayStart(now).getTime() + DAY);
 
-/** The current billing cycle: the active paid purchase's window, or the UTC day on Free (its daily Lamina allowance). */
+/**
+ * The current billing cycle: the active paid purchase's window, or the UTC day on Free (its daily Lamina allowance).
+ * A yearly plan is cut into monthly cycles (see cycleWindow), each with its own usage row and full pools.
+ */
 export async function cycleFor(userId: string, plan?: CurrentPlan): Promise<Cycle> {
   const p = plan ?? (await currentPlan(userId));
   const info = planById(p.id);
   if (p.id !== "free" && p.startsAt && p.expiresAt) {
-    return { plan: p, paid: true, start: new Date(p.startsAt), end: new Date(Math.min(p.expiresAt, p.startsAt + PLAN_DAYS * DAY)), laminaLimit: usdToMicros(info.laminaUsd), premiumLimit: usdToMicros(info.premiumUsd) };
+    const w = cycleWindow(Date.now(), { startsAt: p.startsAt, expiresAt: p.expiresAt, period: p.period ?? "monthly" });
+    return { plan: p, paid: true, start: new Date(w.start), end: new Date(w.end), laminaLimit: usdToMicros(info.laminaUsd), premiumLimit: usdToMicros(info.premiumUsd) };
   }
   return { plan: p, paid: false, start: utcDayStart(), end: nextUtcMidnight(), laminaLimit: usdToMicros(FREE_LAMINA_USD_PER_DAY), premiumLimit: 0 };
 }
@@ -196,7 +201,7 @@ async function alerts(userId: string, cycle: Cycle, before: Snapshot, s: { lamin
       await notify(userId, {
         kind: "payment", key: `usage:${id}:${pct}:${key}`, url: "/settings#billing",
         title: pct >= 100 ? `${label} usage is used up` : `You've used ${pct}% of ${label}`,
-        body: pct >= 100 ? (id === "lamina" ? "Lamina keeps going on your premium usage, then extra credits." : "Top up extra credits or move up a plan to keep using premium models.") : `Your plan renews on ${cycle.end.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}.`,
+        body: pct >= 100 ? (id === "lamina" ? "Lamina keeps going on your premium usage, then extra credits." : "Top up extra credits or move up a plan to keep using premium models.") : `${cycle.plan.period === "yearly" ? "Your usage refills" : "Your plan renews"} on ${cycle.end.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}.`,
       });
     }
   } else if (s.lamina > 0 && before.period.laminaUsed + s.lamina >= before.period.laminaLimit) {

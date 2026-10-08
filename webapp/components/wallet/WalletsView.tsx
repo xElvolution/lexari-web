@@ -14,44 +14,28 @@ import { cardFor, useCards } from "./useCards";
 import type { Card } from "@/lib/pay";
 import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
 import CardSheet from "./CardSheet";
-import { AgentWalletCard, useWallet, type HistoryRow, type WalletData } from "./agentWallet";
+import { AgentWalletCard, useWallet, type WalletData } from "./agentWallet";
+import HistorySheet from "./HistorySheet";
 
-const when = (t: number) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-const ICON: Record<string, string> = { topup_card: "plus", topup_crypto: "plus", dev_grant: "plus", refund: "check", fund_refund: "check", fund_return: "check", hire: "user", card: "file", fund: "wallet", plan: "star", usage: "spark" };
-
-function HistoryItem({ r }: { r: HistoryRow }) {
-  const up = r.delta > 0;
-  return (
-    <li data-history={r.kind} className="flex items-center gap-3 py-2.5">
-      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${up ? "bg-[#e7f8ee] text-[#137a3d]" : "bg-tint text-ink/70"}`}><Icon name={(ICON[r.kind] || "wallet") as never} size={15} /></span>
-      <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-semibold text-ink">{r.label}</span><span className="block text-[12px] text-ink/50">{when(r.at)}{r.kind === "plan" && r.paid ? ` · paid ${money(r.paid, { cents: true })} at Top up` : ""}</span></span>
-      <span className={`tab-num shrink-0 text-[14px] font-bold ${up ? "text-[#137a3d]" : "text-ink"}`}>{r.delta === 0 ? "" : `${up ? "+" : "\u2212"}${money(Math.abs(r.delta), { cents: true })}`}</span>
-    </li>
-  );
-}
-
-/** Your Lexari balance in dollars: Top up by card or USDC, and everything it paid for. */
+/** Your Lexari balance in dollars: Top up by card or USDC, and History in its own sheet. */
 function Balance({ d }: { d: WalletData | null | undefined }) {
   const hide = useHideBalance();
-  const [all, setAll] = useState(false);
+  const [open, setOpen] = useState(false);
   const hist = d?.history ?? [];
   return (
-    <section data-rise className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+    <section data-rise className="min-w-0">
       <div data-lexari-balance className="grain relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#6a3dff,#5b2bff_45%,#2a0f9a)] p-6 text-white shadow-[0_24px_50px_-28px_rgba(91,43,255,.9)] sm:p-7">
         <div className="flex items-center gap-2"><span className="label text-[9px] text-white/75">Lexari balance</span><button data-hide-balance onClick={() => setHideBalance(!hide)} aria-label={hide ? "Show balance" : "Hide balance"} aria-pressed={hide} className="grid h-7 w-7 place-items-center rounded-full bg-white/15 hover:bg-white/25"><Icon name={hide ? "eyeoff" : "eye"} size={14} /></button></div>
         <div data-balance className="display tab-num mt-3 text-[56px] leading-none">{d === undefined ? "…" : hide ? MASK : money(d?.balance ?? 0, { cents: true })}</div>
         <p className="mt-3 max-w-[28rem] text-[13.5px] leading-snug text-white/80">Pays for AI usage past your plan, hires, agent cards and funding your agents.</p>
-        <div className="mt-5 flex flex-wrap gap-2">
-          <button data-open-topup onClick={() => openTopUp({ product: "credits" })} className="btn btn-white btn-sm !h-11"><Icon name="plus" size={16} />Top up</button>
-          <span className="inline-flex h-11 items-center rounded-full bg-white/15 px-4 text-[12.5px] font-semibold">Card or USDC</span>
+        <div data-balance-actions className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <button data-open-topup onClick={() => openTopUp({ product: "credits" })} className="btn btn-white btn-sm !h-11 w-full sm:w-auto"><Icon name="plus" size={16} />Top up</button>
+          <button data-open-history onClick={() => setOpen(true)} aria-haspopup="dialog" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white/15 px-4 text-[14px] font-bold ring-1 ring-white/20 transition hover:bg-white/25 active:scale-[.98] sm:w-auto">
+            <Icon name="clock" size={16} />History{hist.length ? <span className="tab-num rounded-full bg-white/20 px-1.5 py-0.5 text-[11px] leading-none">{hist.length}</span> : null}
+          </button>
         </div>
       </div>
-      <div className="rounded-[28px] bg-card p-5 ring-1 ring-line sm:p-6">
-        <div className="flex items-center justify-between"><h3 className="text-[16px] font-bold text-ink">History</h3>{hist.length > 5 && <button data-view-all onClick={() => setAll((x) => !x)} className="text-[13px] font-bold text-brand-ink hover:underline">{all ? "Less" : "View all"}</button>}</div>
-        {d === undefined ? <p className="mt-3 text-[14px] text-ink/60">Loading…</p> : !hist.length ? <p className="mt-3 text-[14px] text-ink/60">Nothing yet. Top ups, plans, hires and refunds show here.</p> : (
-          <ul data-history-list className="mt-1 divide-y divide-[var(--line)]">{(all ? hist : hist.slice(0, 5)).map((r) => <HistoryItem key={r.id} r={r} />)}</ul>
-        )}
-      </div>
+      {open && <HistorySheet rows={hist} loading={d === undefined} onClose={() => setOpen(false)} />}
     </section>
   );
 }

@@ -3,12 +3,12 @@
  * purchases were devnet SOL). A purchase counts from startsAt (createdAt when null) until expiresAt.
  */
 import { and, count, desc, eq, gt, sql } from "drizzle-orm";
-import { PLANS, planById, type PlanId } from "@/content/appData";
+import { PLANS, isPeriod, planById, type Period, type PlanId } from "@/content/appData";
 import { db } from "./db";
 import { agents, planPurchases } from "./db/schema";
 import { HttpError } from "./http";
 
-export type CurrentPlan = { id: PlanId; name: string; seats: number; expiresAt: number | null; startsAt: number | null; purchaseId: string | null };
+export type CurrentPlan = { id: PlanId; name: string; seats: number; expiresAt: number | null; startsAt: number | null; purchaseId: string | null; period: Period | null };
 
 export async function currentPlan(userId: string): Promise<CurrentPlan> {
   const rows = await db().select().from(planPurchases)
@@ -16,8 +16,8 @@ export async function currentPlan(userId: string): Promise<CurrentPlan> {
     .orderBy(desc(planPurchases.createdAt)).limit(10);
   // The biggest active plan wins (an upgrade during an active plan replaces it).
   const best = rows.map((r) => ({ p: planById(r.plan), r })).sort((a, b) => b.p.seats - a.p.seats || b.r.expiresAt.getTime() - a.r.expiresAt.getTime())[0];
-  if (!best) return { id: PLANS[0].id, name: PLANS[0].name, seats: PLANS[0].seats, expiresAt: null, startsAt: null, purchaseId: null };
-  return { id: best.p.id, name: best.p.name, seats: best.p.seats, expiresAt: best.r.expiresAt.getTime(), startsAt: (best.r.startsAt ?? best.r.createdAt).getTime(), purchaseId: best.r.id };
+  if (!best) return { id: PLANS[0].id, name: PLANS[0].name, seats: PLANS[0].seats, expiresAt: null, startsAt: null, purchaseId: null, period: null };
+  return { id: best.p.id, name: best.p.name, seats: best.p.seats, expiresAt: best.r.expiresAt.getTime(), startsAt: (best.r.startsAt ?? best.r.createdAt).getTime(), purchaseId: best.r.id, period: isPeriod(best.r.period) ? best.r.period : "monthly" };
 }
 
 /** Agents on the account: your own agent, hired specialists and the ones you made. Each takes a seat. */

@@ -5,6 +5,7 @@ import { CREDITS_ON_FREE } from "@/content/billing";
 import { LAMINA, modelById } from "@/content/models";
 import { friendly } from "@/lib/api";
 import { closeBillingSheet, openSpend, openTopUp, setModel, useBilling, type OutInfo } from "@/lib/billing";
+import { openUpgrade } from "../overlays";
 import { toast } from "@/lib/store";
 import Icon from "../Icon";
 import { LaminaMark, ModelMark, Sheet, dateShort, money, timeShort } from "./parts";
@@ -28,9 +29,9 @@ export default function OutOfUsageSheet({ info }: { info: OutInfo }) {
     switch (info.reason) {
       case "free_daily": return { title: "You've used today's free Lamina", body: `Free comes with a small Lamina allowance every day.${resets ? ` It refills at ${timeShort(resets)}.` : ""} Pro keeps Lamina going all month, with $20 of premium models.` };
       case "premium_locked": return { title: `${model.label} is a premium model`, body: free ? (CREDITS_ON_FREE ? "Premium models run on Pro's included usage, or on extra credits. Lamina stays free for your daily messages." : "Premium models come with Pro. Lamina stays free for your daily messages.") : "Your plan's premium usage covers it." };
-      case "spend_limit": return { title: "You've hit your spend limit", body: `Extra credits are capped at ${state ? money(state.spend.limit) : "your limit"} a cycle and that's used. Raise the limit, or wait for the next cycle${state?.plan.endsAt ? ` on ${dateShort(state.plan.endsAt)}` : ""}.` };
+      case "spend_limit": return { title: "You've hit your spend limit", body: `Extra credits are capped at ${state ? money(state.spend.limit) : "your limit"} a cycle and that's used. Raise the limit, or wait for the next cycle${state?.plan.refillsAt ? ` on ${dateShort(state.plan.refillsAt)}` : ""}.` };
       case "model_unavailable": return { title: `${model.label} isn't available yet`, body: "Premium models are coming soon on this server. Lamina is ready right now." };
-      default: return { title: premium ? "Premium usage is used up" : "Included usage is used up", body: `You've used everything included this cycle${state?.plan.endsAt ? `. It resets on ${dateShort(state.plan.endsAt)}` : ""}. Top up extra credits to keep going${plan !== "plus" ? ", or move up a plan for more" : ""}.` };
+      default: return { title: premium ? "Premium usage is used up" : "Included usage is used up", body: `You've used everything included this cycle${state?.plan.refillsAt ? `. It resets on ${dateShort(state.plan.refillsAt)}` : ""}. Top up extra credits to keep going${plan !== "plus" ? ", or move up a plan for more" : ""}.` };
     }
   })();
 
@@ -54,7 +55,7 @@ export default function OutOfUsageSheet({ info }: { info: OutInfo }) {
         {info.reason === "spend_limit" && <Choice icon={<Icon name="settings" size={18} />} title="Raise your spend limit" body="Pick a higher monthly cap, or none." onClick={openSpend} primary={!canLamina} />}
         {showTopUp && <Choice icon={<Icon name="wallet" size={18} />} title="Top up extra credits" body="$5, $10 or $25, by card or USDC. Used after your included usage." onClick={() => openTopUp({ product: "credits" })} primary={!canLamina && info.reason !== "free_daily"} />}
         {showUpgrade && info.reason !== "model_unavailable" && (
-          <Choice icon={<Icon name="star" size={18} />} title={`Upgrade to ${upgradeTo === "pro" ? "Pro" : "Max"}`} body={upgradeTo === "pro" ? "$20 a month: Lamina all month plus $20 of premium models." : "$60 a month: 3x the usage of Pro plus $60 of premium models."} onClick={() => openTopUp({ product: "plan", id: upgradeTo })} primary={info.reason === "free_daily"} />
+          <Choice icon={<Icon name="star" size={18} />} title={`Upgrade to ${upgradeTo === "pro" ? "Pro" : "Max"}`} body={upgradeTo === "pro" ? "$20 a month: Lamina all month plus $20 of premium models." : "$60 a month: 3x the usage of Pro plus $60 of premium models."} onClick={() => { closeBillingSheet(); openUpgrade("plans"); }} primary={info.reason === "free_daily"} />
         )}
         {info.reason === "free_daily" && <button onClick={closeBillingSheet} className="mt-1 h-10 text-[13.5px] font-bold text-ink/60 hover:text-ink">I&apos;ll wait for tomorrow</button>}
       </div>

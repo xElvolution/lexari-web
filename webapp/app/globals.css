@@ -99,3 +99,14 @@ html[data-motion="off"] :is(.hub-flame, .hub-flame-core, .hub-orbit, .hub-orbit 
    If it does, mobile browsers zoom the layout out for a moment and the fixed bottom nav jumps. clip keeps sticky headers working. */
 html, body { overflow-x: clip; }
 @supports not (overflow: clip) { html, body { overflow-x: hidden; } }
+
+/* Plans: the Monthly / Yearly thumb slides with a little overshoot, and a price swaps in from below */
+.period-thumb { transition: transform .42s cubic-bezier(.3, 1.35, .5, 1); will-change: transform; }
+@keyframes price-in { 0% { opacity: 0; transform: translateY(10px) scale(.96); filter: blur(2px); } 100% { opacity: 1; transform: none; filter: none; } }
+.price-in { display: inline-block; animation: price-in .38s cubic-bezier(.2, .9, .3, 1.15) both; }
+/* bottom sheets that rise from the edge on phones (dialog pop on desktop is unchanged) */
+@keyframes sheet-up { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
+@media (max-width: 639px) { .sheet-up { animation: sheet-up .42s cubic-bezier(.2, .9, .25, 1) both; } }
+@keyframes row-in { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
+.row-in { animation: row-in .35s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .period-thumb { transition: none; } .price-in, .sheet-up, .row-in { animation: none; } }

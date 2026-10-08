@@ -1,6 +1,7 @@
 "use client";
 import { useSyncExternalStore } from "react";
 import { api } from "./api";
+import { moneyChanged, startMoneySync } from "./money";
 
 export type Notice = { id: string; kind: string; title: string; body: string; url: string; read: boolean; at: number };
 type S = { items: Notice[]; unread: number; loaded: boolean };
@@ -13,7 +14,10 @@ export const useNotices = () => useSyncExternalStore(subscribe, () => state, () 
 export async function loadNotices() {
   try {
     const r = await api<{ items: Notice[]; unread: number }>("/api/notifications");
+    // A payment notice we haven't seen (a top up confirmed by a webhook, a plan, a hire): balances refetch.
+    const fresh = state.loaded && r.items.some((n) => n.kind === "payment" && !state.items.some((o) => o.id === n.id));
     state = { items: r.items, unread: r.unread, loaded: true }; emit();
+    if (fresh) moneyChanged();
   } catch { /* signed out or offline */ }
 }
 
@@ -81,6 +85,7 @@ let started = false;
 export function startNotices() {
   if (started || typeof window === "undefined") return;
   started = true;
+  startMoneySync();
   void loadNotices();
   setInterval(() => { if (document.visibilityState === "visible") void loadNotices(); }, 45_000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void loadNotices(); });

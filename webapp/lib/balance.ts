@@ -26,7 +26,7 @@ export function topUpFor(short: Short, what: string, then: () => void, cancel?: 
 }
 
 export type PayReq = {
-  kind: "hire" | "card" | "fund";
+  kind: "hire" | "card" | "fund" | "plan";
   title: string;
   /** how Top up names it when the balance is short: "Hiring Ava" */
   doing?: string;

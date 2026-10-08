@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { friendly } from "@/lib/api";
 import { parkPay, resumePay, shortOf, topUpFor, usePayReq } from "@/lib/balance";
 import { refreshBilling, useBilling } from "@/lib/billing";
+import { moneyChanged } from "@/lib/money";
 import Icon from "../Icon";
 import { Sheet, Spinner, money } from "./parts";
 
@@ -37,7 +38,7 @@ function PaySheetBody() {
     setBusy(true);
     try {
       const result = await req.run(usd);
-      void refreshBilling();
+      moneyChanged();
       open.done({ ok: true, result, usd });
     } catch (e) {
       const s = shortOf(e);
@@ -59,7 +60,8 @@ function PaySheetBody() {
           {busy ? <><Spinner className="mr-2" />Paying…</> : short ? `Top up and ${req.kind === "fund" ? "fund" : "continue"}` : req.cta ? req.cta(usd) : `Pay ${money(price, { cents: !Number.isInteger(usd) })} from balance`}
         </button>
       }>
-      {req.art && <div className="mb-3 flex justify-center">{req.art}</div>}
+      {/* room above and below for the primary agent's gold ring, its glow and the status dot: the sheet body scrolls, so anything past its edge is clipped */}
+      {req.art && <div data-pay-art className="mb-1 flex justify-center pb-5 pt-7">{req.art}</div>}
       {req.amounts && (
         <div className="mb-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Amount">
           {req.amounts.map((v) => (

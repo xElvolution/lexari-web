@@ -21,7 +21,8 @@ test("the smallest pack that covers the shortfall", () => {
   assert.equal(packFor(5_000_000), 5);
   assert.equal(packFor(5_000_001), 10);
   assert.equal(packFor(24_000_000), 25);
-  assert.equal(packFor(90_000_000), 25);
+  assert.equal(packFor(90_000_000), 90); // past the largest pack: the shortfall in whole dollars
+  assert.equal(packFor(185_400_000), 186);
 });
 
 test("a hired agent's fund tag is read in dollars, capped and rounded", () => {

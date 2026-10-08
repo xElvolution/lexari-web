@@ -14,6 +14,7 @@ import {
 import type { Account } from "@/server/account";
 import type { HubState } from "@/server/hub/state";
 import { ApiError, api } from "./api";
+import { onMoneyChanged } from "./money";
 import { applyTheme } from "@shared/components/theme";
 import { signOutSession } from "./session";
 import { bridgeFor, runSignOutHooks } from "./walletBridge";
@@ -351,6 +352,8 @@ export async function hubAct<T>(run: () => Promise<T>): Promise<T> {
 }
 /** Resolves once no Hub action is on its way (a claim waits for a training still being saved, for example). */
 export const hubIdle = () => (hubActs ? new Promise<void>((r) => hubIdleWaiters.push(r)) : Promise.resolve());
+// Money moved (a plan or hire can complete a Hub quest): refresh the Hub only when it's loaded.
+onMoneyChanged(() => { if (state?.live) void refreshHub(); });
 export function refreshHub(): Promise<HubState | null> {
   if (hubActs) { hubAgain = true; return Promise.resolve(state?.live ?? null); }
   // A fetch already in flight may have started before what you just did was recorded: fetch once more after it.

@@ -232,6 +232,8 @@ export const planPurchases = pgTable("plan_purchases", {
   /** the payments row (card or USDC) that bought it; null for older devnet SOL purchases */
   paymentId: uuid("payment_id"),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  /** monthly | yearly (migration 0012). A yearly plan runs a calendar year and refills its pools every month. */
+  period: text("period").notNull().default("monthly"),
 });
 
 /** Devnet SOL the server sent to a person, so the per-person cap holds. */

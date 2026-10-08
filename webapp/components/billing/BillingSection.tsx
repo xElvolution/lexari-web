@@ -10,6 +10,7 @@ import { setPlan, toast } from "@/lib/store";
 import { celebrate } from "../Celebrate";
 import Icon from "../Icon";
 import { PlansGrid } from "../Plans";
+import { openUpgrade } from "../overlays";
 import UsageMeters from "./UsageMeters";
 import { LaminaMark, ModelMark, Spinner, dateShort, money } from "./parts";
 
@@ -17,9 +18,10 @@ const box = "rounded-[22px] bg-card ring-1 ring-line";
 const smallBtn = "inline-flex h-10 items-center gap-2 rounded-full bg-tint px-4 text-[14px] font-semibold text-ink transition hover:bg-grape hover:text-white";
 const H = ({ children, right }: { children: ReactNode; right?: ReactNode }) => <div className="mb-1.5 mt-7 flex items-end justify-between gap-3"><h3 className="label text-[9.5px] text-ink/50">{children}</h3>{right}</div>;
 const skuLabel = (sku: string) => {
-  const [k, v] = sku.split("-");
-  return k === "plan" ? `${PLANS.find((p) => p.id === v)?.name ?? v} plan, 30 days` : `$${v} extra credits`;
+  const [k, v, per] = sku.split("-");
+  return k === "plan" ? `${PLANS.find((p) => p.id === v)?.name ?? v} plan, ${per === "yearly" ? "yearly" : "monthly"}` : `$${v} extra credits`;
 };
+const dateLong = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 /** Settings, Billing: the plan, usage meters, extra credits and the spend limit, plans, payments and recent usage. */
 export default function BillingSection({ children }: { children?: ReactNode }) {
@@ -33,6 +35,7 @@ export default function BillingSection({ children }: { children?: ReactNode }) {
   const paid = s.plan.id !== "free";
   const home = modelById(s.models.agents.home) ?? LAMINA;
   const nextPlan = s.plan.next ? PLANS.find((p) => p.id === s.plan.next!.id) : null;
+  const yearly = s.plan.period === "yearly";
 
   return (
     <div data-billing>
@@ -42,18 +45,25 @@ export default function BillingSection({ children }: { children?: ReactNode }) {
         <span className="label text-[9px] text-white/70">Current plan</span>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span data-current-plan className="display text-[44px] leading-none max-[430px]:text-[38px]">{s.plan.name}</span>
-          <span className="text-[15px] font-semibold text-white/80">{paid ? `$${s.plan.usd} / month` : "Free forever"}</span>
+          {paid && <span data-plan-period className="label self-center whitespace-nowrap rounded-full bg-white/20 px-2 py-1 text-[8.5px]">{yearly ? "Yearly" : "Monthly"}</span>}
+          <span className="text-[15px] font-semibold text-white/80">{paid ? `$${s.plan.usd} / ${yearly ? "year" : "month"}` : "Free forever"}</span>
         </div>
+        {paid && s.plan.endsAt ? (
+          <dl data-plan-dates className="relative mt-3 grid max-w-[460px] grid-cols-2 gap-2 text-[12.5px]">
+            <div className="min-w-0 rounded-2xl bg-white/12 px-3 py-2.5"><dt className="text-white/70">{nextPlan ? "Ends" : "Renews"}</dt><dd data-renews className="mt-0.5 truncate text-[14px] font-bold">{yearly ? dateLong(s.plan.endsAt) : dateShort(s.plan.endsAt)}</dd></div>
+            <div className="min-w-0 rounded-2xl bg-white/12 px-3 py-2.5"><dt className="text-white/70">Usage refills</dt><dd data-refills className="mt-0.5 truncate text-[14px] font-bold">{s.plan.refillsAt && s.plan.refillsAt < s.plan.endsAt ? dateShort(s.plan.refillsAt) : yearly ? "Monthly" : "On renewal"}</dd></div>
+          </dl>
+        ) : null}
         <p className="relative mt-2 max-w-[460px] text-[13.5px] leading-snug text-white/85">
-          {paid ? <>Runs until {dateShort(s.plan.endsAt!)}. {s.plan.seats} seats.{nextPlan ? ` ${nextPlan.name} is booked from ${dateShort(s.plan.next!.startsAt)}.` : " Renew any time; days add on to the end."}</> : "Lamina every day, your own agent, its computer and memory. Upgrade for Lamina all month and premium models."}
+          {paid ? <>{s.plan.seats} seats.{yearly ? " Billed once a year from your balance; your Lamina and premium usage refill every month." : " Renew any time; days add on to the end."}{nextPlan ? ` ${nextPlan.name} ${s.plan.next!.period} is booked from ${dateShort(s.plan.next!.startsAt)}.` : ""}</> : "Lamina every day, your own agent, its computer and memory. Upgrade for Lamina all month and premium models."}
         </p>
         <div className="relative mt-5 flex flex-wrap gap-2">
           <button data-open-topup onClick={() => openTopUp({ product: "credits" })} className="btn btn-white btn-sm !h-11"><Icon name="wallet" size={16} />Top up</button>
-          <button data-change-plan onClick={() => openTopUp({ product: "plan", id: paid ? s.plan.id : "pro" })} className="inline-flex h-11 items-center gap-2 rounded-full bg-white/15 px-4 text-[14px] font-bold transition hover:bg-white/25">{paid ? "Renew or change plan" : "Upgrade to Pro"}</button>
+          <button data-change-plan onClick={() => openUpgrade("plans")} className="inline-flex h-11 items-center gap-2 rounded-full bg-white/15 px-4 text-[14px] font-bold transition hover:bg-white/25">{paid ? "Renew or change plan" : "Upgrade to Pro"}</button>
         </div>
       </section>
 
-      <H right={<span className="text-[12px] font-semibold text-ink/50">{paid ? `Cycle ${dateShort(s.usage.cycleStart)} to ${dateShort(s.usage.cycleEnd)}` : "Free refills every day"}</span>}>Usage</H>
+      <H right={<span className="text-[12px] font-semibold text-ink/50">{paid ? `${yearly ? "This month" : "Cycle"} ${dateShort(s.usage.cycleStart)} to ${dateShort(s.usage.cycleEnd)}` : "Free refills every day"}</span>}>Usage</H>
       <div className={`${box} p-5`}><UsageMeters s={s} /></div>
 
       <div className={`${box} mt-3 divide-y divide-[var(--line)] px-5`}>
@@ -113,7 +123,7 @@ function Payments({ s }: { s: BillingState }) {
         {list.map((p) => (
           <li key={p.id} className="flex items-center gap-3 py-3.5">
             <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${p.status === "paid" ? "bg-grape/12 text-brand-ink" : "bg-tint text-ink/50"}`}><Icon name={p.product === "plan" ? "star" : "wallet"} size={16} /></span>
-            <div className="min-w-0 flex-1"><div className="truncate text-[14.5px] font-semibold text-ink">{skuLabel(p.sku)}</div><div className="text-[12.5px] text-ink/55">{dateShort(p.paidAt ?? p.at)} · {p.test ? "Local test grant" : p.rail === "card" ? "Card" : "USDC"}{p.status === "pending" ? " · waiting" : ""}</div></div>
+            <div className="min-w-0 flex-1"><div className="truncate text-[14.5px] font-semibold text-ink">{skuLabel(p.sku)}</div><div className="text-[12.5px] text-ink/55">{dateShort(p.paidAt ?? p.at)} · {p.test ? "Local test grant" : p.rail === "balance" ? "From balance" : p.rail === "card" ? "Card" : "USDC"}{p.status === "pending" ? " · waiting" : ""}</div></div>
             <span className="shrink-0 text-[14px] font-bold tabular-nums text-ink">${(p.amountMinor / MICROS).toFixed(p.amountMinor % MICROS ? 2 : 0)}</span>
             {p.status === "pending" ? <button onClick={() => check(p.id)} disabled={checking === p.id} className="shrink-0 text-[12.5px] font-bold text-brand-ink disabled:opacity-50">{checking === p.id ? "Checking…" : "Check"}</button>
               : p.txSig && !p.txSig.startsWith("dev-") && p.rail === "crypto" ? <a href={`https://explorer.solana.com/tx/${p.txSig}${s.rails.crypto.cluster === "mainnet-beta" ? "" : `?cluster=${s.rails.crypto.cluster}`}`} target="_blank" rel="noreferrer" aria-label="View on Solana Explorer" className="shrink-0 text-ink/40 hover:text-brand-ink"><Icon name="globe" size={16} /></a> : null}
@@ -162,7 +172,7 @@ function DevTools({ s }: { s: BillingState }) {
       <div className="label text-[9px] text-[#c98410]">Local dev only · not in production</div>
       <p className="mt-1 text-[12.5px] text-ink/60">Grants go through the same entitlement service as real payments. Plan: {s.plan.name}. Lamina via {s.models.laminaVia}.</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {b("free", "Free", { action: "free" })}{b("pro", "Grant Pro", { action: "plan", id: "pro" })}{b("plus", "Grant Max", { action: "plan", id: "plus" })}
+        {b("free", "Free", { action: "free" })}{b("pro", "Grant Pro", { action: "plan", id: "pro" })}{b("proy", "Grant Pro yearly", { action: "plan", id: "pro", period: "yearly" })}{b("plus", "Grant Max", { action: "plan", id: "plus" })}
         {b("c10", "+$10 credits", { action: "credits", usd: 10 })}
         {s.usage.free ? <>{b("f90", "Today 90%", { action: "use", pool: "lamina", share: 0.9 })}{b("f100", "Use all today", { action: "use", pool: "lamina", share: 1 })}</>
           : <>{b("l90", "Lamina 90%", { action: "use", pool: "lamina", share: 0.9 })}{b("l100", "Lamina 100%", { action: "use", pool: "lamina", share: 1 })}{b("p100", "Premium 100%", { action: "use", pool: "premium", share: 1 })}</>}
@@ -187,7 +197,7 @@ function useCardReturn() {
       if (r.status !== "paid") { toast({ text: "Your card payment is still processing. We'll update this page when it lands." }); return; }
       const p = r.state.payments.find((x) => x.id === id);
       if (p?.product === "plan") setPlan(r.state.plan.id as PlanId, r.state.plan.seats, r.state.plan.endsAt);
-      celebrate({ confetti: p?.product === "plan" ? "big" : true, title: p ? (p.product === "plan" ? `${skuLabel(p.sku).replace(", 30 days", "")} is yours` : `${skuLabel(p.sku)} added`) : "Payment received", body: "Thanks for supporting Lexari." });
+      celebrate({ confetti: p?.product === "plan" ? "big" : true, title: p ? (p.product === "plan" ? `${skuLabel(p.sku).replace(/, (monthly|yearly)$/, "")} is yours` : `${skuLabel(p.sku)} added`) : "Payment received", body: "Thanks for supporting Lexari." });
     }).catch((e) => toast({ text: friendly(e, "We couldn't confirm the card payment yet.") }));
   }, []);
 }

@@ -18,7 +18,7 @@ export const runtime = "nodejs";
  */
 const on = () => process.env.NODE_ENV !== "production" && process.env.LEXARI_DEV_BILLING === "1";
 const body = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("plan"), id: z.enum(["pro", "plus"]) }),
+  z.object({ action: z.literal("plan"), id: z.enum(["pro", "plus"]), period: z.enum(["monthly", "yearly"]).default("monthly") }),
   z.object({ action: z.literal("credits"), usd: z.number().int().min(1).max(100) }),
   z.object({ action: z.literal("free") }),
   z.object({ action: z.literal("use"), pool: z.enum(["lamina", "premium"]), share: z.number().min(0).max(1) }),
@@ -31,7 +31,7 @@ export const POST = withUser(async (user, req) => {
   if (b instanceof Response) return b;
   const database = db();
   if (b.action === "plan" || b.action === "credits") {
-    const item = b.action === "plan" ? itemFor("plan", b.id) : { product: "credits" as const, sku: `credits-${b.usd}`, usd: b.usd };
+    const item = b.action === "plan" ? itemFor("plan", b.id, b.period) : { product: "credits" as const, sku: `credits-${b.usd}`, usd: b.usd };
     if (b.action === "credits" && ![5, 10, 25].includes(b.usd)) return jsonError(400, "Use 5, 10 or 25.");
     const [p] = await database.insert(payments).values({ userId: user.userId, rail: "crypto", provider: "dev", product: item.product, sku: item.sku, amountMinor: item.usd * 1_000_000, currency: "USDC", meta: { dev: true } }).returning();
     await markPaid(p.id, { txSig: `dev-${p.id}` });

@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore, useState } from "react";
 import { api, friendly } from "@/lib/api";
 import { payFromBalance } from "@/lib/balance";
 import { refreshBilling } from "@/lib/billing";
+import { onMoneyChanged, startMoneySync } from "@/lib/money";
 import { toast } from "@/lib/store";
 import { txUrl } from "@/lib/nft";
 import { MASK, useHideBalance } from "@/lib/privacy";
@@ -39,9 +40,12 @@ export function refreshWallet(agent = "") {
   return p;
 }
 const refreshAll = () => Promise.all([...new Set(["", ...cache.keys()])].map((k) => refreshWallet(k)));
+// Any money change (a top up confirmed, a payment notification, coming back to the tab) refetches the scopes on screen
+// or already loaded. Nothing is fetched for a wallet view that was never opened.
+onMoneyChanged(() => { const keys = [...new Set([...cache.keys(), ...(subs.size ? [""] : [])])]; keys.forEach((k) => void refreshWallet(k)); });
 export function useWallet(agent = "") {
   const d = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => cache.get(agent), () => undefined);
-  useEffect(() => { void refreshWallet(agent); }, [agent]);
+  useEffect(() => { startMoneySync(); void refreshWallet(agent); }, [agent]);
   return d;
 }
 
@@ -126,7 +130,7 @@ export function AgentWalletCard({ a, name, look, funding, fundings = [], compact
       {sol && (
         <div className="mt-3 flex gap-2">
           <button data-fund-agent={a.slug} onClick={() => void fundAgent(a.slug, name, funding.amounts)} disabled={!funding.on} className="btn btn-brand btn-sm !h-10 flex-1 disabled:opacity-50"><Icon name="plus" size={14} />Fund</button>
-          {usdc && <button data-return-agent={a.slug} onClick={async () => { setBack(true); await returnToBalance(a.slug, name); setBack(false); }} disabled={back || !funding.on} className="btn btn-line btn-sm !h-10 flex-1 text-ink disabled:opacity-60">{back ? "Sending…" : "Back to balance"}</button>}
+          {usdc && <button data-return-agent={a.slug} onClick={async () => { setBack(true); await returnToBalance(a.slug, name); setBack(false); }} disabled={back || !funding.on} className="btn btn-line btn-sm !h-10 flex-1 text-ink disabled:opacity-60">{back ? "Moving…" : "Move to balance"}</button>}
         </div>
       )}
       {!funding.on && sol && <p className="mt-2 text-[12px] text-ink/50">Funding agents isn&apos;t switched on here yet.</p>}

@@ -53,6 +53,21 @@ export const PLANS = [
 ] as const;
 /** Paid plans run for this many days; Lexari tracks the cycle and reminds you before it ends. */
 export const PLAN_DAYS = 30;
+/**
+ * Billing period. Monthly runs PLAN_DAYS; yearly runs one calendar year and costs 10 months (2 months free). A yearly
+ * plan still refills its Lamina and premium pools every month (on the same day of the month it started).
+ */
+export const PERIODS = ["monthly", "yearly"] as const;
+export type Period = (typeof PERIODS)[number];
+export const YEAR_MONTHS_PAID = 10;
+export const isPeriod = (v: unknown): v is Period => v === "monthly" || v === "yearly";
+/** What a plan costs for a period, in whole dollars. The server prices every purchase with this; the client price is never trusted. */
+export const planPrice = (p: { usd: number }, period: Period) => (period === "yearly" ? p.usd * YEAR_MONTHS_PAID : p.usd);
+/** Dollars saved by paying yearly (two months). */
+export const yearSaving = (p: { usd: number }) => p.usd * 12 - planPrice(p, "yearly");
+/** The monthly equivalent of a yearly price, to the cent: $200 a year reads $16.67 a month. */
+export const perMonth = (p: { usd: number }, period: Period) => Math.round((planPrice(p, period) / (period === "yearly" ? 12 : 1)) * 100) / 100;
+export const periodLabel = (period: Period) => (period === "yearly" ? "yearly" : "monthly");
 export const planById = (id: string) => PLANS.find((p) => p.id === id) ?? PLANS[0];
 export type PlanId = (typeof PLANS)[number]["id"];
 

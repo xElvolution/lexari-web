@@ -13,6 +13,8 @@ import { LAMINA, modelById, type ModelInfo } from "@/content/models";
 import { api, ApiError, friendly } from "./api";
 import { connection, payer } from "./pay";
 import { confirmSig } from "./rpc";
+import { openUpgrade } from "@/components/overlays";
+import { moneyChanged, onMoneyChanged } from "./money";
 
 export type { BillingState };
 export type OutInfo = (Blocked | { reason: "model_unavailable"; model: string; modelLabel: string }) & { convo?: string; agent?: string };
@@ -46,6 +48,9 @@ export function refreshBilling(): Promise<BillingState | null> {
 }
 export const applyState = (s: BillingState) => { fetchedAt = Date.now(); set({ state: s, error: "" }); };
 
+// A money change refetches billing when something on screen shows it (or it was loaded before).
+onMoneyChanged(() => { if (subs.size || store.state) void refreshBilling(); });
+
 /** The billing state, fetched on first use and again when stale (30 s) or when the tab comes back. */
 export function useBilling() {
   const s = useSyncExternalStore(subscribe, () => store, () => SERVER);
@@ -69,7 +74,11 @@ export function billingBlocked(info: OutInfo) {
 }
 
 export const openModels = (convo: string, agent: string | null, group = false) => set({ sheet: { kind: "models", convo, agent, group } });
-export const openTopUp = (intent: TopUpIntent = { product: "credits" }) => set({ sheet: { kind: "topup", intent } });
+/** Top up adds to the balance. A plan intent opens the plans sheet instead (plans are paid from the balance, monthly or yearly). */
+export const openTopUp = (intent: TopUpIntent = { product: "credits" }) => {
+  if (intent.product === "plan") { set({ sheet: null }); openUpgrade("plans"); return; }
+  set({ sheet: { kind: "topup", intent } });
+};
 export const openSpend = () => set({ sheet: { kind: "spend" } });
 export const closeBillingSheet = () => set({ sheet: null });
 
@@ -103,13 +112,13 @@ export async function setSpend(mode: "disabled" | "fixed" | "unlimited", limitUs
 
 export type CryptoRequest = { id: string; recipient: string; mint: string; reference: string; amountMinor: number; decimals: number; cluster: string; title: string; url: string; expiresAt: number };
 
-export type BuyIntent = { product: "plan" | "credits"; id: string };
+export type BuyIntent = { product: "plan" | "credits"; id: string; period?: "monthly" | "yearly" };
 export async function startCard(intent: BuyIntent) {
-  const r = await api<{ rail: "card"; card: { id: string; url: string } }>("/api/billing/checkout", { body: { rail: "card", product: intent.product, id: intent.id } });
+  const r = await api<{ rail: "card"; card: { id: string; url: string } }>("/api/billing/checkout", { body: { rail: "card", product: intent.product, id: intent.id, ...(intent.period ? { period: intent.period } : {}) } });
   return r.card;
 }
 export async function startCrypto(intent: BuyIntent) {
-  const r = await api<{ rail: "crypto"; crypto: CryptoRequest }>("/api/billing/checkout", { body: { rail: "crypto", product: intent.product, id: intent.id } });
+  const r = await api<{ rail: "crypto"; crypto: CryptoRequest }>("/api/billing/checkout", { body: { rail: "crypto", product: intent.product, id: intent.id, ...(intent.period ? { period: intent.period } : {}) } });
   return r.crypto;
 }
 
@@ -160,6 +169,7 @@ export async function verifyPayment(paymentId: string, sig?: string, tries = 5) 
     try {
       const r = await api<{ status: string; state: BillingState }>("/api/billing/verify", { body: { paymentId, ...(sig ? { sig } : {}) } });
       applyState(r.state);
+      if (r.status === "paid") moneyChanged(); // the Wallet tab, Hub and anything else showing dollars refetch now
       return r;
     } catch (e) {
       last = e;
@@ -174,4 +184,5 @@ export async function verifyPayment(paymentId: string, sig?: string, tries = 5) 
 /** Dev-only billing actions (local next dev with LEXARI_DEV_BILLING=1); the server answers 404 otherwise. */
 export async function devBilling(body: Record<string, unknown>) {
   applyState(await api<BillingState>("/api/billing/dev", { body }));
+  moneyChanged();
 }

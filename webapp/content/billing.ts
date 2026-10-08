@@ -23,8 +23,13 @@ export const ALERT_AT = [0.8, 1] as const;
 /** Extra credit packs, in USD. Credits are spend-only on Lexari (plans and AI usage) and are not withdrawable. */
 export const TOPUP_PACKS = [5, 10, 25] as const;
 export type TopUpPack = (typeof TOPUP_PACKS)[number];
-/** The smallest credit pack that covers a shortfall (micro dollars); the largest when nothing does. */
-export const packFor = (shortMicros: number): TopUpPack => TOPUP_PACKS.find((p) => p * 1_000_000 >= shortMicros) ?? TOPUP_PACKS[TOPUP_PACKS.length - 1];
+/** The most one top up can add (a whole dollar amount, used to cover a shortfall bigger than the largest pack). */
+export const TOPUP_MAX_USD = 1000;
+/**
+ * What to top up for a shortfall (micro dollars): the smallest pack that covers it, else the shortfall rounded up to
+ * whole dollars (a yearly plan can be short by more than the largest pack).
+ */
+export const packFor = (shortMicros: number): number => TOPUP_PACKS.find((p) => p * 1_000_000 >= shortMicros) ?? Math.min(TOPUP_MAX_USD, Math.ceil(shortMicros / 1_000_000));
 
 /** Monthly spend limit on extra credits: Disabled, Fixed (an amount) or Unlimited, like Cursor. */
 export type SpendMode = "disabled" | "fixed" | "unlimited";
@@ -41,4 +46,3 @@ export const usd = (micros: number, digits?: number) => {
   const d = digits ?? (v !== 0 && Math.abs(v) < 1 ? 2 : v % 1 === 0 ? 0 : 2);
   return `$${v.toFixed(d)}`;
 };
-export const skuOf = (product: "plan" | "credits", id: string | number) => (product === "plan" ? `plan-${id}` : `credits-${id}`);
