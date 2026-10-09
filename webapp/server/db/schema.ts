@@ -19,8 +19,13 @@ export const users = pgTable("users", {
   lockHash: text("lock_hash"),
   /** WebAuthn credential ids allowed to unlock */
   lockCreds: jsonb("lock_creds").$type<{ id: string; at: number }[]>().notNull().default([]),
-  /** account default model for agents without their own (content/models.ts id or byo:<uuid>); null = Lamina */
+  /** account default model for agents without their own (content/models.ts id or key:<provider>:<model>); null = Lamina */
   defaultModel: text("default_model"),
+  /** agent email name: agents are <agent>.<this>@agents.lexari.ai; unique; your first name until you choose once */
+  emailHandle: text("email_handle"),
+  emailHandleChosen: boolean("email_handle_chosen").notNull().default(false),
+  /** Settings > Models switches: { on, off, extra } (content/models.ts ModelPrefs) */
+  modelPrefs: jsonb("model_prefs").$type<{ on?: string[]; off?: string[]; extra?: string[] }>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

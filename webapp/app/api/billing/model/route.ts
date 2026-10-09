@@ -11,9 +11,9 @@ export const runtime = "nodejs";
 const slug = z.string().min(1).max(80).regex(/^[\w-]+$/);
 const body = z.discriminatedUnion("scope", [
   /** model null: the agent follows the account default (Settings > Models) */
-  z.object({ scope: z.literal("agent"), agent: slug, model: z.string().max(60).nullable() }),
+  z.object({ scope: z.literal("agent"), agent: slug, model: z.string().max(160).nullable() }),
   /** model null: the chat follows its agent again */
-  z.object({ scope: z.literal("chat"), convo: slug, model: z.string().max(60).nullable() }),
+  z.object({ scope: z.literal("chat"), convo: slug, model: z.string().max(160).nullable() }),
 ]);
 
 /** Picks the model for one agent (all its chats) or for one chat. null = follow the account default. */

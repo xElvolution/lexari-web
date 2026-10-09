@@ -4,7 +4,7 @@ import { readJson } from "@/server/http";
 import { withUser } from "@/server/route";
 
 export const runtime = "nodejs";
-const body = z.object({ model: z.string().min(1).max(60) }).strict();
+const body = z.object({ model: z.string().min(1).max(160) }).strict();
 
 /** The account default: the model every agent without its own pick answers with. */
 export const PUT = withUser(async (user, req) => {

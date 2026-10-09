@@ -1,102 +1,211 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { BYO_PROVIDERS, INCLUDED, LAMINA, PREMIUM, byoProvider, customInfo, type ByoProvider, type CustomModel, type ModelInfo } from "@/content/models";
-import { infoFor, refreshBilling, setModel, useBilling, type BillingState } from "@/lib/billing";
+import { useEffect, useMemo, useState } from "react";
+import { KEY_PROVIDERS, LAMINA, MODEL_NAME_RE, type CatalogRow, type KeyInfo, type KeyProvider, type ModelInfo } from "@/content/models";
+import { catalogOf, enabledModels, infoFor, refreshBilling, setModel, useBilling, type BillingState } from "@/lib/billing";
 import { api, friendly } from "@/lib/api";
 import { toast, type State } from "@/lib/store";
 import { myAgents } from "../agents";
 import { AgentTile } from "../faces";
 import Icon from "../Icon";
-import { BurnChip, ModelMark, Sheet, Spinner } from "../billing/parts";
+import { ModelMark, Sheet, Spinner } from "../billing/parts";
 
-type Pick = null | { kind: "default" } | { kind: "agent"; id: string; name: string } | { kind: "add" } | { kind: "own"; id: string };
-const tile = "flex w-full items-center gap-3 rounded-[18px] bg-card p-3 text-left ring-1 ring-line transition hover:ring-grape/50 max-[430px]:gap-2.5 max-[430px]:p-2.5";
-const ago = (t: number) => { const s = Math.max(1, Math.round((Date.now() - t) / 1000)); return s < 60 ? "just now" : s < 3600 ? `${Math.round(s / 60)}m ago` : s < 86400 ? `${Math.round(s / 3600)}h ago` : new Date(t).toLocaleDateString([], { month: "short", day: "numeric" }); };
+type Pick = null | { kind: "default" } | { kind: "agent"; id: string; name: string };
+const card = "rounded-[20px] bg-card ring-1 ring-line";
+const h3 = "label mb-1.5 px-1 text-[9.5px] text-ink/50";
+const iconBtn = "grid h-9 w-9 shrink-0 place-items-center rounded-full transition disabled:opacity-40";
+const makerMark = (p: KeyProvider) => ({ id: p, label: "", short: "", maker: KEY_PROVIDERS.find((x) => x.id === p)!.maker, blurb: "", pool: "byo", price: { in: 0, out: 0 } }) as ModelInfo;
 
-/** Settings > Models: the account default, each agent's model, and models on your own API key. */
+/** Settings > Models: default and per-agent picks, every model with an on/off switch, and one API key per provider. */
 export default function ModelsSection({ s }: { s: State }) {
   const { state: b, error } = useBilling();
   const [sheet, setSheet] = useState<Pick>(null);
   useEffect(() => { void refreshBilling(); }, []);
-  if (!b) return error ? <p className="rounded-[22px] bg-card p-5 text-[14px] text-ink/70 ring-1 ring-line">{error} <button onClick={() => void refreshBilling()} className="font-bold text-brand-ink">Try again</button></p> : <div className="space-y-3"><div className="h-[110px] animate-pulse rounded-[22px] bg-tint" /><div className="h-[160px] animate-pulse rounded-[22px] bg-tint" /></div>;
+  if (!b) return error ? <p className="rounded-[22px] bg-card p-5 text-[14px] text-ink/70 ring-1 ring-line">{error} <button onClick={() => void refreshBilling()} className="font-bold text-brand-ink">Try again</button></p> : <div className="space-y-3"><div className="h-[110px] animate-pulse rounded-[22px] bg-tint" /><div className="h-[260px] animate-pulse rounded-[22px] bg-tint" /></div>;
   const def = infoFor(b, b.models.default) ?? LAMINA;
-  const custom = b.models.custom ?? [];
   const agents = myAgents(s);
   return (
     <div data-models-section className="grid gap-5 max-[430px]:gap-4">
-      <button data-account-default={def.id} onClick={() => setSheet({ kind: "default" })} className="grain relative flex items-center gap-3.5 overflow-hidden rounded-[22px] bg-[linear-gradient(130deg,#2a0f9a,#5b2bff_60%,#8f6bff)] p-4 text-left text-white">
-        <span className="rounded-[15px] ring-2 ring-white/30"><ModelMark m={def} size={46} /></span>
-        <span className="min-w-0 flex-1">
-          <span className="label block text-[9px] text-white/70">Account default</span>
-          <span className="mt-0.5 block truncate text-[19px] font-bold leading-tight">{def.label}</span>
-          <span className="mt-0.5 block truncate text-[12px] text-white/75">{def.pool === "byo" ? "On your key · never uses your balance" : def.pool === "lamina" ? "Included on every plan" : "Premium usage"}</span>
-        </span>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/15"><Icon name="right" size={16} className="rotate-90" /></span>
-      </button>
-
       <section>
-        <h3 className="label mb-1.5 px-1 text-[9.5px] text-ink/50">Agents</h3>
-        <div className="grid gap-2">
+        <h3 className={h3}>Defaults</h3>
+        <div className={`${card} divide-y divide-[var(--line)]`}>
+          <PickRow data-account-default={def.id} onClick={() => setSheet({ kind: "default" })} lead={<span className="grid h-8 w-8 place-items-center rounded-[10px] bg-grape text-white"><Icon name="spark" size={15} /></span>} title="Account default" value={def} />
           {agents.map((a) => {
             const own = infoFor(b, b.models.agents[a.id]);
-            const m = own ?? def;
-            return (
-              <button key={a.id} data-agent-model-row={a.id} onClick={() => setSheet({ kind: "agent", id: a.id, name: a.name })} className={tile}>
-                <AgentTile id={a.id} look={s.agent?.look} size={38} status={false} />
-                <span className="min-w-0 flex-1"><span className="block truncate text-[14.5px] font-bold text-ink">{a.name}</span><span className="block truncate text-[12px] text-ink/55">{own ? m.label : `Default · ${m.label}`}</span></span>
-                <ModelMark m={m} size={28} />
-                <Icon name="right" size={15} className="shrink-0 text-ink/35" />
-              </button>
-            );
+            return <PickRow key={a.id} data-agent-model-row={a.id} onClick={() => setSheet({ kind: "agent", id: a.id, name: a.name })} lead={<AgentTile id={a.id} look={s.agent?.look} size={32} status={false} />} title={a.name} value={own ?? def} follows={!own} />;
           })}
         </div>
       </section>
-
-      <section>
-        <div className="mb-1.5 flex items-center justify-between px-1">
-          <h3 className="label text-[9.5px] text-ink/50">Your models · your keys</h3>
-          <button data-add-model onClick={() => setSheet({ kind: "add" })} aria-label="Add a model" className="grid h-8 w-8 place-items-center rounded-full bg-grape text-white shadow-sm transition hover:scale-105"><Icon name="plus" size={16} stroke={2.6} /></button>
-        </div>
-        {custom.length === 0 ? (
-          <button onClick={() => setSheet({ kind: "add" })} className="flex w-full items-center gap-3 rounded-[18px] border border-dashed border-[var(--line)] bg-card/60 p-3.5 text-left transition hover:border-grape/60">
-            <span className="flex -space-x-2">{BYO_PROVIDERS.slice(0, 4).map((p) => <span key={p.id} className="rounded-[12px] ring-2 ring-[var(--card)]"><ModelMark m={customInfo({ id: p.id, provider: p.id, label: p.name, model: "" })} size={30} /></span>)}</span>
-            <span className="min-w-0 flex-1"><span className="block text-[14px] font-bold text-ink">Bring your own model</span><span className="block text-[12px] leading-snug text-ink/55">OpenAI, Claude, Gemini, Grok, OpenRouter or any OpenAI-compatible API. Never uses your Lexari balance.</span></span>
-          </button>
-        ) : (
-          <div className="grid gap-2">{custom.map((c) => <OwnRow key={c.id} c={c} onOpen={() => setSheet({ kind: "own", id: c.id })} />)}</div>
-        )}
-      </section>
-
-      {sheet?.kind === "default" && <PickSheet b={b} title="Account default" sub="Every agent without its own pick answers with this." current={b.models.default} onClose={() => setSheet(null)} onPick={async (id) => { await api("/api/models/default", { method: "PUT", body: { model: id } }); await refreshBilling(); }} onAdd={() => setSheet({ kind: "add" })} />}
-      {sheet?.kind === "agent" && <PickSheet b={b} title={sheet.name} sub={`The model ${sheet.name} answers with in chats without their own pick.`} current={b.models.agents[sheet.id] ?? null} followDefault={def} onClose={() => setSheet(null)} onPick={async (id) => { await setModel({ scope: "agent", agent: sheet.id, model: id }); await refreshBilling(); }} onAdd={() => setSheet({ kind: "add" })} />}
-      {sheet?.kind === "add" && <AddSheet onClose={() => setSheet(null)} onAdded={(id) => setSheet({ kind: "own", id })} />}
-      {sheet?.kind === "own" && custom.find((c) => c.id === sheet.id) && <OwnSheet b={b} c={custom.find((c) => c.id === sheet.id)!} onClose={() => setSheet(null)} />}
+      <ModelList b={b} />
+      <ApiKeys b={b} />
+      {sheet?.kind === "default" && <PickSheet b={b} title="Account default" sub="Every agent without its own pick answers with this." current={b.models.default} onClose={() => setSheet(null)} onPick={async (id) => { await api("/api/models/default", { method: "PUT", body: { model: id } }); await refreshBilling(); }} />}
+      {sheet?.kind === "agent" && <PickSheet b={b} title={sheet.name} sub={`What ${sheet.name} answers with in chats without their own pick.`} current={b.models.agents[sheet.id] ?? null} followDefault={def} onClose={() => setSheet(null)} onPick={async (id) => { await setModel({ scope: "agent", agent: sheet.id, model: id }); await refreshBilling(); }} />}
     </div>
   );
 }
 
-function StatusDot({ c }: { c: CustomModel }) {
-  const [t, cls] = c.status === "ok" ? ["Connected", "bg-[#e7f8ee] text-[#137a3d]"] : c.status === "failed" ? ["Failed", "bg-[#fdecec] text-[#c4292f]"] : ["Not tested", "bg-tint text-ink/55"];
-  return <span data-model-status={c.status} className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold ${cls}`}>{t}</span>;
-}
-
-function OwnRow({ c, onOpen }: { c: CustomModel; onOpen: () => void }) {
-  const m = customInfo(c);
+function PickRow({ onClick, lead, title, value, follows = false, ...rest }: { onClick: () => void; lead: React.ReactNode; title: string; value: ModelInfo; follows?: boolean; [k: `data-${string}`]: string }) {
   return (
-    <button data-own-model={c.id} onClick={onOpen} className={tile}>
-      <ModelMark m={m} size={38} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14.5px] font-bold text-ink">{m.label}</span>
-        <span className="block truncate text-[12px] text-ink/55">{byoProvider(c.provider)?.name} · <span className="font-mono">••••{c.last4}</span></span>
-      </span>
-      <StatusDot c={c} />
+    <button {...rest} onClick={onClick} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition first:rounded-t-[20px] last:rounded-b-[20px] hover:bg-tint/50">
+      {lead}
+      <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink">{title}</span>
+      <span className="flex min-w-0 max-w-[55%] items-center gap-1.5 text-[12.5px] font-semibold text-ink/60"><ModelMark m={value} size={18} /><span className="truncate">{follows ? `Default · ${value.short}` : value.label}</span></span>
+      <Icon name="right" size={14} className="shrink-0 text-ink/35" />
     </button>
   );
 }
 
-/** Pick a model: Lamina and the included models, premium (when on), and your own. */
-function PickSheet({ b, title, sub, current, followDefault, onClose, onPick, onAdd }: { b: BillingState; title: string; sub: string; current: string | null; followDefault?: ModelInfo; onClose: () => void; onPick: (id: string | null) => Promise<void>; onAdd: () => void }) {
+function Switch({ on, onChange, label, disabled = false, busy = false }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean; busy?: boolean }) {
+  return (
+    <button role="switch" aria-checked={on} aria-label={label} disabled={disabled || busy} onClick={() => onChange(!on)} className={`relative h-6 w-10 shrink-0 rounded-full transition disabled:cursor-not-allowed ${on ? "bg-grape" : "bg-ink/20"} ${disabled ? "opacity-60" : ""} ${busy ? "animate-pulse" : ""}`}>
+      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
+    </button>
+  );
+}
+
+/** The model list: search, a switch per model, and "Add" for a model id that isn't listed. */
+function ModelList({ b }: { b: BillingState }) {
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const rows = useMemo(() => catalogOf(b), [b]);
+  const keyed = b.models.keys.map((k) => k.provider);
+  const query = q.trim().toLowerCase();
+  const shown = query ? rows.filter((r) => `${r.m.label} ${r.m.id} ${r.m.maker}`.toLowerCase().includes(query)) : rows;
+  const addable = query && MODEL_NAME_RE.test(q.trim()) && !rows.some((r) => r.m.id.endsWith(`:${q.trim()}`)) ? keyed : [];
+  const run = async (key: string, f: () => Promise<unknown>, ok?: string) => {
+    setBusy(key);
+    try { await f(); await refreshBilling(); if (ok) toast({ text: ok }); }
+    catch (e) { toast({ text: friendly(e, "Couldn't change that. Try again.") }); }
+    finally { setBusy(null); }
+  };
+  const toggle = (r: CatalogRow, on: boolean) => run(r.m.id, () => api("/api/models", { method: "PATCH", body: { op: "toggle", id: r.m.id, on } }));
+  const add = (p: KeyProvider) => run(`add:${p}`, () => api("/api/models", { method: "PATCH", body: { op: "add", provider: p, model: q.trim() } }), `${q.trim()} added`).then(() => setQ(""));
+  const drop = (r: CatalogRow) => run(r.m.id, () => api("/api/models", { method: "PATCH", body: { op: "drop", id: r.m.id } }), `${r.m.label} removed`);
+  return (
+    <section data-model-list>
+      <h3 className={h3}>Models</h3>
+      <div className={card}>
+        <label className="flex items-center gap-2 border-b border-[var(--line)] px-3 py-2">
+          <Icon name="search" size={15} className="shrink-0 text-ink/45" />
+          <input data-model-search value={q} onChange={(e) => setQ(e.target.value)} placeholder={keyed.length ? "Search or add a model id" : "Search models"} autoCapitalize="off" autoCorrect="off" spellCheck={false} className="h-8 min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-ink/40" />
+          {q && <button onClick={() => setQ("")} aria-label="Clear search" className="grid h-7 w-7 place-items-center rounded-full text-ink/50 hover:bg-tint"><Icon name="x" size={14} /></button>}
+        </label>
+        <ul className="divide-y divide-[var(--line)]">
+          {shown.map((r) => (
+            <li key={r.m.id} data-model-row={r.m.id} data-enabled={r.enabled ? "1" : "0"} className="flex items-center gap-2.5 px-3 py-2">
+              <ModelMark m={r.m} size={26} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-semibold text-ink">{r.m.label}</span>
+                <span className="block truncate text-[11.5px] text-ink/50">{r.provider ? <>{KEY_PROVIDERS.find((p) => p.id === r.provider)!.name} key · <span className="font-mono">{r.m.id.split(":").slice(2).join(":")}</span></> : r.m.pool === "premium" ? "Premium usage" : "Included"}</span>
+              </span>
+              {r.added && <button onClick={() => void drop(r)} disabled={busy === r.m.id} aria-label={`Remove ${r.m.label}`} title="Remove" className={`${iconBtn} !h-7 !w-7 text-ink/45 hover:bg-[#e5484d]/12 hover:text-[#e5484d]`}><Icon name="trash" size={14} /></button>}
+              <Switch on={r.enabled} disabled={r.locked} busy={busy === r.m.id} label={`${r.m.label} ${r.enabled ? "on" : "off"}`} onChange={(v) => void toggle(r, v)} />
+            </li>
+          ))}
+          {addable.map((p) => (
+            <li key={p}><button data-add-model={p} onClick={() => void add(p)} disabled={!!busy} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition hover:bg-tint/50">
+              <span className="grid h-[26px] w-[26px] place-items-center rounded-[9px] bg-grape/15 text-brand-ink">{busy === `add:${p}` ? <Spinner /> : <Icon name="plus" size={14} stroke={2.6} />}</span>
+              <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink">Add <span className="font-mono font-semibold">{q.trim()}</span></span>
+              <span className="shrink-0 text-[11.5px] font-semibold text-ink/50">{KEY_PROVIDERS.find((x) => x.id === p)!.name}</span>
+            </button></li>
+          ))}
+          {query && !shown.length && !addable.length && <li className="px-3 py-3 text-[12.5px] text-ink/50">{keyed.length ? "No match. Model ids use letters, numbers and . : / @ + - _" : "No match. Add an API key below to use more models."}</li>}
+        </ul>
+        {!keyed.length && !query && <p className="border-t border-[var(--line)] px-3 py-2.5 text-[12px] leading-snug text-ink/55">Add an API key below and GPT, Claude, Gemini and Grok models show up here.</p>}
+      </div>
+    </section>
+  );
+}
+
+/** API Keys: one row per provider. Verify checks the key with the provider and saves it encrypted. */
+function ApiKeys({ b }: { b: BillingState }) {
+  return (
+    <section data-api-keys>
+      <h3 className={h3}>API Keys</h3>
+      <div className={`${card} divide-y divide-[var(--line)]`}>
+        {KEY_PROVIDERS.map((p) => <KeyRow key={p.id} provider={p.id} saved={b.models.keys.find((k) => k.provider === p.id) ?? null} ready={b.models.byoReady !== false} />)}
+      </div>
+      <p className="mt-2 px-1 text-[11.5px] leading-snug text-ink/50">Keys are encrypted on Lexari&apos;s server and never shown again. Replies on your key are billed by your provider and never use your Lexari balance.</p>
+    </section>
+  );
+}
+
+function KeyRow({ provider, saved, ready }: { provider: KeyProvider; saved: KeyInfo | null; ready: boolean }) {
+  const p = KEY_PROVIDERS.find((x) => x.id === provider)!;
+  const [key, setKey] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState<"verify" | "remove" | "base" | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [err, setErr] = useState("");
+  const [baseOn, setBaseOn] = useState(!!saved?.baseUrl);
+  const [base, setBase] = useState(saved?.baseUrl ?? "");
+  useEffect(() => { setBaseOn(!!saved?.baseUrl); setBase(saved?.baseUrl ?? ""); }, [saved?.baseUrl]);
+  const fresh = key.trim().length >= 8;
+  const verify = async () => {
+    setBusy("verify"); setErr("");
+    try {
+      if (fresh) { const r = await api<{ note: string }>(`/api/models/keys/${provider}`, { method: "PUT", body: { key: key.trim() } }); setKey(""); setShow(false); toast({ text: `${p.name} key verified. ${r.note.replace(/^Verified in/, "Took")}` }); }
+      else { const r = await api<{ result: { ok: boolean; error?: string } }>(`/api/models/keys/${provider}`, { body: { op: "verify" } }); if (!r.result.ok) setErr(r.result.error || "The key didn't pass."); else toast({ text: `${p.name} key works` }); }
+      await refreshBilling();
+    } catch (e) { setErr(friendly(e, "Couldn't verify the key. Try again.")); }
+    finally { setBusy(null); }
+  };
+  const remove = async () => {
+    setBusy("remove"); setErr("");
+    try { await api(`/api/models/keys/${provider}`, { method: "DELETE" }); await refreshBilling(); toast({ text: `${p.name} key removed` }); setConfirm(false); }
+    catch (e) { setErr(friendly(e, "Couldn't remove the key.")); }
+    finally { setBusy(null); }
+  };
+  const saveBase = async (url: string | null) => {
+    setBusy("base"); setErr("");
+    try { await api(`/api/models/keys/openai`, { method: "PATCH", body: { baseUrl: url } }); await refreshBilling(); toast({ text: url ? "OpenAI models now use your base URL" : "Back to api.openai.com" }); }
+    catch (e) { setErr(friendly(e, "Couldn't save the base URL.")); if (!url) setBaseOn(true); }
+    finally { setBusy(null); }
+  };
+  const status = saved ? (saved.status === "ok" ? ["Verified", "text-[#2fbf71]"] : saved.status === "failed" ? ["Failed", "text-[#e5484d]"] : ["Not checked", "text-ink/50"]) : null;
+  return (
+    <div data-key-row={provider} data-key-status={saved?.status ?? "none"} className="px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <ModelMark m={makerMark(provider)} size={22} />
+        <span className="text-[14px] font-bold text-ink">{p.name}</span>
+        {status && <span className={`inline-flex items-center gap-1 text-[11.5px] font-semibold ${status[1]}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{status[0]}</span>}
+        <a href={p.keyUrl} target="_blank" rel="noreferrer" className="ml-auto text-[11.5px] font-semibold text-ink/45 hover:text-brand-ink">Get a key</a>
+      </div>
+      <div className="mt-2 flex items-center gap-1.5">
+        <span className="relative min-w-0 flex-1">
+          <input data-key-input={provider} value={key} onChange={(e) => { setKey(e.target.value); setErr(""); setConfirm(false); }} type={show ? "text" : "password"} disabled={!ready} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+            placeholder={saved ? `••••••••${saved.last4}` : `${p.name} API key (${p.keyHint})`} aria-label={`${p.name} API key`} className="field h-9 !rounded-full !py-0 !pl-3.5 !pr-9 font-mono !text-[13px]" />
+          {key && <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide key" : "Show key"} className="absolute right-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-ink/50 hover:bg-tint"><Icon name={show ? "eyeoff" : "eye"} size={14} /></button>}
+        </span>
+        <button data-key-verify={provider} onClick={() => void verify()} disabled={!ready || !!busy || (!fresh && !saved)} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-grape px-3 text-[13px] font-bold text-white transition hover:brightness-110 disabled:bg-tint disabled:text-ink/40">
+          {busy === "verify" ? <Spinner /> : <Icon name={fresh || !saved ? "check" : "refresh"} size={14} stroke={2.6} />}{fresh || !saved ? "Verify" : "Check"}
+        </button>
+        {saved && (confirm
+          ? <button data-key-remove-confirm={provider} onClick={() => void remove()} disabled={!!busy} aria-label={`Confirm remove ${p.name} key`} className={`${iconBtn} bg-[#e5484d] text-white`}>{busy === "remove" ? <Spinner /> : <Icon name="trash" size={15} />}</button>
+          : <button data-key-remove={provider} onClick={() => setConfirm(true)} disabled={!!busy} aria-label={`Remove ${p.name} key`} title="Remove key" className={`${iconBtn} text-ink/50 ring-1 ring-line hover:text-[#e5484d] hover:ring-[#e5484d]/50`}><Icon name="trash" size={15} /></button>)}
+      </div>
+      {confirm && <p className="mt-1.5 text-[11.5px] text-[#e5484d]">Tap the red button to remove the key. Its models leave your list.</p>}
+      {err && <p role="alert" className="mt-1.5 text-[12px] font-semibold text-[#e5484d]">{err}</p>}
+      {provider === "openai" && saved && (
+        <div className="mt-2.5 rounded-[14px] bg-tint/60 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1"><span className="block text-[13px] font-semibold text-ink">Override OpenAI base URL</span><span className="block text-[11px] leading-snug text-ink/50">For any OpenAI-compatible API, with this key.</span></span>
+            <Switch on={baseOn} busy={busy === "base"} label="Override OpenAI base URL" onChange={(v) => { setBaseOn(v); if (!v && saved.baseUrl) void saveBase(null); }} />
+          </div>
+          {baseOn && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <input data-base-url value={base} onChange={(e) => setBase(e.target.value)} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="https://api.example.com/v1" aria-label="Base URL" className="field h-9 min-w-0 flex-1 !rounded-full !py-0 !pl-3.5 font-mono !text-[12.5px]" />
+              <button data-base-save onClick={() => void saveBase(base.trim())} disabled={!!busy || !base.trim() || base.trim() === saved.baseUrl} aria-label="Save base URL" className={`${iconBtn} bg-grape text-white disabled:bg-tint disabled:text-ink/40`}>{busy === "base" ? <Spinner /> : <Icon name="check" size={15} stroke={2.6} />}</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Pick a model from the ones switched on. */
+function PickSheet({ b, title, sub, current, followDefault, onClose, onPick }: { b: BillingState; title: string; sub: string; current: string | null; followDefault?: ModelInfo; onClose: () => void; onPick: (id: string | null) => Promise<void> }) {
   const [busy, setBusy] = useState<string | null>(null);
   const go = async (id: string | null, label: string) => {
     setBusy(id ?? "default");
@@ -104,126 +213,22 @@ function PickSheet({ b, title, sub, current, followDefault, onClose, onPick, onA
     catch (e) { toast({ text: friendly(e, "Couldn't change the model. Try again.") }); }
     finally { setBusy(null); }
   };
-  const built = [LAMINA, ...INCLUDED, ...PREMIUM].filter((m) => b.models.available[m.id]);
-  const soon = PREMIUM.filter((m) => !b.models.available[m.id]);
-  const custom = (b.models.custom ?? []).map(customInfo);
+  const list = enabledModels(b);
   const Opt = ({ m, on, id }: { m: ModelInfo; on: boolean; id: string | null }) => (
-    <button data-pick-model={id ?? "default"} onClick={() => void go(id, m.label)} disabled={!!busy} aria-pressed={on} className={`flex w-full items-center gap-3 rounded-[16px] p-2.5 text-left transition ${on ? "bg-grape text-white" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
-      <ModelMark m={m} size={34} />
-      <span className="min-w-0 flex-1"><span className="flex items-center gap-1.5"><span className="truncate text-[14px] font-bold">{id === null ? "Account default" : m.label}</span><BurnChip m={m} on={on} /></span><span className={`block truncate text-[12px] ${on ? "text-white/75" : "text-ink/55"}`}>{id === null ? m.label : m.blurb}</span></span>
+    <button data-pick-model={id ?? "default"} onClick={() => void go(id, m.label)} disabled={!!busy} aria-pressed={on} className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition first:rounded-t-[18px] last:rounded-b-[18px] ${on ? "bg-grape text-white" : "hover:bg-tint/50"}`}>
+      <ModelMark m={m} size={26} />
+      <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-semibold">{id === null ? "Account default" : m.label}</span><span className={`block truncate text-[11.5px] ${on ? "text-white/75" : "text-ink/50"}`}>{id === null ? m.label : m.pool === "byo" ? m.blurb : m.pool === "premium" ? "Premium usage" : "Included"}</span></span>
       {busy === (id ?? "default") ? <Spinner /> : on ? <span className="grid h-6 w-6 place-items-center rounded-full bg-white text-brand-ink"><Icon name="check" size={13} stroke={3} /></span> : <span className="h-6 w-6 rounded-full ring-1 ring-line" />}
     </button>
   );
   return (
     <Sheet label="pick-model" title={title} sub={sub} icon={<Icon name="spark" size={20} />} onClose={onClose}>
-      <div className="grid gap-2">
+      <div className="divide-y divide-[var(--line)] rounded-[18px] ring-1 ring-line">
         {followDefault && <Opt m={followDefault} on={current === null} id={null} />}
-        <h4 className="label mt-1 px-1 text-[9px] text-ink/45">Built in</h4>
-        {built.map((m) => <Opt key={m.id} m={m} on={current === m.id || (!followDefault && !current && m.id === LAMINA.id)} id={m.id} />)}
-        {soon.length > 0 && <p className="px-1 text-[11.5px] text-ink/45">Soon: {soon.map((m) => m.short).join(", ")}</p>}
-        <div className="mt-1 flex items-center justify-between px-1"><h4 className="label text-[9px] text-ink/45">Your models</h4><button onClick={onAdd} className="inline-flex items-center gap-1 text-[12px] font-bold text-brand-ink"><Icon name="plus" size={13} stroke={2.6} />Add</button></div>
-        {custom.length ? custom.map((m) => <Opt key={m.id} m={m} on={current === m.id} id={m.id} />) : <p className="px-1 text-[12px] text-ink/50">None yet.</p>}
+        {list.map((m) => <Opt key={m.id} m={m} on={current === m.id || (!followDefault && !current && m.id === LAMINA.id)} id={m.id} />)}
       </div>
+      <p className="mt-2.5 px-1 text-[11.5px] text-ink/50">Only models switched on in Settings &gt; Models show here.</p>
     </Sheet>
   );
 }
 
-/** Add a model on your own key: provider, model id, key (and base URL for a custom API). Saves, then tests. */
-function AddSheet({ onClose, onAdded }: { onClose: () => void; onAdded: (id: string) => void }) {
-  const [provider, setProvider] = useState<ByoProvider>("openai");
-  const p = byoProvider(provider)!;
-  const [model, setModelId] = useState(p.models[0] ?? "");
-  const [key, setKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [label, setLabel] = useState("");
-  const [show, setShow] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const choose = (id: ByoProvider) => { setProvider(id); setModelId(byoProvider(id)!.models[0] ?? ""); setErr(""); };
-  const ok = model.trim() && key.trim().length >= 8 && (provider !== "custom" || baseUrl.trim());
-  const save = async () => {
-    setBusy(true); setErr("");
-    try {
-      const r = await api<{ model: CustomModel }>("/api/models", { body: { provider, model: model.trim(), key: key.trim(), ...(label.trim() ? { label: label.trim() } : {}), ...(provider === "custom" ? { baseUrl: baseUrl.trim() } : {}) } });
-      setKey("");
-      // Test right away so the list shows whether it works.
-      const t = await api<{ result: { ok: boolean; error?: string } }>(`/api/models/${encodeURIComponent(r.model.id)}`, { body: { op: "test" } }).catch(() => null);
-      await refreshBilling();
-      toast({ text: t?.result.ok ? `${r.model.label} is connected` : `${r.model.label} saved. ${t?.result.error || "The test didn't pass."}` });
-      onAdded(r.model.id);
-    } catch (e) { setErr(friendly(e, "Couldn't save that model. Try again.")); }
-    finally { setBusy(false); }
-  };
-  return (
-    <Sheet label="add-model" title="Add a model" sub="Your key is encrypted on Lexari's server and never shown again. Usage goes on your provider account, not your Lexari balance." icon={<Icon name="plus" size={20} stroke={2.4} />} onClose={onClose}
-      footer={<button data-save-model disabled={!ok || busy} onClick={() => void save()} className="btn btn-brand !h-11 w-full disabled:opacity-45 disabled:shadow-none">{busy ? <><Spinner className="mr-2" />Saving and testing…</> : "Save and test"}</button>}>
-      <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Provider">
-        {BYO_PROVIDERS.map((x) => (
-          <button key={x.id} role="radio" aria-checked={provider === x.id} data-provider={x.id} onClick={() => choose(x.id)} className={`flex flex-col items-center gap-1 rounded-[16px] p-2 text-center transition ${provider === x.id ? "bg-grape/12 ring-2 ring-grape" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
-            <ModelMark m={customInfo({ id: x.id, provider: x.id, label: x.name, model: "" })} size={30} />
-            <span className="w-full truncate text-[11.5px] font-bold text-ink">{x.name}</span>
-          </button>
-        ))}
-      </div>
-      {provider === "custom" && (
-        <label className="mt-3 block"><span className="label text-[9px] text-ink/55">Base URL</span><input data-base-url value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="https://api.example.com/v1" className="field mt-1 !py-2.5 !text-[14px]" /></label>
-      )}
-      <label className="mt-3 block"><span className="label text-[9px] text-ink/55">Model id</span><input data-model-id value={model} onChange={(e) => setModelId(e.target.value)} autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder={provider === "custom" ? "e.g. llama-3.3-70b" : p.models[0]} className="field mt-1 !py-2.5 font-mono !text-[14px]" /></label>
-      {p.models.length > 0 && <div className="no-bar -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5">{p.models.map((m) => <button key={m} onClick={() => setModelId(m)} className={`shrink-0 rounded-full px-2.5 py-1 font-mono text-[11.5px] font-semibold transition ${model === m ? "bg-ink text-[var(--bg)]" : "bg-tint text-ink/70 hover:text-ink"}`}>{m}</button>)}</div>}
-      <label className="mt-3 block"><span className="label text-[9px] text-ink/55">API key</span>
-        <span className="relative mt-1 block"><input data-api-key value={key} onChange={(e) => setKey(e.target.value)} type={show ? "text" : "password"} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder={p.keyHint} className="field !py-2.5 !pr-11 font-mono !text-[14px]" />
-          <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide key" : "Show key"} className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-ink/55 hover:bg-tint"><Icon name={show ? "eyeoff" : "eye"} size={16} /></button></span>
-      </label>
-      <label className="mt-3 block"><span className="label text-[9px] text-ink/55">Name (optional)</span><input value={label} onChange={(e) => setLabel(e.target.value.slice(0, 40))} placeholder={model || "My model"} className="field mt-1 !py-2.5 !text-[14px]" /></label>
-      {err && <p role="alert" className="mt-3 rounded-xl bg-[#fdecec] px-3 py-2.5 text-[12.5px] font-semibold text-[#c4292f]">{err}</p>}
-    </Sheet>
-  );
-}
-
-/** One of your models: test the connection, make it the default, or remove it (and its key). */
-function OwnSheet({ b, c, onClose }: { b: BillingState; c: CustomModel; onClose: () => void }) {
-  const m = customInfo(c);
-  const [busy, setBusy] = useState<"test" | "remove" | "default" | null>(null);
-  const [confirm, setConfirm] = useState(false);
-  const users = Object.entries(b.models.agents).filter(([, id]) => id === c.id).length + (b.models.default === c.id ? 1 : 0);
-  const test = async () => {
-    setBusy("test");
-    try { const r = await api<{ result: { ok: boolean; error?: string; ms?: number } }>(`/api/models/${encodeURIComponent(c.id)}`, { body: { op: "test" } }); await refreshBilling(); toast({ text: r.result.ok ? `Connected in ${((r.result.ms ?? 0) / 1000).toFixed(1)}s` : r.result.error || "The test didn't pass." }); }
-    catch (e) { toast({ text: friendly(e, "Couldn't test it. Try again.") }); }
-    finally { setBusy(null); }
-  };
-  const remove = async () => {
-    setBusy("remove");
-    try { await api(`/api/models/${encodeURIComponent(c.id)}`, { method: "DELETE" }); await refreshBilling(); toast({ text: `${m.label} removed. Its key is deleted.` }); onClose(); }
-    catch (e) { toast({ text: friendly(e, "Couldn't remove it. Try again.") }); setBusy(null); }
-  };
-  const makeDefault = async () => {
-    setBusy("default");
-    try { await api("/api/models/default", { method: "PUT", body: { model: c.id } }); await refreshBilling(); toast({ text: `${m.label} is your default` }); }
-    catch (e) { toast({ text: friendly(e, "Couldn't change the default.") }); }
-    finally { setBusy(null); }
-  };
-  const rows: [string, React.ReactNode][] = [
-    ["Provider", byoProvider(c.provider)?.name], ["Model id", <span key="m" className="font-mono">{c.model}</span>],
-    ...(c.baseUrl ? [["Base URL", <span key="u" className="break-all font-mono text-[12px]">{c.baseUrl}</span>] as [string, React.ReactNode]] : []),
-    ["API key", <span key="k" className="font-mono">••••••••{c.last4}</span>], ["Billing", "Your provider account"],
-  ];
-  return (
-    <Sheet label="own-model" title={m.label} sub={c.note ? `${c.note}${c.testedAt ? ` · ${ago(c.testedAt)}` : ""}` : "Not tested yet."} icon={<ModelMark m={m} size={44} />} onClose={onClose}
-      footer={confirm ? (
-        <div className="grid gap-2"><p className="text-[12.5px] text-ink/65">{users ? `${users} place${users === 1 ? "" : "s"} use${users === 1 ? "s" : ""} it and will go back to Lamina. ` : ""}The key is deleted.</p>
-          <div className="flex gap-2"><button onClick={() => setConfirm(false)} className="btn btn-line btn-sm !h-10 flex-1 text-ink">Keep</button><button data-remove-confirm onClick={() => void remove()} disabled={!!busy} className="inline-flex h-10 flex-1 items-center justify-center rounded-full bg-[#e5484d] text-[14px] font-bold text-white disabled:opacity-50">{busy === "remove" ? <Spinner /> : "Remove"}</button></div></div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <button data-test-model onClick={() => void test()} disabled={!!busy} className="btn btn-brand btn-sm !h-10 flex-1 disabled:opacity-60">{busy === "test" ? <><Spinner className="mr-2" />Testing…</> : "Test connection"}</button>
-          <button data-default-own onClick={() => void makeDefault()} disabled={!!busy || b.models.default === c.id} aria-label="Make account default" title="Make account default" className="grid h-10 w-10 place-items-center rounded-full bg-tint text-ink transition hover:bg-grape hover:text-white disabled:opacity-45">{busy === "default" ? <Spinner /> : <Icon name="star" size={17} />}</button>
-          <button data-remove-model onClick={() => setConfirm(true)} disabled={!!busy} aria-label="Remove model" title="Remove" className="grid h-10 w-10 place-items-center rounded-full text-[#e5484d] ring-1 ring-[#e5484d]/40 transition hover:bg-[#e5484d] hover:text-white"><Icon name="trash" size={16} /></button>
-        </div>
-      )}>
-      <div className="mb-3 flex items-center gap-2"><StatusDot c={c} />{b.models.default === c.id && <span className="label rounded-full bg-grape px-1.5 py-0.5 text-[8px] text-white">Default</span>}<BurnChip m={m} /></div>
-      <dl className="divide-y divide-[var(--line)] rounded-[16px] bg-tint/50 px-3.5 text-[13px] ring-1 ring-line">
-        {rows.map(([k, v]) => <div key={k} className="flex justify-between gap-3 py-2.5"><dt className="shrink-0 text-ink/55">{k}</dt><dd className="min-w-0 text-right font-semibold text-ink">{v}</dd></div>)}
-      </dl>
-    </Sheet>
-  );
-}

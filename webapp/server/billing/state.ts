@@ -16,12 +16,13 @@ import { creditsAvailable } from "./math";
 import { cycleFor, snapshot } from "./meter";
 import { cardProvider } from "./payments/card";
 import { planOffers } from "./planPurchase";
-import { accountDefault, listCustom } from "../models";
+import { accountDefault, getPrefs, listKeys } from "../models";
+import { secretBoxReady } from "../secretBox";
 
 export async function billingState(userId: string) {
   const database = db();
   const cycle = await cycleFor(userId);
-  const [snap, agentRows, chatRows, pays, usage, queued, offers, balancePlans, custom, def] = await Promise.all([
+  const [snap, agentRows, chatRows, pays, usage, queued, offers, balancePlans, keys, def, prefs] = await Promise.all([
     snapshot(database, userId, cycle),
     database.select({ slug: agents.slug, model: agents.model }).from(agents).where(eq(agents.userId, userId)),
     database.select({ slug: chats.slug, model: chats.model }).from(chats).where(and(eq(chats.userId, userId), isNotNull(chats.model))),
@@ -30,8 +31,9 @@ export async function billingState(userId: string) {
     database.select({ plan: planPurchases.plan, period: planPurchases.period, startsAt: planPurchases.startsAt, expiresAt: planPurchases.expiresAt }).from(planPurchases).where(eq(planPurchases.userId, userId)).orderBy(desc(planPurchases.expiresAt)).limit(5),
     planOffers(userId),
     database.select().from(creditLedger).where(and(eq(creditLedger.userId, userId), eq(creditLedger.reason, "plan"))).orderBy(desc(creditLedger.createdAt)).limit(12),
-    listCustom(userId).catch(() => []),
+    listKeys(userId).catch(() => []),
     accountDefault(userId).catch(() => null),
+    getPrefs(userId).catch(() => ({})),
   ]);
   const { period, settings, meter } = snap;
   const now = Date.now();
@@ -76,8 +78,11 @@ export async function billingState(userId: string) {
       agents: Object.fromEntries(agentRows.map((a) => [a.slug, a.model || null])) as Record<string, string | null>,
       /** the account default (Settings > Models) */
       default: def || LAMINA.id,
-      /** your own models (key masked) */
-      custom,
+      /** your API keys (masked) and your model switches (Settings > Models) */
+      keys,
+      prefs,
+      /** this server can store API keys (MODEL_KEYS_SECRET set) */
+      byoReady: secretBoxReady(),
       chats: Object.fromEntries(chatRows.map((c) => [c.slug, c.model!])),
     },
     rails: {

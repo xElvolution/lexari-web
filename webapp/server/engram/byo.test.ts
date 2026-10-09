@@ -95,3 +95,19 @@ test("private addresses and odd URLs are refused", () => {
   assert.throws(() => cleanBaseUrl("https://user:pw@api.example.com/v1"));
 });
 test.after(() => srv.close());
+
+test("model catalog: key models appear only with a key, switches and defaults", async () => {
+  const { modelCatalog, enabledIds, parseKeyModel, keyModelInfo } = await import("@/content/models");
+  const none = modelCatalog([], {}, { lamina: true });
+  assert.deepEqual(none.map((r) => r.m.id), ["lamina"]);
+  const rows = modelCatalog(["openai"], { off: ["key:openai:gpt-6-astra"], on: ["key:openai:gpt-5.6-sol"], extra: ["key:openai:my-ft-model", "key:anthropic:claude-x"] }, { lamina: true, "grok-fast": true });
+  const on = enabledIds(rows);
+  assert.ok(on.has("lamina") && on.has("grok-fast"));
+  assert.ok(!on.has("key:openai:gpt-6-astra"));
+  assert.ok(on.has("key:openai:gpt-5.6-sol") && on.has("key:openai:gpt-6-luna") && on.has("key:openai:my-ft-model"));
+  assert.ok(!rows.some((r) => r.m.id.startsWith("key:anthropic")));
+  assert.deepEqual(parseKeyModel("key:openrouter:anthropic/claude-sonnet-5.5"), { provider: "openrouter", model: "anthropic/claude-sonnet-5.5" });
+  assert.equal(parseKeyModel("byo:123"), null);
+  assert.equal(keyModelInfo("key:anthropic:claude-opus-5-5")?.label, "Claude Opus 5.5");
+  assert.equal(keyModelInfo("key:anthropic:claude-opus-5-5")?.pool, "byo");
+});

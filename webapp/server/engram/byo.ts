@@ -197,3 +197,32 @@ export async function testByo(t: ByoTarget): Promise<{ ok: true; ms: number; sam
     return { ok: false, error: `${t.label} couldn't be reached.` };
   }
 }
+
+/**
+ * Verify: checks a key with the provider's model list (no tokens used). With an OpenAI base URL override it asks that
+ * endpoint instead; one without a /models list still counts as reachable.
+ */
+export async function verifyKey(provider: Exclude<ByoProvider, "custom">, key: string, baseUrl?: string | null): Promise<{ ok: true; ms: number; note: string } | { ok: false; error: string }> {
+  const t0 = Date.now();
+  const name = baseUrl ? "Your OpenAI-compatible endpoint" : ({ openai: "OpenAI", anthropic: "Anthropic", gemini: "Google", xai: "xAI", openrouter: "OpenRouter" } as const)[provider];
+  let url: string, headers: Record<string, string>;
+  if (baseUrl) { url = `${baseUrl.replace(/\/$/, "")}/models`; headers = { Authorization: `Bearer ${key}` }; }
+  else if (provider === "anthropic") { url = `${ANTHROPIC}/models?limit=1`; headers = { "x-api-key": key, "anthropic-version": "2023-06-01" }; }
+  else if (provider === "gemini") { url = `${GEMINI}/models?pageSize=1`; headers = { "x-goog-api-key": key }; }
+  else if (provider === "openrouter") { url = `${BASES.openrouter}/key`; headers = { Authorization: `Bearer ${key}` }; }
+  else { url = `${BASES[provider]}/models`; headers = { Authorization: `Bearer ${key}` }; }
+  try {
+    await checkHost(url);
+    const res = await fetch(url, { headers, redirect: "error", signal: AbortSignal.timeout(15_000) });
+    const ms = Date.now() - t0;
+    if (res.ok) return { ok: true, ms, note: `Verified in ${(ms / 1000).toFixed(1)}s` };
+    if (baseUrl && (res.status === 404 || res.status === 405)) return { ok: true, ms, note: "Reachable. This endpoint has no model list." };
+    if (res.status === 401 || res.status === 403 || (provider === "gemini" && res.status === 400)) return { ok: false, error: `${name} rejected this key.` };
+    if (res.status === 429) return { ok: false, error: `${name} says this key is over its rate limit. Try again in a minute.` };
+    if (res.status === 402) return { ok: false, error: `Your ${name} account is out of credit.` };
+    return { ok: false, error: `${name} answered with error ${res.status}. Try again.` };
+  } catch (e) {
+    if (e instanceof ModelError) return { ok: false, error: e.friendly };
+    return { ok: false, error: `${name} couldn't be reached. Try again.` };
+  }
+}

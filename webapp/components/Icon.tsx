@@ -1,5 +1,6 @@
 /** Small stroke icons for the app. One set, one weight. */
 const P: Record<string, React.ReactNode> = {
+  key: <><circle cx="8" cy="15" r="4" /><path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2" /></>,
   server: <><rect x="4" y="4" width="16" height="7" rx="2" /><rect x="4" y="13" width="16" height="7" rx="2" /><path d="M8 7.5h.01M8 16.5h.01" strokeWidth="2.6" /></>,
   gauge: <><path d="M4.5 16a8 8 0 1 1 15 0" /><path d="m12 13 3.5-4" /><path d="M12 13h.01" strokeWidth="3" /></>,
   stop: <><rect x="6.5" y="6.5" width="11" height="11" rx="2" /></>,
