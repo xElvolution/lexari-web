@@ -143,7 +143,7 @@ async function receipt(userId: string, a: typeof integrationActions.$inferSelect
   if (!r.receipt || !a.convo) return;
   await recordTx(userId, a.convo, {
     id: `int-${a.id}`.slice(0, 36), kind: a.tool === "tempo.topup" ? "topup" : a.tool.startsWith("tempo.") ? "send" : "pay", status: a.status === "confirmed" ? "confirmed" : "pending", sol: 0, at: Date.now(),
-    agent: a.agentSlug, amount: r.receipt.amount, label: r.receipt.label, ...(r.receipt.net ? { net: r.receipt.net } : {}), ...(r.sig ? { sig: r.sig } : {}), ...(r.receipt.url ? { url: r.receipt.url } : {}),
+    agent: a.agentSlug, amount: r.receipt.amount, label: r.receipt.label, ...(r.text ? { detail: r.text.slice(0, 1800) } : {}), ...(r.receipt.net ? { net: r.receipt.net } : {}), ...(r.sig ? { sig: r.sig } : {}), ...(r.receipt.url ? { url: r.receipt.url } : {}),
   }).catch((e) => console.error(`[integrations] receipt: ${(e as Error).message?.slice(0, 200)}`));
 }
 

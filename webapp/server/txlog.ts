@@ -27,6 +27,8 @@ export type TxEvent = {
   balance?: number;
   /** a non-SOL amount, already formatted ("0.05 USDC", "$10.00"), and its network when not Solana devnet */
   amount?: string; net?: string;
+  /** what a paid service or hired agent returned, for the agent's follow-up (never shown as is) */
+  detail?: string;
 };
 
 const SIG = /^[1-9A-HJ-NP-Za-km-z]{64,90}$/;

@@ -6,7 +6,7 @@ import { integrationById } from "@/content/integrations";
 import { actOn, actionNow } from "@/lib/integrations";
 import { friendly } from "@/lib/api";
 import { moneyChanged } from "@/lib/money";
-import { set, useApp, type Msg } from "@/lib/store";
+import { ackTx, refreshReceipts, set, useApp, type Msg } from "@/lib/store";
 import { nameOf } from "../agents";
 import Icon from "../Icon";
 import { IntegrationLogo } from "./Logos";
@@ -62,6 +62,11 @@ export function ActionCardView({ convo, m }: { convo: string; m: Msg & { action:
       const n = await actOn(a.id, op);
       keep(n);
       if (n.status === "confirmed") moneyChanged();
+      // Agent payments and Tempo write a receipt row; the agent then follows up with what came back.
+      if (op === "confirm" && (n.connector === "payments" || n.connector === "tempo") && n.status !== "failed") {
+        await refreshReceipts(convo);
+        void ackTx(convo, `tx-int-${a.id}`.slice(0, 39), a.agent);
+      }
     } catch (e) {
       setErr(friendly(e, "That didn't go through. Nothing was sent."));
       void actionNow(a.id).then(keep).catch(() => setA((x) => ({ ...x, status: x.status === "submitting" ? "prepared" : x.status })));
