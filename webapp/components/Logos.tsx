@@ -119,9 +119,11 @@ export function ProviderLogo({ provider, maker, size = 40, className = "" }: { p
       </span>
     );
   }
+  // Official mono marks sit on the maker's brand colour (inverted to white) so they stay crisp on dark UI.
+  const icon = Math.round(size * 0.56);
   return (
-    <span className={`grid shrink-0 place-items-center overflow-hidden rounded-[14px] bg-white ring-1 ring-black/5 ${className}`} style={{ width: size, height: size }}>
-      <img src={src} alt="" width={Math.round(size * 0.62)} height={Math.round(size * 0.62)} draggable={false} onError={() => setBroken(true)} className="object-contain" style={{ width: Math.round(size * 0.62), height: Math.round(size * 0.62) }} />
+    <span className={`grid shrink-0 place-items-center overflow-hidden rounded-[14px] ${className}`} style={{ width: size, height: size, background: tile }}>
+      <img src={src} alt="" width={icon} height={icon} draggable={false} onError={() => setBroken(true)} className="object-contain" style={{ width: icon, height: icon, filter: "brightness(0) invert(1)" }} />
     </span>
   );
 }

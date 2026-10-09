@@ -44,9 +44,9 @@ const CHAIN_FILE: Record<ChainId | "polygon", string> = {
 /** API key providers in Settings > Models. */
 const PROVIDER_FILE: Record<KeyProvider, string> = {
   openai: "openai.png",
-  anthropic: "anthropic.png",
-  gemini: "google.png",
-  xai: "xai.png",
+  anthropic: "claude.png",
+  gemini: "gemini.png",
+  xai: "grok.png",
   openrouter: "openrouter.png",
 };
 
@@ -54,9 +54,9 @@ const PROVIDER_FILE: Record<KeyProvider, string> = {
 const MAKER_FILE: Record<string, string> = {
   Lexari: "", // Lamina mark is drawn inline
   OpenAI: "openai.png",
-  Anthropic: "anthropic.png",
-  Google: "google.png",
-  xAI: "xai.png",
+  Anthropic: "claude.png",
+  Google: "gemini.png",
+  xAI: "grok.png",
   OpenRouter: "openrouter.png",
   Custom: "",
 };
