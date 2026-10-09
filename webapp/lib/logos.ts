@@ -46,7 +46,7 @@ const PROVIDER_FILE: Record<KeyProvider, string> = {
   openai: "openai.png",
   anthropic: "claude.png",
   gemini: "gemini.png",
-  xai: "grok.png",
+  xai: "xai.png",
   openrouter: "openrouter.png",
 };
 
@@ -56,7 +56,7 @@ const MAKER_FILE: Record<string, string> = {
   OpenAI: "openai.png",
   Anthropic: "claude.png",
   Google: "gemini.png",
-  xAI: "grok.png",
+  xAI: "xai.png",
   OpenRouter: "openrouter.png",
   Custom: "",
 };
