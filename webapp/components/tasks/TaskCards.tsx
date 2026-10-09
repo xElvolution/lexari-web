@@ -64,7 +64,7 @@ export function MeetCard({ m, convo, onDesktop }: { m: Msg & { meet: MeetAsk }; 
       ) : (
         <>
           <div role="radiogroup" aria-label="Join as" className="mt-2.5 inline-flex w-full rounded-full bg-tint p-1">
-            {([["agent", "As my agent"], ["me", "As me"]] as const).map(([k, l]) => <button key={k} role="radio" aria-checked={as === k} data-meet-as={k} onClick={() => setAs(k)} className={`h-8 flex-1 rounded-full text-[12.5px] font-bold transition ${as === k ? "bg-card text-ink shadow-sm" : "text-ink/60"}`}>{l}</button>)}
+            {([["agent", "As my agent"], ["me", "As me"]] as const).map(([k, l]) => <button key={k} role="radio" aria-checked={as === k} data-meet-as={k} onClick={() => setAs(k)} className={`h-8 flex-1 rounded-full text-[12.5px] font-bold transition ${as === k ? "bg-grape text-white shadow-sm" : "text-ink/65"}`}>{l}</button>)}
           </div>
           <p className="mt-2 text-[11.5px] leading-snug text-ink/60">Joins as <b className="text-ink/80">{shown}</b>, muted with camera off, and says it&apos;s taking notes.{as === "me" ? " Uses your account if you're signed in on its browser." : ""}</p>
           <button data-meet-join disabled={busy} onClick={() => void join()} className="btn btn-brand btn-sm mt-2.5 !h-9 w-full">{busy ? <Spinner /> : "Join"}</button>
