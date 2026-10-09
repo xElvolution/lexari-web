@@ -5,7 +5,8 @@
 //
 // Containers run with --network none. Each gets a bind-mounted socket dir (/run/lexari inside):
 //   proxy.sock  this relay's filtering web proxy (CONNECT + plain HTTP, ports 80/443 and TURN ports, public IPs only:
-//               loopback, private, link-local, CGNAT and multicast are refused, so nothing host-local is reachable)
+//               loopback, private, link-local, CGNAT and multicast are refused, and so is this host's own public address
+//               on every port, so nothing host-local (other sites, app ports, databases) is reachable)
 //   vnc.sock    the container's x11vnc, bridged by socat; the screen websocket is piped to it
 // So the desktop browses the public web but can never reach host-local ports, and the host firewall is untouched.
 import http from "node:http";
@@ -25,9 +26,18 @@ const SOCKS = process.env.DESKTOP_SOCKS || "/opt/lexari-desktop/socks";
 const IDLE_MS = Number(process.env.DESKTOP_IDLE_MS || 15 * 60_000);
 if (SECRET.length < 32) { console.error("DESKTOP_SECRET missing"); process.exit(1); }
 
-const LIMITS = ["--cpus", "1", "--memory", "1536m", "--memory-swap", "1536m", "--pids-limit", "768", "--shm-size", "256m"];
+// Disk: writes to the host disk are rate capped (so nothing can fill it between quota checks), see DISK QUOTA below.
+const HARDENING = "2"; // bump when LIMITS/HARDEN change, so stopped desktops are recreated with them
+const DISK_DEV = process.env.DESKTOP_DISK_DEV ?? "/dev/sda";
+const SECCOMP = process.env.DESKTOP_SECCOMP || "/opt/lexari-desktop/seccomp-desktop.json";
+const WRITE_BPS = process.env.DESKTOP_WRITE_BPS || "60mb";
+const LIMITS = ["--cpus", "1", "--memory", "1536m", "--memory-swap", "1536m", "--pids-limit", "768", "--shm-size", "256m",
+  ...(DISK_DEV && fs.existsSync(DISK_DEV) ? ["--device-write-bps", `${DISK_DEV}:${WRITE_BPS}`] : [])];
 const HARDEN = ["--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--read-only", "--init",
-  "--tmpfs", "/tmp:rw,nosuid,nodev,size=384m,mode=1777", "--user", "1000:1000", "--ulimit", "nofile=4096:4096"];
+  "--tmpfs", "/tmp:rw,nosuid,nodev,size=384m,mode=1777", "--user", "1000:1000", "--ulimit", "nofile=4096:4096",
+  // Docker's default seccomp profile, except fallocate() returns EOPNOTSUPP: preallocating a huge file would skip the
+  // write-rate cap and fill the disk instantly (glibc posix_fallocate falls back to normal writes).
+  ...(fs.existsSync(SECCOMP) ? ["--security-opt", `seccomp=${SECCOMP}`] : [])];
 
 const last = new Map(); // container -> last activity
 const sockets = new Map(); // user -> Set<ws> (terminals)
@@ -47,17 +57,19 @@ for (const [a, p] of [["::", 128], ["::1", 128], ["fc00::", 7], ["fe80::", 10], 
 // Web on 80/443, plus the TURN/ICE-TCP ports video meetings relay their audio over (3478 TURN, 5349 TURN-TLS,
 // 4443/8443 bridge TCP): containers have no UDP, so meeting media can only flow as TCP through this proxy.
 const OK_PORTS = new Set([80, 443, 3478, 5349, 4443, 8443]);
-// The meeting ports never reach this machine's own addresses (other services on this host may listen there).
-const SELF = new Set(Object.values(os.networkInterfaces()).flat().filter(Boolean).map((i) => unmapIp(i.address)));
+// This machine's own addresses (every interface, plus DESKTOP_HOST_IPS for a public IP that sits behind NAT) are refused
+// on every port: other sites and services on this host must not be reachable from a desktop.
+const SELF = new Set([...Object.values(os.networkInterfaces()).flat().filter(Boolean).map((i) => unmapIp(i.address)),
+  ...String(process.env.DESKTOP_HOST_IPS || "5.189.170.85").split(",").map((x) => x.trim()).filter(Boolean)]);
 function unmapIp(ip) { return /^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(ip) ? ip.slice(7) : ip; }
 const portOk = (port, ip) => OK_PORTS.has(port) && (port === 80 || port === 443 || !SELF.has(unmapIp(ip)));
 const unmap = (ip) => (/^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(ip) ? ip.slice(7) : ip);
 function isBlocked(ip) {
   ip = unmap(ip);
   const fam = net.isIP(ip); if (!fam) return true;
-  // Loopback, private, link-local and CGNAT ranges (where host-local services live) are always refused. This host's own
-  // public address is allowed because only ports 80/443 pass, and there it serves the same public sites anyone can open.
-  return blocked.check(ip, fam === 4 ? "ipv4" : "ipv6");
+  // Loopback, private, link-local and CGNAT ranges (where host-local services live) are always refused, and so is this
+  // host's own public address: it serves other sites, so desktops never reach it at all.
+  return SELF.has(ip) || blocked.check(ip, fam === 4 ? "ipv4" : "ipv6");
 }
 /** Resolve a host for the proxy: every address must be public, or the request is refused (no DNS-rebinding way in). */
 async function resolvePublic(host) {
@@ -129,15 +141,20 @@ async function ensure(user) {
   const c = name(user);
   last.set(c, Date.now());
   const dir = `${SOCKS}/${user}`;
-  fs.mkdirSync(dir, { recursive: true }); fs.chmodSync(dir, 0o777);
+  // Socket dirs: owner this relay, group = the container's gid (inherited from the setgid parent, which is
+  // lexaridesk:1000 2750), mode 770, so only the relay and that container can reach proxy.sock / vnc.sock.
+  fs.mkdirSync(dir, { recursive: true }); fs.chmodSync(dir, 0o770);
   startProxy(user, dir);
-  const st = await sh(["inspect", "-f", "{{.State.Running}} {{.Config.Image}}", c]);
+  const st = await sh(["inspect", "-f", '{{.State.Running}} {{.Config.Image}} {{index .Config.Labels "lexari.hardening"}}', c]);
   if (st.code === 0) {
-    const [running, image] = st.out.trim().split(" ");
-    if (image === IMAGE) { if (running !== "true") await sh(["start", c]); return c; }
+    const [running, image, hard] = st.out.trim().split(" ");
+    // Same image: keep it. A stopped one made before the current hardening (HARDENING) is recreated so it gets the
+    // disk limits; a running one is left alone (a meeting or job may be on) and picks them up after its next stop.
+    if (image === IMAGE && (running === "true" || hard === HARDENING)) { if (running !== "true") { allowCleanup(user); await sh(["start", c]); } return c; }
     await sh(["rm", "-f", c]); // an older image: recreate (the home volume and its files stay)
   }
-  const r = await sh(["run", "-d", "--name", c, "--hostname", "lexari", "--label", "lexari.desktop=1", ...LIMITS, ...HARDEN,
+  allowCleanup(user);
+  const r = await sh(["run", "-d", "--name", c, "--hostname", "lexari", "--label", "lexari.desktop=1", "--label", `lexari.hardening=${HARDENING}`, ...LIMITS, ...HARDEN,
     "--restart", "no", "-v", `lxvol-${user}:/home/agent`, "-v", `${dir}:/run/lexari`, "-w", "/home/agent", IMAGE], { timeout: 60_000 });
   if (r.code !== 0) throw new Error("container start failed: " + r.err.slice(0, 200));
   return c;
@@ -285,6 +302,7 @@ async function pullFile(user, p) {
 }
 /** Writes an upload into ~/Uploads (only there), creating the folder. */
 async function pushFile(user, p, b64) {
+  if (overQuota(user)) return { error: "storage full", ...quotaInfo(user) };
   if (!okPath(p) || !p.startsWith("/home/agent/Uploads/") || p.slice(20).includes("/")) return { error: "bad path" };
   const buf = Buffer.from(String(b64 || ""), "base64");
   if (!buf.length || buf.length > FILE_MAX) return { error: "bad size" };
@@ -304,6 +322,7 @@ async function pushFile(user, p, b64) {
 const okJob = (id) => typeof id === "string" && /^[a-z0-9-]{6,64}$/.test(id);
 async function jobStart(user, id, cmd) {
   if (!okJob(id) || !cmd) return { error: "bad job" };
+  if (overQuota(user)) return { error: "storage full", ...quotaInfo(user) };
   const c = await ensure(user);
   const running = (await sh(["exec", c, "lx-job", "list"])).out.split("\n").filter(Boolean);
   if (running.length >= JOBS_MAX) return { error: "busy", running };
@@ -423,6 +442,43 @@ setInterval(async () => {
     }
   }
 }, 60_000);
+
+// ---- DISK QUOTA ----
+// The overlay storage driver on ext4 has no per-volume quota, so the relay enforces one: every QUOTA_CHECK_MS it
+// measures each running desktop's home (du). Over the soft limit (DESKTOP_QUOTA_GB, default 5) uploads and new jobs
+// are refused with "storage full"; over the hard limit (soft x 1.2) the computer is stopped. When it is started again
+// the person gets QUOTA_GRACE_MS to delete files before the hard limit applies again. Write speed is capped
+// (--device-write-bps) so the disk can't be filled between checks.
+const QUOTA_KB = Math.round(Number(process.env.DESKTOP_QUOTA_GB || 5) * 1024 * 1024);
+const HARD_KB = Math.round(QUOTA_KB * 1.2);
+const QUOTA_CHECK_MS = Number(process.env.DESKTOP_QUOTA_CHECK_MS || 120_000);
+const QUOTA_GRACE_MS = Number(process.env.DESKTOP_QUOTA_GRACE_MS || 15 * 60_000);
+const usage = new Map(); // user -> KB used in /home/agent (last check)
+const grace = new Map(); // user -> time until which the hard limit doesn't stop the computer
+function allowCleanup(user) { if ((usage.get(user) || 0) > HARD_KB) grace.set(user, Date.now() + QUOTA_GRACE_MS); }
+const overQuota = (user) => (usage.get(user) || 0) > QUOTA_KB;
+const quotaInfo = (user) => ({ usedMb: Math.round((usage.get(user) || 0) / 1024), limitMb: Math.round(QUOTA_KB / 1024) });
+async function measure(c) {
+  const r = await sh(["exec", c, "du", "-sxk", "/home/agent"], { timeout: 90_000 });
+  const kb = parseInt(r.out, 10); // du exits 1 on unreadable files but still prints the total
+  return Number.isFinite(kb) ? kb : null;
+}
+let quotaBusy = false;
+setInterval(async () => {
+  if (quotaBusy) return; quotaBusy = true;
+  try {
+    const r = await sh(["ps", "--filter", "label=lexari.desktop=1", "--format", "{{.Names}}"]);
+    for (const c of r.out.split("\n").filter(Boolean)) {
+      const user = c.slice(3); if (!okUser(user)) continue;
+      const kb = await measure(c); if (kb === null) continue;
+      const was = usage.get(user) || 0; usage.set(user, kb);
+      if (kb > QUOTA_KB && was <= QUOTA_KB) console.log("quota over", user.slice(0, 8), Math.round(kb / 1024), "MB");
+      if (kb > HARD_KB && !((grace.get(user) || 0) > Date.now())) {
+        await sh(["stop", "-t", "3", c]); last.delete(c); console.log("quota stop", user.slice(0, 8), Math.round(kb / 1024), "MB");
+      }
+    }
+  } finally { quotaBusy = false; }
+}, QUOTA_CHECK_MS).unref();
 
 server.listen(PORT, "127.0.0.1", async () => {
   console.log(`desktop relay on 127.0.0.1:${PORT}`);
