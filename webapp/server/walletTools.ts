@@ -14,7 +14,7 @@ export const WALLET_HINT = [
   "So after a send tag, say you've prepared it and they need to confirm. Never say SOL was sent until Lexari tells you the result (a Lexari event, or the wallet activity list below). Never invent an address; ask for one if missing.",
 ].join(" ");
 
-export type SendReq = { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; /** a hired agent asking you to fund its task wallet (in dollars, from your balance) */ kind?: "fund"; agent?: string; reason?: string; usd?: number };
+export type SendReq = { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; /** Settings > Security: never sent to this address before */ firstTime?: boolean; /** dollar value when prepared */ valueUsd?: number; /** a fresh PIN or wallet confirm is needed before signing */ stepup?: boolean; /** a hired agent asking you to fund its task wallet (in dollars, from your balance) */ kind?: "fund"; agent?: string; reason?: string; usd?: number };
 
 /** Pulls wallet tags out of a reply. */
 export function walletRequests(text: string) {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { jsonError, rateLimit, readJson } from "@/server/http";
 import { withUser } from "@/server/route";
+import { countSent } from "@/server/security/walletSend";
 import { chatReceipts, checkSig, isSig, noticeIncoming, readTx, recordTx, settleTx, type TxEvent } from "@/server/txlog";
 
 export const runtime = "nodejs";
@@ -38,6 +39,7 @@ export const POST = withUser(async (user, req) => {
     if ("error" in r && r.error) ev.error = r.error;
   }
   ev = await recordTx(user.userId, convo, ev);
+  if (ev.kind === "send" && ev.status === "confirmed" && ev.sig && ev.sol > 0) void countSent(user.userId, ev.sol, ev.sig).catch(() => {});
   if (ev.sig && (ev.status === "pending" || ev.status === "confirmed")) void settleTx(user.userId, convo, body.id, user.wallet).catch(() => {});
   return Response.json({ tx: ev, id: `tx-${body.id}` });
 });
@@ -52,6 +54,7 @@ export const GET = withUser(async (user, req) => {
   if (pending.length) {
     await Promise.all(pending.map((r) => settleTx(user.userId, convo, r.id.replace(/^tx-/, ""), user.wallet, 0).catch(() => null)));
     list = await chatReceipts(user.userId, convo);
+    for (const r of list) if (r.tx.kind === "send" && r.tx.status === "confirmed" && r.tx.sig && r.tx.sol > 0) void countSent(user.userId, r.tx.sol, r.tx.sig).catch(() => {});
   }
   return Response.json({ receipts: list }, { headers: { "cache-control": "no-store" } });
 });

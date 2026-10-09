@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!isWallet(body.wallet)) return jsonError(400, "That is not a Solana wallet address.");
   try {
     if (!(await rateLimit(`verify:${clientIp(req)}`, 20))) return jsonError(429, "Too many sign-in attempts. Wait a minute.");
-    const session = await verifySignIn(body);
+    const session = await verifySignIn(body, { ua: req.headers.get("user-agent") || "", ip: clientIp(req) });
     const jar = await cookies();
     jar.set(SESSION_COOKIE, session.token, sessionCookieOptions(session.expires));
     return Response.json({ wallet: session.wallet, referralCode: session.referralCode });

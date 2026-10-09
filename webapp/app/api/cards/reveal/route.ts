@@ -6,6 +6,7 @@ import { jsonError, readJson } from "@/server/http";
 import { checkPin, checkSignedConfirm, lockHashOf } from "@/server/lock";
 import { withUser } from "@/server/route";
 import { view } from "@/server/cards/view";
+import { logEvent, useOnce } from "@/server/security";
 
 export const runtime = "nodejs";
 
@@ -26,8 +27,10 @@ export const POST = withUser(async (user, req) => {
   } else {
     if (!b.message || !b.signature) return jsonError(401, "Confirm with your wallet to view the card.");
     checkSignedConfirm(user.wallet, b.message, b.signature, `view card ${b.agent}`);
+    await useOnce(b.signature); // a copied signature can't be replayed inside its 2-minute window
   }
   const [c] = await db().select().from(agentCards).where(and(eq(agentCards.userId, user.userId), eq(agentCards.agentKey, b.agent))).limit(1);
   if (!c) return jsonError(404, "There's no card for that agent.");
+  await logEvent(user, "card", `Viewed the full card details for ${b.agent}`);
   return Response.json({ card: view(c, true) }, { headers: { "cache-control": "no-store" } });
 });

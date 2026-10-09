@@ -7,6 +7,7 @@ import { withUser } from "@/server/route";
 import { ownAgent } from "@/server/agentWallets";
 import { BUDGET_LIMITS, agentSpentToday, budgetOf, setBudget } from "@/server/agentpay/budgets";
 import { cardOf } from "@/server/integrations/cards";
+import { logEvent, requireStepUp } from "@/server/security";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,10 @@ export const POST = withUser(async (user, req) => {
   if (b.dailyUsd < b.perTaskUsd) return jsonError(400, "The daily budget can't be lower than the per-task budget.");
   if (!(await rateLimit(`budget:${user.userId}`, 60, 3_600_000))) return jsonError(429, "Wait a minute and try again.");
   await ownAgent(user.userId, b.agent);
+  const cur = await budgetOf(user.userId, b.agent);
+  const raises = Math.round(b.perTaskUsd * 1e6) > cur.perTaskMicros || Math.round(b.dailyUsd * 1e6) > cur.dailyMicros;
+  if (raises) requireStepUp(user, "raise an agent's budget");
   await setBudget(user.userId, b.agent, b.perTaskUsd, b.dailyUsd);
+  if (raises) await logEvent(user, "budget", `Raised ${b.agent}'s budget to $${b.perTaskUsd} a task, $${b.dailyUsd} a day`);
   return Response.json(await view(user.userId, b.agent));
 });

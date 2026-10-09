@@ -34,6 +34,15 @@ export const sessions = pgTable("sessions", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   tokenHash: text("token_hash").notNull().unique(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  userAgent: text("user_agent").notNull().default(""),
+  /** coarse network hint (first two IPv4 octets / IPv6 /32), never the full address */
+  ipHint: text("ip_hint").notNull().default(""),
+  /** "Chrome on Android" */
+  device: text("device").notNull().default(""),
+  /** high-risk actions are allowed until this time (re-confirmed with your PIN or a wallet signature) */
+  stepupUntil: timestamp("stepup_until", { withTimezone: true }),
 });
 
 export const agents = pgTable(

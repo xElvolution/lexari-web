@@ -5,6 +5,7 @@ import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { withUser } from "@/server/route";
 import { listSocial } from "@/server/social";
+import { requireStepUp } from "@/server/security";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,7 @@ export const GET = withUser(async (user) => {
 
 /** Delete the account and everything tied to it. Onchain records stay onchain and stay yours. */
 export const DELETE = withUser(async (user) => {
+  requireStepUp(user, "delete your account");
   await db().delete(users).where(eq(users.id, user.userId));
   await destroySession().catch(() => {});
   return Response.json({ ok: true });

@@ -6,6 +6,8 @@ import { referrals, sessions, users } from "../db/schema";
 import { HttpError } from "../http";
 import { buildSignInMessage, isWallet, verifySolanaSignature } from "./siws";
 import { verifyPrivyToken } from "./privy";
+import { deviceName, ipHint } from "../security/device";
+import { noteSignIn } from "../security";
 
 export const SESSION_COOKIE = "lexari_session";
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -71,7 +73,7 @@ export async function issueNonce(wallet: string, origin: { domain: string; uri: 
   return { message, expiresAt: nonceExpires.toISOString() };
 }
 
-export async function verifySignIn(input: { wallet: string; message: string; signature: string; referral?: string; privyToken?: string; email?: string }) {
+export async function verifySignIn(input: { wallet: string; message: string; signature: string; referral?: string; privyToken?: string; email?: string }, from: { ua?: string; ip?: string } = {}) {
   if (!isWallet(input.wallet)) throw new HttpError(400, "That is not a Solana wallet address.");
   if (!verifySolanaSignature(input.message, input.signature, input.wallet)) {
     throw new HttpError(401, "Signature does not match this wallet.");
@@ -109,7 +111,9 @@ export async function verifySignIn(input: { wallet: string; message: string; sig
 
   const token = crypto.randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + SESSION_MS);
-  await database.insert(sessions).values({ userId: user.id, tokenHash: hashToken(token), expiresAt: expires });
+  const device = deviceName(from.ua || ""), hint = ipHint(from.ip || "");
+  const [row] = await database.insert(sessions).values({ userId: user.id, tokenHash: hashToken(token), expiresAt: expires, userAgent: (from.ua || "").slice(0, 300), device, ipHint: hint }).returning({ id: sessions.id });
+  await noteSignIn(user.id, row.id, device, hint).catch((e: Error) => console.error(`[security] sign-in note: ${e.message?.slice(0, 120)}`));
   return { token, expires, wallet: user.wallet, referralCode: user.referralCode };
 }
 
@@ -118,12 +122,16 @@ export async function currentSession() {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const rows = await db()
-    .select({ wallet: users.wallet, referralCode: users.referralCode, userId: users.id, privyDid: users.privyDid, email: users.email, createdAt: users.createdAt })
+    .select({ wallet: users.wallet, referralCode: users.referralCode, userId: users.id, privyDid: users.privyDid, email: users.email, createdAt: users.createdAt,
+      sessionId: sessions.id, stepupUntil: sessions.stepupUntil, lastSeenAt: sessions.lastSeenAt, device: sessions.device })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
     .where(and(eq(sessions.tokenHash, hashToken(token)), gt(sessions.expiresAt, new Date())))
     .limit(1);
-  return rows[0] ?? null;
+  const s = rows[0] ?? null;
+  // "Last active" for Settings > Security, written at most every 5 minutes per session.
+  if (s && Date.now() - s.lastSeenAt.getTime() > 5 * 60_000) void db().update(sessions).set({ lastSeenAt: new Date() }).where(eq(sessions.id, s.sessionId)).catch(() => {});
+  return s;
 }
 
 export async function destroySession() {

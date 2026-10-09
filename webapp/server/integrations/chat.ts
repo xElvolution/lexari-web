@@ -65,7 +65,7 @@ export const stripToolTags = (t: string) => t.replace(/<tool\b[^>]*\/>/gi, "").r
 
 export type TurnResult = { facts: string[]; notes: string[]; actions: ActionCard[]; markets: MarketsCard | null; reads: number };
 
-export async function runTurnTools(userId: string, agent: AgentRef, tt: TurnTools, text: string, ctx: { convo: string; messageId: string }): Promise<TurnResult> {
+export async function runTurnTools(userId: string, agent: AgentRef, tt: TurnTools, text: string, ctx: { convo: string; messageId: string; untrusted?: boolean }): Promise<TurnResult> {
   const calls = toolTags(text);
   const out: TurnResult = { facts: [], notes: [], actions: [], markets: null, reads: 0 };
   for (const c of calls) {

@@ -23,6 +23,7 @@ import type { Executed } from "./registry";
 import { Reject, toolByName, type AgentRef, type ToolDef } from "./registry";
 import { ChainError, SimError, isDevnet, network } from "./solana";
 import { cardOf, type Preview } from "./cards";
+import { checkMoney, type SendCheck } from "../security";
 
 const EXPIRE_MS = 15 * 60_000;
 const CONFIRMS_PER_HOUR = Number(process.env.INTEGRATION_CONFIRMS_PER_HOUR || 30);
@@ -33,7 +34,8 @@ export function agentRef(userId: string, a: { slug: string; kind: string; name: 
   return { userId, slug: a.slug, kind: a.kind, name: (a.meta as { nick?: string } | null)?.nick || a.name, keypair: () => (kp ??= solanaKeypair(userId, a.slug, a.kind)) };
 }
 
-type Ctx = { userId: string; agent: AgentRef; convo: string; messageId: string };
+/** untrusted: this turn read content the person didn't write (email, web pages), so nothing pays on its own. */
+type Ctx = { userId: string; agent: AgentRef; convo: string; messageId: string; untrusted?: boolean };
 export type CallResult =
   | { kind: "read"; tool: string; ok: true; text: string; markets?: MarketsCard }
   | { kind: "read"; tool: string; ok: false; text: string }
@@ -88,6 +90,20 @@ export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: un
     return { kind: "refused", tool: tool.name, text: why };
   }
   const preview: Preview = { title: prep.title, rows: prep.rows, network: netOf(prep.chain), plan: prep.plan, summary: prep.summary };
+  // Settings > Security: the daily money limit and "saved addresses only" apply to everything an agent prepares.
+  let guard: SendCheck;
+  try { guard = await checkMoney(ctx.userId, { usdMicros: prep.usdMicros, to: (prep.plan as { to?: string } | undefined)?.to ?? null }); }
+  catch (e) {
+    if (!(e instanceof HttpError)) throw e;
+    await record(ctx, tool, parsed.data, "rejected", { preview, usdMicros: prep.usdMicros, error: e.message, chain: prep.chain });
+    return { kind: "refused", tool: tool.name, text: e.message };
+  }
+  if (guard.firstTime) preview.rows = [...preview.rows, ["Heads up", "You've never sent to this address. Check every character before you confirm."]];
+  if (tool.auto && (guard.firstTime || ctx.untrusted)) {
+    // A new payee, or a turn that read email or web content: always your Confirm, never on its own.
+    const row = await record(ctx, tool, parsed.data, "prepared", { preview: { ...preview, rows: [...preview.rows, ["Why you're asked", guard.firstTime ? "It's a new payee" : "This came up while reading content you didn't write"]] }, usdMicros: prep.usdMicros, chain: prep.chain });
+    return { kind: "action", tool: tool.name, card: cardOf(row) };
+  }
   if (tool.auto) {
     // Inside the agent's budget it pays on its own (with a receipt); over it, you get a Confirm card.
     const why = await overBudget(ctx.userId, ctx.agent.slug, prep.usdMicros);

@@ -3,6 +3,7 @@ import { KEY_PROVIDERS, type KeyProvider } from "@/content/models";
 import { recheckKey, removeKey, saveKey, setBaseUrl } from "@/server/models";
 import { jsonError, rateLimit, readJson } from "@/server/http";
 import { withUser } from "@/server/route";
+import { requireStepUp } from "@/server/security";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -16,6 +17,7 @@ export const PUT = withUser<Ctx>(async (user, req, ctx) => {
   const b = await readJson(req, z.object({ key: z.string().trim().min(8, "Paste the full API key.").max(400) }).strict());
   if (b instanceof Response) return b;
   if (!(await rateLimit(`byo:key:${user.userId}`, 30, 3_600_000))) return jsonError(429, "That's a lot of keys. Try again later.");
+  requireStepUp(user, "add an API key");
   return Response.json(await saveKey(user.userId, provider, b.key));
 });
 
@@ -35,6 +37,8 @@ export const PATCH = withUser<Ctx>(async (user, req, ctx) => {
   const b = await readJson(req, z.object({ baseUrl: z.string().trim().max(300).nullable() }).strict());
   if (b instanceof Response) return b;
   if (!(await rateLimit(`byo:base:${user.userId}`, 30, 3_600_000))) return jsonError(429, "That's a lot of changes. Try again later.");
+  // a new base URL receives your OpenAI key on every request
+  if (b.baseUrl) requireStepUp(user, "send your key to a different server");
   await setBaseUrl(user.userId, b.baseUrl || null);
   return Response.json({ ok: true });
 });

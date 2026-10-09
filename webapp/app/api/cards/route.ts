@@ -10,6 +10,7 @@ import { verifyPayment } from "@/server/hires";
 import { fetchConfirmed } from "@/server/hub/confirm";
 import { jsonError, readJson } from "@/server/http";
 import { withUser } from "@/server/route";
+import { requireStepUp } from "@/server/security";
 import { cardBuyBody, cardPatchBody } from "@/server/validate";
 import { charge, credit } from "@/server/billing/balance";
 import { CARD_USD } from "@/lib/prices";
@@ -88,6 +89,7 @@ export const PATCH = withUser(async (user, req) => {
   const database = db();
   const [card] = await database.select().from(agentCards).where(and(eq(agentCards.userId, user.userId), eq(agentCards.agentKey, body.agent))).limit(1);
   if (!card) return jsonError(404, "This agent has no card.");
+  if ((body.limit !== undefined && body.limit > card.spendLimit) || (body.frozen === false && card.frozen)) requireStepUp(user, body.limit !== undefined ? "raise a card limit" : "unfreeze a card");
   const issuer = cardIssuer();
   if (card.externalId && body.frozen !== undefined) await issuer.setFrozen?.(card.externalId, body.frozen);
   if (card.externalId && body.limit !== undefined) await issuer.setLimit?.(card.externalId, body.limit);

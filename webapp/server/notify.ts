@@ -6,7 +6,7 @@ import { QUEST_RULES } from "./hub/catalog";
 import { periodNumber } from "./hub/catalog";
 import { progressFrom, questCounts } from "./hub/rules";
 
-export type NoteKind = "quest" | "box" | "hire" | "payment" | "card" | "reply" | "faucet" | "mail";
+export type NoteKind = "quest" | "box" | "hire" | "payment" | "card" | "reply" | "faucet" | "mail" | "security";
 export type Note = { kind: NoteKind; title: string; body?: string; url?: string; key?: string };
 
 /** Which Settings › Notifications toggle silences the push for a kind. The bell always keeps it. */
