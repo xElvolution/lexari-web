@@ -37,6 +37,8 @@ export default function Home() {
 
   useEffect(() => { if (fromUrl) setActive(fromUrl); }, [fromUrl]);
   useEffect(() => { if (params.get("pane") === "1") setPane(true); }, [params]);
+  // "Take over" on a sign-in card opens the agent's desktop.
+  useEffect(() => { const on = () => setPane(true); window.addEventListener("lexari:desktop", on); return () => window.removeEventListener("lexari:desktop", on); }, []);
 
   const open = (id: string) => {
     setActive(id);

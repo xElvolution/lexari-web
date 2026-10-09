@@ -7,6 +7,7 @@ import { ensureMic, transcribe, type Transcriber } from "@/lib/voice";
 import Icon from "../Icon";
 import { fmtSecs } from "../agents";
 import { uploadFile, type SentFile } from "@/lib/files";
+import { usePasteGuard } from "../secrets/PasteGuard";
 
 const kb = (n: number) => (n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
 const BARS = 36;
@@ -48,8 +49,12 @@ export default function Composer({ id, name, members, suggestions, onCall, onDes
   const [multi, setMulti] = useState(false);
   const grow = () => { const t = input.current; if (!t) return; if (!t.value) setMulti(false); t.style.height = "auto"; if (t.value && t.scrollHeight > 48) setMulti(true); t.style.height = `${Math.min(160, t.scrollHeight)}px`; };
   useEffect(() => { requestAnimationFrame(grow); }, [multi]); // eslint-disable-line react-hooks/exhaustive-deps
-  const send = (v = text) => {
+  // Paste protection: keys, passwords, recovery phrases and private keys never leave in a message.
+  const textRef = useRef(text); textRef.current = text;
+  const guard = usePasteGuard(() => textRef.current, (v) => { setText(v); requestAnimationFrame(grow); });
+  const send = async (v = text) => {
     if ((!v.trim() && !file) || file?.uploading) return;
+    if (v.trim() && !(await guard.check(v))) return;
     const sent = file ? { name: file.name, size: file.size, ...(file.id ? { id: file.id, mime: file.mime, kind: file.kind } : {}) } : null;
     sendTo(id, v, { ...(sent ? { file: sent } : {}), ...(reply ? { reply } : {}) }); setText(""); setFile(null); onClearReply?.(); requestAnimationFrame(grow); input.current?.focus();
   };
@@ -91,9 +96,10 @@ export default function Composer({ id, name, members, suggestions, onCall, onDes
       <div className="mx-auto max-w-[820px] px-3 pb-2.5 pt-3 sm:px-5">
         {suggestions.length > 0 && rec === null && (
           <div className="no-bar -mx-1 mb-2.5 flex gap-2 overflow-x-auto px-1 [mask-image:linear-gradient(to_right,black_88%,transparent)]">
-            {suggestions.map((c) => <button key={c} onClick={() => send(c)} className="shrink-0 rounded-full bg-tint px-3.5 py-2 text-[13px] font-semibold text-ink/80 transition hover:bg-grape hover:text-white">{c}</button>)}
+            {suggestions.map((c) => <button key={c} onClick={() => void send(c)} className="shrink-0 rounded-full bg-tint px-3.5 py-2 text-[13px] font-semibold text-ink/80 transition hover:bg-grape hover:text-white">{c}</button>)}
           </div>
         )}
+        {rec === null && guard.panel}
         {matches.length > 0 && rec === null && (
           <div data-mention-picker role="listbox" aria-label="Mention an agent" className="mb-2 overflow-hidden rounded-[18px] bg-card p-1 shadow-lg ring-1 ring-line">
             {matches.map((m, i) => (
@@ -124,11 +130,11 @@ export default function Composer({ id, name, members, suggestions, onCall, onDes
             </div>
           )}
           {rec === null ? (
-            <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex flex-wrap items-end gap-1 p-1.5">
+            <form onSubmit={(e) => { e.preventDefault(); void send(); }} className="flex flex-wrap items-end gap-1 p-1.5">
               <input ref={picker} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) attach(f); e.target.value = ""; }} />
               <button type="button" onClick={onDesktop} data-tour="desktop-btn" aria-pressed={desktopOpen} aria-label={`Open ${name}'s desktop`} title="Desktop" className={desktopOpen ? "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-grape text-white transition" : iconBtn}><Icon name="monitor" size={19} /></button>
               <button type="button" onClick={() => picker.current?.click()} aria-label="Attach a file" title="Attach a file" className={iconBtn}><Icon name="clip" size={19} /></button>
-              <textarea ref={input} value={text} rows={1} onChange={(e) => { setText(e.target.value.slice(0, 2000)); setCaret(e.target.selectionStart ?? e.target.value.length); grow(); }} onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)} onKeyDown={(e) => { if (matches.length && (e.key === "Enter" || e.key === "Tab") && !e.shiftKey) { e.preventDefault(); pickMention(matches[0]); } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } else if (e.key === "Escape" && reply) onClearReply?.(); }} placeholder={`Message ${name}`} aria-label={`Message ${name}`} className={`${multi ? "order-first basis-full px-3" : "flex-1 px-1.5"} max-h-40 min-h-[40px] min-w-0 resize-none bg-transparent py-2 text-[16px] leading-6 text-ink outline-none placeholder:text-ink/45`} />
+              <textarea ref={input} value={text} rows={1} onPaste={guard.onPaste} onChange={(e) => { setText(e.target.value.slice(0, 2000)); setCaret(e.target.selectionStart ?? e.target.value.length); grow(); }} onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)} onKeyDown={(e) => { if (matches.length && (e.key === "Enter" || e.key === "Tab") && !e.shiftKey) { e.preventDefault(); pickMention(matches[0]); } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } else if (e.key === "Escape" && reply) onClearReply?.(); }} placeholder={`Message ${name}`} aria-label={`Message ${name}`} className={`${multi ? "order-first basis-full px-3" : "flex-1 px-1.5"} max-h-40 min-h-[40px] min-w-0 resize-none bg-transparent py-2 text-[16px] leading-6 text-ink outline-none placeholder:text-ink/45`} />
               <button type="button" onClick={() => void startVoice()} aria-label="Record a voice message" title="Voice message" className={`${iconBtn} ${multi ? "ml-auto" : ""}`}><Icon name="mic" size={19} /></button>
               <button type="button" onClick={onCall} aria-label={`Call ${name}`} title="Voice call" className={iconBtn}><Icon name="call" size={18} /></button>
               <button disabled={!ready} aria-label="Send" className="grid h-10 w-10 max-[430px]:h-9 max-[430px]:w-9 shrink-0 place-items-center rounded-full bg-grape text-white transition hover:bg-grape-deep disabled:bg-ink/15 disabled:text-ink/40"><Icon name="send" size={18} stroke={2.4} /></button>

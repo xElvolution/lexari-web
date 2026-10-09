@@ -39,6 +39,8 @@ export type Msg = {
   action?: import("@/content/integrations").ActionCard; // something an agent prepared with an integration; only you can confirm it
   markets?: import("@/content/integrations").MarketsCard; // live prediction markets an agent pulled in
   email?: import("@/content/email").EmailCard; // an email an agent wrote; only you can send it
+  secret?: import("@/content/secrets").SecretCard; // a credential an agent asked for: a secure card, the value goes straight to the vault
+  takeover?: import("@/content/secrets").TakeoverCard; // the agent asks you to take over its desktop (to sign in yourself)
 };
 export type TxKind = "send" | "fund" | "return" | "hire" | "plan" | "card" | "mint" | "incoming" | "pay" | "topup";
 export type TxStatus = "pending" | "confirmed" | "failed" | "cancelled";
@@ -691,6 +693,8 @@ async function oneReplyRun(convo: string, userMsg: Msg, speaker: string, follow:
         if (res.status === 401) { void hydrate(); return fail("You're signed out. Sign in again."); }
         error = typeof data.error === "string" ? data.error : "The agent could not answer.";
         if ((res.status === 402 || res.status === 409) && data.billing) void import("./billing").then((b) => b.billingBlocked({ ...data.billing, convo, agent: speaker }));
+        // The server refused a message that carries a secret: take it off this screen too.
+        if (res.status === 422 && data.secret) { setMsg(convo, userMsg.id, "[removed: it looked like a password, key or recovery phrase]"); return fail(error); }
         if (res.status === 429 || res.status === 402 || res.status === 403 || res.status === 400 || res.status === 409) return fail(error);
       } else {
         const reader = res.body.getReader();
@@ -706,12 +710,14 @@ async function oneReplyRun(convo: string, userMsg: Msg, speaker: string, follow:
             const trimmed = line.trim();
             if (computerEvent(convo, bubble, trimmed)) { typingWho.set(convo, speaker); continue; }
             if (!trimmed.startsWith("data:")) continue;
-            let payload: { token?: string; replace?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"]; files?: Msg["files"]; action?: Msg["action"]; markets?: Msg["markets"]; email?: Msg["email"] } = {};
+            let payload: { token?: string; replace?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"]; files?: Msg["files"]; action?: Msg["action"]; markets?: Msg["markets"]; email?: Msg["email"]; secret?: Msg["secret"]; takeover?: Msg["takeover"] } = {};
             try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
             if (payload.error) { error = payload.error; break read; }
             if (payload.send) { const sd = payload.send; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, send: sd } : mm)) } })); }
             if (payload.action) { const ac = payload.action; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, action: ac } : mm)) } })); }
             if (payload.email) { const em = payload.email; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, email: em } : mm)) } })); }
+            if (payload.secret) { const sc = payload.secret; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, secret: sc } : mm)) } })); }
+            if (payload.takeover) { const tk = payload.takeover; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, takeover: tk } : mm)) } })); }
             if (payload.markets) { const mk = payload.markets; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, markets: mk } : mm)) } })); }
             if (payload.files?.length) { const fl = payload.files; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, files: fl } : mm)) } })); }
             if (typeof payload.replace === "string") { full = payload.replace; if (full.trim()) setMood(speaker, "speaking"); setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
@@ -730,7 +736,7 @@ async function oneReplyRun(convo: string, userMsg: Msg, speaker: string, follow:
       error = "Could not reach the agent.";
     }
     const cur = (get().threads[convo] || []).find((m) => m.id === bubble);
-    if (!error && (full.trim() || cur?.send || cur?.action || cur?.markets || cur?.email)) return { bubble, text: cur?.text || full };
+    if (!error && (full.trim() || cur?.send || cur?.action || cur?.markets || cur?.email || cur?.secret)) return { bubble, text: cur?.text || full };
     if (!error) error = "The agent sent an empty reply.";
     // Retry only when nothing reached the screen yet and the failure looks temporary.
     if (attempt === 0 && !full.trim() && TRANSIENT.test(error)) { await new Promise((r) => setTimeout(r, 1500)); continue; }
