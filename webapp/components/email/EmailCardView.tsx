@@ -70,7 +70,7 @@ export function EmailCardView({ convo, m }: { convo: string; m: Msg & { email: E
             <button data-email-send onClick={() => void run("send")} disabled={!!busy || !text.trim()} className="btn btn-brand btn-sm !h-10 flex-1 gap-1.5 disabled:opacity-60">{busy === "send" ? "Sending…" : <><Icon name="send" size={15} />Send</>}</button>
           </div>
         )}
-        {e.status === "sent" && <p data-email-sent className="pop mt-2.5 flex items-center gap-2 rounded-xl bg-[#e7f8ee] px-3 py-2.5 text-[13px] font-bold text-[#137a3d]"><Icon name="check" size={15} stroke={2.6} />{e.mock ? "Recorded as sent (test mode)" : "Sent"}{e.sentAt ? <span className="ml-auto text-[11.5px] font-semibold">{new Date(e.sentAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span> : null}</p>}
+        {e.status === "sent" && <p data-email-sent className="pop mt-2.5 flex items-center gap-2 rounded-xl bg-[#e7f8ee] px-3 py-2.5 text-[13px] font-bold text-[#137a3d]"><Icon name="check" size={15} stroke={2.6} />{e.mock ? "Sent · test mode" : "Sent"}{e.sentAt ? <span className="ml-auto text-[11.5px] font-semibold">{new Date(e.sentAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span> : null}</p>}
         {e.status === "failed" && <p role="alert" className="mt-2.5 rounded-xl bg-[#fdecec] px-3 py-2.5 text-[12.5px] font-semibold text-[#c4292f]">{e.error || "It didn't send. Nothing went out."}</p>}
         {e.status === "cancelled" && <p className="mt-2.5 text-[12.5px] font-semibold text-ink/55">Cancelled. Nothing was sent.</p>}
         {err && <p role="alert" className="mt-2 text-[12.5px] text-[#e5484d]">{err}</p>}

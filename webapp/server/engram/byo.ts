@@ -13,7 +13,7 @@ import type { ByoProvider } from "@/content/models";
 import { ModelError, type ChatMessage } from "./cortex";
 import type { Usage } from "./gateway";
 
-export type ByoTarget = { provider: ByoProvider; model: string; key: string; baseUrl?: string | null; label: string };
+export type ByoTarget = { provider: ByoProvider; model: string; key: string; baseUrl?: string | null; label: string; /** who to name in errors (the provider, or your name for a custom API) */ who?: string };
 
 const BASES: Record<Exclude<ByoProvider, "custom" | "anthropic" | "gemini">, string> = {
   openai: "https://api.openai.com/v1",
@@ -134,12 +134,13 @@ export function buildRequest(t: ByoTarget, messages: ChatMessage[], maxTokens: n
 }
 
 function friendlyStatus(t: ByoTarget, status: number, detail: string) {
-  if (status === 401 || status === 403) return `${t.label} rejected your API key. Check it in Settings > Models.`;
-  if (status === 404) return `${t.label} couldn't find the model "${t.model}". Check the model id in Settings > Models.`;
-  if (status === 429) return `${t.label} says you're over your rate limit or quota on your key. Try again in a minute.`;
-  if (status === 400 && /model/i.test(detail)) return `${t.label} didn't accept the model "${t.model}". Check the model id.`;
-  if (status === 402) return `Your ${t.label} account is out of credit.`;
-  return `${t.label} couldn't answer (error ${status}). Try again.`;
+  const who = t.who || t.label;
+  if (status === 401 || status === 403) return `${who} rejected your API key. Check it in Settings > Models.`;
+  if (status === 404) return `${who} couldn't find the model "${t.model}". Check the model id in Settings > Models.`;
+  if (status === 429) return `${who} says you're over your rate limit or quota on your key. Try again in a minute.`;
+  if (status === 400 && /model/i.test(detail)) return `${who} didn't accept the model "${t.model}". Check the model id.`;
+  if (status === 402) return `Your ${who} account is out of credit.`;
+  return `${who} couldn't answer (error ${status}). Try again.`;
 }
 
 /** Streams one reply from a model on the person's own key. Calls onUsage once at the end (cost 0 to Lexari). */

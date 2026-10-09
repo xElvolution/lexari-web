@@ -3,7 +3,7 @@
  * model answers a turn (chat pick, else the agent's, else the account default, else Lamina).
  */
 import { and, asc, eq } from "drizzle-orm";
-import { LAMINA, customInfo, isByoId, modelById, type ByoProvider, type CustomModel, type ModelInfo } from "@/content/models";
+import { LAMINA, byoProvider, customInfo, isByoId, modelById, type ByoProvider, type CustomModel, type ModelInfo } from "@/content/models";
 import { db } from "./db";
 import { userModels } from "./db/modelsSchema";
 import { agents, chats, users } from "./db/schema";
@@ -25,7 +25,7 @@ export async function listCustom(userId: string) {
   return rows.map(toCustom);
 }
 
-const target = (r: Row, userId: string): ByoTarget => ({ provider: r.provider as ByoProvider, model: r.model, key: open(r.keyEnc, `model:${userId}`), baseUrl: r.baseUrl, label: r.label || r.model });
+const target = (r: Row, userId: string): ByoTarget => ({ provider: r.provider as ByoProvider, model: r.model, key: open(r.keyEnc, `model:${userId}`), baseUrl: r.baseUrl, label: r.label || r.model, who: r.provider === "custom" ? r.label || r.model : byoProvider(r.provider)?.name });
 
 export async function addCustom(userId: string, input: { provider: ByoProvider; model: string; key: string; label?: string; baseUrl?: string | null }) {
   if (!secretBoxReady()) throw new HttpError(503, "Adding your own models isn't switched on on this server yet.");

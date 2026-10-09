@@ -160,8 +160,12 @@ export function emailRequest(s: string) {
 
 async function fromLabel(userId: string, b: Box, agentLabel: string) {
   if (b.senderMode !== "user") return agentLabel;
-  const [u] = await db().select({ profile: users.profile }).from(users).where(eq(users.id, userId)).limit(1);
-  const you = String((u?.profile as { name?: string })?.name || "").trim();
+  // Your profile name, else what your agent calls you, else your email's name part.
+  const [[u], [home]] = await Promise.all([
+    db().select({ profile: users.profile, email: users.email }).from(users).where(eq(users.id, userId)).limit(1),
+    db().select({ meta: agents.meta }).from(agents).where(and(eq(agents.userId, userId), eq(agents.slug, "home"))).limit(1),
+  ]);
+  const you = String((u?.profile as { name?: string })?.name || (home?.meta as { you?: string })?.you || (u?.email ? u.email.split("@")[0] : "")).trim();
   return `${you || agentLabel} via Lexari`;
 }
 const fromHeader = (label: string, address: string) => `${label.replace(/["<>\r\n]/g, "").slice(0, 60)} <${address}>`;
