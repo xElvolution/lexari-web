@@ -23,6 +23,7 @@ import TasksSheetHost from "./tasks/TasksSheet";
 import BalancePaySheet from "./billing/BalancePaySheet";
 import Celebrate from "./Celebrate";
 import AppLock from "./lock/AppLock";
+import StepUpSheet from "./security/StepUpSheet";
 import MemoryChain from "./MemoryChain";
 import NotifyBell from "./NotifyBell";
 
@@ -218,6 +219,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <TasksSheetHost />
       <Celebrate />
       <AppLock />
+      <StepUpSheet />
       {s.tour?.on && <Tour s={s} />}
       <MemoryChain />
       <Toaster />

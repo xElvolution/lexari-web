@@ -7,6 +7,8 @@ import { refreshBilling, useBilling } from "@/lib/billing";
 import { moneyChanged } from "@/lib/money";
 import Icon from "../Icon";
 import { Sheet, Spinner, money } from "./parts";
+import { useMask } from "@/lib/privacy";
+import EyeToggle from "../security/EyeToggle";
 
 /** Confirms a purchase paid from your Lexari balance. Short? Top up first, then it finishes on its own. */
 export default function BalancePaySheet() {
@@ -26,6 +28,7 @@ function PaySheetBody() {
   const price = Math.round(usd * 1e6);
   const short = balance !== null && balance < price;
   const fired = useRef(false);
+  const mask = useMask();
 
   const toTopUp = (s: { needMicros: number; haveMicros: number; shortMicros: number }) => {
     const parked = parkPay();
@@ -73,8 +76,8 @@ function PaySheetBody() {
       )}
       <dl data-pay-summary className="space-y-2 rounded-[18px] bg-tint p-3.5 text-[14px]">
         <div className="flex justify-between gap-3"><dt className="text-ink/65">Price</dt><dd className="tab-num font-bold text-ink">{money(price, { cents: true })}</dd></div>
-        <div className="flex justify-between gap-3"><dt className="text-ink/65">Your balance</dt><dd data-pay-have className={`tab-num font-semibold ${short ? "text-[#c2410c]" : "text-ink"}`}>{balance === null ? "…" : money(balance, { cents: true })}</dd></div>
-        <div className="flex justify-between gap-3 border-t border-line pt-2"><dt className="text-ink/65">{short ? "You need" : "After this"}</dt><dd className="tab-num font-bold text-ink">{balance === null ? "…" : short ? `${money(price - balance, { cents: true })} more` : money(balance - price, { cents: true })}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="text-ink/65">Your balance</dt><dd data-pay-have className={`flex items-center gap-1.5 tab-num font-semibold ${short ? "text-[#c2410c]" : "text-ink"}`}>{balance === null ? "…" : mask(money(balance, { cents: true }))}<EyeToggle size={22} /></dd></div>
+        <div className="flex justify-between gap-3 border-t border-line pt-2"><dt className="text-ink/65">{short ? "You need" : "After this"}</dt><dd className="tab-num font-bold text-ink">{balance === null ? "…" : short ? `${mask(money(price - balance, { cents: true }))} more` : mask(money(balance - price, { cents: true }))}</dd></div>
       </dl>
       {req.note && <p className="mt-3 flex gap-2 text-[12.5px] leading-snug text-ink/65"><Icon name="info" size={14} className="mt-0.5 shrink-0 text-brand-ink" />{req.note}</p>}
       {err && <p role="alert" className="mt-3 text-[13px] text-[#e5484d]">{err}</p>}

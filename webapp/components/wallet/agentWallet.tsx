@@ -122,7 +122,7 @@ export function AgentWalletCard({ a, name, look, funding, fundings = [], compact
               ))}
           </div>
           {last && <a data-last-funding href={last.sig ? txUrl(last.sig) : undefined} target="_blank" rel="noreferrer" className="mt-2 block truncate text-[12px] text-ink/55 hover:text-brand-ink">
-            {last.direction === "in" ? (last.status === "sent" ? `Funded $${(last.amount / 1e6).toFixed(2)}` : last.status === "refunded" ? `Funding of $${(last.amount / 1e6).toFixed(2)} failed and was refunded` : `Funding $${(last.amount / 1e6).toFixed(2)}…`) : `$${(last.amount / 1e6).toFixed(2)} sent back to your balance`}
+            {(() => { const amt = hide ? MASK : `$${(last.amount / 1e6).toFixed(2)}`; return last.direction === "in" ? (last.status === "sent" ? `Funded ${amt}` : last.status === "refunded" ? `Funding of ${amt} failed and was refunded` : `Funding ${amt}…`) : `${amt} sent back to your balance`; })()}
             {" · "}{new Date(last.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}{last.sig ? " · receipt" : ""}
           </a>}
         </div>

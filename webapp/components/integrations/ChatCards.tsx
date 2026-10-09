@@ -10,6 +10,7 @@ import { set, useApp, type Msg } from "@/lib/store";
 import { nameOf } from "../agents";
 import Icon from "../Icon";
 import { IntegrationLogo } from "./Logos";
+import { PhraseBadge, usePhrase } from "../security/PhraseBadge";
 
 const short = (a: string) => `${a.slice(0, 5)}…${a.slice(-5)}`;
 const LIVE: ActionStatus[] = ["submitting", "submitted"];
@@ -37,6 +38,7 @@ export function ActionCardView({ convo, m }: { convo: string; m: Msg & { action:
   const st = useApp();
   const who = st ? nameOf(st, a.agent) : "Your agent";
   const info = integrationById(a.connector);
+  const phrase = usePhrase();
 
   const keep = (next: ActionCard) => {
     setA(next);
@@ -106,6 +108,7 @@ export function ActionCardView({ convo, m }: { convo: string; m: Msg & { action:
         {(a.status === "failed" || a.status === "rejected") && <p data-action-error role="alert" className="mt-3 rounded-xl bg-[#fdecec] px-3 py-2.5 text-[12.5px] font-semibold leading-snug text-[#c4292f]">{a.error || "That didn't go through. Nothing was sent."}{a.explorer && <> <a href={a.explorer} target="_blank" rel="noreferrer" className="underline">View</a></>}</p>}
         {a.status === "cancelled" && <p className="mt-3 text-[12.5px] font-semibold text-ink/55">Cancelled. Nothing was sent.</p>}
         {a.status === "expired" && <p className="mt-3 text-[12.5px] font-semibold text-ink/55">This expired before it was confirmed. Ask again for a fresh quote.</p>}
+        {a.status === "prepared" && <div className="mt-2"><PhraseBadge phrase={phrase} compact /></div>}
         {err && a.status === "prepared" && <p role="alert" className="mt-2 text-[12.5px] text-[#e5484d]">{err}</p>}
       </div>
     </div>

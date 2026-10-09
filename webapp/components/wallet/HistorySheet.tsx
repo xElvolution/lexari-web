@@ -5,6 +5,8 @@ import { openTopUp } from "@/lib/billing";
 import Icon from "../Icon";
 import { money } from "../billing/parts";
 import type { HistoryRow } from "./agentWallet";
+import { useMask } from "@/lib/privacy";
+import EyeToggle from "../security/EyeToggle";
 
 const ICON: Record<string, string> = { topup_card: "plus", topup_crypto: "plus", dev_grant: "plus", refund: "check", fund_refund: "check", fund_return: "check", hire: "user", card: "file", fund: "wallet", plan: "star", usage: "spark" };
 const MONEY_IN = new Set(["topup_card", "topup_crypto", "dev_grant", "refund", "fund_refund", "fund_return"]);
@@ -19,12 +21,13 @@ const sub = (r: HistoryRow) => {
 };
 
 export function HistoryItem({ r, i = 0 }: { r: HistoryRow; i?: number }) {
+  const mask = useMask();
   const up = r.delta > 0 || MONEY_IN.has(r.kind) && r.delta >= 0;
   return (
     <li data-history={r.kind} className="row-in flex items-center gap-3 py-3" style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}>
       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${up ? "bg-[#e7f8ee] text-[#137a3d]" : r.kind === "plan" ? "bg-grape/15 text-brand-ink" : "bg-tint text-ink/70"}`}><Icon name={(ICON[r.kind] || "wallet") as never} size={16} /></span>
       <span className="min-w-0 flex-1"><span className="block truncate text-[14.5px] font-semibold text-ink">{r.label}</span><span className="block truncate text-[12px] text-ink/50">{sub(r)}</span></span>
-      <span className={`tab-num shrink-0 text-[14.5px] font-bold ${up ? "text-[#137a3d]" : "text-ink"}`}>{r.delta === 0 ? (r.paid ? money(r.paid, { cents: true }) : "") : `${r.delta > 0 ? "+" : "\u2212"}${money(Math.abs(r.delta), { cents: true })}`}</span>
+      <span className={`tab-num shrink-0 text-[14.5px] font-bold ${up ? "text-[#137a3d]" : "text-ink"}`}>{r.delta === 0 ? (r.paid ? mask(money(r.paid, { cents: true })) : "") : mask(`${r.delta > 0 ? "+" : "\u2212"}${money(Math.abs(r.delta), { cents: true })}`)}</span>
     </li>
   );
 }
@@ -58,6 +61,7 @@ export default function HistorySheet({ rows, loading, onClose }: { rows: History
   const added = rows.reduce((n, r) => n + (r.delta > 0 ? r.delta : 0), 0);
   const spent = rows.reduce((n, r) => n + (r.delta < 0 ? -r.delta : 0), 0);
   let idx = 0;
+  const mask = useMask();
 
   return (
     <div data-history-overlay className="fixed inset-0 z-[96] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-5" style={{ opacity: drag ? Math.max(0.35, 1 - drag / 500) : undefined }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -72,12 +76,13 @@ export default function HistorySheet({ rows, loading, onClose }: { rows: History
               <h2 id="history-title" className="display text-[24px] leading-[1.05] text-ink">History</h2>
               <p className="mt-1 text-[13px] leading-snug text-ink/60">{rows.length ? `${rows.length} item${rows.length === 1 ? "" : "s"} on your Lexari balance` : "Everything your balance does shows here."}</p>
             </div>
+            <span onPointerDown={(e) => e.stopPropagation()} className="mt-1.5"><EyeToggle size={30} /></span>
             <button onPointerDown={(e) => e.stopPropagation()} onClick={onClose} aria-label="Close" data-history-close className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink/70 hover:bg-tint"><Icon name="x" size={19} /></button>
           </div>
           {rows.length > 0 && (
             <div className="grid grid-cols-2 gap-2 px-5 pb-3 sm:px-6">
-              <div className="min-w-0 rounded-2xl bg-[#e7f8ee] px-3.5 py-2.5 text-[#137a3d]"><div className="text-[11.5px] font-semibold opacity-80">Added</div><div className="tab-num truncate text-[16px] font-bold">+{money(added, { cents: true })}</div></div>
-              <div className="min-w-0 rounded-2xl bg-tint px-3.5 py-2.5 text-ink"><div className="text-[11.5px] font-semibold text-ink/60">Spent</div><div className="tab-num truncate text-[16px] font-bold">{"\u2212"}{money(spent, { cents: true })}</div></div>
+              <div className="min-w-0 rounded-2xl bg-[#e7f8ee] px-3.5 py-2.5 text-[#137a3d]"><div className="text-[11.5px] font-semibold opacity-80">Added</div><div className="tab-num truncate text-[16px] font-bold">{mask(`+${money(added, { cents: true })}`)}</div></div>
+              <div className="min-w-0 rounded-2xl bg-tint px-3.5 py-2.5 text-ink"><div className="text-[11.5px] font-semibold text-ink/60">Spent</div><div className="tab-num truncate text-[16px] font-bold">{mask(`\u2212${money(spent, { cents: true })}`)}</div></div>
             </div>
           )}
         </div>

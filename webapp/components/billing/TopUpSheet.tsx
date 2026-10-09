@@ -11,6 +11,7 @@ import Icon from "../Icon";
 import { CardGlyph, Sheet, Spinner, UsdcGlyph, money } from "./parts";
 import { CoinGlyph, CoinPicker, CoinTileLabel, DepositPay, TokenPay, isWalletRail } from "./CoinPay";
 import { railById } from "@/content/topup";
+import { useMask } from "@/lib/privacy";
 
 type Rail = "card" | "crypto";
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
@@ -19,6 +20,7 @@ const SOL_FOR_FEES = 3_000_000;
 
 /** Top up: add dollars to your Lexari balance, by card or with USDC on Solana. Plans are then paid from the balance. */
 export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
+  const mask = useMask();
   const { state } = useBilling();
   const need = intent.need;
   // Packs that cover a shortfall; when none does (a yearly plan), the shortfall itself in whole dollars.
@@ -49,7 +51,7 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
       {need && (
         <div data-shortfall className="mb-3 rounded-[18px] bg-[#fff4d6] p-3.5 text-[13.5px] leading-snug text-[#5c4300] ring-1 ring-[#f5d27a]">
           <div className="font-bold">{need.what} costs {money(need.needMicros, { cents: true })}</div>
-          <div className="mt-0.5">Your balance is {money(need.haveMicros, { cents: true })}. Add at least <b>{money(need.shortMicros, { cents: true })}</b> to continue.</div>
+          <div className="mt-0.5">Your balance is {mask(money(need.haveMicros, { cents: true }))}. Add at least <b>{money(need.shortMicros, { cents: true })}</b> to continue.</div>
         </div>
       )}
       <div className={`grid gap-2 ${amounts.length === 1 ? "grid-cols-1" : "grid-cols-3"}`} role="radiogroup" aria-label="Amount">

@@ -8,7 +8,7 @@ import { ago } from "./ui";
 import { enablePush, markRead, pushOnHere, pushPermission, startNotices, useNotices, type Notice } from "@/lib/notifications";
 import { toast } from "@/lib/store";
 
-const KIND_ICON: Record<string, Parameters<typeof Icon>[0]["name"]> = { quest: "star", box: "box", hire: "team", payment: "check", card: "wallet", reply: "chat", faucet: "wallet" };
+const KIND_ICON: Record<string, Parameters<typeof Icon>[0]["name"]> = { quest: "star", box: "box", hire: "team", payment: "check", card: "wallet", reply: "chat", faucet: "wallet", security: "lock" };
 
 /** Header bell with an unread badge, and the notification center that drops down from it. */
 export default function NotifyBell({ className = "" }: { className?: string }) {

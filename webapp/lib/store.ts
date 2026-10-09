@@ -5,6 +5,7 @@
  * This module loads it once from /api/me, keeps it in memory for the UI, and sends every change
  * to the API. Memories are encrypted in the browser (lib/vault.ts) before they leave it.
  */
+import { applyServerHide } from "./privacy";
 import { cheer, isWarm, isWarmReaction, setMood } from "./mood";
 import type { FaceLook } from "@shared/components/avatar";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -33,7 +34,7 @@ export type Msg = {
   call?: number; // a call log line, length in seconds
   re?: Record<string, string[]>; // reactions: emoji → who reacted ("you" or an agent id)
   reply?: { id: string; from: string; text: string }; // the message this one answers
-  send?: { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; error?: string; kind?: "fund"; agent?: string; reason?: string; usd?: number; returned?: { sig: string; sol: number; usd?: number } }; // a SOL transfer the agent prepared; only you can confirm it
+  send?: { to: string; sol: number; status: "pending" | "sent" | "cancelled" | "failed"; sig?: string; error?: string; kind?: "fund"; agent?: string; reason?: string; usd?: number; firstTime?: boolean; valueUsd?: number; stepup?: boolean; returned?: { sig: string; sol: number; usd?: number } }; // a SOL transfer the agent prepared; only you can confirm it
   tx?: TxReceipt; // a receipt row: what happened to a Confirm card (or SOL that arrived)
   about?: string; // an agent's follow-up on a receipt (its id)
   action?: import("@/content/integrations").ActionCard; // something an agent prepared with an integration; only you can confirm it
@@ -190,7 +191,8 @@ function jobFrom(j: Account["jobs"][number], i: number): Job {
 
 function fromAccount(acc: Account): State {
   const home = acc.agents.find((a) => a.slug === "home");
-  const prefsRaw = acc.prefs as Partial<Prefs> & { tourDone?: boolean };
+  const prefsRaw = acc.prefs as Partial<Prefs> & { tourDone?: boolean; hideBalance?: boolean };
+  applyServerHide(prefsRaw.hideBalance);
   const prefs: Prefs = { ...DEFAULT_PREFS, ...prefsRaw, demoLabels: false, notif: { ...DEFAULT_PREFS.notif, ...(prefsRaw.notif || {}) } };
   const label = acc.user.email || shortAddr(acc.user.wallet);
   const auth: Auth = acc.user.method === "google"

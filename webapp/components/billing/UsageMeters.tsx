@@ -2,9 +2,12 @@
 
 import type { BillingState } from "@/lib/billing";
 import { LaminaMark, Meter, dateShort, money, pct, timeShort } from "./parts";
+import { useMask } from "@/lib/privacy";
+import EyeToggle from "../security/EyeToggle";
 
 /** Lamina as a percentage on every plan (Free: today's allowance), premium in dollars on paid plans. */
 export default function UsageMeters({ s, compact = false }: { s: BillingState; compact?: boolean }) {
+  const mask = useMask();
   const u = s.usage;
   const paid = s.plan.id !== "free";
   return (
@@ -27,8 +30,8 @@ export default function UsageMeters({ s, compact = false }: { s: BillingState; c
       )}
       {(s.credits.balance > 0 || !compact) && (
         <div className="flex items-center justify-between gap-3 text-[14px]">
-          <span className="font-semibold text-ink">Extra credits</span>
-          <span className="font-bold tabular-nums text-ink">{money(s.credits.balance, { cents: true })}{s.credits.spent > 0 && <span className="ml-1.5 font-semibold text-ink/50">{money(s.credits.spent, { cents: true })} used this {paid ? "cycle" : "month"}</span>}</span>
+          <span className="flex items-center gap-2 font-semibold text-ink">Extra credits<EyeToggle size={24} /></span>
+          <span data-credits-balance className="font-bold tabular-nums text-ink">{mask(money(s.credits.balance, { cents: true }))}{s.credits.spent > 0 && <span className="ml-1.5 font-semibold text-ink/50">{mask(money(s.credits.spent, { cents: true }))} used this {paid ? "cycle" : "month"}</span>}</span>
         </div>
       )}
     </div>

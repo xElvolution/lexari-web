@@ -7,9 +7,11 @@ import { closeBillingSheet, setSpend, useBilling } from "@/lib/billing";
 import { toast } from "@/lib/store";
 import Icon from "../Icon";
 import { Sheet, money } from "./parts";
+import { useMask } from "@/lib/privacy";
 
 /** Monthly spend limit on extra credits: Disabled, Fixed or Unlimited (the same three states Cursor uses). */
 export default function SpendSheet() {
+  const mask = useMask();
   const { state } = useBilling();
   const [mode, setMode] = useState<SpendMode>(state?.spend.mode ?? "fixed");
   const start = state ? Math.round(state.spend.limit / MICROS) : DEFAULT_SPEND_LIMIT_USD;
@@ -46,7 +48,7 @@ export default function SpendSheet() {
             <button onClick={() => setCustom(true)} aria-pressed={custom} className={`h-10 rounded-full px-4 text-[14px] font-bold transition ${custom ? "bg-ink text-[var(--bg)]" : "bg-tint text-ink hover:bg-grape hover:text-white"}`}>Custom</button>
           </div>
           {custom && <label className="mt-3 flex items-center gap-2"><span className="text-[15px] font-bold text-ink">$</span><input type="number" inputMode="numeric" min={1} max={10000} value={Number.isFinite(limit) ? limit : ""} onChange={(e) => setLimit(Math.max(0, Math.min(10_000, Math.round(Number(e.target.value)))))} aria-label="Custom limit in dollars" className="field !w-32 !py-2" /></label>}
-          {state && <p className="mt-3 text-[12.5px] text-ink/55">{money(state.credits.spent, { cents: true })} of credits used this cycle. Balance {money(state.credits.balance, { cents: true })}.</p>}
+          {state && <p className="mt-3 text-[12.5px] text-ink/55">{mask(money(state.credits.spent, { cents: true }))} of credits used this cycle. Balance {mask(money(state.credits.balance, { cents: true }))}.</p>}
         </div>
       )}
     </Sheet>

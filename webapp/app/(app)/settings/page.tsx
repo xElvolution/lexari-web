@@ -16,6 +16,7 @@ import { myAgents } from "@/components/agents";
 import { openAdd, openAgent } from "@/components/overlays";
 import BillingSection from "@/components/billing/BillingSection";
 import LockSettings from "@/components/lock/LockSettings";
+import SecurityCenter from "@/components/security/SecurityCenter";
 import SocialLinks from "@/components/social/SocialLinks";
 import IntegrationsSection from "@/components/integrations/IntegrationsSection";
 import ModelsSection from "@/components/models/ModelsSection";
@@ -244,9 +245,10 @@ function Security({ s }: { s: State }) {
     <>
       <Group title="Sign-in protection">
         <Row title={google ? "Google or email" : "Wallet signature"} desc={google ? "Privy checks your Google account or a one-time email code. Your Lexari wallet is created and kept by Privy." : "You sign a one-time message with your wallet. Lexari never sees your keys."} />
-        <Row title="Session" desc="Sessions last up to 30 days on this device. Signing out ends it here and in your wallet." />
+        <Row title="Session" desc="Sessions last up to 30 days on a device. See every device below and sign out the ones you don't know." />
       </Group>
       <Group title="App lock"><LockSettings /></Group>
+      <SecurityCenter />
       <Group title="This device">
         <Row title="Sign out" desc="Ends this session."><button onClick={() => { void signOut().then(() => router.push("/signin")); }} className={smallBtn}><Icon name="out" size={15} />Sign out</button></Row>
       </Group>

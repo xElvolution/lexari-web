@@ -5,8 +5,18 @@ export class ApiError extends Error {
   constructor(public status: number, message: string, public data?: unknown) { super(message); }
 }
 
+/**
+ * Settings > Security step-up: a high-risk action answers 401 { stepup }. The confirm sheet (components/security/
+ * StepUpSheet) registers here; api() opens it, and when you confirm (PIN or wallet) the same request runs once more.
+ */
+type StepUpHandler = (what: string) => Promise<boolean>;
+let stepUpHandler: StepUpHandler | null = null;
+export function setStepUpHandler(h: StepUpHandler | null) { stepUpHandler = h; }
+/** Ask for a fresh confirm before something sensitive that happens in the browser (a wallet send). */
+export async function confirmItsYou(what: string) { return stepUpHandler ? stepUpHandler(what) : true; }
+
 /** JSON call to the app's own API. Throws ApiError with a message you can show. */
-export async function api<T = unknown>(path: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+export async function api<T = unknown>(path: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}, retried = false): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
@@ -21,6 +31,11 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
     throw new ApiError(0, "Could not reach Lexari. Check your connection.");
   }
   const data = await res.json().catch(() => ({}));
+  const step = res.status === 401 ? (data as { stepup?: { what?: string } }).stepup : undefined;
+  if (step && !retried && stepUpHandler) {
+    if (await stepUpHandler(step.what || "continue")) return api<T>(path, init, true);
+    throw new ApiError(401, "You didn't confirm, so nothing changed.", data);
+  }
   if (!res.ok) throw new ApiError(res.status, typeof (data as { error?: unknown }).error === "string" ? (data as { error: string }).error : "Something went wrong. Try again.", data);
   return data as T;
 }

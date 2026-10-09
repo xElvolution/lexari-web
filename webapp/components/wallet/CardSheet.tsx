@@ -11,6 +11,7 @@ import PinPad from "../lock/PinPad";
 import CardVisual from "./CardVisual";
 import { CARD_LIMITS } from "./cards";
 import { updateCard } from "./useCards";
+import { useMask } from "@/lib/privacy";
 
 const HIDE_AFTER = 30;
 const b64 = (u: Uint8Array) => { let s = ""; u.forEach((x) => { s += String.fromCharCode(x); }); return btoa(s); };
@@ -25,6 +26,7 @@ export default function CardSheet({ agent, name, card, onClose }: { agent: strin
   const [confirm, setConfirm] = useState(false); // no PIN set: an explicit Confirm step, then a wallet signature
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const mask = useMask();
   const shown = full ? { ...card, ...full, frozen: card.frozen, limit: card.limit, spent: card.spent } : card;
   useEffect(() => { if (!full) return; setLeft(HIDE_AFTER); const t = setInterval(() => setLeft((x) => { if (x <= 1) { setFull(null); return 0; } return x - 1; }), 1000); return () => clearInterval(t); }, [full]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
@@ -86,7 +88,7 @@ export default function CardSheet({ agent, name, card, onClose }: { agent: strin
             </>
           )}
           <div className="mt-4 rounded-2xl bg-tint p-4">
-            <div className="flex items-baseline justify-between text-[13.5px]"><span className="text-ink/65">Spent this month</span><span className="tab-num font-mono font-semibold text-ink">${card.spent} / ${card.limit}</span></div>
+            <div className="flex items-baseline justify-between text-[13.5px]"><span className="text-ink/65">Spent this month</span><span className="tab-num font-mono font-semibold text-ink">{mask(`$${card.spent}`)} / ${card.limit}</span></div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink/10"><div className="h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></div>
           </div>
           <div className="mt-3 divide-y divide-[var(--line)] rounded-2xl px-4 ring-1 ring-line">
@@ -104,7 +106,7 @@ export default function CardSheet({ agent, name, card, onClose }: { agent: strin
                 <span className="tab-num shrink-0 font-mono text-[13px] font-semibold text-ink">{card.amount ? (fromBalance ? `−$${(card.amount / 1e6).toFixed(2)}` : `−${(card.amount / 1e9).toLocaleString(undefined, { maximumFractionDigits: 4 })} SOL`) : ""}</span>
               </li>
             </ul>
-            <p className="mt-2 text-[12.5px] text-ink/55">{card.spent ? `$${card.spent} spent this month.` : `No purchases yet. When ${name} buys a tool or compute, it shows here.`}</p>
+            <p className="mt-2 text-[12.5px] text-ink/55">{card.spent ? `${mask(`$${card.spent}`)} spent this month.` : `No purchases yet. When ${name} buys a tool or compute, it shows here.`}</p>
           </div>
         </>}
       </div>

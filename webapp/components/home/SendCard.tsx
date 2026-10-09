@@ -13,6 +13,8 @@ import { friendly } from "@/lib/api";
 import { shortOf, topUpFor } from "@/lib/balance";
 import { refreshBilling } from "@/lib/billing";
 import { returnToBalance } from "../wallet/agentWallet";
+import { confirmItsYou } from "@/lib/api";
+import { PhraseBadge, usePhrase } from "../security/PhraseBadge";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -105,7 +107,10 @@ function TransferCard({ convo, m }: { convo: string; m: Msg & { send: NonNullabl
     if (ack && r) void ackTx(convo, `tx-${m.id}`, m.from);
   };
   const confirm = async () => {
-    setErr(""); setBusy("sign");
+    setErr("");
+    // A first-time address or a large amount: confirm it's you (PIN or wallet) before your wallet signs.
+    if (sd.stepup && !(await confirmItsYou(sd.firstTime ? "send to a new address" : "send a large amount"))) { setErr("You didn't confirm. Nothing was sent."); return; }
+    setBusy("sign");
     let sent = "";
     try {
       const w = await payer();
@@ -132,6 +137,7 @@ function TransferCard({ convo, m }: { convo: string; m: Msg & { send: NonNullabl
     } finally { setBusy(""); }
   };
   const done = sd.status !== "pending";
+  const phrase = usePhrase();
   void get;
   const st = useApp();
   const fund = sd.kind === "fund";
@@ -155,7 +161,10 @@ function TransferCard({ convo, m }: { convo: string; m: Msg & { send: NonNullabl
         {fund && sd.reason && <div className="flex justify-between gap-3"><dt className="text-ink/60">For</dt><dd className="min-w-0 text-right text-ink">{sd.reason}</dd></div>}
         <div className="flex justify-between gap-3"><dt className="text-ink/60">To</dt><dd title={sd.to} className="font-mono text-ink">{fund ? <>{who}&apos;s wallet · {short(sd.to)}</> : short(sd.to)}</dd></div>
         <div className="flex justify-between gap-3"><dt className="text-ink/60">From</dt><dd className="text-ink">Your wallet</dd></div>
+        {!fund && sd.valueUsd ? <div className="flex justify-between gap-3"><dt className="text-ink/60">Value</dt><dd className="tab-num text-ink">≈ ${sd.valueUsd.toFixed(2)}</dd></div> : null}
       </dl>
+      {!fund && sd.firstTime && sd.status === "pending" && <p data-first-time className="mt-3 flex gap-2 rounded-xl bg-[#fff4d6] px-3 py-2 text-[12.5px] font-semibold leading-snug text-[#7a4b00]"><Icon name="info" size={14} className="mt-0.5 shrink-0" />You&apos;ve never sent to this address. Check every character. Agents can be tricked by web pages and emails.</p>}
+      {!done && <div className="mt-3"><PhraseBadge phrase={phrase} compact /></div>}
       {sd.status === "sent" && sd.sig && <a data-send-sig href={txUrl(sd.sig)} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 rounded-xl bg-[#e7f8ee] px-3 py-2 text-[13px] font-bold text-[#137a3d]"><Icon name="check" size={14} />Sent · {short(sd.sig)}<Icon name="arrow" size={13} className="ml-auto" /></a>}
       {fund && sd.status === "sent" && (sd.returned ? <p data-fund-returned className="mt-2 text-[12.5px] font-semibold text-ink/65">{sd.returned.sig ? <a href={txUrl(sd.returned.sig)} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">Leftover {sd.returned.sol.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")} SOL sent back to you (network fee 0.000005 SOL)</a> : "Nothing was left to send back."}</p>
         : <button data-fund-return onClick={() => void giveBack()} disabled={!!back} className="btn btn-line btn-sm !h-9 mt-2 w-full text-ink disabled:opacity-60">{back ? "Sending back…" : "Task done · return leftover"}</button>)}
