@@ -5,6 +5,7 @@ import { balanceView } from "@/server/billing/balance";
 import { CHAINS, FUND_AMOUNTS, MAX_FUND_USD, fundingHistory, fundingOn, walletsFor, type AgentWallet } from "@/server/agentWallets";
 import { cluster } from "@/server/config";
 import { withUser } from "@/server/route";
+import { checkRecentDeposits } from "@/server/topup/deposits";
 import { CARD_USD, HIRE_USD } from "@/lib/prices";
 
 export const runtime = "nodejs";
@@ -23,5 +24,6 @@ export const GET = withUser(async (user, req) => {
   const fundings = await fundingHistory(user.userId, only || undefined);
   const base = { agents: wallets, fundings, chains: CHAINS, funding: { on: fundingOn(), network: cluster(), amounts: FUND_AMOUNTS, max: MAX_FUND_USD }, prices: { hireUsd: HIRE_USD, cardUsd: CARD_USD } };
   if (only) return Response.json(base);
+  void checkRecentDeposits(user.userId).catch(() => {}); // deposits that confirmed since the sheet closed land on the next look
   return Response.json({ ...(await balanceView(user.userId)), ...base });
 });

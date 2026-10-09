@@ -13,6 +13,9 @@ import { connection } from "../hub/chain";
 import { fetchConfirmed } from "../hub/confirm";
 import { HttpError } from "../http";
 import { markPaid } from "./entitlements";
+import { CHAINS, payKind, railById, railId, type Rail } from "@/content/topup";
+import { coinUsd } from "../topup/prices";
+import { topupCredits } from "../db/topupSchema";
 
 export const USDC_DECIMALS = 6;
 export const cryptoReady = () => !!treasury() && !!usdcMint();
@@ -24,32 +27,61 @@ export function solanaPayUrl(p: { recipient: string; amountMinor: number; mint: 
   return `solana:${p.recipient}?${q.toString()}`;
 }
 
-export async function createCryptoPayment(userId: string, item: { product: string; sku: string; usd: number; title: string }) {
-  if (!cryptoReady()) throw new HttpError(503, "USDC payments are not set up on this server yet.");
+/** The Solana rail to pay with: USDC by default, or any Solana coin in content/topup.ts (SOL, SKR, ORE, ...). */
+export function solanaRail(id?: string): Rail {
+  const r = railById(id || "USDC:solana");
+  if (!r || payKind(r) !== "wallet" || !r.live) throw new HttpError(400, "Pick a Solana coin to pay with.");
+  return r;
+}
+/** The mint a Solana rail pays in (USDC follows the server's configured mint), or null for SOL. */
+const railMint = (r: Rail) => (r.coin === "SOL" ? null : r.coin === "USDC" ? usdcMint() : r.token!);
+
+export async function createCryptoPayment(userId: string, item: { product: string; sku: string; usd: number; title: string }, railKey?: string) {
+  const r = solanaRail(railKey);
+  if (!treasury() || (r.coin === "USDC" && !usdcMint())) throw new HttpError(503, "Crypto payments are not set up on this server yet.");
+  if (r.coin !== "USDC" && item.product !== "credits") throw new HttpError(400, "Plans are paid from your balance. Top up with this coin first.");
+  // Priced at a live mainnet price now and locked for the payment window. Rounded UP to the coin's smallest unit.
+  const price = r.coin === "USDC" ? 1 : await coinUsd(r.coin).catch(() => { throw new HttpError(503, "We couldn't get a live price for that coin. Try again in a moment."); });
+  const amountMinor = r.coin === "USDC" ? Math.round(item.usd * 10 ** USDC_DECIMALS) : Math.ceil((item.usd / price) * 10 ** r.decimals);
   const reference = Keypair.generate().publicKey.toBase58();
-  const amountMinor = Math.round(item.usd * 10 ** USDC_DECIMALS);
+  const mint = railMint(r);
   const [row] = await db().insert(payments).values({
-    userId, rail: "crypto", provider: "solana-usdc", product: item.product, sku: item.sku, amountMinor, currency: "USDC", reference,
-    expiresAt: new Date(Date.now() + PAY_WINDOW_MS), meta: { cluster: cluster(), title: item.title },
+    userId, rail: "crypto", provider: r.coin === "USDC" ? "solana-usdc" : `solana-${r.coin.toLowerCase()}`, product: item.product, sku: item.sku, amountMinor, currency: r.coin, reference,
+    expiresAt: new Date(Date.now() + PAY_WINDOW_MS), meta: { cluster: cluster(), title: item.title, rail: railId(r), price, decimals: r.decimals, mint },
   }).returning();
-  const recipient = treasury(), mint = usdcMint();
+  const recipient = treasury();
+  const amount = (amountMinor / 10 ** r.decimals).toFixed(r.decimals).replace(/\.?0+$/, "");
+  const q = new URLSearchParams({ amount, ...(mint ? { "spl-token": mint } : {}), reference, label: "Lexari", message: item.title });
   return {
-    id: row.id, recipient, mint, reference, amountMinor, decimals: USDC_DECIMALS, cluster: cluster(), title: item.title, expiresAt: row.expiresAt!.getTime(),
-    url: solanaPayUrl({ recipient, amountMinor, mint, reference, label: "Lexari", message: item.title }),
+    id: row.id, recipient, mint: mint || "", reference, amountMinor, decimals: r.decimals, cluster: cluster(), title: item.title, expiresAt: row.expiresAt!.getTime(),
+    rail: railId(r), coin: r.coin, price, network: CHAINS.solana.network,
+    url: `solana:${recipient}?${q.toString()}`,
   };
+}
+
+/** SOL payment: the treasury's lamports went up by at least the amount, and the transfer carries the reference. */
+export function checkSolTransfer(tx: VersionedTransactionResponse, want: { treasury: string; amountMinor: number; reference: string }) {
+  if (!tx.meta || tx.meta.err) throw new HttpError(400, "That payment failed on Solana.");
+  const keys = tx.transaction.message.getAccountKeys({ accountKeysFromLookups: tx.meta.loadedAddresses }).keySegments().flat().map((k) => k.toBase58());
+  if (!keys.includes(want.reference)) throw new HttpError(400, "That transaction is not this payment.");
+  const i = keys.indexOf(want.treasury);
+  if (i < 0) throw new HttpError(400, "That payment did not go to Lexari.");
+  const received = (tx.meta.postBalances[i] ?? 0) - (tx.meta.preBalances[i] ?? 0);
+  if (received < want.amountMinor) throw new HttpError(400, "That payment is less than the price.");
+  return { payer: keys[0] || "", received };
 }
 
 /**
  * Checks a confirmed transaction pays this payment: it succeeded, carries the reference key, and moved at least the
  * amount of the USDC mint into the treasury's token account. Returns who paid.
  */
-export function checkUsdcTransfer(tx: VersionedTransactionResponse, want: { treasury: string; mint: string; amountMinor: number; reference: string }) {
+export function checkUsdcTransfer(tx: VersionedTransactionResponse, want: { treasury: string; mint: string; amountMinor: number; reference: string; decimals?: number }) {
   if (!tx.meta || tx.meta.err) throw new HttpError(400, "That payment failed on Solana.");
   const keys = tx.transaction.message.getAccountKeys({ accountKeysFromLookups: tx.meta.loadedAddresses }).keySegments().flat().map((k) => k.toBase58());
   if (!keys.includes(want.reference)) throw new HttpError(400, "That transaction is not this payment.");
   const amt = (list: typeof tx.meta.preTokenBalances, owner: string) => {
     const b = list?.find((x) => x.mint === want.mint && x.owner === owner);
-    if (b && b.uiTokenAmount.decimals !== USDC_DECIMALS) throw new HttpError(400, "That is not USDC.");
+    if (b && b.uiTokenAmount.decimals !== (want.decimals ?? USDC_DECIMALS)) throw new HttpError(400, "That is not the right token.");
     return BigInt(b?.uiTokenAmount.amount ?? "0");
   };
   const received = amt(tx.meta.postTokenBalances, want.treasury) - amt(tx.meta.preTokenBalances, want.treasury);
@@ -79,6 +111,14 @@ export async function verifyCryptoPayment(userId: string, paymentId: string, sig
   const t = (tx.blockTime ?? 0) * 1000;
   // Paid inside its window (a little grace for slow confirmations), never before the payment existed.
   if (!t || t < p.createdAt.getTime() - 60_000 || (p.expiresAt && t > p.expiresAt.getTime() + 10 * 60_000)) throw new HttpError(400, "That payment is outside its time window. Start a new one.");
-  const { payer } = checkUsdcTransfer(tx, { treasury: treasury(), mint: usdcMint(), amountMinor: p.amountMinor, reference: p.reference! });
-  return markPaid(p.id, { txSig: signature, payer });
+  const meta = (p.meta || {}) as { rail?: string; price?: number; decimals?: number; mint?: string | null };
+  const r = solanaRail(meta.rail);
+  const { payer } = r.coin === "SOL"
+    ? checkSolTransfer(tx, { treasury: treasury(), amountMinor: p.amountMinor, reference: p.reference! })
+    : checkUsdcTransfer(tx, { treasury: treasury(), mint: r.coin === "USDC" ? usdcMint() : r.token!, amountMinor: p.amountMinor, reference: p.reference!, decimals: r.decimals });
+  const granted = await markPaid(p.id, { txSig: signature, payer });
+  if (p.product === "credits" && !granted.already) {
+    await db().insert(topupCredits).values({ userId, rail: railId(r), atoms: String(p.amountMinor), usdMicros: Math.round((granted.creditsUsd ?? 0) * 1e6), price: meta.price ?? 1, ref: `payment:${p.id}`, tx: signature }).onConflictDoNothing().catch(() => {});
+  }
+  return granted;
 }

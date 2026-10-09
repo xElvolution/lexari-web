@@ -14,7 +14,7 @@ import { serverConnection } from "./rpc";
 import { faucetAddress } from "./faucet";
 import { hireWallet } from "./hireWallet";
 
-export type TxKind = "send" | "fund" | "return" | "hire" | "plan" | "card" | "mint" | "incoming";
+export type TxKind = "send" | "fund" | "return" | "hire" | "plan" | "card" | "mint" | "incoming" | "pay" | "topup";
 export type TxStatus = "pending" | "confirmed" | "failed" | "cancelled";
 export type TxEvent = {
   id: string; kind: TxKind; status: TxStatus; sol: number; at: number;
@@ -25,6 +25,8 @@ export type TxEvent = {
   fee?: number;
   /** your wallet's balance right after it confirmed */
   balance?: number;
+  /** a non-SOL amount, already formatted ("0.05 USDC", "$10.00"), and its network when not Solana devnet */
+  amount?: string; net?: string;
 };
 
 const SIG = /^[1-9A-HJ-NP-Za-km-z]{64,90}$/;
@@ -33,13 +35,14 @@ const clusterQ = () => (cluster() === "mainnet-beta" ? "" : `?cluster=${cluster(
 export const explorer = (sig: string) => `https://explorer.solana.com/tx/${sig}${clusterQ()}`;
 const short = (a?: string) => (a ? `${a.slice(0, 4)}…${a.slice(-4)}` : "");
 const solStr = (n: number) => `${+n.toFixed(6)} SOL`;
-const VERB: Record<TxKind, string> = { send: "Sent", fund: "Funded", return: "Returned", hire: "Paid for a hire", plan: "Paid for a plan", card: "Paid for a card", mint: "Minted an ID card", incoming: "Received" };
+const VERB: Record<TxKind, string> = { send: "Sent", fund: "Funded", return: "Returned", hire: "Paid for a hire", plan: "Paid for a plan", card: "Paid for a card", mint: "Minted an ID card", incoming: "Received", pay: "Paid", topup: "Topped up" };
 
 /** The one-line text of a receipt (shown when meta isn't rendered, and read by search). */
 export function receiptText(e: TxEvent) {
   const st = e.status === "confirmed" ? "confirmed" : e.status;
   if (e.kind === "incoming") return `Received ${solStr(e.sol)}${e.from ? ` from ${e.label || short(e.from)}` : ""} · ${st}`;
   if (e.kind === "mint") return `Minted an ID card${e.sol ? ` (${solStr(e.sol)})` : ""} · ${st}`;
+  if (e.amount) return `${VERB[e.kind]} ${e.amount}${e.label ? ` for ${e.label}` : ""} · ${st}`;
   return `${VERB[e.kind]} ${solStr(e.sol)}${e.to ? ` to ${e.label || short(e.to)}` : ""} · ${st}`;
 }
 
@@ -63,7 +66,7 @@ export async function recordTx(userId: string, convo: string, ev: TxEvent): Prom
   let next: TxEvent = { ...(cur || {}), ...ev, at: cur?.at || ev.at };
   if (cur?.status === "confirmed" && ev.status !== "confirmed") next = { ...next, status: "confirmed", error: undefined };
   if (next.status === "confirmed") delete next.error;
-  if (next.sig) next.url = explorer(next.sig);
+  if (next.sig && !ev.url && !cur?.url) next.url = explorer(next.sig);
   if (row) await d.update(messages).set({ text: receiptText(next), metaJson: sql`coalesce(${messages.metaJson}, '{}'::jsonb) || ${JSON.stringify({ tx: next })}::jsonb` }).where(eq(messages.id, row.id));
   else await d.insert(messages).values({ chatId, fromId: "system", text: receiptText(next), clientId, metaJson: { tx: next }, createdAt: new Date(next.at) }).onConflictDoNothing();
   await d.update(chats).set({ updatedAt: new Date() }).where(eq(chats.id, chatId));

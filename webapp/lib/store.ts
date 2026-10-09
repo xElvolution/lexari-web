@@ -40,9 +40,9 @@ export type Msg = {
   markets?: import("@/content/integrations").MarketsCard; // live prediction markets an agent pulled in
   email?: import("@/content/email").EmailCard; // an email an agent wrote; only you can send it
 };
-export type TxKind = "send" | "fund" | "return" | "hire" | "plan" | "card" | "mint" | "incoming";
+export type TxKind = "send" | "fund" | "return" | "hire" | "plan" | "card" | "mint" | "incoming" | "pay" | "topup";
 export type TxStatus = "pending" | "confirmed" | "failed" | "cancelled";
-export type TxReceipt = { id: string; kind: TxKind; status: TxStatus; sol: number; at: number; to?: string; from?: string; sig?: string; url?: string; error?: string; agent?: string; label?: string; fee?: number; balance?: number };
+export type TxReceipt = { id: string; kind: TxKind; status: TxStatus; sol: number; at: number; to?: string; from?: string; sig?: string; url?: string; error?: string; agent?: string; label?: string; fee?: number; balance?: number; amount?: string; net?: string };
 /** Your own notes on any agent. Hired agents only get nick, notes and memory; the maker controls the rest. */
 export type AgentMeta = { nick?: string; notes?: string; memory?: boolean; voice?: { name: string; pitch: number; rate: number; preset?: string }; about?: string; skills?: string[]; /** onchain ID card, once minted */ nft?: import("@/lib/nft").NftRecord };
 export type Tour = { on: boolean; step: number; done: boolean };
@@ -856,11 +856,12 @@ function noteTx(convo: string, t: TxReceipt) {
   const what: Record<TxKind, string> = {
     send: `Sent ${amt} to ${shortA(t.to)}`, fund: `Funded ${t.label || "a hired agent"} with ${amt}`, return: `Got ${amt} back from ${t.label?.replace(/^you \(from (.*)\)$/, "$1") || "a task wallet"}`,
     hire: `Paid ${amt} to hire ${t.label || t.agent || "an agent"}`, plan: `Paid ${amt} for ${t.label || "a plan"}`, card: `Paid ${amt} for ${t.label || "an agent card"}`, mint: `Minted ${t.label || "an agent ID card"} on chain`, incoming: `Received ${amt} from ${t.label || shortA(t.from)}`,
+    pay: `Paid ${t.amount || amt} for ${t.label || "a service"}`, topup: `Topped up the Lexari balance with ${t.amount || amt}`,
   };
   const agent = isGroup(convo) ? "home" : isCustom(convo) ? convo : "home";
   addNote(`${what[t.kind]} on ${day} (devnet, tx ${shortA(t.sig)})`, "Habits", "Wallet", false, agent);
 }
-export type TxInput = { id: string; kind: Exclude<TxKind, "incoming" | "return">; status: TxStatus; sol: number; to?: string; sig?: string; error?: string; agent?: string; label?: string };
+export type TxInput = { id: string; kind: Exclude<TxKind, "incoming" | "return" | "pay" | "topup">; status: TxStatus; sol: number; to?: string; sig?: string; error?: string; agent?: string; label?: string };
 /** Writes a Confirm card's outcome into the chat as a receipt (the server checks it on chain). */
 export async function logTx(convo: string, ev: TxInput): Promise<TxReceipt | null> {
   const mid = `tx-${ev.id}`;

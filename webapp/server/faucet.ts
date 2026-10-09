@@ -17,7 +17,7 @@ export const FAUCET_STEP = Number(process.env.FAUCET_STEP_LAMPORTS || 0.1 * LAMP
 const DAILY = Number(process.env.FAUCET_DAILY_LAMPORTS || 5 * LAMPORTS_PER_SOL);
 const COOLDOWN_MS = 20_000;
 
-function faucetKey() {
+export function faucetKey() {
   const raw = process.env.LEXARI_FAUCET_KEY?.trim();
   if (!raw) return null;
   try {

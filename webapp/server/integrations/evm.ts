@@ -25,9 +25,13 @@ export function checksum(addr: string) {
 
 /** The agent's EVM address. The key is derived on demand and never leaves the server. */
 export function evmAddress(userId: string, slug: string) {
+  return addressOfKey(evmKey(userId, slug));
+}
+/** The agent's EVM private key (server only; used to sign testnet transactions the person confirmed). */
+export function evmKey(userId: string, slug: string): Uint8Array {
   const s = process.env.SESSION_SECRET || "";
   if (s.length < 16) throw new HttpError(503, "Agent wallets are not set up on this server.");
-  return addressOfKey(createHmac("sha256", s).update(`lexari-agent-wallet:v1:evm:${userId}:${slug}`).digest());
+  return new Uint8Array(createHmac("sha256", s).update(`lexari-agent-wallet:v1:evm:${userId}:${slug}`).digest());
 }
 /** The Ethereum address of a 32-byte secp256k1 private key. */
 export function addressOfKey(priv: Uint8Array) {

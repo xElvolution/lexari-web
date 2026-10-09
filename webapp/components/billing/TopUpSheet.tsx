@@ -9,6 +9,8 @@ import { toast } from "@/lib/store";
 import { celebrate } from "../Celebrate";
 import Icon from "../Icon";
 import { CardGlyph, Sheet, Spinner, UsdcGlyph, money } from "./parts";
+import { CoinGlyph, CoinPicker, CoinTileLabel, DepositPay, TokenPay, isWalletRail } from "./CoinPay";
+import { railById } from "@/content/topup";
 
 type Rail = "card" | "crypto";
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
@@ -25,13 +27,23 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
   const amounts: number[] = covering.length ? covering : [exact];
   const [pack, setPack] = useState<number>(() => { const want = intent.id ? Number(intent.id) : need ? amounts[0] : 10; return amounts.includes(want) ? want : amounts[0]; });
   const cardReady = !!state?.rails.card.ready;
-  const [rail, setRail] = useState<Rail>("card");
+  const [rail, setRail] = useState<Rail>(() => (state?.rails.card.ready ? "card" : "crypto"));
+  const [coin, setCoin] = useState("USDC:solana");
+  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
   const close = () => { closeBillingSheet(); intent.cancel?.(); };
   const after = intent.then ? () => intent.then?.() : undefined;
   const usd = pack;
   const id = String(pack);
 
+  if (picking) {
+    return (
+      <Sheet label="topup" wide title="Pay with crypto" sub="Pick a coin, then the network you'll send on." icon={<Icon name="wallet" size={20} />} onClose={() => setPicking(false)}>
+        <CoinPicker value={coin} onBack={() => setPicking(false)} onPick={(k) => { setCoin(k); setRail("crypto"); setPicking(false); }} />
+      </Sheet>
+    );
+  }
+  const coinRail = railById(coin)!;
   return (
     <Sheet label="topup" wide title="Top up" sub={need ? "Add to your balance and the purchase goes through." : "Add to your Lexari balance."} icon={<Icon name="wallet" size={20} />} onClose={close} closable={!busy}>
       {need && (
@@ -51,18 +63,25 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
 
       <h3 className="label mb-2 mt-5 text-[9.5px] text-ink/50">Pay with</h3>
       <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Payment method">
-        {([["card", "Card", cardReady ? state?.rails.card.label || "Visa, Mastercard" : "Coming soon"], ["crypto", "USDC", state?.rails.crypto.cluster === "mainnet-beta" ? "On Solana" : "On Solana devnet"]] as const).map(([k, l, sub]) => (
-          <button key={k} role="radio" aria-checked={rail === k} data-rail={k} disabled={busy} onClick={() => setRail(k)} className={`flex items-center gap-2.5 rounded-[18px] p-3 text-left transition ${rail === k ? "bg-ink text-[var(--bg)] ring-1 ring-ink" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
-            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${rail === k ? "bg-white/15" : "bg-tint"}`}>{k === "card" ? <CardGlyph size={19} /> : <UsdcGlyph size={22} />}</span>
-            <span className="min-w-0"><span className="block text-[14.5px] font-bold">{l}</span><span className={`block truncate text-[11.5px] ${rail === k ? "opacity-70" : "text-ink/55"}`}>{sub}</span></span>
-          </button>
-        ))}
+        <button role="radio" aria-checked={rail === "card"} data-rail="card" disabled={busy} onClick={() => setRail("card")} className={`flex items-center gap-2.5 rounded-[18px] p-3 text-left transition ${rail === "card" ? "bg-ink text-[var(--bg)] ring-1 ring-ink" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
+          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${rail === "card" ? "bg-white/15" : "bg-tint"}`}><CardGlyph size={19} /></span>
+          <span className="min-w-0"><span className="block text-[14.5px] font-bold">Card</span><span className={`block truncate text-[11.5px] ${rail === "card" ? "opacity-70" : "text-ink/55"}`}>{cardReady ? state?.rails.card.label || "Visa, Mastercard" : "Coming soon"}</span></span>
+        </button>
+        <button role="radio" aria-checked={rail === "crypto"} data-rail="crypto" disabled={busy} onClick={() => (rail === "crypto" ? setPicking(true) : setRail("crypto"))} className={`flex items-center gap-2.5 rounded-[18px] p-3 text-left transition ${rail === "crypto" ? "bg-ink text-[var(--bg)] ring-1 ring-ink" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
+          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${rail === "crypto" ? "bg-white/15" : "bg-tint"}`}>{coinRail.coin === "USDC" ? <UsdcGlyph size={22} /> : <CoinGlyph coin={coinRail.coin} size={24} />}</span>
+          <span className="min-w-0 flex-1"><CoinTileLabel railKey={coin} /></span>
+          <span data-coin-change onClick={(e) => { e.stopPropagation(); if (!busy) setPicking(true); }} aria-label="Change coin" className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${rail === "crypto" ? "bg-white/15" : "bg-tint"}`}><Icon name="right" size={12} className="rotate-90" /></span>
+        </button>
       </div>
 
       <div className="mt-4">
         {rail === "card"
           ? <CardPay ready={cardReady} usd={usd} intent={{ product: "credits", id }} onCrypto={() => setRail("crypto")} setBusy={setBusy} />
-          : <CryptoPay key={`credits-${id}`} usd={usd} intent={{ product: "credits", id }} title={`$${pack} for your Lexari balance`} setBusy={setBusy} after={after} />}
+          : coin === "USDC:solana"
+            ? <CryptoPay key={`credits-${id}`} usd={usd} intent={{ product: "credits", id }} title={`$${pack} for your Lexari balance`} setBusy={setBusy} after={after} />
+            : isWalletRail(coin)
+              ? <TokenPay key={`${coin}-${id}`} usd={usd} railKey={coin} setBusy={setBusy} after={after} />
+              : <DepositPay key={coin} usd={usd} railKey={coin} />}
       </div>
       <p className="mt-3 text-center text-[11.5px] leading-snug text-ink/45">Your balance pays for AI usage, hires, agent cards and funding agents. It can&apos;t be withdrawn.</p>
     </Sheet>

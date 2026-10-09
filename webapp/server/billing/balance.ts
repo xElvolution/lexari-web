@@ -12,6 +12,8 @@ import { agents } from "../db/schema";
 import { planById, specialistBySlug } from "@/content/appData";
 import { HttpError } from "../http";
 import { usdToMicros } from "./math";
+import { topupCredits } from "../db/topupSchema";
+import { CHAINS, coinById, railById } from "@/content/topup";
 
 type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
 
@@ -56,7 +58,7 @@ export async function credit(tx: Tx, userId: string, micros: number, reason: str
 }
 
 const LABEL: Record<string, string> = {
-  topup_card: "Top up by card", topup_crypto: "Top up with USDC", dev_grant: "Test top up", refund: "Refund",
+  topup_card: "Top up by card", topup_crypto: "Crypto top up", dev_grant: "Test top up", refund: "Refund",
   plan: "Plan", hire: "Hired a specialist", card: "Agent card", fund: "Funded an agent", fund_refund: "Funding refunded", fund_return: "Back from an agent's wallet",
 };
 /** The balance and its history (top ups, hires, cards, agent funding, refunds; AI usage folded into one row per day). */
@@ -70,6 +72,18 @@ export async function balanceView(userId: string) {
   const fundIds = rows.filter((r) => r.ref?.startsWith("fund:") || r.ref?.startsWith("fund-refund:")).map((r) => r.ref!.slice(r.ref!.indexOf(":") + 1));
   const funded = fundIds.length ? await database.select({ id: agentFundings.id, slug: agentFundings.agentSlug }).from(agentFundings).where(inArray(agentFundings.id, fundIds)) : [];
   const team = await database.select({ slug: agents.slug, name: agents.name }).from(agents).where(eq(agents.userId, userId));
+  // Crypto top ups name the coin: "Top up · 0.05 SOL", "Top up · 25 USDT on Tron".
+  const topRefs = rows.filter((r) => r.reason === "topup_crypto" && r.ref).map((r) => r.ref!);
+  const depIds = topRefs.filter((x) => x.startsWith("deposit:")).map((x) => x.slice(8)).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  const tops = topRefs.length ? await database.select().from(topupCredits).where(and(eq(topupCredits.userId, userId), inArray(topupCredits.ref, topRefs.filter((x) => x.startsWith("payment:"))))) : [];
+  const deps = depIds.length ? await database.select().from(topupCredits).where(inArray(topupCredits.id, depIds)) : [];
+  const coinLine = (ref: string | null) => {
+    const t = ref?.startsWith("deposit:") ? deps.find((d) => d.id === ref.slice(8)) : tops.find((d) => d.ref === ref);
+    const rail = t && railById(t.rail);
+    if (!t || !rail) return "";
+    const amt = +(Number(t.atoms) / 10 ** rail.decimals).toFixed(coinById(rail.coin)?.stable ? 2 : 6);
+    return `Top up · ${amt} ${coinById(rail.coin)?.symbol || rail.coin}${rail.chain === "solana" ? "" : ` on ${CHAINS[rail.chain].name}`}`;
+  };
   const nameOf = (slug?: string) => (slug && team.find((t) => t.slug === slug)?.name) || specialistBySlug(slug || "")?.name || "";
   const agentFor = (r: { reason: string; ref: string | null }) => {
     const ref = r.ref || "";
@@ -79,6 +93,7 @@ export async function balanceView(userId: string) {
   };
   const named = (r: { reason: string; ref: string | null }) => {
     if (r.reason === "plan") { const [, , , id, period] = (r.ref || "").split(":"); return `${planById(id || "").name} plan, ${period === "yearly" ? "yearly" : "monthly"}`; }
+    if (r.reason === "topup_crypto") return coinLine(r.ref) || LABEL[r.reason];
     const n = agentFor(r);
     if (!n) return LABEL[r.reason] ?? r.reason;
     return r.reason === "hire" ? `Hired ${n}` : r.reason === "card" ? `Card for ${n}` : r.reason === "fund" ? `Funded ${n}'s wallet` : `Funding ${n} refunded`;

@@ -5,7 +5,7 @@ import { withUser } from "@/server/route";
 
 export const runtime = "nodejs";
 
-const body = z.object({ rail: z.enum(["card", "crypto"]), product: z.enum(["plan", "credits"]), id: z.string().min(1).max(20), period: z.enum(["monthly", "yearly"]).optional() });
+const body = z.object({ rail: z.enum(["card", "crypto"]), product: z.enum(["plan", "credits"]), id: z.string().min(1).max(20), period: z.enum(["monthly", "yearly"]).optional(), token: z.string().max(24).regex(/^[A-Z]+:[a-z]+$/).optional() });
 
 /** Starts paying Lexari for a plan or extra credits. Card returns a hosted checkout URL; crypto returns a USDC request. */
 export const POST = withUser(async (user, req) => {
