@@ -356,13 +356,23 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/health") return send(200, { ok: true });
     const key = String(req.headers["x-desktop-secret"] || "");
     if (key.length !== SECRET.length || !crypto.timingSafeEqual(Buffer.from(key), Buffer.from(SECRET))) return send(401, { error: "unauthorized" });
-    const body = await readBody(req, req.url === "/push" ? Math.ceil(FILE_MAX * 1.4) + 4096 : 20_000);
+    const body = await readBody(req, req.url === "/push" ? Math.ceil(FILE_MAX * 1.4) + 4096 : req.url === "/exec" || req.url === "/job/start" ? 200_000 : 20_000);
     if (!okUser(body.user)) return send(400, { error: "bad user" });
     if (req.url === "/pull" && req.method === "POST") return send(200, await pullFile(body.user, String(body.path || "")));
     if (req.url === "/push" && req.method === "POST") return send(200, await pushFile(body.user, String(body.path || ""), body.b64));
-    if (req.url === "/exec" && req.method === "POST") return send(200, await execCmd(body.user, String(body.cmd || "").slice(0, 2000), !!body.quiet, body.env));
+    if (req.url === "/exec" && req.method === "POST") {
+      // Agents write whole files with heredocs: allow 64 KB, and refuse rather than silently cut a longer command (a cut file looks "blank").
+      const cmd = String(body.cmd || "");
+      if (!cmd) return send(200, { code: 2, out: "Empty command (or over the size limit)." });
+      if (cmd.length > 65536) return send(200, { code: 2, out: "Command too long (over 64 KB). Write the file in parts (cat >> file) or as a background job." });
+      return send(200, await execCmd(body.user, cmd, !!body.quiet, body.env));
+    }
     if (req.url === "/shot" && req.method === "POST") return send(200, await screenshot(body.user));
-    if (req.url === "/job/start" && req.method === "POST") return send(200, await jobStart(body.user, body.id, String(body.cmd || "").slice(0, 8000), body.env));
+    if (req.url === "/job/start" && req.method === "POST") {
+      const cmd = String(body.cmd || "");
+      if (!cmd || cmd.length > 65536) return send(200, { error: cmd ? "command too long" : "empty command" });
+      return send(200, await jobStart(body.user, body.id, cmd, body.env));
+    }
     if (req.url === "/job/status" && req.method === "POST") return send(200, await jobCmd(body.user, "status", body.id));
     if (req.url === "/job/stop" && req.method === "POST") return send(200, await jobCmd(body.user, "stop", body.id, body.soft === true));
     if (req.url === "/files" && req.method === "POST") return send(200, await listFiles(body.user, body.path));
