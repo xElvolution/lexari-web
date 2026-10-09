@@ -4,13 +4,14 @@
 // Runs as a dedicated user in the docker group.
 //
 // Containers run with --network none. Each gets a bind-mounted socket dir (/run/lexari inside):
-//   proxy.sock  this relay's filtering web proxy (CONNECT + plain HTTP, ports 80/443 only, public IPs only:
+//   proxy.sock  this relay's filtering web proxy (CONNECT + plain HTTP, ports 80/443 and TURN ports, public IPs only:
 //               loopback, private, link-local, CGNAT and multicast are refused, so nothing host-local is reachable)
 //   vnc.sock    the container's x11vnc, bridged by socat; the screen websocket is piped to it
 // So the desktop browses the public web but can never reach host-local ports, and the host firewall is untouched.
 import http from "node:http";
 import net from "node:net";
 import fs from "node:fs";
+import os from "node:os";
 import dns from "node:dns/promises";
 import crypto from "node:crypto";
 import { execFile, spawn } from "node:child_process";
@@ -43,7 +44,13 @@ const blocked = new net.BlockList();
 for (const [a, p] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
   ["192.0.0.0", 24], ["192.0.2.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["198.51.100.0", 24], ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4]]) blocked.addSubnet(a, p, "ipv4");
 for (const [a, p] of [["::", 128], ["::1", 128], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8], ["64:ff9b::", 96], ["2001:db8::", 32]]) blocked.addSubnet(a, p, "ipv6");
-const OK_PORTS = new Set([80, 443]);
+// Web on 80/443, plus the TURN/ICE-TCP ports video meetings relay their audio over (3478 TURN, 5349 TURN-TLS,
+// 4443/8443 bridge TCP): containers have no UDP, so meeting media can only flow as TCP through this proxy.
+const OK_PORTS = new Set([80, 443, 3478, 5349, 4443, 8443]);
+// The meeting ports never reach this machine's own addresses (other services on this host may listen there).
+const SELF = new Set(Object.values(os.networkInterfaces()).flat().filter(Boolean).map((i) => unmapIp(i.address)));
+function unmapIp(ip) { return /^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(ip) ? ip.slice(7) : ip; }
+const portOk = (port, ip) => OK_PORTS.has(port) && (port === 80 || port === 443 || !SELF.has(unmapIp(ip)));
 const unmap = (ip) => (/^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(ip) ? ip.slice(7) : ip);
 function isBlocked(ip) {
   ip = unmap(ip);
@@ -81,6 +88,7 @@ function startProxy(user, dir) {
     if (busy()) return refuse(res, 429, "too many connections");
     const ip = await resolvePublic(u.hostname);
     if (!ip) return refuse(res, 403, "that address is not on the public internet");
+    if (!portOk(port, ip)) return refuse(res, 403, "that port is not allowed");
     const headers = hopless({ ...req.headers, host: u.host });
     const up = http.request({ host: ip, port, method: req.method, path: u.pathname + u.search, headers, setHost: false, timeout: 30_000 }, (r) => { res.writeHead(r.statusCode || 502, hopless(r.headers)); r.pipe(res); });
     up.on("socket", track);
@@ -97,6 +105,7 @@ function startProxy(user, dir) {
     if (busy()) return deny(429, "Too Many Connections");
     const ip = await resolvePublic(m[1]);
     if (!ip) return deny(403, "Not Public");
+    if (!portOk(port, ip)) return deny(403, "Port Not Allowed");
     const up = net.connect({ host: ip, port, timeout: 30_000 }, () => {
       up.setTimeout(0);
       client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
