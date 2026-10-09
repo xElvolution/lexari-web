@@ -13,20 +13,16 @@ import { depositAddress, payToken, solanaHolding, startToken, testTokens, topupI
 import { toast } from "@/lib/store";
 import { celebrate } from "../Celebrate";
 import Icon from "../Icon";
-import { Spinner, UsdcGlyph } from "./parts";
+import { Spinner } from "./parts";
+import { CoinLogo, CoinWithNetwork } from "../Logos";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-6)}`;
 const fmt = (n: number, r: Pick<Rail, "decimals" | "coin">) => (+n.toFixed(coinDigits(r))).toLocaleString("en-US", { maximumFractionDigits: coinDigits(r) });
 const copy = (t: string, what: string) => { void navigator.clipboard?.writeText(t).then(() => toast({ text: `${what} copied` }), () => {}); };
 
-/** A coin's round mark. */
+/** A coin's round mark (official logo from /logos/coins). */
 export function CoinGlyph({ coin, size = 32 }: { coin: CoinId; size?: number }) {
-  if (coin === "USDC") return <UsdcGlyph size={size} />;
-  const c = coinById(coin)!;
-  const t = c.symbol.replace(/USD$/i, "$").slice(0, coin === "PATHUSD" || coin === "ALPHAUSD" ? 2 : 4);
-  return (
-    <span aria-hidden className="grid shrink-0 place-items-center rounded-full font-extrabold text-white" style={{ width: size, height: size, background: c.color, fontSize: size * (t.length > 3 ? 0.27 : t.length > 2 ? 0.31 : 0.38), letterSpacing: "-0.02em" }}>{t}</span>
-  );
+  return <CoinLogo coin={coin} size={size} />;
 }
 
 /** Coin, then network. Search covers names, symbols and chains. */
@@ -56,7 +52,7 @@ export function CoinPicker({ value, onPick, onBack }: { value: string; onPick: (
             const on = railId(r) === value;
             return (
               <button key={railId(r)} data-rail-opt={railId(r)} disabled={!open} onClick={() => onPick(railId(r))} className={`flex w-full items-center gap-3 rounded-[16px] p-3 text-left transition ${on ? "bg-grape/10 ring-2 ring-grape" : "bg-card ring-1 ring-line hover:ring-grape/50"} disabled:opacity-50`}>
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-tint text-[11px] font-extrabold text-ink/70">{ch.name.slice(0, 3).toUpperCase()}</span>
+                <CoinWithNetwork coin={coin} chain={r.chain} size={36} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[14px] font-bold text-ink">{ch.name}</span>
                   <span className="block truncate text-[11.5px] text-ink/55">{open ? `${ch.network}${r.test && r.chain === "solana" ? " · Lexari test token" : ""}` : r.why || ch.why}</span>

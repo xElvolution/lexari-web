@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { MICROS } from "@/content/billing";
 import { burnVsSonnet, type ModelInfo } from "@/content/models";
 import Icon from "../Icon";
+import { ProviderLogo } from "../Logos";
 
 /** Dollars from micro dollars: $0.42, $3.20, $20. */
 export function money(micros: number, opts: { cents?: boolean } = {}) {
@@ -50,19 +51,9 @@ export function LaminaMark({ size = 18, className = "" }: { size?: number; class
   );
 }
 
-const MAKER: Record<string, { bg: string; fg: string; t: string }> = {
-  OpenAI: { bg: "#10a37f", fg: "#fff", t: "O" },
-  OpenRouter: { bg: "#6467f2", fg: "#fff", t: "R" },
-  Custom: { bg: "var(--ink)", fg: "var(--bg)", t: "{}" },
-  Anthropic: { bg: "#d97757", fg: "#fff", t: "A" },
-  xAI: { bg: "#111111", fg: "#fff", t: "x" },
-  Google: { bg: "#1a73e8", fg: "#fff", t: "G" },
-};
-/** A model's tile: Lamina's mark on grape, or the maker's initial. */
+/** A model's tile: Lamina's mark on grape, or the maker's official logo. */
 export function ModelMark({ m, size = 40 }: { m: ModelInfo; size?: number }) {
-  if (m.id === "lamina") return <span className="grid shrink-0 place-items-center rounded-[14px] bg-grape text-white" style={{ width: size, height: size }}><LaminaMark size={Math.round(size * 0.5)} /></span>;
-  const k = MAKER[m.maker] ?? { bg: "var(--tint)", fg: "var(--ink)", t: m.maker[0] };
-  return <span className="grid shrink-0 place-items-center rounded-[14px] font-bold" style={{ width: size, height: size, background: k.bg, color: k.fg, fontSize: Math.round(size * 0.42) }}>{k.t}</span>;
+  return <ProviderLogo maker={m.id === "lamina" ? "Lexari" : m.maker} size={size} />;
 }
 
 /** "Uses 2x" next to a premium model, against Claude Sonnet. */

@@ -10,6 +10,7 @@ import { txUrl } from "@/lib/nft";
 import { MASK, useHideBalance } from "@/lib/privacy";
 import { shortAddr } from "@/content/appData";
 import Icon from "../Icon";
+import { CoinLogo } from "../Logos";
 import { AgentTile } from "../faces";
 
 export type Holding = { asset: string; amount: number; decimals: number; test: boolean };
@@ -115,7 +116,8 @@ export function AgentWalletCard({ a, name, look, funding, fundings = [], compact
           <div data-holdings className="mt-2 flex flex-wrap gap-2">
             {sol.holdings.filter((h) => h.amount > 0).length === 0 ? <span className="text-[13.5px] font-semibold text-ink/55">Empty</span>
               : sol.holdings.filter((h) => h.amount > 0).map((h) => (
-                <span key={h.asset} data-holding={h.asset} className="inline-flex items-baseline gap-1.5 rounded-xl bg-card px-2.5 py-1.5 ring-1 ring-line">
+                <span key={h.asset} data-holding={h.asset} className="inline-flex items-center gap-1.5 rounded-xl bg-card px-2.5 py-1.5 ring-1 ring-line">
+                  <CoinLogo coin={h.asset} size={18} />
                   <span className="tab-num text-[16px] font-bold text-ink">{hide ? MASK : fmtHolding(h)}</span>
                   <span className="text-[11.5px] font-semibold text-ink/55">{h.asset}{h.test ? " (test)" : ""}</span>
                 </span>

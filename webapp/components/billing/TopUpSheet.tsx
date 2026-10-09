@@ -8,8 +8,9 @@ import { balanceOf, isEmbedded, payer } from "@/lib/pay";
 import { toast } from "@/lib/store";
 import { celebrate } from "../Celebrate";
 import Icon from "../Icon";
-import { CardGlyph, Sheet, Spinner, UsdcGlyph, money } from "./parts";
-import { CoinGlyph, CoinPicker, CoinTileLabel, DepositPay, TokenPay, isWalletRail } from "./CoinPay";
+import { CardGlyph, Sheet, Spinner, money } from "./parts";
+import { CoinPicker, CoinTileLabel, DepositPay, TokenPay, isWalletRail } from "./CoinPay";
+import { CoinWithNetwork } from "../Logos";
 import { railById } from "@/content/topup";
 import { useMask } from "@/lib/privacy";
 
@@ -70,7 +71,7 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
           <span className="min-w-0"><span className="block text-[14.5px] font-bold">Card</span><span className={`block truncate text-[11.5px] ${rail === "card" ? "opacity-70" : "text-ink/55"}`}>{cardReady ? state?.rails.card.label || "Visa, Mastercard" : "Coming soon"}</span></span>
         </button>
         <button role="radio" aria-checked={rail === "crypto"} data-rail="crypto" disabled={busy} onClick={() => (rail === "crypto" ? setPicking(true) : setRail("crypto"))} className={`flex items-center gap-2.5 rounded-[18px] p-3 text-left transition ${rail === "crypto" ? "bg-ink text-[var(--bg)] ring-1 ring-ink" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
-          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${rail === "crypto" ? "bg-white/15" : "bg-tint"}`}>{coinRail.coin === "USDC" ? <UsdcGlyph size={22} /> : <CoinGlyph coin={coinRail.coin} size={24} />}</span>
+          <span className={`grid h-9 w-9 shrink-0 place-items-center ${rail === "crypto" ? "" : ""}`}><CoinWithNetwork coin={coinRail.coin} chain={coinRail.chain} size={32} /></span>
           <span className="min-w-0 flex-1"><CoinTileLabel railKey={coin} /></span>
           <span data-coin-change onClick={(e) => { e.stopPropagation(); if (!busy) setPicking(true); }} aria-label="Change coin" className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${rail === "crypto" ? "bg-white/15" : "bg-tint"}`}><Icon name="right" size={12} className="rotate-90" /></span>
         </button>
