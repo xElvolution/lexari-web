@@ -1,3 +1,4 @@
+import { clientIp } from "@/server/http";
 import { currentSession } from "@/server/auth/session";
 
 export const runtime = "nodejs";
@@ -5,7 +6,7 @@ export const runtime = "nodejs";
 /** Errors from people's browsers (window.onerror, unhandled rejections, error boundaries), written to the server log. */
 const hits = new Map<string, { n: number; at: number }>();
 export async function POST(req: Request) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "?";
+  const ip = clientIp(req);
   const h = hits.get(ip);
   const now = Date.now();
   if (h && now - h.at < 60_000) { if (++h.n > 20) return new Response(null, { status: 204 }); } else hits.set(ip, { n: 1, at: now });

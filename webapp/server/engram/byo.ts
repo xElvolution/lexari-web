@@ -8,6 +8,7 @@
  * (so nobody can point Lexari at its own server or network). BYO_ALLOW_PRIVATE=1 lifts that for local tests only.
  */
 import { lookup } from "node:dns/promises";
+import { privateIp, safeFetch } from "../net/safeFetch";
 import { isIP } from "node:net";
 import type { ByoProvider } from "@/content/models";
 import { ModelError, type ChatMessage } from "./cortex";
@@ -26,6 +27,10 @@ const allowPrivate = () => process.env.BYO_ALLOW_PRIVATE === "1" && process.env.
 
 /** True for addresses Lexari must never call on someone's behalf. */
 export function privateAddress(ip: string) {
+  return privateIp(ip);
+}
+/** (older inline rule, kept for reference in tests) */
+export function privateAddressLegacy(ip: string) {
   const v = isIP(ip);
   if (v === 4) {
     const [a, b] = ip.split(".").map(Number);
@@ -150,7 +155,11 @@ export async function* streamByo(messages: ChatMessage[], t: ByoTarget, opts: { 
   const timeout = AbortSignal.timeout(opts.timeoutMs ?? Number(process.env.LLM_TIMEOUT_MS || 90_000));
   let res: Response;
   try {
-    res = await fetch(r.url, { method: "POST", headers: r.headers, body: JSON.stringify(r.body), redirect: "error", signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout });
+    const sig = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
+    // A custom base URL is checked again at connect time (no DNS-rebinding way to a private address).
+    res = t.baseUrl && !allowPrivate()
+      ? await safeFetch(r.url, { method: "POST", headers: r.headers, body: JSON.stringify(r.body), signal: sig })
+      : await fetch(r.url, { method: "POST", headers: r.headers, body: JSON.stringify(r.body), redirect: "error", signal: sig });
   } catch (e) {
     throw new ModelError(`${t.label} didn't answer in time. Try again.`, `byo ${t.provider}: ${(e as Error).message}`);
   }
@@ -213,7 +222,9 @@ export async function verifyKey(provider: Exclude<ByoProvider, "custom">, key: s
   else { url = `${BASES[provider]}/models`; headers = { Authorization: `Bearer ${key}` }; }
   try {
     await checkHost(url);
-    const res = await fetch(url, { headers, redirect: "error", signal: AbortSignal.timeout(15_000) });
+    const res = baseUrl && !allowPrivate()
+      ? await safeFetch(url, { headers, signal: AbortSignal.timeout(15_000), maxBytes: 2_000_000 })
+      : await fetch(url, { headers, redirect: "error", signal: AbortSignal.timeout(15_000) });
     const ms = Date.now() - t0;
     if (res.ok) return { ok: true, ms, note: `Verified in ${(ms / 1000).toFixed(1)}s` };
     if (baseUrl && (res.status === 404 || res.status === 405)) return { ok: true, ms, note: "Reachable. This endpoint has no model list." };

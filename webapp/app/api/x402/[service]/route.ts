@@ -1,5 +1,5 @@
 import { appOrigin } from "@/server/config";
-import { jsonError, rateLimit } from "@/server/http";
+import { clientIp, jsonError, rateLimit } from "@/server/http";
 import { paymentRequired, paymentResponse, requirements, settlePayment } from "@/server/agentpay/x402";
 import { serviceById } from "@/server/agentpay/services";
 
@@ -10,7 +10,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ service: string
   const { service } = await ctx.params;
   const s = serviceById(service);
   if (!s) return jsonError(404, "No such service.");
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip = clientIp(req);
   if (!(await rateLimit(`x402:${ip}`, 120, 60_000))) return jsonError(429, "Slow down.");
   const url = new URL(req.url);
   const origin = appOrigin()?.uri || url.origin;
