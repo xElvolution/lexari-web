@@ -104,6 +104,8 @@ function startProxy(user, dir) {
     if (!OK_PORTS.has(port)) return deny(403, "Port Not Allowed");
     if (busy()) return deny(429, "Too Many Connections");
     const ip = await resolvePublic(m[1]);
+    // Meeting-media tunnels (non-web ports) are rare; log host:port only, so call audio problems can be traced.
+    if (port !== 80 && port !== 443) console.log("proxy media", String(user).slice(0, 8), m[1], port, ip && portOk(port, ip) ? "ok" : "refused");
     if (!ip) return deny(403, "Not Public");
     if (!portOk(port, ip)) return deny(403, "Port Not Allowed");
     const up = net.connect({ host: ip, port, timeout: 30_000 }, () => {
