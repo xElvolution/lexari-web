@@ -21,6 +21,10 @@ export function IntegrationLogo({ id, size = 44, className = "" }: { id: Integra
       return tile("linear-gradient(140deg,#c7f284,#00bef0)", (
         <svg width={g} height={g} viewBox="0 0 24 24" fill="none" stroke="#0e1a2b" strokeWidth="2.1" strokeLinecap="round"><path d="M4.5 9.5c4-2.6 10.2-2.9 15-.6" /><path d="M3.6 13.4c5.2-3 11.6-3.1 16.8-.2" /><path d="M5.4 17.2c4.3-2.1 9.5-2.1 13.4 0" /></svg>
       ));
+    case "bridge":
+      return tile("linear-gradient(140deg,#7b5cff,#21c3a6)", (
+        <svg width={g} height={g} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9h13l-3.5-3.5" /><path d="M20 15H7l3.5 3.5" /></svg>
+      ));
     case "polymarket":
       return tile("#2d63ff", (
         <svg width={g} height={g} viewBox="0 0 24 24"><path fill="#fff" d="M5 4.5 19 8v8L5 19.5zm2.2 2.9v9.2l9.6-2.4V9.8z" /></svg>

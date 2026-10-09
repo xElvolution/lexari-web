@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""mkvideo story.json out.mp4 — a narrated video from scenes (offline: Pillow frames, Piper voice, ffmpeg).
+
+story.json:
+  {"size": "1080x1920" | "1920x1080" | "1080x1080" (default 1080x1920),
+   "captions": true,            # burn the spoken line in as a caption (default true); an .srt is written too
+   "music": "/path/song.mp3",   # optional, mixed quietly under the voice
+   "scenes": [{"image": "/home/agent/pic.png" (optional), "color": "#1d1630" (background when no image),
+               "title": "Big text" (optional), "text": "caption if nothing is spoken" (optional),
+               "say": "voiceover for this scene" (optional), "secs": 4 (minimum length)}]}
+Keeps it light for a 1-CPU computer: still frames, H.264 stillimage tune. Prints the output path and length.
+"""
+import json, os, subprocess, sys, tempfile, textwrap
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+def die(m): print("mkvideo:", m, file=sys.stderr); sys.exit(2)
+if len(sys.argv) < 3: die("usage: mkvideo story.json out.mp4")
+story = json.load(open(sys.argv[1]))
+out = os.path.abspath(sys.argv[2])
+W, H = (int(x) for x in str(story.get("size", "1080x1920")).lower().split("x"))
+if not (240 <= W <= 1920 and 240 <= H <= 1920): die("size must be at most 1920 on each side")
+scenes = story.get("scenes") or []
+if not scenes or len(scenes) > 40: die("1 to 40 scenes")
+caps = story.get("captions", True)
+FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FONT2 = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+tmp = tempfile.mkdtemp(prefix="mkvideo-")
+
+def run(cmd):
+    r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if r.returncode: die(" ".join(cmd[:3]) + " failed: " + r.stderr[-400:])
+    return r.stdout
+
+def dur(f): return float(run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f]).strip() or 0)
+
+def hexcolor(c):
+    c = str(c or "#1d1630").lstrip("#")
+    try: return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4))
+    except Exception: return (29, 22, 48)
+
+def wrap(draw, text, font, width):
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        t = (cur + " " + w).strip()
+        if draw.textlength(t, font=font) <= width: cur = t
+        else:
+            if cur: lines.append(cur)
+            cur = w
+    if cur: lines.append(cur)
+    return lines
+
+def frame(sc, i, caption):
+    if sc.get("image") and os.path.isfile(sc["image"]):
+        img = ImageOps.fit(ImageOps.exif_transpose(Image.open(sc["image"])).convert("RGB"), (W, H), Image.LANCZOS)
+    else:
+        img = Image.new("RGB", (W, H), hexcolor(sc.get("color")))
+    d = ImageDraw.Draw(img, "RGBA")
+    u = min(W, H)
+    if sc.get("title"):
+        f = ImageFont.truetype(FONT, int(u * 0.085))
+        lines = wrap(d, sc["title"], f, W * 0.86)[:4]
+        lh = int(u * 0.105); y = H * 0.42 - lh * len(lines) / 2
+        for ln in lines:
+            tw = d.textlength(ln, font=f)
+            d.text(((W - tw) / 2, y), ln, font=f, fill=(255, 255, 255), stroke_width=max(2, u // 200), stroke_fill=(0, 0, 0, 160))
+            y += lh
+    if caption:
+        f = ImageFont.truetype(FONT2, int(u * 0.045))
+        lines = wrap(d, caption, f, W * 0.84)[-4:]
+        lh = int(u * 0.06); pad = int(u * 0.03)
+        bh = lh * len(lines) + pad * 2; top = H - bh - int(H * 0.08)
+        d.rounded_rectangle([W * 0.05, top, W * 0.95, top + bh], radius=int(u * 0.03), fill=(0, 0, 0, 150))
+        y = top + pad
+        for ln in lines:
+            tw = d.textlength(ln, font=f)
+            d.text(((W - tw) / 2, y), ln, font=f, fill=(255, 255, 255))
+            y += lh
+    p = f"{tmp}/f{i:03d}.png"; img.save(p); return p
+
+def ts(t):
+    h, r = divmod(t, 3600); m, s = divmod(r, 60)
+    return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{int(round((s % 1) * 1000)):03d}"
+
+parts, srt, t0 = [], [], 0.0
+for i, sc in enumerate(scenes):
+    say = str(sc.get("say") or "").strip()
+    secs = max(1.0, min(60.0, float(sc.get("secs") or 3)))
+    wav = None
+    if say:
+        wav = f"{tmp}/v{i:03d}.wav"
+        r = subprocess.run(["piper", "--model", os.environ.get("PIPER_VOICE", "/opt/piper/en_US-lessac-medium.onnx"), "--output_file", wav], input=say, text=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if r.returncode: die("voice failed: " + r.stderr[-300:])
+        secs = max(secs, dur(wav) + 0.5)
+    caption = (say or str(sc.get("text") or "")) if caps else str(sc.get("text") or "")
+    png = frame(sc, i, caption)
+    seg = f"{tmp}/s{i:03d}.mp4"
+    audio = ["-i", wav] if wav else ["-f", "lavfi", "-t", f"{secs:.2f}", "-i", "anullsrc=r=44100:cl=stereo"]
+    run(["nice", "-n", "10", "ffmpeg", "-y", "-loglevel", "error", "-loop", "1", "-framerate", "25", "-t", f"{secs:.2f}", "-i", png, *audio,
+         "-af", f"apad=whole_dur={secs:.2f}", "-t", f"{secs:.2f}", "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-crf", "26", "-pix_fmt", "yuv420p",
+         "-r", "25", "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2", "-threads", "1", seg])
+    parts.append(seg)
+    if say: srt.append(f"{len(srt) + 1}\n{ts(t0)} --> {ts(t0 + secs - 0.3)}\n{textwrap.fill(say, 42)}\n")
+    t0 += secs
+
+lst = f"{tmp}/list.txt"
+open(lst, "w").write("".join(f"file '{p}'\n" for p in parts))
+os.makedirs(os.path.dirname(out), exist_ok=True)
+music = story.get("music")
+if music and os.path.isfile(music):
+    run(["nice", "-n", "10", "ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", lst, "-stream_loop", "-1", "-i", music,
+         "-filter_complex", "[1:a]volume=0.12[m];[0:a][m]amix=inputs=2:duration=first:dropout_transition=0[a]", "-map", "0:v", "-map", "[a]",
+         "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", out])
+else:
+    run(["nice", "-n", "10", "ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", "-movflags", "+faststart", out])
+if srt: open(os.path.splitext(out)[0] + ".srt", "w").write("\n".join(srt))
+size = os.path.getsize(out)
+print(f"Saved {out} ({t0:.0f} s, {size / 1048576:.1f} MB){' + captions .srt' if srt else ''}")
+subprocess.run(["rm", "-rf", tmp])

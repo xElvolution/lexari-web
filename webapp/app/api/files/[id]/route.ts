@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 type Ctx = { params: Promise<{ id: string }> };
 
 // Only these are ever shown inline; everything else downloads as bytes. No HTML, no SVG, nothing a browser runs.
-const INLINE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "text/plain; charset=utf-8", "text/csv; charset=utf-8"]);
+const INLINE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "video/mp4", "video/webm", "text/plain; charset=utf-8", "text/csv; charset=utf-8"]);
 
 /** A file from your chats (only yours). ?dl=1 downloads it; otherwise images and text preview inline. */
 export const GET = withUser<Ctx>(async (user, req, ctx) => {
@@ -18,8 +18,21 @@ export const GET = withUser<Ctx>(async (user, req, ctx) => {
   // ?peek=1: the first 4 KB of a text file, for the preview on its card
   const data = !dl && inline && row.mime.startsWith("text/") && new URL(req.url).searchParams.get("peek") === "1" ? row.data.subarray(0, 4096) : row.data;
   const ascii = row.name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  // Videos: byte ranges, so phones can seek and Safari plays them at all.
+  const range = inline && row.mime.startsWith("video/") ? /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("range") || "") : null;
+  if (range && (range[1] || range[2])) {
+    const total = data.length;
+    const start = range[1] ? Number(range[1]) : Math.max(0, total - Number(range[2]));
+    const end = range[1] && range[2] ? Math.min(Number(range[2]), total - 1) : total - 1;
+    if (start >= total || start > end) return new Response(null, { status: 416, headers: { "content-range": `bytes */${total}` } });
+    return new Response(new Uint8Array(data.subarray(start, end + 1)), { status: 206, headers: {
+      "content-type": row.mime, "content-length": String(end - start + 1), "content-range": `bytes ${start}-${end}/${total}`, "accept-ranges": "bytes",
+      "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff", "cross-origin-resource-policy": "same-origin",
+    } });
+  }
   return new Response(new Uint8Array(data), {
     headers: {
+      ...(inline && row.mime.startsWith("video/") ? { "accept-ranges": "bytes" } : {}),
       "content-type": inline ? row.mime : row.mime === "application/pdf" ? "application/pdf" : row.mime.startsWith("text/") ? "text/plain; charset=utf-8" : "application/octet-stream",
       "content-length": String(data.length),
       "content-disposition": `${inline ? "inline" : "attachment"}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(row.name)}`,

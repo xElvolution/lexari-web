@@ -3,7 +3,7 @@
  * Files in chat (client side). Agents attach files from their computer to a reply ({files} on the reply stream, saved
  * in the message as files); you attach one to a message by uploading it first (POST /api/files), then sending its id.
  */
-export type FileKind = "image" | "text" | "code" | "pdf" | "other";
+export type FileKind = "image" | "video" | "text" | "code" | "pdf" | "other";
 export type FileView = { id: string; name: string; size: number; mime: string; kind: FileKind };
 /** What a message carries for the file you attached. */
 export type SentFile = { name: string; size: string; id?: string; mime?: string; kind?: FileKind };

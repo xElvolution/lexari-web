@@ -13,6 +13,7 @@ import type { IntegrationId, MarketsCard } from "@/content/integrations";
 import { EVM, evmAddress, evmBalances, type EvmChain } from "./evm";
 import { jupiterQuote, polymarketMarkets, spotUsd } from "./market";
 import { EXTRA_TOOLS } from "./extra";
+import { bridgeQuote } from "./bridge";
 import { SOL_RESERVE_LAMPORTS, balances, feePayer, fmtAmount, isDevnet, network, orcaQuote, orcaSwap, parseAddress, transfer, type Asset } from "./solana";
 
 export type AgentRef = { slug: string; kind: string; name: string; userId: string; keypair: () => Keypair };
@@ -176,6 +177,20 @@ const jupiterQuoteTool: ToolDef = {
   },
 };
 
+/* ---------- Cross-chain (LI.FI quotes, read only) ---------- */
+const bridgeInput = z.object({ fromChain: z.string().min(2).max(30), toChain: z.string().min(2).max(30), token: z.string().min(1).max(20).optional(), from: z.string().max(20).optional(), to: z.string().max(20).optional(), amount: num }).passthrough();
+const bridgeQuoteTool: ToolDef = {
+  name: "bridge.quote", connector: "bridge", risk: "read", input: bridgeInput,
+  hint: `bridge.quote {"fromChain":"solana","toChain":"base","from":"SOL","to":"USDC","amount":1} : a live cross-chain quote (route, fees, time) via LI.FI; reference only, nothing is bridged.`,
+  run: async (i: z.output<typeof bridgeInput>) => {
+    const fromToken = i.from || i.token || "";
+    if (!fromToken) throw new Reject("Which token should I quote?");
+    const q = await bridgeQuote({ fromChain: i.fromChain, toChain: i.toChain, fromToken, toToken: i.to || i.token, amount: i.amount }).catch((e: Error) => { throw new Reject(e.message); });
+    const mins = q.secs < 90 ? `${q.secs} s` : `${Math.round(q.secs / 60)} min`;
+    return { summary: `Quoted ${q.amount} ${q.from} ${q.fromChain} → ${q.to} ${q.toChain}`, text: `Cross-chain quote (LI.FI, reference only, not executed): ${q.amount} ${q.from} on ${q.fromChain} → about ${+q.out.toPrecision(7)} ${q.to} on ${q.toChain} (at least ${+q.outMin.toPrecision(7)} after slippage${q.outUsd ? `, ≈ $${q.outUsd.toFixed(2)}` : ""}). Route: ${q.route}. Fees ≈ $${q.feesUsd.toFixed(2)}, gas ≈ $${q.gasUsd.toFixed(2)}, about ${mins}.` };
+  },
+};
+
 /* ---------- Polymarket (read only) ---------- */
 const pmInput = z.object({ query: z.string().max(80).optional(), q: z.string().max(80).optional(), limit: num.optional() }).passthrough();
 const polymarketTool: ToolDef = {
@@ -218,5 +233,5 @@ const pricesTool: ToolDef = {
   },
 };
 
-export const TOOLS: ToolDef[] = [solanaWallet, solanaTransfer, orcaQuoteTool, orcaSwapTool, jupiterQuoteTool, polymarketTool, evmWallet("base"), evmWallet("ethereum"), pricesTool, ...EXTRA_TOOLS];
+export const TOOLS: ToolDef[] = [solanaWallet, solanaTransfer, orcaQuoteTool, orcaSwapTool, jupiterQuoteTool, bridgeQuoteTool, polymarketTool, evmWallet("base"), evmWallet("ethereum"), pricesTool, ...EXTRA_TOOLS];
 export const toolByName = (name: string) => TOOLS.find((t) => t.name === name.trim().toLowerCase());

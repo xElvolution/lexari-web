@@ -174,3 +174,14 @@ export async function resolveTurnModel(userId: string, ids: (string | null | und
   return { model: LAMINA, byo: null };
 }
 
+
+/** Your own key that can make pictures (Settings > Models), in this order; null when you have none that works. */
+export async function imageKeyFor(userId: string): Promise<{ provider: "xai" | "openai" | "gemini" | "openrouter"; key: string; own: true } | null> {
+  if (!secretBoxReady()) return null;
+  const rows = await db().select().from(userModelKeys).where(eq(userModelKeys.userId, userId));
+  for (const p of ["xai", "openai", "gemini", "openrouter"] as const) {
+    const r = rows.find((x) => x.provider === p && x.status === "ok" && (p !== "openai" || !x.baseUrl));
+    if (r) { try { return { provider: p, key: open(r.keyEnc, aad(userId)), own: true }; } catch { /* unreadable: try the next */ } }
+  }
+  return null;
+}

@@ -8,7 +8,7 @@
  * moves), "needskey" is built but waits for an API key on the server, "soon" is listed but can't be added.
  * `builtin` ones aren't in the catalog: every agent has them (payments) or one agent does (the ORE Miner's servers).
  */
-export type IntegrationId = "solana" | "orca" | "jupiter" | "polymarket" | "panta" | "base" | "ethereum" | "tempo" | "prices" | "payments" | "ore" | "solami";
+export type IntegrationId = "solana" | "orca" | "jupiter" | "bridge" | "polymarket" | "panta" | "base" | "ethereum" | "tempo" | "prices" | "payments" | "ore" | "solami";
 export type IntegrationCategory = "chains" | "trading" | "prediction" | "data";
 export type IntegrationStatus = "devnet" | "live" | "testnet" | "market" | "needskey" | "soon";
 
@@ -71,6 +71,13 @@ export const INTEGRATIONS: IntegrationInfo[] = [
     about: "Your agents pull live Jupiter quotes from Solana mainnet as a price reference, for memecoins and blue chips alike. Read only: nothing is swapped.",
     can: [{ text: "Live mainnet quotes and routes", live: true }, { text: "Swaps", live: false }],
     tags: "aggregator quote route memecoin bonk wif jup price",
+  },
+  {
+    id: "bridge", name: "Cross-chain", category: "trading", status: "market", addable: true, moves: false, chains: ["Solana", "Ethereum", "Base", "Arbitrum", "Bitcoin", "+ more"],
+    blurb: "Quotes for moving tokens between chains.",
+    about: "Your agents get live LI.FI quotes for moving a token from one chain to another (Solana, Ethereum, Base, Arbitrum, Optimism, Polygon, BNB Chain, Avalanche, Bitcoin): what you'd receive, the route, fees and time. Read only: nothing is bridged.",
+    can: [{ text: "Live cross-chain quotes and routes", live: true }, { text: "Bridging", live: false }],
+    tags: "bridge cross-chain lifi li.fi across wormhole debridge thorchain btc eth base arbitrum",
   },
   {
     id: "polymarket", name: "Polymarket", category: "prediction", status: "market", addable: true, moves: false, chains: ["Polygon"],

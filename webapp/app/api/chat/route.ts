@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { currentSession } from "@/server/auth/session";
 import { ModelError, llmConfig, modelReady, streamCompletion } from "@/server/engram/cortex";
 import { gatewayReady } from "@/server/engram/gateway";
-import { accountDefault, resolveTurnModel } from "@/server/models";
+import { accountDefault, imageKeyFor, resolveTurnModel } from "@/server/models";
 import { beginTurn, isBlocked, type Blocked, type Turn } from "@/server/billing/meter";
 import { splitRemember } from "@/server/engram/hippocampus";
 import { buildPrompt } from "@/server/engram/spinal";
@@ -19,12 +19,12 @@ import { walletSendGuard } from "@/server/security/walletSend";
 import { chatBody } from "@/server/validate";
 import { lockedSlugs } from "@/server/plans";
 import { SPECIALISTS } from "@/content/appData";
-import { desktopOn, runInDesktop, runRequests } from "@/server/desktop";
+import { desktopOn, pullDesktop, runInDesktop, runRequests } from "@/server/desktop";
 import { DESKTOP_MARK } from "@/server/engram/grokCli";
 import { CU_BUDGET_MS, computerOn, computerTask, runComputer, stripComputer } from "@/server/computer";
 import { agentLevel, takeShift } from "@/server/hub/levels";
-import { attachFromComputer, fileTags, ownFiles, saveGenerated, stripFileTags, type FileItem } from "@/server/agentFiles";
-import { generateImage, imageGenOn, imagineTask, stripImagine } from "@/server/imageGen";
+import { attachFromComputer, fileTags, ownFiles, saveGenerated, sniff, stripFileTags, type FileItem } from "@/server/agentFiles";
+import { generateImage, imageGenOn, imagineTask, stripImagine, type ImageKey } from "@/server/imageGen";
 import { grokVision, visionOn, type VisionImage } from "@/server/engram/grokCli";
 import type { ModelInfo } from "@/content/models";
 import { queuePriority, recallSize, shifts } from "@/lib/perks";
@@ -135,7 +135,8 @@ export async function POST(req: Request) {
   const tools = !call && desktopOn();
   if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}\n${FILES_HINT}` };
   // The image tool (a new picture from a description) only exists when an image key is set; otherwise the agent says so.
-  const imagineOn = !call && imageGenOn();
+  const ownImageKey = !call ? await imageKeyFor(userId).catch(() => null) : null;
+  const imagineOn = !call && (imageGenOn() || !!ownImageKey);
   if (!call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${imagineOn ? IMAGINE_HINT : IMAGINE_OFF}` };
   const event = !call && body.event ? body.event : null;
   // Integrations (Settings > Integrations): only what the person added, switched on and granted to this agent.
@@ -398,7 +399,7 @@ export async function POST(req: Request) {
           }
           if (idea) {
             send({ tool: { imagine: true } });
-            const made = await imagine(userId, body.convo, ctx, idea, abort.signal);
+            const made = await imagine(userId, body.convo, ctx, idea, abort.signal, ownImageKey);
             if (made.item) files.push(made.item); else notes.push(made.note);
           }
           if (notes.length) full = `${full}${full ? "\n\n" : ""}(${notes.join("; ")}.)`;
@@ -509,28 +510,40 @@ const FILES_HINT = [
   "Do this whenever they ask you to send, share, attach or give them a file, and after you make or edit one for them. Make the file first with <run>, then attach it in your answer. Save new files in /home/agent/Outputs (mkdir -p it first).",
   "Photos and files the person uploads are on your computer in /home/agent/Uploads. To edit images use Python with Pillow (python3 -c \"from PIL import Image, ImageDraw, ImageFont; ...\") or ImageMagick (convert, identify), save the result in /home/agent/Outputs and send it back with <file>.",
 ].join(" ");
-const IMAGINE_HINT = "To make a brand new picture from a description (not an edit of a photo), write <imagine>a detailed description of the picture</imagine>, at most one per reply. The picture is attached to your reply. Don't say which tool or company makes it.";
-const IMAGINE_OFF = "If the person asks you to generate, draw or create a brand new AI image from a description, tell them AI image generation isn't switched on yet. You can still edit photos they upload and make charts or graphics with code.";
+const IMAGINE_HINT = "PICTURES: to make a brand new picture from a description, write <imagine>a detailed description of the picture</imagine>. To edit a photo with AI (change the style, background, add or remove things, restyle a selfie), write <imagine edit=\"/home/agent/Uploads/photo.jpg\">the change, described clearly</imagine> with the photo's path on your computer (photos the person sends are in ~/Uploads). At most one per reply; the result is attached to your reply. Simple exact edits (crop, resize, rotate, brightness, text on top, collage, convert) are better done with Python Pillow or ImageMagick on your computer, then attach the file. Don't say which tool or company makes pictures.";
+const IMAGINE_OFF = "PICTURES: AI picture making isn't switched on for this person yet. If they ask you to generate a new AI image or do an AI photo edit, tell them in one line that they can switch it on by adding their own xAI, OpenAI, Google or OpenRouter key in Settings > Models. Meanwhile you can still edit their photos exactly (crop, resize, rotate, filters, text, collages, background color) with Python Pillow or ImageMagick on your computer and attach the result, and draw graphics or charts with code.";
 
 /** Usage for one picture from the image tool: premium usage first, then credits (never the free Lamina pool). */
 const IMAGES: ModelInfo = { id: "images", label: "Image making", short: "Images", maker: "", blurb: "", pool: "premium", price: { in: 0, out: 0 } };
-async function imagine(userId: string, convo: string, ctx: { agent: string; convo: string; messageId: string }, idea: string, signal: AbortSignal): Promise<{ item?: FileItem; note: string }> {
+async function imagine(userId: string, convo: string, ctx: { agent: string; convo: string; messageId: string }, idea: { prompt: string; edit?: string }, signal: AbortSignal, own: ImageKey | null): Promise<{ item?: FileItem; note: string }> {
   const ok = await rateLimit(`img:h:${userId}`, IMAGES_PER_HOUR, 3_600_000).catch(() => false);
   if (!ok) return { note: "I've made a lot of pictures this hour, so try again in a bit" };
-  const t = await beginTurn({ userId, model: IMAGES, convo, agent: ctx.agent, kind: "chat", prompt: [{ content: idea }] }).catch(() => null);
-  if (!t) return { note: "I couldn't make the picture right now" };
-  if (isBlocked(t)) return { note: t.reason === "premium_locked" ? "making pictures needs Pro or credits, so I couldn't make it" : "you're out of premium usage and credits for pictures, so I couldn't make it" };
+  // A photo edit: the picture comes off the agent's computer (your uploads land in ~/Uploads).
+  let source: { data: Buffer; mime: string } | undefined;
+  if (idea.edit) {
+    const path = idea.edit.replace(/^~(?=\/)/, "/home/agent");
+    const got = path.startsWith("/home/agent/") ? await pullDesktop(userId, path).catch(() => null) : null;
+    const data = got?.b64 ? Buffer.from(got.b64, "base64") : null;
+    const kind = data ? sniff(path, data) : null;
+    if (!data || kind?.kind !== "image" || kind.mime === "image/gif") return { note: got?.error === "too big" ? "that photo is too big to edit (max 10 MB)" : "I couldn't find that photo on my computer to edit" };
+    source = { data, mime: kind.mime };
+  }
+  // Your own key (Settings > Models): billed by your provider, not metered here.
+  const t = own ? null : await beginTurn({ userId, model: IMAGES, convo, agent: ctx.agent, kind: "chat", prompt: [{ content: idea.prompt }] }).catch(() => null);
+  if (!own && !t) return { note: "I couldn't make the picture right now" };
+  if (t && isBlocked(t)) return { note: t.reason === "premium_locked" ? "making pictures needs Pro or credits, so I couldn't make it" : "you're out of premium usage and credits for pictures, so I couldn't make it" };
   try {
-    const g = await generateImage(idea, signal);
-    t.add({ model: "images", promptTokens: 0, completionTokens: 0, costUsd: g.costUsd, estimated: false });
+    const g = await generateImage(idea.prompt, signal, { key: own, source });
+    if (t && !isBlocked(t)) t.add({ model: "images", promptTokens: 0, completionTokens: 0, costUsd: g.costUsd, estimated: false });
     const ext = g.data[0] === 0xff ? "jpg" : "png";
-    const name = `${idea.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "picture"}.${ext}`;
+    const stem = idea.edit ? `${(idea.edit.split("/").pop() || "photo").replace(/\.[a-z0-9]+$/i, "")}-edited` : idea.prompt;
+    const name = `${stem.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "picture"}.${ext}`;
     return { item: await saveGenerated(userId, ctx, name, g.data), note: "" };
   } catch (e) {
     console.error(`[imagine] ${e instanceof ModelError ? e.message : (e as Error).message}`);
-    return { note: "the picture couldn't be made right now" };
+    return { note: idea.edit ? "the photo edit couldn't be made right now" : "the picture couldn't be made right now" };
   } finally {
-    await t.settle().catch((e: Error) => console.error(`[billing] image settle: ${e.message}`));
+    if (t && !isBlocked(t)) await t.settle().catch((e: Error) => console.error(`[billing] image settle: ${e.message}`));
   }
 }
 

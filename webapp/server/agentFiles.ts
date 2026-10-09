@@ -14,7 +14,7 @@ export const FILE_MAX = Number(process.env.LEXARI_FILE_MAX || 10 * 1024 * 1024);
 const KEEP = 200; // newest files kept per person
 const HOME = "/home/agent";
 
-export type FileKind = "image" | "text" | "code" | "pdf" | "other";
+export type FileKind = "image" | "video" | "text" | "code" | "pdf" | "other";
 export type FileItem = { id: string; name: string; size: number; mime: string; kind: FileKind };
 
 const CODE = /\.(py|js|mjs|cjs|ts|tsx|jsx|sh|bash|rb|go|rs|java|kt|c|h|cpp|hpp|cs|php|sql|swift|lua|r|pl|yaml|yml|toml|ini|json|css|scss)$/i;
@@ -28,6 +28,9 @@ export function sniff(name: string, b: Buffer): { mime: string; kind: FileKind }
   if (h.toString("latin1", 0, 6) === "GIF87a" || h.toString("latin1", 0, 6) === "GIF89a") return { mime: "image/gif", kind: "image" };
   if (h.toString("latin1", 0, 4) === "RIFF" && h.toString("latin1", 8, 12) === "WEBP") return { mime: "image/webp", kind: "image" };
   if (h.toString("latin1", 0, 5) === "%PDF-") return { mime: "application/pdf", kind: "pdf" };
+  // MP4 / MOV (ISO base media: "ftyp" box first) and WebM (EBML): videos the agent made play inline
+  if (h.toString("latin1", 4, 8) === "ftyp" && /^(isom|iso[2-9]|mp4[12]|avc1|M4V |qt  |dash|mmp4)$/.test(h.toString("latin1", 8, 12))) return { mime: "video/mp4", kind: "video" };
+  if (h[0] === 0x1a && h[1] === 0x45 && h[2] === 0xdf && h[3] === 0xa3 && /\.webm$/i.test(name)) return { mime: "video/webm", kind: "video" };
   const head = b.subarray(0, 16384);
   const textish = !head.includes(0) && (() => { try { new TextDecoder("utf-8", { fatal: true }).decode(head.length === b.length ? head : head.subarray(0, lastBoundary(head))); return true; } catch { return false; } })();
   if (textish) {

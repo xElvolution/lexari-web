@@ -5,7 +5,7 @@ import Icon from "../Icon";
 import { downloadUrl, fileUrl, sizeLabel, typeLabel, type FileKind } from "@/lib/files";
 
 type CardFile = { id: string; name: string; size: number | string; mime?: string; kind?: FileKind };
-const ICON: Record<FileKind, string> = { image: "camera", text: "list", code: "terminal", pdf: "file", other: "box" };
+const ICON: Record<FileKind, string> = { image: "camera", video: "play", text: "list", code: "terminal", pdf: "file", other: "box" };
 
 /** First lines of a text or code file, fetched once when the card shows. */
 function Peek({ id }: { id: string }) {
@@ -36,6 +36,9 @@ export default function FileCard({ f, mine = false }: { f: CardFile; mine?: bool
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img data-file-preview src={fileUrl(f.id)} alt={f.name} onError={() => setBroken(true)} className="block max-h-[320px] w-full object-contain" loading="lazy" />
         </button>
+      )}
+      {kind === "video" && !broken && (
+        <video data-file-video src={fileUrl(f.id)} controls playsInline preload="metadata" onError={() => setBroken(true)} className="block max-h-[420px] w-full bg-black" />
       )}
       {(kind === "text" || kind === "code") && <div className={mine ? "bg-black/10" : "border-b border-line bg-tint/60"}><Peek id={f.id} /></div>}
       <div className="flex items-center gap-2.5 p-2">
