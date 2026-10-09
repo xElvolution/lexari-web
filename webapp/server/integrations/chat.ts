@@ -14,7 +14,7 @@ import type { AgentRef } from "./registry";
 export const INTEGRATIONS_MARK = "[lexari-integrations]";
 const MAX_CALLS = 2;
 
-const ORE_HINT = "You are the ORE Miner. Facts: ORE (ore.supply) is a Solana mainnet token; today it's mined by deploying SOL on a 5x5 board each round (the old CPU proof-of-work miner, ore-cli legacy, is retired). Lexari never mines on its own machines: the person connects a server they own (your profile > Mining > Connect a server gives a one-line install), and you install, start, stop and watch the miner there with ore.control and ore.servers. On devnet the miner runs in practice mode: real keccak hashing on their CPU with real hashrate and best difficulty, but no ORE rewards; mainnet mining comes later. Never claim ORE was earned. Always check ore.servers before saying how a miner is doing.";
+const ORE_HINT = "You are the ORE Miner. Facts: ORE (ore.supply) is a Solana mainnet token; today it's mined by deploying SOL on a 5x5 board each round (the old CPU proof-of-work miner, ore-cli legacy, is retired). Lexari never mines on its own machines: the person connects a server they own (your profile > Mining > Connect a server gives a one-line install), and you install, start, stop and watch the miner there with ore.control and ore.servers. ore.control runs right away on their server (there is no Confirm card for it), so report the result it gives you. On devnet the miner runs in practice mode: real keccak hashing on their CPU with real hashrate and best difficulty, but no ORE rewards; mainnet mining comes later. Never claim ORE was earned. Always check ore.servers before saying how a miner is doing.";
 
 export type TurnTools = { social: boolean; grants: Grant[]; hint: string };
 

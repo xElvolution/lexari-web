@@ -47,7 +47,7 @@ export default function Detail({ slug }: { slug: string }) {
   const reviews = [...a.review.map((r, i) => ({ ...r, when: i ? "1 week ago" : "3 days ago" })), ...EXTRA_REVIEWS];
   const stats = [
     { top: <>{a.rating}<Icon name="star" size={14} className="text-brand-ink" /></>, sub: `${a.reviews} reviews` },
-    { top: compact(m.hires), sub: "Hires" },
+    a.free ? { top: "Free", sub: "No seat" } : { top: compact(m.hires), sub: "Hires" },
     { top: <span className="rounded-md border-2 border-ink/70 px-1.5 text-[14px] leading-tight">{m.age}</span>, sub: "Age rating" },
     { top: <Icon name="spark" size={18} />, sub: a.speed.replace("Usually done in ", "~") },
   ];
@@ -75,7 +75,7 @@ export default function Detail({ slug }: { slug: string }) {
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px]">
             <span className="rounded-full bg-tint px-2.5 py-1 font-semibold text-ink">{m.cat}</span>
             <span className="rounded-full bg-tint px-2.5 py-1 font-semibold text-ink">{a.job}</span>
-            {m.free && <span className="rounded-full bg-tint px-2.5 py-1 font-semibold text-brand-ink">Free to try</span>}
+            {(a.free || m.free) && <span className="rounded-full bg-tint px-2.5 py-1 font-semibold text-brand-ink">{a.free ? "Free · no seat" : "Free to try"}</span>}
             {m.isNew && <span className="rounded-full bg-ink px-2.5 py-1 font-semibold text-[var(--bg)]">New</span>}
           </div>
           <dl className="mt-5 grid max-w-[560px] grid-cols-4 divide-x divide-[var(--line)]">
@@ -85,7 +85,7 @@ export default function Detail({ slug }: { slug: string }) {
             {hired ? (
               <>
                 <Link href={`/agents/${a.slug}`} className="inline-flex h-12 items-center gap-2 rounded-full bg-grape px-7 text-[16px] font-bold text-white hover:bg-grape-deep">Chat with {a.name}<Icon name="arrow" size={17} /></Link>
-                <button onClick={() => { release(a.slug); toast({ text: `${a.name} left your team.`, face: a.seed, color: a.color }); }} className="inline-flex h-12 items-center rounded-full px-5 text-[15px] font-bold text-ink ring-1 ring-line hover:ring-grape">Release seat</button>
+                <button onClick={() => { release(a.slug); toast({ text: `${a.name} left your team.`, face: a.seed, color: a.color }); }} className="inline-flex h-12 items-center rounded-full px-5 text-[15px] font-bold text-ink ring-1 ring-line hover:ring-grape">{a.free ? "Release" : "Release seat"}</button>
               </>
             ) : <HireBtn a={a} size="lg" faceEl={() => face.current} />}
             <button onClick={() => { navigator.clipboard?.writeText(location.href).catch(() => {}); toast({ text: "Link copied" }); }} aria-label="Share" className="grid h-12 w-12 place-items-center rounded-full bg-tint text-ink hover:bg-grape hover:text-white"><Icon name="copy" size={18} /></button>

@@ -49,7 +49,7 @@ export function MinerSheet({ onClose }: { onClose: () => void }) {
   useEffect(() => { if (pending && pending.status !== "waiting") { toast({ text: `${pending.name} connected` }); setConnect(null); } }, [pending]);
   const start = async (id?: string) => {
     setBusy("connect");
-    try { const r = await api<{ id: string; command: string }>("/api/miner/hosts", { body: { op: "connect", name: name || undefined, ...(id ? { id } : {}) } }); setConnect(r); void load(); }
+    try { const r = await api<{ id: string; command: string }>("/api/miner/hosts", { body: { op: "connect", name: name || undefined, ...(id ? { id } : {}) } }); setConnect(r); setName(""); void load(); }
     catch (e) { toast({ text: friendly(e, "Couldn't make an install line.") }); }
     finally { setBusy(""); }
   };

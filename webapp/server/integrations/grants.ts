@@ -132,7 +132,8 @@ export async function removeIntegration(userId: string, id: string) {
 /** Integrations this agent can use right now: you linked a social account, added it, switched it on and granted it this agent. */
 export async function usableGrants(userId: string, slug: string) {
   const own = builtinGrants(userId, slug);
-  if (!(await hasVerifiedSocial(userId))) return { social: false, grants: own.filter((g) => !integrationById(g.connector)?.moves) };
+  // Built-ins don't need the social gate: agent payments spend only what you funded the agent with, inside its budget.
+  if (!(await hasVerifiedSocial(userId))) return { social: false, grants: own };
   const rows = await db().select().from(integrationGrants).where(and(eq(integrationGrants.userId, userId), eq(integrationGrants.enabled, true), sql`${slug} = any(${integrationGrants.agentSlugs})`));
   return { social: true, grants: [...rows.filter((g) => INTEGRATIONS.some((i) => i.id === g.connector && i.addable)), ...own] };
 }

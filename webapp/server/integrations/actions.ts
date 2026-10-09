@@ -168,7 +168,7 @@ export async function confirmAction(userId: string, id: string): Promise<ActionC
   if (!tool?.execute || !info) return cardOf(await finish(a.id, { status: "failed", error: "This integration can't run that any more." }));
   if (Date.now() - a.createdAt.getTime() > EXPIRE_MS) return cardOf(await finish(a.id, { status: "expired", error: "This quote expired. Ask again for a fresh one." }));
   if (!isDevnet()) return cardOf(await finish(a.id, { status: "rejected", error: "Execution is off: devnet and testnets only." }));
-  if (!(await hasVerifiedSocial(userId))) throw new HttpError(403, "Link an X, Discord or Telegram account in Settings to use integrations.");
+  if (!isBuiltin(a.connector) && !(await hasVerifiedSocial(userId))) throw new HttpError(403, "Link an X, Discord or Telegram account in Settings to use integrations.");
   if (!(await rateLimit(`int:confirm:${userId}`, CONFIRMS_PER_HOUR, 3_600_000))) throw new HttpError(429, "That's a lot of transactions this hour. Wait a bit and try again.");
   const agentRow = await ownAgent(userId, a.agentSlug).catch(() => null);
   if (!agentRow) return cardOf(await finish(a.id, { status: "rejected", error: "That agent isn't on your team any more." }));
