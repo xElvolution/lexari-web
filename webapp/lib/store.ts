@@ -9,7 +9,7 @@ import { cheer, isWarm, isWarmReaction, setMood } from "./mood";
 import type { FaceLook } from "@shared/components/avatar";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
-  PLANS, SPECIALISTS, WALLETS, registerCustom, shortAddr,
+  FREE_SLUGS, PLANS, SPECIALISTS, WALLETS, registerCustom, shortAddr,
   type CustomAgent, type Job, type MemoryTag, type PlanId, type ToneId, type WalletId,
 } from "@/content/appData";
 import type { Account } from "@/server/account";
@@ -418,10 +418,10 @@ export function dropHubPending(sig: string) { hubPending.delete(sig); }
 /* ---------- helpers ---------- */
 /** The current plan. Every agent (yours, hired, made by you) takes a seat. */
 export const planOf = (s: State) => ({ ...(PLANS.find((p) => p.id === s.plan) ?? PLANS[0]), seats: s.planInfo?.seats ?? 1, expiresAt: s.planInfo?.expiresAt ?? null });
-export const seatsUsed = (s: State) => 1 + s.hired.length + s.custom.length;
+export const seatsUsed = (s: State) => 1 + s.hired.filter((h) => !FREE_SLUGS.includes(h)).length + s.custom.length;
 export const seatsLeft = (s: State) => planOf(s).seats - seatsUsed(s);
 /** Agents past your plan's seats (newest first to lose a seat). Their chats and data stay; they wait for an upgrade. */
-export const lockedAgents = (s: State) => [...s.hired, ...s.custom.map((c) => c.id)].sort((a, b) => (s.born[a] || 0) - (s.born[b] || 0)).slice(Math.max(0, planOf(s).seats - 1));
+export const lockedAgents = (s: State) => [...s.hired.filter((h) => !FREE_SLUGS.includes(h)), ...s.custom.map((c) => c.id)].sort((a, b) => (s.born[a] || 0) - (s.born[b] || 0)).slice(Math.max(0, planOf(s).seats - 1));
 export const isLocked = (s: State, id: string) => id !== "home" && lockedAgents(s).includes(id);
 export const agentName = (s: State | null) => s?.agent?.name || "Your agent";
 export const jobNo = (id: number) => `#${String(id).padStart(3, "0")}`;

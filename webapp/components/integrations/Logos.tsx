@@ -37,6 +37,22 @@ export function IntegrationLogo({ id, size = 44, className = "" }: { id: Integra
       return tile("#16161d", (
         <svg width={g} height={g} viewBox="0 0 24 24"><path fill="#fff" d="M5 5.5h14v3.2h-5.3V19h-3.4V8.7H5z" /></svg>
       ));
+    case "panta":
+      return tile("linear-gradient(140deg,#0f172a,#1e3a8a)", (
+        <svg width={g} height={g} viewBox="0 0 24 24" fill="none"><path d="M6 19V5h6.5a4.5 4.5 0 0 1 0 9H6" stroke="#fff" strokeWidth="2.4" strokeLinejoin="round" /><circle cx="17.5" cy="17.5" r="2" fill="#38bdf8" /></svg>
+      ));
+    case "payments":
+      return tile("linear-gradient(140deg,#0f9f6e,#22c55e)", (
+        <svg width={g} height={g} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="6" width="18" height="12" rx="3" /><path d="M3 10h18M7 15h3" /></svg>
+      ));
+    case "ore":
+      return tile("#1a1206", (
+        <svg width={g} height={g} viewBox="0 0 24 24"><path fill="#f5a524" d="m12 3 7.5 4.5v9L12 21l-7.5-4.5v-9z" /><path fill="#1a1206" d="m12 7.2 3.8 2.3v4.9L12 16.8l-3.8-2.4V9.5z" /></svg>
+      ));
+    case "solami":
+      return tile("#111", (
+        <svg width={g} height={g} viewBox="0 0 24 24" fill="none" stroke="#a3e635" strokeWidth="2.2" strokeLinecap="round"><path d="M5 8h14M5 12h10M5 16h6" /></svg>
+      ));
     case "prices":
       return tile("linear-gradient(140deg,#5b2bff,#8f6bff)", (
         <svg width={g} height={g} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 17.5 9 12l3.5 3.5L20.5 7" /><path d="M15.5 7h5v5" /></svg>
@@ -46,17 +62,19 @@ export function IntegrationLogo({ id, size = 44, className = "" }: { id: Integra
 
 const PILL: Record<IntegrationStatus, string> = {
   devnet: "bg-[#e7f8ee] text-[#137a3d]",
+  live: "bg-[#e7f8ee] text-[#137a3d]",
+  needskey: "bg-[#fff4d6] text-[#8a5a00]",
   testnet: "bg-[#e8efff] text-[#2453c9]",
   market: "bg-grape/12 text-brand-ink",
   soon: "bg-tint text-ink/55",
 };
-const DOT: Record<IntegrationStatus, string> = { devnet: "bg-[#22c55e]", testnet: "bg-[#3b6cf0]", market: "bg-grape", soon: "bg-ink/30" };
+const DOT: Record<IntegrationStatus, string> = { devnet: "bg-[#22c55e]", live: "bg-[#22c55e]", needskey: "bg-[#e0a100]", testnet: "bg-[#3b6cf0]", market: "bg-grape", soon: "bg-ink/30" };
 
 /** The honest status pill: Live on devnet, Testnet wallet, Market data or Coming soon. */
 export function StatusPill({ status, className = "" }: { status: IntegrationStatus; className?: string }) {
   return (
     <span data-int-status={status} className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10.5px] font-bold ${PILL[status]} ${className}`}>
-      <i className={`h-1.5 w-1.5 rounded-full ${DOT[status]} ${status === "devnet" ? "animate-pulse" : ""}`} />{STATUS_LABEL[status]}
+      <i className={`h-1.5 w-1.5 rounded-full ${DOT[status]} ${status === "devnet" || status === "live" ? "animate-pulse" : ""}`} />{STATUS_LABEL[status]}
     </span>
   );
 }

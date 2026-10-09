@@ -15,7 +15,11 @@ import { HttpError, rateLimit } from "../http";
 import { connection } from "../hub/chain";
 import { ownAgent, solanaKeypair } from "../agentWallets";
 import { hasVerifiedSocial } from "../social";
-import { COUNTED, spentToday, type Grant } from "./grants";
+import { COUNTED, isBuiltin, spentToday, type Grant } from "./grants";
+import { overBudget } from "../agentpay/budgets";
+import { recordTx } from "../txlog";
+import { TEMPO, tempoReceipt } from "./tempo";
+import type { Executed } from "./registry";
 import { Reject, toolByName, type AgentRef, type ToolDef } from "./registry";
 import { ChainError, SimError, isDevnet, network } from "./solana";
 import { cardOf, type Preview } from "./cards";
@@ -83,7 +87,14 @@ export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: un
     await record(ctx, tool, parsed.data, "rejected", { error: why });
     return { kind: "refused", tool: tool.name, text: why };
   }
-  const preview: Preview = { title: prep.title, rows: prep.rows, network: network(), plan: prep.plan, summary: prep.summary };
+  const preview: Preview = { title: prep.title, rows: prep.rows, network: netOf(prep.chain), plan: prep.plan, summary: prep.summary };
+  if (tool.auto) {
+    // Inside the agent's budget it pays on its own (with a receipt); over it, you get a Confirm card.
+    const why = await overBudget(ctx.userId, ctx.agent.slug, prep.usdMicros);
+    if (!why) return autoRun(ctx, tool, parsed.data, preview, prep);
+    const row = await record(ctx, tool, parsed.data, "prepared", { preview: { ...preview, rows: [...preview.rows, ["Why you're asked", why[0].toUpperCase() + why.slice(1)]] }, usdMicros: prep.usdMicros, chain: prep.chain });
+    return { kind: "action", tool: tool.name, card: cardOf(row) };
+  }
   const over = await overLimit(ctx.userId, info.name, grant, prep.usdMicros);
   if (over) {
     await record(ctx, tool, parsed.data, "rejected", { preview, usdMicros: prep.usdMicros, error: over, chain: prep.chain });
@@ -91,6 +102,33 @@ export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: un
   }
   const row = await record(ctx, tool, parsed.data, "prepared", { preview, usdMicros: prep.usdMicros, chain: prep.chain });
   return { kind: "action", tool: tool.name, card: cardOf(row) };
+}
+
+const netOf = (chain: string) => (chain === "tempo" ? TEMPO.network : chain === "panta" ? "Panta (paper, devnet)" : network());
+
+/** A payment inside the agent's budget: counted toward today first, then executed, with a receipt in the chat. */
+async function autoRun(ctx: Ctx, tool: ToolDef, input: unknown, preview: Preview, prep: { usdMicros: number; chain: string; summary: string }): Promise<CallResult> {
+  const row = await record(ctx, tool, input, "submitting", { preview, usdMicros: prep.usdMicros, chain: prep.chain });
+  try {
+    const r = await tool.execute!(preview.plan as never, ctx.agent);
+    const a = await finish(row.id, { status: r.confirmed ? "confirmed" : "submitted", txSig: r.sig || null, preview: { ...preview, ...(r.rows ? { result: r.rows } : {}) } });
+    await receipt(ctx.userId, a, r);
+    return { kind: "read", tool: tool.name, ok: true, text: r.text || `${prep.summary}.` };
+  } catch (e) {
+    const why = e instanceof SimError || e instanceof Reject ? e.message : e instanceof ChainError ? e.message : "It didn't go through. Nothing was paid.";
+    if (!(e instanceof SimError || e instanceof Reject)) console.error(`[integrations] auto ${tool.name}: ${(e as Error).message?.slice(0, 300)}`);
+    await finish(row.id, { status: "failed", error: why, ...(e instanceof ChainError && e.sig ? { txSig: e.sig } : {}) });
+    return { kind: "read", tool: tool.name, ok: false, text: why };
+  }
+}
+
+/** The chat receipt row for something that moved money (agent payments, Tempo). */
+async function receipt(userId: string, a: typeof integrationActions.$inferSelect, r: Executed) {
+  if (!r.receipt || !a.convo) return;
+  await recordTx(userId, a.convo, {
+    id: `int-${a.id}`.slice(0, 36), kind: a.tool === "tempo.topup" ? "topup" : a.tool.startsWith("tempo.") ? "send" : "pay", status: a.status === "confirmed" ? "confirmed" : "pending", sol: 0, at: Date.now(),
+    agent: a.agentSlug, amount: r.receipt.amount, label: r.receipt.label, ...(r.receipt.net ? { net: r.receipt.net } : {}), ...(r.sig ? { sig: r.sig } : {}), ...(r.receipt.url ? { url: r.receipt.url } : {}),
+  }).catch((e) => console.error(`[integrations] receipt: ${(e as Error).message?.slice(0, 200)}`));
 }
 
 async function overLimit(userId: string, name: string, g: Grant, micros: number, tx = db()) {
@@ -137,6 +175,11 @@ export async function confirmAction(userId: string, id: string): Promise<ActionC
   // Re-check the grant and the limits under a per-person lock, then mark it as being sent (which counts toward today).
   const gate = await db().transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`integration:${userId}:${a.connector}`}))`);
+    if (isBuiltin(a.connector)) {
+      // Built-in (agent payments): your Confirm is the approval for going over the agent's budget.
+      const [moved] = await tx.update(integrationActions).set({ status: "submitting" }).where(and(eq(integrationActions.id, a.id), eq(integrationActions.status, "prepared"))).returning({ id: integrationActions.id });
+      return moved ? null : "busy";
+    }
     const [g] = await tx.select().from(integrationGrants).where(and(eq(integrationGrants.userId, userId), eq(integrationGrants.connector, a.connector))).limit(1);
     if (!g) return `${info.name} was removed, so this can't run.`;
     if (!g.enabled) return `${info.name} is switched off in Settings > Integrations.`;
@@ -152,7 +195,9 @@ export async function confirmAction(userId: string, id: string): Promise<ActionC
   try {
     const r = await tool.execute(plan as never, agentRef(userId, agentRow));
     const preview = { ...((a.preview || {}) as Preview), ...(r.rows ? { result: r.rows } : {}) };
-    return cardOf(await finish(a.id, { status: r.confirmed ? "confirmed" : "submitted", txSig: r.sig, preview }));
+    const done = await finish(a.id, { status: r.confirmed ? "confirmed" : "submitted", txSig: r.sig || null, preview });
+    await receipt(userId, done, r);
+    return cardOf(done);
   } catch (e) {
     if (e instanceof ChainError) return cardOf(await finish(a.id, { status: "failed", txSig: e.sig, error: e.message }));
     const why = e instanceof SimError || e instanceof Reject ? e.message : "It didn't go through. Nothing was sent.";
@@ -172,6 +217,13 @@ export async function cancelAction(userId: string, id: string): Promise<ActionCa
 /** A transaction that was sent but not yet confirmed: check it on chain. */
 async function settle(a: typeof integrationActions.$inferSelect) {
   if (a.status !== "submitted" || !a.txSig) return a;
+  if (a.chain === "tempo") {
+    const rc = await tempoReceipt(a.txSig).catch(() => null);
+    if (rc?.status === "0x1") return finish(a.id, { status: "confirmed" });
+    if (rc?.status) return finish(a.id, { status: "failed", error: "The transfer failed on Tempo." });
+    if (Date.now() - a.createdAt.getTime() > 10 * 60_000) return finish(a.id, { status: "failed", error: "The transfer never landed. Nothing moved." });
+    return a;
+  }
   const st = (await connection().getSignatureStatuses([a.txSig], { searchTransactionHistory: true }).catch(() => null))?.value[0];
   if (st?.err) return finish(a.id, { status: "failed", error: "The transaction failed on Solana." });
   if (st?.confirmationStatus === "confirmed" || st?.confirmationStatus === "finalized") return finish(a.id, { status: "confirmed" });

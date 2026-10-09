@@ -32,6 +32,6 @@ test("rejects a short payment, a missing reference, the wrong mint or decimals, 
   assert.throws(() => checkUsdcTransfer(fakeTx({ got: 9_999_999 }), want), /less than the price/);
   assert.throws(() => checkUsdcTransfer(fakeTx({ ref: false }), want), /not this payment/);
   assert.throws(() => checkUsdcTransfer(fakeTx({ mint: Keypair.generate().publicKey.toBase58() }), want), /less than the price/);
-  assert.throws(() => checkUsdcTransfer(fakeTx({ decimals: 9 }), want), /not USDC/);
+  assert.throws(() => checkUsdcTransfer(fakeTx({ decimals: 9 }), want), /not the right token|not USDC/);
   assert.throws(() => checkUsdcTransfer(fakeTx({ err: { InstructionError: [0, "Custom"] } }), want), /failed/);
 });

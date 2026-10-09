@@ -2,8 +2,8 @@
  * Plans: seats and model usage per account. Bought with a card or USDC through server/billing/entitlements.ts (older
  * purchases were devnet SOL). A purchase counts from startsAt (createdAt when null) until expiresAt.
  */
-import { and, count, desc, eq, gt, sql } from "drizzle-orm";
-import { PLANS, isPeriod, planById, type Period, type PlanId } from "@/content/appData";
+import { and, count, desc, eq, gt, notInArray, sql } from "drizzle-orm";
+import { FREE_SLUGS, PLANS, isPeriod, planById, type Period, type PlanId } from "@/content/appData";
 import { db } from "./db";
 import { agents, planPurchases } from "./db/schema";
 import { HttpError } from "./http";
@@ -22,7 +22,7 @@ export async function currentPlan(userId: string): Promise<CurrentPlan> {
 
 /** Agents on the account: your own agent, hired specialists and the ones you made. Each takes a seat. */
 export async function seatsUsed(userId: string) {
-  const [row] = await db().select({ n: count() }).from(agents).where(eq(agents.userId, userId));
+  const [row] = await db().select({ n: count() }).from(agents).where(and(eq(agents.userId, userId), notInArray(agents.slug, FREE_SLUGS)));
   return Math.max(1, Number(row?.n ?? 1));
 }
 
@@ -41,6 +41,6 @@ export async function assertSeat(userId: string) {
 export async function lockedSlugs(userId: string, seats?: number) {
   const n = seats ?? (await currentPlan(userId)).seats;
   const rows = await db().select({ slug: agents.slug, at: agents.createdAt }).from(agents).where(eq(agents.userId, userId));
-  const order = rows.sort((a, b) => (a.slug === "home" ? -1 : b.slug === "home" ? 1 : a.at.getTime() - b.at.getTime()));
+  const order = rows.filter((r) => !FREE_SLUGS.includes(r.slug)).sort((a, b) => (a.slug === "home" ? -1 : b.slug === "home" ? 1 : a.at.getTime() - b.at.getTime()));
   return order.slice(Math.max(1, n)).map((r) => r.slug);
 }

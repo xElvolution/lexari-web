@@ -22,7 +22,7 @@ export function HireBtn({ a, size = "sm", faceEl }: { a: Specialist; size?: "sm"
   if (hired) return <Link href={`/agents/${a.slug}`} onClick={(e) => e.stopPropagation()} className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-tint font-bold text-brand-ink transition hover:bg-grape hover:text-white ${cls}`}>Open</Link>;
   return (
     <button ref={me} onClick={(e) => { e.preventDefault(); e.stopPropagation(); void hireWithFx(a.slug, faceEl?.() ?? me.current, () => router.push("/team")); }} className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-grape font-bold text-white transition hover:bg-grape-deep ${cls}`}>
-      {s.paid?.includes(a.slug) ? "Hire again · free" : <>Hire · {hirePriceLabel()}</>}
+      {a.free ? "Hire · Free" : s.paid?.includes(a.slug) ? "Hire again · free" : <>Hire · {hirePriceLabel()}</>}
     </button>
   );
 }

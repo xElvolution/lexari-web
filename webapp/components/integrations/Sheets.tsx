@@ -50,7 +50,7 @@ export function CatalogSheet({ added, onPick, onClose }: { added: AddedIntegrati
   const has = (id: string) => added.some((a) => a.connector === id);
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return INTEGRATIONS.filter((i) => (cat === "all" || i.category === cat) && (!t || `${i.name} ${i.blurb} ${i.chains.join(" ")} ${i.tags}`.toLowerCase().includes(t)));
+    return INTEGRATIONS.filter((i) => !i.builtin && (cat === "all" || i.category === cat) && (!t || `${i.name} ${i.blurb} ${i.chains.join(" ")} ${i.tags}`.toLowerCase().includes(t)));
   }, [q, cat]);
   const groups = cat === "all" && !q.trim() ? CATEGORIES.map((c) => ({ c, items: list.filter((i) => i.category === c.id) })).filter((g) => g.items.length) : [{ c: null, items: list }];
   let idx = 0;

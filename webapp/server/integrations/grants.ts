@@ -11,6 +11,7 @@ import { HttpError } from "../http";
 import { hasVerifiedSocial, requireSocial } from "../social";
 import { solanaKeypair } from "../agentWallets";
 import { EVM, evmAddress } from "./evm";
+import { TEMPO } from "./tempo";
 import { addrExplorer } from "./solana";
 import { cardOf } from "./cards";
 
@@ -31,7 +32,7 @@ export async function teamOf(userId: string) {
   return rows.sort((a, b) => Number(b.slug === "home") - Number(a.slug === "home")).map((r) => ({ slug: r.slug, kind: r.kind, name: (r.meta as { nick?: string } | null)?.nick || r.name }));
 }
 
-const CHAIN_OF: Partial<Record<IntegrationId, "solana" | "base" | "ethereum">> = { solana: "solana", orca: "solana", base: "base", ethereum: "ethereum" };
+const CHAIN_OF: Partial<Record<IntegrationId, "solana" | "base" | "ethereum" | "tempo">> = { solana: "solana", orca: "solana", base: "base", ethereum: "ethereum", tempo: "tempo", panta: "solana" };
 
 function addressesFor(userId: string, g: Grant, team: { slug: string; kind: string }[]) {
   const chain = CHAIN_OF[g.connector as IntegrationId];
@@ -42,6 +43,7 @@ function addressesFor(userId: string, g: Grant, team: { slug: string; kind: stri
     try {
       if (chain === "solana") { const addr = solanaKeypair(userId, slug, a.kind).publicKey.toBase58(); return [{ agent: slug, chain: "Solana", address: addr, explorer: addrExplorer(addr) }]; }
       const addr = evmAddress(userId, slug);
+      if (chain === "tempo") return [{ agent: slug, chain: TEMPO.network, address: addr, explorer: TEMPO.explorerAddr(addr) }];
       return [{ agent: slug, chain: EVM[chain].network, address: addr, explorer: `${EVM[chain].explorer}${addr}` }];
     } catch { return []; }
   });
@@ -129,7 +131,18 @@ export async function removeIntegration(userId: string, id: string) {
 
 /** Integrations this agent can use right now: you linked a social account, added it, switched it on and granted it this agent. */
 export async function usableGrants(userId: string, slug: string) {
-  if (!(await hasVerifiedSocial(userId))) return { social: false, grants: [] as Grant[] };
+  const own = builtinGrants(userId, slug);
+  if (!(await hasVerifiedSocial(userId))) return { social: false, grants: own.filter((g) => !integrationById(g.connector)?.moves) };
   const rows = await db().select().from(integrationGrants).where(and(eq(integrationGrants.userId, userId), eq(integrationGrants.enabled, true), sql`${slug} = any(${integrationGrants.agentSlugs})`));
-  return { social: true, grants: rows.filter((g) => INTEGRATIONS.some((i) => i.id === g.connector && i.addable)) };
+  return { social: true, grants: [...rows.filter((g) => INTEGRATIONS.some((i) => i.id === g.connector && i.addable)), ...own] };
+}
+
+/** Built-in connectors this agent always has (agent payments for everyone, the ORE Miner's servers): never in the
+ * integration_grants table; payments are limited by the agent's budget instead of grant limits. */
+export const isBuiltin = (connector: string) => !!integrationById(connector)?.builtin;
+export function builtinGrants(userId: string, slug: string): Grant[] {
+  const now = new Date();
+  return INTEGRATIONS.filter((i) => i.builtin === "all" || (Array.isArray(i.builtin) && i.builtin.includes(slug))).map((i) => ({
+    id: `builtin-${i.id}`, userId, connector: i.id, enabled: true, agentSlugs: [slug], perTxUsd: LIMITS.perTx.max, dailyUsd: LIMITS.daily.max, maxSlippageBps: LIMITS.slippageBps.def, createdAt: now, updatedAt: now,
+  }) as Grant);
 }

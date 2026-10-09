@@ -26,7 +26,7 @@ export const PUT = withUser(async (user, req) => {
   if (!paid) return jsonError(402, "Hire this specialist first.");
   const [on] = await database.select({ id: agents.id }).from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, sp.slug))).limit(1);
   if (on) return Response.json({ ok: true });
-  await assertSeat(user.userId);
+  if (!sp.free) await assertSeat(user.userId);
   await database.insert(agents).values({ userId: user.userId, slug: sp.slug, kind: "hired", name: sp.name, role: sp.job, tone: "" }).onConflictDoNothing();
   return Response.json({ ok: true });
 });
@@ -45,6 +45,14 @@ export const POST = withUser(async (user, req) => {
   if ("pay" in body) {
     const [on] = await database.select({ id: agents.id }).from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, sp.slug))).limit(1);
     if (on) return Response.json({ ok: true, already: true });
+    if (sp.free) {
+      // Free specialists (the ORE Miner): no charge and no seat.
+      await database.insert(hires).values({ buyerId: user.userId, tx: `free:${user.userId}:${sp.slug}`, slug: sp.slug, mint: "USD", amount: 0, payer: "free" }).onConflictDoNothing();
+      await database.insert(agents).values({ userId: user.userId, slug: sp.slug, kind: "hired", name: sp.name, role: sp.job, tone: "" }).onConflictDoNothing();
+      await recordEvent(user.userId, "hire", { ref: `free:${sp.slug}` });
+      await notify(user.userId, { kind: "hire", title: `${sp.name} joined your team`, body: `Free. Say hi to ${sp.name}, your ${sp.job.toLowerCase()} agent.`, url: `/agents/${sp.slug}`, key: `hire:free:${user.userId}:${sp.slug}` });
+      return Response.json({ ok: true, charged: 0 });
+    }
     await assertSeat(user.userId);
     const micros = Math.round(HIRE_USD * 1_000_000);
     const ref = `hire:${user.userId}:${sp.slug}`;

@@ -27,10 +27,13 @@ async function run(slug: string, faceEl: HTMLElement | null): Promise<"ok" | "fu
     toast({ text: `${sp.name} is already on your team`, face: sp.seed, color: sp.color });
     return "already";
   }
-  if (seatsLeft(s) <= 0) { openUpgrade(s.plan === "free" ? "hire" : "full"); return "full"; }
+  if (!sp.free && seatsLeft(s) <= 0) { openUpgrade(s.plan === "free" ? "hire" : "full"); return "full"; }
   const before = s.paid.includes(slug);
   let paidNow = false;
-  if (before) {
+  if (sp.free && !before) {
+    try { await api("/api/hires", { body: { slug, pay: "balance" } }); void refreshHub(); }
+    catch (e) { toast({ text: friendly(e, "Could not hire them."), face: "home" }); return "unpaid"; }
+  } else if (before) {
     try { await api("/api/hires", { method: "PUT", body: { slug } }); }
     catch (e) { if ((e as { status?: number }).status === 402) { openUpgrade("hire"); return "full"; } toast({ text: friendly(e, "Could not add them back."), face: "home" }); return "unpaid"; }
   } else {
@@ -46,8 +49,9 @@ async function run(slug: string, faceEl: HTMLElement | null): Promise<"ok" | "fu
   const r = hire(slug);
   if (r === "ok") {
     flyToSeats(faceEl);
-    if (paidNow) celebrate({ title: `${sp.name} joined your team`, body: `${sp.job}. Paid ${hirePriceLabel()} from your balance.`, art: createElement(AgentTile, { id: slug, look: null, size: 96, radius: 30 }), cta: { label: "Say hi", href: `/agents/${slug}` } });
-    toast({ text: before ? `${sp.name} is back on your team` : `${sp.name} joined your team · ${hirePriceLabel()}`, face: sp.seed, color: sp.color });
+    if (sp.free && !before) celebrate({ title: `${sp.name} joined your team`, body: `${sp.job}. Free, and it doesn't take a seat.`, art: createElement(AgentTile, { id: slug, look: null, size: 96, radius: 30 }), cta: { label: "Say hi", href: `/agents/${slug}` } });
+    else if (paidNow) celebrate({ title: `${sp.name} joined your team`, body: `${sp.job}. Paid ${hirePriceLabel()} from your balance.`, art: createElement(AgentTile, { id: slug, look: null, size: 96, radius: 30 }), cta: { label: "Say hi", href: `/agents/${slug}` } });
+    toast({ text: before ? `${sp.name} is back on your team` : `${sp.name} joined your team · ${sp.free ? "Free" : hirePriceLabel()}`, face: sp.seed, color: sp.color });
   } else {
     toast({ text: `${sp.name} is already on your team`, face: sp.seed, color: sp.color });
   }

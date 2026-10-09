@@ -12,16 +12,23 @@ import type { Keypair } from "@solana/web3.js";
 import type { IntegrationId, MarketsCard } from "@/content/integrations";
 import { EVM, evmAddress, evmBalances, type EvmChain } from "./evm";
 import { jupiterQuote, polymarketMarkets, spotUsd } from "./market";
+import { EXTRA_TOOLS } from "./extra";
 import { SOL_RESERVE_LAMPORTS, balances, feePayer, fmtAmount, isDevnet, network, orcaQuote, orcaSwap, parseAddress, transfer, type Asset } from "./solana";
 
 export type AgentRef = { slug: string; kind: string; name: string; userId: string; keypair: () => Keypair };
 export type GrantLimits = { perTxUsd: number; dailyUsd: number; maxSlippageBps: number };
 export type ReadResult = { text: string; markets?: MarketsCard; summary: string };
 export type Prepared = { title: string; rows: [string, string][]; usdMicros: number; chain: string; plan: Record<string, unknown>; summary: string };
-export type Executed = { sig: string; confirmed: boolean; rows?: [string, string][] };
+export type Executed = {
+  sig: string; confirmed: boolean; rows?: [string, string][];
+  /** what the agent hears after an auto (within budget) payment */
+  text?: string;
+  /** a receipt row in the chat (kind "pay"): amount and label already formatted */
+  receipt?: { amount: string; label: string; net?: string; url?: string };
+};
 
-/** A request the agent made that can't be prepared as asked (bad input, not enough funds, over a limit). */
-export class Reject extends Error {}
+import { Reject } from "./reject";
+export { Reject };
 
 export type ToolDef = {
   name: string;
@@ -33,6 +40,8 @@ export type ToolDef = {
   run?: (input: never, agent: AgentRef) => Promise<ReadResult>;
   prepare?: (input: never, agent: AgentRef, limits: GrantLimits) => Promise<Prepared>;
   execute?: (plan: never, agent: AgentRef) => Promise<Executed>;
+  /** sign tools that run on their own inside the agent's budget (server/agentpay/budgets.ts); over it they're a Confirm card */
+  auto?: boolean;
 };
 
 const num = z.union([z.number(), z.string().regex(/^\s*\$?\d+(\.\d+)?\s*$/).transform((s) => Number(s.replace(/[$\s]/g, "")))]);
@@ -209,5 +218,5 @@ const pricesTool: ToolDef = {
   },
 };
 
-export const TOOLS: ToolDef[] = [solanaWallet, solanaTransfer, orcaQuoteTool, orcaSwapTool, jupiterQuoteTool, polymarketTool, evmWallet("base"), evmWallet("ethereum"), pricesTool];
+export const TOOLS: ToolDef[] = [solanaWallet, solanaTransfer, orcaQuoteTool, orcaSwapTool, jupiterQuoteTool, polymarketTool, evmWallet("base"), evmWallet("ethereum"), pricesTool, ...EXTRA_TOOLS];
 export const toolByName = (name: string) => TOOLS.find((t) => t.name === name.trim().toLowerCase());

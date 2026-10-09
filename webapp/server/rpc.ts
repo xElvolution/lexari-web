@@ -3,7 +3,8 @@
  *
  * Which endpoint (first match wins):
  *   1. SOLANA_RPC set to anything that is not a public solana.com endpoint (your own provider, a local validator)
- *   2. HELIUS_API_KEY: Helius for the configured cluster (devnet.helius-rpc.com or mainnet.helius-rpc.com)
+ *   2. SOLAMI_API_KEY on mainnet: Solami RPC (sendTransaction with a tip routes through Beam; see server/solami.ts)
+ *   2b. HELIUS_API_KEY: Helius for the configured cluster (devnet.helius-rpc.com or mainnet.helius-rpc.com)
  *   3. SOLANA_RPC / NEXT_PUBLIC_SOLANA_RPC as given, else the public endpoint for the cluster
  *
  * Every call goes through a fetch with bounded backoff on 429 and 5xx (honouring Retry-After), and when a private
@@ -16,10 +17,13 @@ export const cluster = () => (process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "mainne
 export const publicRpcUrl = () => (cluster() === "mainnet-beta" ? "https://api.mainnet-beta.solana.com" : "https://api.devnet.solana.com");
 const isPublicSolana = (u: string) => /^https?:\/\/api\.(devnet|mainnet-beta|testnet)\.solana\.com\/?$/i.test(u.trim());
 
-export type RpcSource = "custom" | "helius" | "public";
+export type RpcSource = "custom" | "solami" | "helius" | "public";
 export function rpcChoice(): { url: string; source: RpcSource } {
   const override = (process.env.SOLANA_RPC || "").trim();
   if (override && !isPublicSolana(override)) return { url: override, source: "custom" };
+  // Solami (server/solami.ts) serves Solana mainnet only; on mainnet it's the data path when SOLAMI_API_KEY is set.
+  const solami = (process.env.SOLAMI_API_KEY || "").trim();
+  if (solami && cluster() === "mainnet-beta") return { url: `https://rpc.solami.dev/sol?api_key=${encodeURIComponent(solami)}`, source: "solami" };
   const key = (process.env.HELIUS_API_KEY || "").trim();
   if (key) return { url: `https://${cluster() === "mainnet-beta" ? "mainnet" : "devnet"}.helius-rpc.com/?api-key=${encodeURIComponent(key)}`, source: "helius" };
   const pub = (process.env.NEXT_PUBLIC_SOLANA_RPC || "").trim();

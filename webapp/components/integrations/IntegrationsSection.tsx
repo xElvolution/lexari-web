@@ -69,7 +69,7 @@ export default function IntegrationsSection({ s }: { s: State }) {
     <div data-integrations data-int-state="open">
       <section className="grain relative overflow-hidden rounded-[22px] bg-[linear-gradient(130deg,#2a0f9a,#5b2bff_60%,#8f6bff)] p-5 text-white">
         <div aria-hidden className="pointer-events-none absolute -right-6 -top-6 flex rotate-12 gap-2 opacity-25">
-          {INTEGRATIONS.slice(0, 4).map((i, n) => <span key={i.id} style={{ animation: `hub-float ${3 + n * 0.4}s ease-in-out ${n * 0.3}s infinite` }}><IntegrationLogo id={i.id} size={40} /></span>)}
+          {INTEGRATIONS.filter((i) => !i.builtin).slice(0, 4).map((i, n) => <span key={i.id} style={{ animation: `hub-float ${3 + n * 0.4}s ease-in-out ${n * 0.3}s infinite` }}><IntegrationLogo id={i.id} size={40} /></span>)}
         </div>
         <div className="relative flex items-start gap-4">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15"><Icon name="plug" size={24} /></span>
@@ -123,8 +123,8 @@ function Locked({ s }: { s: State }) {
           </div>
         </div>
         <div className="mt-4 flex items-center gap-2">
-          <div className="flex -space-x-2">{INTEGRATIONS.slice(0, 6).map((i) => <span key={i.id} className="rounded-[12px] ring-2 ring-[#3d1fc4]"><IntegrationLogo id={i.id} size={30} /></span>)}</div>
-          <span className="text-[12.5px] font-semibold text-white/75">{INTEGRATIONS.length} integrations waiting</span>
+          <div className="flex -space-x-2">{INTEGRATIONS.filter((i) => !i.builtin).slice(0, 6).map((i) => <span key={i.id} className="rounded-[12px] ring-2 ring-[#3d1fc4]"><IntegrationLogo id={i.id} size={30} /></span>)}</div>
+          <span className="text-[12.5px] font-semibold text-white/75">{INTEGRATIONS.filter((i) => !i.builtin).length} integrations waiting</span>
         </div>
       </section>
       <SocialConnect s={s}>

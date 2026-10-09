@@ -26,14 +26,15 @@ test("tool tags never reach the screen, even half written", () => {
 test("registry: every addable integration has tools, coming soon ones have none", () => {
   for (const i of INTEGRATIONS) {
     const tools = TOOLS.filter((t) => t.connector === i.id);
+    if (i.builtin) { assert.equal(i.addable, false); assert.ok(tools.length > 0, `${i.id} (built in) has tools`); continue; }
     if (i.addable) assert.ok(tools.length > 0, `${i.id} has tools`);
     else assert.equal(tools.length, 0, `${i.id} has no tools`);
     if (i.status === "soon") assert.equal(i.addable, false);
     // moving money only on devnet integrations
-    if (i.moves) assert.equal(i.status, "devnet");
+    if (i.moves) assert.ok(["devnet", "live", "needskey"].includes(i.status), `${i.id} moves money only on devnet / testnet`);
     if (tools.some((t) => t.risk === "sign")) assert.ok(i.moves, `${i.id} signs, so it shows limits`);
   }
-  for (const t of TOOLS) assert.ok(INTEGRATIONS.some((i) => i.id === t.connector && i.addable), `${t.name} belongs to an addable integration`);
+  for (const t of TOOLS) assert.ok(INTEGRATIONS.some((i) => i.id === t.connector && (i.addable || i.builtin)), `${t.name} belongs to an addable integration`);
   assert.equal(new Set(TOOLS.map((t) => t.name)).size, TOOLS.length);
   assert.ok(LIMITS.perTx.def <= LIMITS.daily.def && LIMITS.perTx.max <= LIMITS.daily.max);
 });

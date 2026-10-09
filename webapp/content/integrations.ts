@@ -4,11 +4,13 @@
  * an integration is one entry here plus its tools there.
  *
  * Status is honest per connector: "devnet" executes real transactions on Solana devnet, "testnet" reads a testnet
- * wallet (no execution yet), "market" reads live public market data (nothing moves), "soon" is listed but can't be added.
+ * wallet (no execution yet), "live" executes on a non-Solana testnet, "market" reads live public market data (nothing
+ * moves), "needskey" is built but waits for an API key on the server, "soon" is listed but can't be added.
+ * `builtin` ones aren't in the catalog: every agent has them (payments) or one agent does (the ORE Miner's servers).
  */
-export type IntegrationId = "solana" | "orca" | "jupiter" | "polymarket" | "base" | "ethereum" | "tempo" | "prices";
+export type IntegrationId = "solana" | "orca" | "jupiter" | "polymarket" | "panta" | "base" | "ethereum" | "tempo" | "prices" | "payments" | "ore" | "solami";
 export type IntegrationCategory = "chains" | "trading" | "prediction" | "data";
-export type IntegrationStatus = "devnet" | "testnet" | "market" | "soon";
+export type IntegrationStatus = "devnet" | "live" | "testnet" | "market" | "needskey" | "soon";
 
 export type IntegrationInfo = {
   id: IntegrationId;
@@ -28,6 +30,8 @@ export type IntegrationInfo = {
   can: { text: string; live: boolean }[];
   /** search words */
   tags: string;
+  /** always on (not in the catalog): "all" agents, or only these agent slugs */
+  builtin?: "all" | string[];
 };
 
 export const CATEGORIES: { id: IntegrationCategory; label: string }[] = [
@@ -39,7 +43,9 @@ export const CATEGORIES: { id: IntegrationCategory; label: string }[] = [
 
 export const STATUS_LABEL: Record<IntegrationStatus, string> = {
   devnet: "Live on devnet",
+  live: "Live on testnet",
   testnet: "Testnet wallet",
+  needskey: "Needs API key",
   market: "Market data",
   soon: "Coming soon",
 };
@@ -95,11 +101,39 @@ export const INTEGRATIONS: IntegrationInfo[] = [
     tags: "price btc eth sol data feed spot",
   },
   {
-    id: "tempo", name: "Tempo", category: "chains", status: "soon", addable: false, moves: false, chains: ["Tempo"],
-    blurb: "Stablecoin payments chain.",
-    about: "Stablecoin payments and transfers on Tempo. Coming soon.",
-    can: [{ text: "Stablecoin balances and transfers", live: false }],
-    tags: "stablecoin payments stripe",
+    id: "tempo", name: "Tempo", category: "chains", status: "live", addable: true, moves: true, chains: ["Tempo Moderato testnet"],
+    blurb: "Stablecoin wallet, sends and top-ups on Tempo testnet.",
+    about: "Each agent gets its own Tempo address. Agents read their pathUSD and AlphaUSD balances, get test stablecoins from the Tempo faucet, send to an address you approve and top up your Lexari balance from their Tempo wallet. Fees are paid in the stablecoin itself. Every send waits for your Confirm.",
+    can: [{ text: "Its Tempo address and stablecoin balances", live: true }, { text: "Test stablecoins from the faucet", live: true }, { text: "Send pathUSD or AlphaUSD, after you confirm", live: true }, { text: "Top up your Lexari balance from its Tempo wallet", live: true }, { text: "Mainnet", live: false }],
+    tags: "stablecoin payments stripe pathusd alphausd tip20 moderato",
+  },
+  {
+    id: "panta", name: "Panta", category: "prediction", status: process.env.NEXT_PUBLIC_PANTA_READY === "1" ? "devnet" : "needskey", addable: true, moves: true, chains: ["Solana"],
+    blurb: "Prediction markets on Solana: research and YES / NO positions.",
+    about: "Your agents browse Panta markets, read live YES / NO prices and get real quotes. On devnet a position you confirm is recorded as a paper position at Panta's real quote (Panta settles in mainnet USDC, so no money moves yet).",
+    can: [{ text: "Browse markets and live YES / NO prices", live: true }, { text: "Real quotes for a position", live: true }, { text: "Paper positions on devnet, after you confirm", live: true }, { text: "Real positions and claims (mainnet)", live: false }],
+    tags: "prediction betting odds yes no markets panta usdc",
+  },
+  {
+    id: "solami", name: "Solami", category: "data", status: "soon", addable: false, moves: false, chains: ["Solana mainnet"],
+    blurb: "Live Solana data and Beam transaction landing.",
+    about: "Solami's RPC, webhooks and Beam power wallet history, incoming transfers and faster transaction landing. Solami serves Solana mainnet, so it switches on with Lexari mainnet.",
+    can: [{ text: "Incoming transfers by webhook", live: false }, { text: "Transactions landed through Beam", live: false }],
+    tags: "rpc data webhooks beam mainnet solami",
+  },
+  {
+    id: "payments", name: "Agent payments", category: "data", status: "devnet", addable: false, moves: true, chains: ["Solana"], builtin: "all",
+    blurb: "Agents pay x402 services and other agents within their budget.",
+    about: "Agents pay per request for x402 services and hire other agents per task, in test USDC from their own wallet. Inside the agent's budget it pays on its own; anything over asks you first.",
+    can: [{ text: "Pay x402 services in devnet USDC", live: true }, { text: "Hire another agent per task", live: true }],
+    tags: "x402 pay budget agent hire",
+  },
+  {
+    id: "ore", name: "ORE mining", category: "data", status: "devnet", addable: false, moves: false, chains: ["Your server"], builtin: ["ore"],
+    blurb: "The ORE Miner runs a miner on a server you own.",
+    about: "Connect your own server with a one-line install. The ORE Miner installs, starts, stops and watches the miner there. Nothing mines on Lexari's machines.",
+    can: [{ text: "Install, start, stop and monitor on your server", live: true }, { text: "ORE rewards (mainnet)", live: false }],
+    tags: "ore mining miner server",
   },
 ];
 

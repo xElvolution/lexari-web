@@ -83,6 +83,7 @@ export type Specialist = {
   review: { who: string; seed: number; text: string; stars: number }[];
   face?: Partial<Variant>; // custom agents pick their own shape, eyes and mouth
   custom?: boolean; // made by you in Create an agent
+  free?: boolean; // hired for free and doesn't take a team seat
 };
 
 const ROSTER_COLORS: ColorKey[] = ["orange", "blue", "green", "yellow", "red", "teal", "pink", "sky"];
@@ -151,6 +152,11 @@ export const SPECIALISTS: Specialist[] = [
     examples: ["Brief me on my space every morning", "Watch three competitors", "List new launches this week"],
     words: ["news", "competitor", "brief", "trend", "market", "scan"],
     review: [{ who: "Uche", seed: 217, stars: 5, text: "My morning read, done for me." }] },
+  { slug: "ore", name: "ORE Miner", job: "ORE mining", cat: "Onchain", quip: "Your server, your ORE. I run the rig.", back: "Explains ORE mining, connects to a server you own, installs and runs the miner there and reports what it earns. Free to hire.", rating: 4.8, jobs: 1, reviews: 0, ...face(13), speed: "Always on", free: true,
+    skills: [["ORE mining", 95], ["Server setup", 90], ["Miner monitoring", 92], ["Plain reports", 88]], tools: ["Your server", "Terminal"],
+    examples: ["How does ORE mining work now?", "Connect my server and install the miner", "How is my miner doing?"],
+    words: ["ore", "mine", "mining", "miner", "hashrate", "rig"],
+    review: [] },
 ];
 /* ---------- agents you create (demo: saved in this browser only) ---------- */
 export type CustomAgent = {
@@ -199,6 +205,8 @@ export function customToSpecialist(c: CustomAgent): Specialist {
 let CUSTOM: Specialist[] = [];
 /** Called by the store whenever your custom agents change. */
 export function registerCustom(list: CustomAgent[]) { CUSTOM = list.map(customToSpecialist); }
+/** Free specialists (the ORE Miner): no hire price and no team seat. */
+export const FREE_SLUGS: string[] = SPECIALISTS.filter((s) => s.free).map((s) => s.slug);
 export const specialistBySlug = (slug: string) => SPECIALISTS.find((s) => s.slug === slug) ?? CUSTOM.find((s) => s.slug === slug);
 
 /* ---------- memory ---------- */
