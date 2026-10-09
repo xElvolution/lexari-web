@@ -47,7 +47,7 @@ export default function DesktopPane({ s, id, onClose }: { s: State; id: string; 
       try { t = await api("/api/desktop/ticket"); } catch (e) { setStatus("error"); setErr(friendly(e, "Could not open the desktop.")); return; }
       if (disposed) return;
       const proto = location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(`${proto}://${location.host}${t.path}?t=${encodeURIComponent(t.ticket)}&c=${term.cols}&r=${term.rows}`);
+      const ws = new WebSocket(`${proto}://${location.host}${t.path}?c=${term.cols}&r=${term.rows}`, ["lx", `lxt.${t.ticket}`]);
       wsRef.current = ws;
       ws.onopen = () => { if (!disposed) setStatus("live"); };
       ws.onclose = () => { if (!disposed) setStatus((st) => (st === "error" ? st : "closed")); };

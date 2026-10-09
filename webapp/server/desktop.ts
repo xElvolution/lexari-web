@@ -11,9 +11,13 @@ const relay = () => process.env.DESKTOP_RELAY_URL || "";
 export const desktopOn = () => secret().length >= 32 && !!relay();
 export const desktopUser = (userId: string) => userId.replace(/-/g, "").toLowerCase();
 
-/** A ticket for the terminal websocket: the user's id and a 60-second expiry, HMAC-signed. */
+/**
+ * A ticket for the desktop websockets (terminal and screen): the user's id, a one-time nonce and a 30-second expiry,
+ * HMAC-signed. The relay accepts each ticket once. The app sends it as a websocket subprotocol ("lxt.<ticket>"),
+ * not in the URL, so it never lands in access logs.
+ */
 export function desktopTicket(userId: string) {
-  const body = Buffer.from(JSON.stringify({ u: desktopUser(userId), exp: Date.now() + 60_000 })).toString("base64url");
+  const body = Buffer.from(JSON.stringify({ u: desktopUser(userId), n: crypto.randomBytes(12).toString("base64url"), exp: Date.now() + 30_000 })).toString("base64url");
   return `${body}.${crypto.createHmac("sha256", secret()).update(body).digest("base64url")}`;
 }
 

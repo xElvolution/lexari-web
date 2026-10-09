@@ -54,7 +54,7 @@ export default function DesktopScreen({ active, onStatus }: { active: boolean; o
       }
       if (disposed || !host.current) return;
       const proto = location.protocol === "https:" ? "wss" : "ws";
-      const rfb = new RFB(host.current, `${proto}://${location.host}${t.path}?k=vnc&t=${encodeURIComponent(t.ticket)}`, { wsProtocols: ["binary"], shared: true });
+      const rfb = new RFB(host.current, `${proto}://${location.host}${t.path}?k=vnc`, { wsProtocols: ["binary", `lxt.${t.ticket}`], shared: true });
       rfb.scaleViewport = true; rfb.resizeSession = true; rfb.background = "#0d0b14"; rfb.qualityLevel = 6; rfb.compressionLevel = 4; rfb.showDotCursor = true;
       rfb.addEventListener("connect", () => { if (!disposed) set("live"); });
       rfb.addEventListener("disconnect", (e) => {

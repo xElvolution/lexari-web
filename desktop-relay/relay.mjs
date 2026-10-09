@@ -141,12 +141,27 @@ async function ensure(user) {
   return c;
 }
 
+// Tickets are single use: each one carries a nonce, remembered until it expires (30 s), so a copied ticket is worthless.
+const usedTickets = new Map(); // nonce -> expiry
+setInterval(() => { const now = Date.now(); for (const [n, exp] of usedTickets) if (exp < now) usedTickets.delete(n); }, 30_000).unref();
 function verifyTicket(t) {
   const [body, mac] = String(t || "").split(".");
   if (!body || !mac) return null;
   const want = crypto.createHmac("sha256", SECRET).update(body).digest("base64url");
   if (want.length !== mac.length || !crypto.timingSafeEqual(Buffer.from(want), Buffer.from(mac))) return null;
-  try { const p = JSON.parse(Buffer.from(body, "base64url").toString()); return okUser(p.u) && p.exp > Date.now() ? p.u : null; } catch { return null; }
+  let p; try { p = JSON.parse(Buffer.from(body, "base64url").toString()); } catch { return null; }
+  if (!okUser(p.u) || !(p.exp > Date.now()) || p.exp > Date.now() + 120_000 || typeof p.n !== "string" || p.n.length < 12) return null;
+  if (usedTickets.has(p.n)) return null;
+  usedTickets.set(p.n, p.exp);
+  return p.u;
+}
+// Only the app's own pages may open a desktop websocket (a browser always sends Origin on websocket upgrades).
+const ORIGINS = new Set((process.env.DESKTOP_ORIGINS || "https://app.lexari.ai").split(",").map((o) => o.trim()).filter(Boolean));
+/** The ticket from the "lxt.<ticket>" subprotocol (the app's way, kept out of URLs and logs), else the old ?t= query. */
+function ticketOf(req, url) {
+  const offered = String(req.headers["sec-websocket-protocol"] || "").split(",").map((p) => p.trim());
+  const sub = offered.find((p) => p.startsWith("lxt."));
+  return sub ? sub.slice(4) : url.searchParams.get("t");
 }
 
 function broadcast(user, msg) {
@@ -336,11 +351,12 @@ const server = http.createServer(async (req, res) => {
   } catch (e) { send(500, { error: String(e.message || e).slice(0, 200) }); }
 });
 
-const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, handleProtocols: (p) => (p.has("lx") ? "lx" : false) });
 server.on("upgrade", (req, socket, head) => {
   const url = new URL(req.url, "http://x");
   if (url.pathname !== "/desktop/ws") { socket.destroy(); return; }
-  const user = verifyTicket(url.searchParams.get("t"));
+  if (!ORIGINS.has(String(req.headers.origin || ""))) { socket.write("HTTP/1.1 403 Forbidden\r\n\r\n"); socket.destroy(); return; }
+  const user = verifyTicket(ticketOf(req, url));
   if (!user) { socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n"); socket.destroy(); return; }
   if (url.searchParams.get("k") === "vnc") { vss.handleUpgrade(req, socket, head, (ws) => attachScreen(ws, user)); return; }
   wss.handleUpgrade(req, socket, head, (ws) => attach(ws, user, Number(url.searchParams.get("c")) || 80, Number(url.searchParams.get("r")) || 24));
