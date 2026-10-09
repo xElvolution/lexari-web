@@ -1,5 +1,6 @@
 #!/bin/bash
 # Chromium for the agent's desktop. The container is the sandbox (no capabilities, no network except the filtered proxy).
+# WebRTC: the container has only loopback, so Chromium needs loopback allowed to gather at all; media then goes as TURN over TCP through the proxy (no UDP leaves).
 mkdir -p "$HOME/.config/chromium"
 rm -f "$HOME/.config/chromium/SingletonLock" 2>/dev/null
 # the container is stopped when idle: don't greet you with "Chromium didn't shut down correctly"
@@ -8,4 +9,4 @@ P="$HOME/.config/chromium/Default/Preferences"
 exec chromium --no-sandbox --test-type --no-first-run --no-default-browser-check --disable-gpu --disable-dev-shm-usage \
   --proxy-server=http://127.0.0.1:3128 --user-data-dir="$HOME/.config/chromium" --disk-cache-dir=/tmp/chromium-cache \
   --password-store=basic --hide-crash-restore-bubble --disable-session-crashed-bubble --disable-features=Translate,MediaRouter --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 --autoplay-policy=no-user-gesture-required \
-  --force-webrtc-ip-handling-policy=disable_non_proxied_udp --start-maximized "$@" >/tmp/chromium.log 2>&1
+  --force-webrtc-ip-handling-policy=disable_non_proxied_udp --allow-loopback-in-peer-connection --start-maximized "$@" >/tmp/chromium.log 2>&1

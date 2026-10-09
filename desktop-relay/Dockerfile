@@ -45,7 +45,7 @@ RUN chmod 755 /opt/lexari/bin/* && ln -s /opt/lexari/bin/* /usr/local/bin/ \
 ENV DISPLAY=:0 http_proxy=http://127.0.0.1:3128 https_proxy=http://127.0.0.1:3128 HTTP_PROXY=http://127.0.0.1:3128 HTTPS_PROXY=http://127.0.0.1:3128 no_proxy=localhost,127.0.0.1 \
     XDG_RUNTIME_DIR=/tmp/runtime PULSE_SERVER=unix:/tmp/runtime/pulse/native NPM_CONFIG_PREFIX=/home/agent/.npm-global PATH=/home/agent/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     WHISPER_MODEL=/opt/whisper/ggml-base.en.bin PIPER_VOICE=/opt/piper/en_US-lessac-medium.onnx
-LABEL lexari.desktop.version="6"
+LABEL lexari.desktop.version="7"
 USER agent
 WORKDIR /home/agent
 CMD ["/opt/lexari/bin/lexari-session"]

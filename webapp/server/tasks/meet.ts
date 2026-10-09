@@ -20,6 +20,8 @@ export function meetingLink(text: string): { url: string; platform: MeetPlatform
 /** "Rika (for Ada)" as the agent, or the person's own name. */
 export function meetName(mode: "me" | "agent", agentName: string, userName: string) {
   const clean = (s: string) => s.replace(/[^\p{L}\p{N} .'-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 40);
-  const you = clean(userName) || "my owner";
-  return mode === "me" ? (clean(userName) || "Guest") : `${clean(agentName) || "Agent"} (for ${you.split(" ")[0]})`;
+  const you = clean(userName).split(" ")[0];
+  const agent = clean(agentName) || "Agent";
+  // No name on the profile yet: "Rika (notetaker)" rather than a dangling "(for …)".
+  return mode === "me" ? (clean(userName) || agent) : you ? `${agent} (for ${you})` : `${agent} (notetaker)`;
 }

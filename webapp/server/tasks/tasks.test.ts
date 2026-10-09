@@ -32,4 +32,5 @@ test("meetingLink finds real meeting links only", () => {
   assert.equal(meetingLink("https://example.com/j/123"), null);
   assert.equal(meetName("agent", "Rika", "Ada Obi"), "Rika (for Ada)");
   assert.equal(meetName("me", "Rika", "Ada Obi"), "Ada Obi");
+  assert.equal(meetName("agent", "Nova", ""), "Nova (notetaker)");
 });
