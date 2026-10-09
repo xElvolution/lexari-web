@@ -76,10 +76,10 @@ export function usePasteGuard(getText: () => string, setText: (v: string) => voi
   const panel = items.length ? (
     <div data-paste-guard className="mb-2 overflow-hidden rounded-[18px] bg-card ring-1 ring-line">
       {items.map((it) => isBlockedKind(it.kind) ? (
-        <div key={it.id} data-guard-blocked={it.kind} role="alert" className="flex items-start gap-2.5 bg-[#fdecec] p-3 dark:bg-[#3a1d1f]">
+        <div key={it.id} data-guard-blocked={it.kind} role="alert" className="flex items-start gap-2.5 bg-[#e5484d]/12 p-3">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[#e5484d] text-white"><Icon name="lock" size={15} /></span>
           <p className="min-w-0 flex-1 text-[12.5px] leading-snug text-ink"><b className="block text-[13.5px]">Removed {it.label}</b>Never share it with anyone, agents included. Lexari will never ask for it, and it can't be saved or sent.</p>
-          <button onClick={() => drop(it.id)} aria-label="Got it" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink/60 hover:bg-white/50"><Icon name="x" size={14} /></button>
+          <button onClick={() => drop(it.id)} aria-label="Got it" className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink/60 hover:bg-tint"><Icon name="x" size={14} /></button>
         </div>
       ) : (
         <div key={it.id} data-guard-key={it.id} className="border-b border-line p-3 last:border-0">
