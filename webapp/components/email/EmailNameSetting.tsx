@@ -50,7 +50,7 @@ export default function EmailNameSetting({ agent }: { agent: string }) {
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[15px] font-semibold text-ink">Email name{info.chosen && <span className="label inline-flex items-center gap-1 rounded-full bg-tint px-1.5 py-0.5 text-[8px] text-ink/60"><Icon name="lock" size={9} />Set</span>}</div>
-          <div className="mt-0.5 text-[13.5px] leading-snug text-ink/60">All your agents share it. Their addresses look like <span data-email-sample className="break-all font-mono text-[12.5px] font-semibold text-ink">{sample(edit ? name : info.handle)}</span></div>
+          <div className="mt-0.5 text-[13.5px] leading-snug text-ink/60">All your agents share it. Their addresses look like <span data-email-sample className="mt-0.5 block break-all font-mono text-[12.5px] font-semibold text-ink">{sample(edit ? name : info.handle)}</span></div>
         </div>
         {!info.chosen && !edit && <button data-email-name-edit onClick={() => { setEdit(true); setV(info.handle); }} aria-label="Choose your email name" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-tint text-ink transition hover:bg-grape hover:text-white"><Icon name="edit" size={16} /></button>}
       </div>
