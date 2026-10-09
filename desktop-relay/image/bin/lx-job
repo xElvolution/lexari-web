@@ -1,0 +1,47 @@
+#!/bin/bash
+# lx-job: long jobs on the agent's computer that keep running after a chat turn.
+#   lx-job run <id>     runs ~/.lexari/jobs/<id>/cmd detached (the relay starts it with docker exec -d)
+#   lx-job status <id>  JSON: running, exit code, seconds, log tail, and the job's own status.json if it writes one
+#   lx-job stop <id>    asks the job to stop (touches ./stop), then kills it after 20 s
+#   lx-job list         ids of jobs that are running
+J="$HOME/.lexari/jobs"
+id="$2"
+case "$id" in ""|*/*|*..*) [ "$1" = list ] || { echo '{"error":"bad id"}'; exit 2; };; esac
+d="$J/$id"
+case "$1" in
+  run)
+    [ -f "$d/cmd" ] || exit 2
+    cd "$HOME"; date +%s > "$d/started"; echo $$ > "$d/pid"; touch "$d/running"
+    LX_JOB_DIR="$d" setsid bash "$d/cmd" > "$d/log" 2>&1 < /dev/null &
+    child=$!; echo $child > "$d/pid"
+    wait $child; code=$?
+    echo $code > "$d/exit"; date +%s > "$d/ended"; rm -f "$d/running"
+    ;;
+  status)
+    [ -d "$d" ] || { echo '{"error":"no such job"}'; exit 0; }
+    python3 - "$d" <<'PY'
+import json, os, sys, time
+d = sys.argv[1]
+def rd(n, default=""):
+    try: return open(os.path.join(d, n)).read().strip()
+    except Exception: return default
+st = {}
+try: st = json.load(open(os.path.join(d, "status.json")))
+except Exception: pass
+log = rd("log")
+started = int(rd("started", "0") or 0); ended = int(rd("ended", "0") or 0)
+print(json.dumps({"running": os.path.exists(os.path.join(d, "running")), "exit": int(rd("exit")) if rd("exit").lstrip("-").isdigit() else None,
+  "secs": (ended or int(time.time())) - started if started else 0, "log": log[-3000:], "status": st}))
+PY
+    ;;
+  stop)
+    [ -d "$d" ] || exit 0
+    touch "$d/stop"
+    [ "$3" = soft ] && { echo '{"ok":true}'; exit 0; }  # the job ends itself (a meeting still writes its transcript)
+    ( for i in $(seq 1 20); do [ -e "$d/running" ] || exit 0; sleep 1; done
+      p=$(cat "$d/pid" 2>/dev/null); [ -n "$p" ] && kill -TERM -- -"$p" 2>/dev/null; kill -TERM "$p" 2>/dev/null; sleep 3; kill -KILL -- -"$p" 2>/dev/null ) >/dev/null 2>&1 &
+    echo '{"ok":true}'
+    ;;
+  list) for r in "$J"/*/running; do [ -e "$r" ] && basename "$(dirname "$r")"; done 2>/dev/null; true ;;
+  *) echo "usage: lx-job run|status|stop|list <id>"; exit 2 ;;
+esac

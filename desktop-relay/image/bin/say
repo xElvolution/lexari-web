@@ -1,0 +1,7 @@
+#!/bin/bash
+# say "text" out.wav: an offline natural English voiceover (Piper). Long text is fine.
+txt="$1"; out="${2:-/home/agent/Outputs/voice.wav}"
+[ -n "$txt" ] || { echo 'usage: say "text" out.wav'; exit 2; }
+mkdir -p "$(dirname "$out")"
+printf '%s' "$txt" | nice -n 10 piper --model "${PIPER_VOICE:-/opt/piper/en_US-lessac-medium.onnx}" --output_file "$out" >/dev/null 2>/tmp/piper.log || { tail -3 /tmp/piper.log; exit 1; }
+d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$out"); echo "Saved $out (${d%.*} s)"

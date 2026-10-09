@@ -1,0 +1,19 @@
+#!/bin/bash
+# transcribe <audio-or-video> [out.txt]: offline speech-to-text with whisper.cpp (base.en). Prints the transcript with
+# [mm:ss] timestamps, and writes it to out.txt if given. Runs at low priority on the computer's single CPU.
+in="$1"; out="$2"
+[ -f "$in" ] || { echo "usage: transcribe <file> [out.txt]"; exit 2; }
+t=$(mktemp -d /tmp/tr.XXXX)
+ffmpeg -nostdin -loglevel error -y -i "$in" -ac 1 -ar 16000 -c:a pcm_s16le "$t/a.wav" || { echo "could not read audio"; exit 1; }
+nice -n 15 whisper-cli -m "${WHISPER_MODEL:-/opt/whisper/ggml-base.en.bin}" -f "$t/a.wav" -t 1 -np -ocsv -of "$t/o" >/dev/null 2>"$t/err" || { tail -3 "$t/err"; exit 1; }
+python3 - "$t/o.csv" > "$t/out.txt" <<'PY'
+import csv, sys
+rows = list(csv.reader(open(sys.argv[1], encoding="utf-8", errors="replace")))
+for r in rows[1:]:
+    if len(r) < 3: continue
+    s = int(r[0]) // 1000; txt = ",".join(r[2:]).strip().strip('"').strip()
+    if not txt or txt in ("[BLANK_AUDIO]", "[ Silence ]", "[silence]"): continue
+    print(f"[{s//60:02d}:{s%60:02d}] {txt}")
+PY
+[ -n "$out" ] && cp "$t/out.txt" "$out"
+cat "$t/out.txt"; rm -rf "$t"

@@ -1,0 +1,8 @@
+# Lexari agent audio: a virtual speaker everything plays into ("meet", recorded from meet.monitor) and a silent
+# virtual microphone ("mic"), so meeting sites see a mic but nothing from the computer is ever sent into a call.
+load-module module-native-protocol-unix auth-anonymous=1 socket=/tmp/runtime/pulse/native
+load-module module-null-sink sink_name=meet sink_properties=device.description=Speaker
+load-module module-null-sink sink_name=silence sink_properties=device.description=Silence
+load-module module-remap-source source_name=mic master=silence.monitor source_properties=device.description=Microphone
+set-default-sink meet
+set-default-source mic

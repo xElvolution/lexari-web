@@ -5,7 +5,13 @@ cd "$HOME"
 [ -f "$HOME/.bashrc" ] || cp /etc/skel/.bashrc /etc/skel/.profile "$HOME/" 2>/dev/null
 grep -q agent@lexari "$HOME/.bashrc" 2>/dev/null || printf 'export PS1="\\[\\e[38;5;141m\\]agent@lexari\\[\\e[0m\\]:\\w$ "\n' >> "$HOME/.bashrc"
 [ -f "$HOME/README.txt" ] || printf "Welcome to your agent's computer.\nFiles you and your agent make live in /home/agent.\nThe browser reaches the public web through Lexari's filtered proxy.\n" > "$HOME/README.txt"
-mkdir -p /tmp/.X11-unix "$HOME/Downloads"
+mkdir -p /tmp/.X11-unix "$HOME/Downloads" /tmp/runtime/pulse "$HOME/.lexari/jobs"
+chmod 700 /tmp/runtime
+# audio: virtual speaker + silent mic (meetings, videos). Never a real device.
+pulseaudio -n --daemonize=yes --use-pid-file=no --system=no -F /opt/lexari/pulse.pa \
+  --exit-idle-time=-1 --disable-shm=yes --log-target=file:/tmp/pulse.log >/dev/null 2>&1 || true
+# jobs that were running when the computer stopped are marked stopped
+for r in "$HOME"/.lexari/jobs/*/running; do [ -e "$r" ] && { d=$(dirname "$r"); rm -f "$r"; [ -f "$d/exit" ] || echo 137 > "$d/exit"; }; done 2>/dev/null
 rm -f /tmp/.X0-lock /run/lexari/vnc.sock
 socat TCP-LISTEN:3128,bind=127.0.0.1,fork,reuseaddr UNIX-CONNECT:/run/lexari/proxy.sock &
 Xvnc :0 -geometry ${LX_SCREEN:-1280x800} -depth 24 -dpi 96 -nolisten tcp -rfbport -1 -rfbunixpath /run/lexari/vnc.sock -rfbunixmode 0666 \

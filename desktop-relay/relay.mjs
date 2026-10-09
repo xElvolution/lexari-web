@@ -19,7 +19,7 @@ import pty from "node-pty";
 
 const PORT = Number(process.env.PORT || 3295);
 const SECRET = process.env.DESKTOP_SECRET || "";
-const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:5";
+const IMAGE = process.env.DESKTOP_IMAGE || "lexari-desktop:6";
 const SOCKS = process.env.DESKTOP_SOCKS || "/opt/lexari-desktop/socks";
 const IDLE_MS = Number(process.env.DESKTOP_IDLE_MS || 15 * 60_000);
 if (SECRET.length < 32) { console.error("DESKTOP_SECRET missing"); process.exit(1); }
@@ -273,6 +273,35 @@ async function pushFile(user, p, b64) {
   return r === 0 ? { ok: true, path: p, size: buf.length } : { error: "write failed" };
 }
 
+// Long jobs (meetings, renders, builds, scheduled work): the command is written to ~/.lexari/jobs/<id>/cmd and run
+// detached with lx-job, so it outlives the 20 s /exec limit and the chat turn. A running job keeps the computer awake.
+const okJob = (id) => typeof id === "string" && /^[a-z0-9-]{6,64}$/.test(id);
+async function jobStart(user, id, cmd) {
+  if (!okJob(id) || !cmd) return { error: "bad job" };
+  const c = await ensure(user);
+  const running = (await sh(["exec", c, "lx-job", "list"])).out.split("\n").filter(Boolean);
+  if (running.length >= JOBS_MAX) return { error: "busy", running };
+  const w = await new Promise((resolve) => {
+    const k = spawn("docker", ["exec", "-i", c, "bash", "-c", 'd="$HOME/.lexari/jobs/$1"; rm -rf "$d"; mkdir -p "$d" && cat > "$d/cmd"', "_", id], { stdio: ["pipe", "ignore", "pipe"] });
+    const t = setTimeout(() => k.kill("SIGKILL"), 15_000);
+    k.on("close", (code) => { clearTimeout(t); resolve(code); });
+    k.stdin.end(String(cmd));
+  });
+  if (w !== 0) return { error: "could not write the job" };
+  const r = await sh(["exec", "-d", "-w", "/home/agent", c, "lx-job", "run", id]);
+  last.set(c, Date.now());
+  return r.code === 0 ? { ok: true, id } : { error: "could not start the job" };
+}
+async function jobCmd(user, verb, id, soft = false) {
+  if (!okJob(id)) return { error: "bad job" };
+  const c = name(user);
+  const st = await sh(["inspect", "-f", "{{.State.Running}}", c]);
+  if (st.out.trim() !== "true") return verb === "status" ? { running: false, gone: true } : { ok: true };
+  const r = await sh(["exec", c, "lx-job", verb, id, ...(soft ? ["soft"] : [])], { timeout: 15_000 });
+  try { return JSON.parse(r.out.trim().split("\n").pop() || "{}"); } catch { return { error: (r.err || r.out).slice(0, 200) }; }
+}
+const JOBS_MAX = Number(process.env.DESKTOP_JOBS_MAX || 3);
+
 const server = http.createServer(async (req, res) => {
   const send = (code, obj) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
   try {
@@ -285,6 +314,9 @@ const server = http.createServer(async (req, res) => {
     if (req.url === "/push" && req.method === "POST") return send(200, await pushFile(body.user, String(body.path || ""), body.b64));
     if (req.url === "/exec" && req.method === "POST") return send(200, await execCmd(body.user, String(body.cmd || "").slice(0, 2000), !!body.quiet, body.env));
     if (req.url === "/shot" && req.method === "POST") return send(200, await screenshot(body.user));
+    if (req.url === "/job/start" && req.method === "POST") return send(200, await jobStart(body.user, body.id, String(body.cmd || "").slice(0, 8000)));
+    if (req.url === "/job/status" && req.method === "POST") return send(200, await jobCmd(body.user, "status", body.id));
+    if (req.url === "/job/stop" && req.method === "POST") return send(200, await jobCmd(body.user, "stop", body.id, body.soft === true));
     if (req.url === "/files" && req.method === "POST") return send(200, await listFiles(body.user, body.path));
     if (req.url === "/read" && req.method === "POST") {
       const c = await ensure(body.user); const p = String(body.path || "");
@@ -357,8 +389,17 @@ setInterval(async () => {
   for (const c of r.out.split("\n").filter(Boolean)) {
     const user = c.slice(3);
     if ((sockets.get(user)?.size || 0) > 0 || (screens.get(user)?.size || 0) > 0) continue;
-    if (Date.now() - (last.get(c) || 0) > IDLE_MS) { await sh(["stop", "-t", "3", c]); last.delete(c); console.log("idle stop", c); }
+    if (Date.now() - (last.get(c) || 0) > IDLE_MS) {
+      const jobs = await sh(["exec", c, "lx-job", "list"], { timeout: 10_000 });
+      if (jobs.code === 0 && jobs.out.trim()) { last.set(c, Date.now()); continue; } // a job is running: stay awake
+      await sh(["stop", "-t", "3", c]); last.delete(c); console.log("idle stop", c);
+    }
   }
 }, 60_000);
 
-server.listen(PORT, "127.0.0.1", () => console.log(`desktop relay on 127.0.0.1:${PORT}`));
+server.listen(PORT, "127.0.0.1", async () => {
+  console.log(`desktop relay on 127.0.0.1:${PORT}`);
+  // After a relay restart, computers that kept running (a meeting, a job) get their web proxy back right away.
+  const r = await sh(["ps", "--filter", "label=lexari.desktop=1", "--format", "{{.Names}}"]);
+  for (const c of r.out.split("\n").filter(Boolean)) { const user = c.slice(3); if (okUser(user)) { last.set(c, Date.now()); startProxy(user, `${SOCKS}/${user}`); } }
+});

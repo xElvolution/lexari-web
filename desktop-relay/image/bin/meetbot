@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""meetbot: joins a video meeting in the agent's own browser as a silent note taker, records the meeting audio and
+transcribes it when the meeting ends.
+
+  meetbot --url <meeting link> --name "<display name>" [--note "<chat message>"] [--max 7200]
+
+Runs as a Lexari job (lx-job): progress goes to $LX_JOB_DIR/status.json, a file named "stop" there ends it, and the
+transcript is written to $LX_JOB_DIR/transcript.txt (also copied to ~/Meetings/<date-time>/).
+Mic and camera are switched off before joining and the microphone the browser sees is a silent virtual one, so the
+agent never sends sound or video into the call. The browser's DevTools port is only on the container's own loopback.
+"""
+import argparse, json, os, re, subprocess, sys, time, urllib.parse, urllib.request
+import websocket
+
+ap = argparse.ArgumentParser()
+ap.add_argument("--url", required=True); ap.add_argument("--name", required=True)
+ap.add_argument("--note", default=""); ap.add_argument("--max", type=int, default=7200)
+ap.add_argument("--lobby", type=int, default=900, help="seconds to wait to be let in")
+ap.add_argument("--alone", type=int, default=180, help="leave after this long alone")
+a = ap.parse_args()
+
+JOB = os.environ.get("LX_JOB_DIR") or f"/tmp/meetbot-{int(time.time())}"
+os.makedirs(JOB, exist_ok=True)
+OUT = os.path.join(os.environ["HOME"], "Meetings", time.strftime("%Y-%m-%d-%H%M"))
+os.makedirs(OUT, exist_ok=True)
+state = {"phase": "starting", "platform": "", "joinedAt": None, "endedAt": None, "reason": "", "name": a.name, "dir": OUT}
+def status(**kw):
+    state.update(kw); state["at"] = int(time.time())
+    tmp = os.path.join(JOB, "status.json.tmp"); json.dump(state, open(tmp, "w")); os.replace(tmp, os.path.join(JOB, "status.json"))
+    print(time.strftime("%H:%M:%S"), json.dumps(kw), flush=True)
+def stopped(): return os.path.exists(os.path.join(JOB, "stop"))
+
+# ---- the meeting link ----
+url = a.url.strip()
+u = urllib.parse.urlparse(url)
+host = (u.hostname or "").lower()
+if not u.scheme.startswith("http") or not host: status(phase="failed", reason="That isn't a meeting link."); sys.exit(1)
+if host.endswith("zoom.us") or host.endswith("zoom.com"):
+    platform = "zoom"
+    m = re.search(r"/(?:j|w|s|wc(?:/join)?)/(\d{9,12})", u.path)
+    if m:
+        q = urllib.parse.parse_qs(u.query); pwd = q.get("pwd", [""])[0]
+        url = f"https://app.zoom.us/wc/join/{m.group(1)}" + (f"?pwd={urllib.parse.quote(pwd)}" if pwd else "")
+elif host == "meet.google.com": platform = "meet"
+elif "teams.microsoft.com" in host or "teams.live.com" in host: platform = "teams"
+else:
+    platform = "jitsi"
+    cfg = {"userInfo.displayName": json.dumps(a.name), "config.startWithAudioMuted": "true", "config.startWithVideoMuted": "true",
+           "config.prejoinConfig.enabled": "false", "config.prejoinPageEnabled": "false", "config.disableDeepLinking": "true"}
+    url = url.split("#")[0] + "#" + "&".join(f"{k}={urllib.parse.quote(v)}" for k, v in cfg.items())
+status(phase="starting", platform=platform)
+
+# ---- the agent's browser over DevTools (127.0.0.1:9222 inside the container) ----
+NOPROXY = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+def devtools(path, method="GET"):
+    return json.loads(NOPROXY.open(urllib.request.Request("http://127.0.0.1:9222" + path, method=method), timeout=10).read())
+def ensure_browser():
+    try: return devtools("/json/version")
+    except Exception: pass
+    subprocess.run(["pkill", "-x", "chromium"], check=False); time.sleep(2)
+    subprocess.Popen(["setsid", "browser", "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _ in range(40):
+        time.sleep(0.5)
+        try: return devtools("/json/version")
+        except Exception: pass
+    status(phase="failed", reason="My browser didn't start."); sys.exit(1)
+
+class Tab:
+    def __init__(self, ws_url):
+        self.ws = websocket.create_connection(ws_url, timeout=20, suppress_origin=True, http_proxy_host=None)
+        self.n = 0
+    def call(self, method, **params):
+        self.n += 1; me = self.n
+        self.ws.send(json.dumps({"id": me, "method": method, "params": params}))
+        while True:
+            m = json.loads(self.ws.recv())
+            if m.get("id") == me:
+                if "error" in m: raise RuntimeError(m["error"].get("message", "devtools error"))
+                return m.get("result", {})
+    def js(self, expr, gesture=True):
+        try:
+            r = self.call("Runtime.evaluate", expression=expr, returnByValue=True, awaitPromise=True, userGesture=gesture)
+            return r.get("result", {}).get("value")
+        except Exception as e:
+            return None
+
+ver = ensure_browser()
+browser = Tab(ver["webSocketDebuggerUrl"])
+origin = f"{urllib.parse.urlparse(url).scheme}://{urllib.parse.urlparse(url).netloc}"
+try:  # the silent mic is allowed so sites don't block joining; the camera is never allowed
+    browser.call("Browser.grantPermissions", origin=origin, permissions=["audioCapture"])
+except Exception: pass
+target = devtools("/json/new?" + urllib.parse.quote(url, safe=":/?&=#%"), method="PUT")
+tab = Tab(target["webSocketDebuggerUrl"])
+tab.call("Page.enable"); tab.call("Runtime.enable")
+subprocess.run(["bash", "-c", "id=$(xdotool search --onlyvisible --class chromium | tail -1); [ -n \"$id\" ] && xdotool windowactivate $id"], check=False)
+
+HELP = r"""
+window.__lx = window.__lx || {
+  vis(el){ if(!el) return false; const r=el.getBoundingClientRect(); const s=getComputedStyle(el); return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'; },
+  els(sel){ return [...document.querySelectorAll(sel)].filter(e=>__lx.vis(e)); },
+  text(){ return (document.body ? document.body.innerText : '').slice(0, 20000); },
+  has(re){ return new RegExp(re,'i').test(__lx.text()); },
+  clickText(re, sel){ const rx=new RegExp(re,'i'); for (const e of __lx.els(sel||'button,[role=button],a,div[tabindex],span')) { const t=(e.innerText||e.getAttribute('aria-label')||'').trim(); if (t && t.length<60 && rx.test(t)) { e.click(); return t; } } return ''; },
+  clickLabel(re){ const rx=new RegExp(re,'i'); for (const e of __lx.els('[aria-label],[data-tooltip]')) { const t=e.getAttribute('aria-label')||e.getAttribute('data-tooltip')||''; if (rx.test(t)) { e.click(); return t; } } return ''; },
+  fill(sel, v){ const e=__lx.els(sel)[0]; if(!e) return false; if (e.value===v) return true; e.focus(); const set=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(e),'value').set; set.call(e,v); e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); return true; },
+};
+true
+"""
+def lx(expr): tab.js(HELP); return tab.js(expr)
+NAME = json.dumps(a.name)
+NOTE = json.dumps(a.note)
+
+# per platform: one step of the pre-join screen, whether we're in, waiting, or out
+P = {
+  "jitsi": {
+    "prejoin": f"""(()=>{{ __lx.fill('input#premeeting-name-input,input[placeholder*="name" i]', {NAME}); __lx.clickLabel('^(Mute|Stop camera|Stop video)'); return __lx.clickText('^(Join meeting|Join|Ask to join)$') }})()""",
+    "in": "!!(window.APP && APP.conference && APP.conference._room && APP.conference.isJoined && APP.conference.isJoined())",
+    "count": "(window.APP && APP.conference && APP.conference._room) ? APP.conference._room.getParticipants().length : -1",
+    "wait": "__lx.has('(asking to join|waiting for (the )?(moderator|host)|lobby|knock|meeting has not yet started|let you in)')",
+    "ended": "__lx.has('(meeting (has )?ended|you have been (kicked|removed)|the meeting was ended|conference has been destroyed|thank you for using)')",
+    "mute": "(()=>{ try { APP.conference.muteAudio(true); APP.conference.muteVideo(true); } catch(e){} return true })()",
+    "chat": f"""(()=>{{ try {{ APP.conference._room.sendTextMessage({NOTE}); return true }} catch(e) {{ return false }} }})()""",
+    "leave": "(()=>{ try { APP.conference.hangup(false) } catch(e){} return true })()",
+  },
+  "meet": {
+    "prejoin": f"""(()=>{{ __lx.fill('input[type=text][aria-label*="name" i],input[placeholder*="name" i]', {NAME}); __lx.clickLabel('^Turn off microphone'); __lx.clickLabel('^Turn off camera'); __lx.clickText('^(Continue without (microphone|camera|microphone and camera)|Got it|Dismiss)$'); return __lx.clickText('^(Ask to join|Join now|Join anyway|Switch here)$') }})()""",
+    "in": "!!document.querySelector('[aria-label=\"Leave call\"]')",
+    "count": "(()=>{ const b=[...document.querySelectorAll('[aria-label]')].map(e=>e.getAttribute('aria-label')).find(t=>/^Show everyone|participant|People/i.test(t)); const m=b&&b.match(/(\\d+)/); return m?Number(m[1]):-1 })()",
+    "wait": "__lx.has('(asking to be let in|someone in the call (should|will) let you in|you.ll join the call when someone lets you in|waiting for the host)')",
+    "ended": "__lx.has('(you.ve left the (meeting|call)|the call (has )?ended|you (were|have been) removed|no one responded to your request|you can.t join this (video )?call|someone has removed you|meeting has ended|return to home screen)') && !document.querySelector('[aria-label=\"Leave call\"]')",
+    "alone": "__lx.has('(you.re the only one here|no one else is here)')",
+    "mute": "(()=>{ __lx.clickLabel('^Turn off microphone'); __lx.clickLabel('^Turn off camera'); return true })()",
+    "chat": f"""(async()=>{{ __lx.clickLabel('^Chat with everyone'); await new Promise(r=>setTimeout(r,1200)); const t=__lx.els('textarea')[0]; if(!t) return false; const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set; set.call(t,{NOTE}); t.dispatchEvent(new Event('input',{{bubbles:true}})); await new Promise(r=>setTimeout(r,300)); __lx.clickLabel('^Send a message'); return true }})()""",
+    "leave": "(()=>{ __lx.clickLabel('^Leave call'); return true })()",
+  },
+  "zoom": {
+    "prejoin": f"""(()=>{{ __lx.fill('#input-for-name,input[placeholder*="name" i]', {NAME}); __lx.clickLabel('^(mute|stop video|turn off)'); __lx.clickText('^(Continue without (microphone and camera|audio or video)|Got it|I agree)$'); return __lx.clickText('^(Join|Join Meeting)$') }})()""",
+    "in": "!!document.querySelector('.footer__leave-btn, [aria-label*=\"Leave\" i]') && !__lx.has('please wait, the meeting host will let you in')",
+    "count": "(()=>{ const e=document.querySelector('.footer-button__number-counter'); return e?Number(e.innerText)||-1:-1 })()",
+    "wait": "__lx.has('(host will let you in|waiting for the host|meeting host will let you in soon|waiting room)')",
+    "ended": "__lx.has('(meeting has been ended|this meeting has ended|you have been removed|removed you from the meeting|meeting is not started|invalid meeting id)')",
+    "mute": "(()=>{ __lx.clickText('^Join Audio by Computer$'); __lx.clickText('^Join Audio$'); __lx.clickLabel('^mute my microphone'); __lx.clickLabel('^stop my video'); return true })()",
+    "chat": f"""(async()=>{{ __lx.clickLabel('^open the chat|^chat'); await new Promise(r=>setTimeout(r,1200)); const t=__lx.els('textarea,[contenteditable=true]')[0]; if(!t) return false; t.focus(); document.execCommand('insertText', false, {NOTE}); t.dispatchEvent(new KeyboardEvent('keydown',{{key:'Enter',code:'Enter',keyCode:13,bubbles:true}})); return true }})()""",
+    "leave": "(()=>{ __lx.clickText('^Leave$'); setTimeout(()=>__lx.clickText('^Leave Meeting$'), 800); return true })()",
+  },
+  "teams": {
+    "prejoin": f"""(()=>{{ __lx.clickText('^(Continue on this browser|Join on the web instead|Continue without audio or video)$'); __lx.fill('input[data-tid="prejoin-display-name-input"],input[placeholder*="name" i]', {NAME}); return __lx.clickText('^Join now$') }})()""",
+    "in": "!!document.querySelector('#hangup-button, [data-tid=\"hangup-main-btn\"], [aria-label^=\"Leave\" i]') && !__lx.has('someone in the meeting should let you in')",
+    "count": "-1",
+    "wait": "__lx.has('(someone in the meeting should let you in|let you in soon|waiting for others to join|lobby)')",
+    "ended": "__lx.has('(the meeting has ended|you.ve been removed|you have been removed|call ended|meeting ended)')",
+    "mute": "(()=>{ __lx.clickLabel('^Mute'); __lx.clickLabel('^Turn camera off'); return true })()",
+    "chat": "false",
+    "leave": "(()=>{ __lx.clickLabel('^Leave'); return true })()",
+  },
+}[platform]
+
+# ---- join ----
+status(phase="joining")
+t0 = time.time(); joined = False; waited = None
+while not stopped():
+    time.sleep(2)
+    if lx(P["ended"]): status(phase="failed", reason="The meeting has ended or I wasn't allowed in."); break
+    if lx(P["in"]): joined = True; break
+    if lx(P["wait"]):
+        if waited is None: waited = time.time(); status(phase="waiting")
+        if time.time() - waited > a.lobby: status(phase="failed", reason="Nobody let me in."); break
+        continue
+    if time.time() - t0 > 180:
+        if lx("__lx.has('(sign in|log in) to (join|continue)|you need to sign in')"):
+            status(phase="failed", reason="This meeting only lets signed-in people join. Sign in to your account in my browser (Desktop view), then send it again.")
+        else: status(phase="failed", reason="I couldn't find the join button on that page.")
+        break
+    lx(P["prejoin"])
+
+rec = None; segs = os.path.join(OUT, "audio-%03d.wav")
+if joined and not stopped():
+    lx(P["mute"])
+    rec = subprocess.Popen(["nice", "-n", "5", "ffmpeg", "-nostdin", "-loglevel", "error", "-f", "pulse", "-i", "meet.monitor", "-ac", "1", "-ar", "16000",
+                            "-f", "segment", "-segment_time", "600", "-c:a", "pcm_s16le", segs])
+    status(phase="in_meeting", joinedAt=int(time.time()))
+    if a.note:
+        time.sleep(4); ok = lx(P["chat"]); print("consent note posted" if ok else "could not post the consent note", flush=True)
+    alone_since = None; muted_at = time.time()
+    while not stopped():
+        time.sleep(3)
+        if lx(P["ended"]) or not lx(P["in"]):
+            time.sleep(3)
+            if lx(P["ended"]) or not lx(P["in"]): status(reason="The meeting ended."); break
+        n = lx(P["count"]); n = n if isinstance(n, (int, float)) else -1
+        alone = (platform == "jitsi" and n == 0) or (platform in ("meet", "zoom") and n == 1) or (P.get("alone") and lx(P["alone"]))
+        if alone:
+            alone_since = alone_since or time.time()
+            if time.time() - alone_since > a.alone: status(reason="Everyone else left."); break
+        else: alone_since = None
+        if time.time() - state["joinedAt"] > a.max: status(reason="I reached the time limit for one meeting."); break
+        if time.time() - muted_at > 60: lx(P["mute"]); muted_at = time.time()
+    if stopped(): status(reason="You stopped me.")
+    lx(P["leave"])
+    status(endedAt=int(time.time()))
+elif stopped():
+    status(phase="failed", reason="You stopped me before I got in.")
+time.sleep(2)
+try: devtools("/json/close/" + target["id"])
+except Exception: pass
+if rec:
+    rec.terminate()
+    try: rec.wait(10)
+    except Exception: rec.kill()
+
+if not joined:
+    sys.exit(3)
+
+# ---- transcript ----
+status(phase="transcribing")
+files = sorted(f for f in os.listdir(OUT) if f.startswith("audio-") and f.endswith(".wav"))
+lines = []; offset = 0; loud = False
+for f in files:
+    p = os.path.join(OUT, f)
+    vol = subprocess.run(["ffmpeg", "-nostdin", "-i", p, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
+    m = re.search(r"max_volume: (-?[\d.]+) dB", vol)
+    dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", p], capture_output=True, text=True).stdout.strip()
+    dur = float(dur or 0)
+    if m and float(m.group(1)) > -60:
+        loud = True
+        out = subprocess.run(["transcribe", p], capture_output=True, text=True).stdout
+        for line in out.splitlines():
+            mm = re.match(r"\[(\d+):(\d+)\] (.*)", line)
+            if mm:
+                s = offset + int(mm.group(1)) * 60 + int(mm.group(2))
+                lines.append(f"[{s//3600:d}:{s%3600//60:02d}:{s%60:02d}] {mm.group(3)}" if s >= 3600 else f"[{s//60:02d}:{s%60:02d}] {mm.group(3)}")
+    offset += int(dur)
+text = "\n".join(lines)
+open(os.path.join(JOB, "transcript.txt"), "w").write(text)
+open(os.path.join(OUT, "transcript.txt"), "w").write(text)
+status(phase="done", seconds=offset, heard=loud, lines=len(lines))
