@@ -14,7 +14,7 @@ import { Sheet } from "../billing/parts";
 const card = "rounded-[20px] bg-card ring-1 ring-line";
 const h3 = "label mb-1.5 px-1 text-[9.5px] text-ink/50";
 const ibtn = "grid h-9 w-9 shrink-0 place-items-center rounded-full bg-tint text-ink/70 transition hover:bg-grape hover:text-white disabled:opacity-40";
-const day = (t: number) => new Date(t).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+const day = (t: number) => new Date(t).toLocaleDateString([], { day: "numeric", month: "short" });
 
 type Edit = null | { kind: "add" } | { kind: "replace"; s: SecretInfo } | { kind: "agents"; s: SecretInfo } | { kind: "delete"; s: SecretInfo };
 
@@ -50,8 +50,8 @@ export default function SecretsSection({ s }: { s: State }) {
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-tint text-brand-ink"><Icon name="key" size={16} /></span>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-mono text-[13px] font-semibold text-ink">{x.name}</div>
-                <div className="truncate text-[11.5px] text-ink/55">{x.service || x.label || "Secret"} · <span className="font-mono">••••{x.last4}</span> · {day(x.createdAt)}</div>
-                <div className="mt-0.5 truncate text-[11.5px] text-ink/55"><Icon name="team" size={11} className="mr-1 inline -translate-y-px" />{x.agents.length ? x.agents.map(agentName).join(", ") : "All your agents"}</div>
+                <div className="truncate text-[11.5px] text-ink/55">{x.service || x.label || "Secret"}{x.last4 ? <> · <span className="font-mono">••••{x.last4}</span></> : null}</div>
+                <div className="mt-0.5 truncate text-[11.5px] text-ink/55">{x.agents.length ? x.agents.map(agentName).join(", ") : "All agents"} · Added {day(x.createdAt)}</div>
               </div>
               <button onClick={() => setEdit({ kind: "agents", s: x })} aria-label={`Which agents can use ${x.name}`} title="Agents" data-secret-agents className={ibtn}><Icon name="team" size={15} /></button>
               <button onClick={() => setEdit({ kind: "replace", s: x })} aria-label={`Replace ${x.name}`} title="Replace" data-secret-replace className={ibtn}><Icon name="edit" size={15} /></button>

@@ -82,11 +82,16 @@ export function SecretCardView({ convo, m }: { convo: string; m: Msg & { secret:
 }
 
 /** The agent stopped at a sign-in page on its computer: you take over its desktop and sign in yourself. */
+const takeoverTitle = (r: string) => {
+  const site = /\b(?:sign|log)\s*(?:in|into|on)\s*(?:to\s+)?(?:your\s+|my\s+)?([A-Z0-9][\w.-]*(?:\s[A-Z][\w.-]*)?)/i.exec(r)?.[1];
+  if (site && !/^(the|it|there|here|yourself)$/i.test(site)) return `Sign in to ${site.replace(/\s+account$/i, "")}`;
+  return /captcha/i.test(r) ? "Solve the CAPTCHA" : /code|2fa|two-factor|verif/i.test(r) ? "Enter the code" : "Your turn on my computer";
+};
 export function TakeoverCardView({ reason }: { reason: string }) {
   return (
     <div data-takeover-card className="row-in mt-2 flex w-[min(320px,100%)] items-center gap-2.5 rounded-2xl bg-card p-3 ring-1 ring-line">
       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-tint text-brand-ink"><Icon name="monitor" size={16} /></span>
-      <span className="min-w-0 flex-1"><b className="block truncate text-[13.5px] text-ink">{reason}</b><span className="block text-[11.5px] leading-snug text-ink/55">You sign in on my screen. I never see your password.</span></span>
+      <span className="min-w-0 flex-1"><b className="block truncate text-[13.5px] text-ink" title={reason}>{takeoverTitle(reason)}</b><span className="block text-[11.5px] leading-snug text-ink/55">You sign in on my screen. I never see your password.</span></span>
       <button onClick={openDesktop} data-takeover-open className="shrink-0 rounded-full bg-grape px-3 py-1.5 text-[12.5px] font-bold text-white">Take over</button>
     </div>
   );
