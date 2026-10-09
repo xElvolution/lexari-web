@@ -41,6 +41,8 @@ export type Msg = {
   email?: import("@/content/email").EmailCard; // an email an agent wrote; only you can send it
   secret?: import("@/content/secrets").SecretCard; // a credential an agent asked for: a secure card, the value goes straight to the vault
   takeover?: import("@/content/secrets").TakeoverCard; // the agent asks you to take over its desktop (to sign in yourself)
+  meet?: import("@/content/tasks").MeetAsk; // a meeting the agent offers to join (as you or as itself)
+  task?: import("@/content/tasks").TaskRef; // a meeting, background job or schedule; live state comes from lib/tasks
 };
 export type TxKind = "send" | "fund" | "return" | "hire" | "plan" | "card" | "mint" | "incoming" | "pay" | "topup";
 export type TxStatus = "pending" | "confirmed" | "failed" | "cancelled";
@@ -710,7 +712,7 @@ async function oneReplyRun(convo: string, userMsg: Msg, speaker: string, follow:
             const trimmed = line.trim();
             if (computerEvent(convo, bubble, trimmed)) { typingWho.set(convo, speaker); continue; }
             if (!trimmed.startsWith("data:")) continue;
-            let payload: { token?: string; replace?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"]; files?: Msg["files"]; action?: Msg["action"]; markets?: Msg["markets"]; email?: Msg["email"]; secret?: Msg["secret"]; takeover?: Msg["takeover"] } = {};
+            let payload: { token?: string; replace?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"]; files?: Msg["files"]; action?: Msg["action"]; markets?: Msg["markets"]; email?: Msg["email"]; secret?: Msg["secret"]; takeover?: Msg["takeover"]; card?: Pick<Msg, "meet" | "task"> } = {};
             try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
             if (payload.error) { error = payload.error; break read; }
             if (payload.send) { const sd = payload.send; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, send: sd } : mm)) } })); }
@@ -718,6 +720,7 @@ async function oneReplyRun(convo: string, userMsg: Msg, speaker: string, follow:
             if (payload.email) { const em = payload.email; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, email: em } : mm)) } })); }
             if (payload.secret) { const sc = payload.secret; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, secret: sc } : mm)) } })); }
             if (payload.takeover) { const tk = payload.takeover; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, takeover: tk } : mm)) } })); }
+            if (payload.card) { const cd = payload.card; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, ...cd } : mm)) } })); if (cd.task) void import("./tasks").then((t) => t.refreshTasks(speaker)); }
             if (payload.markets) { const mk = payload.markets; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, markets: mk } : mm)) } })); }
             if (payload.files?.length) { const fl = payload.files; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, files: fl } : mm)) } })); }
             if (typeof payload.replace === "string") { full = payload.replace; if (full.trim()) setMood(speaker, "speaking"); setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
@@ -833,6 +836,20 @@ const txRank: Record<TxStatus, number> = { pending: 0, cancelled: 1, failed: 1, 
 const noted = new Set<string>();
 const shortA = (a?: string) => (a ? `${a.slice(0, 4)}…${a.slice(-4)}` : "");
 /** Adds or updates a receipt row (kept in time order; a confirmed one never goes back). Returns the previous status. */
+/** A message the server posted on its own (a task result): added once, in time order. */
+export function upsertMsg(convo: string, m: Msg) {
+  set((x) => {
+    const list = [...(x.threads[convo] || [])];
+    if (list.some((mm) => mm.id === m.id)) return x;
+    const j = list.findIndex((mm) => mm.at > m.at);
+    if (j < 0) list.push(m); else list.splice(j, 0, m);
+    return { ...x, threads: { ...x.threads, [convo]: list.slice(-200) } };
+  });
+}
+/** Merges fields into one message (e.g. the meeting card once you joined). */
+export function patchMsg(convo: string, id: string, patch: Partial<Msg>) {
+  set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === id ? { ...mm, ...patch } : mm)) } }));
+}
 function upsertReceipt(convo: string, mid: string, tx: TxReceipt, at?: number): TxStatus | null {
   let before: TxStatus | null = null;
   set((x) => {

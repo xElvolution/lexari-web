@@ -46,3 +46,10 @@ export const shotDesktop = (userId: string) => call<{ png?: string; error?: stri
 export const pullDesktop = (userId: string, path: string) => call<{ b64?: string; size?: number; error?: string }>("/pull", { user: desktopUser(userId), path }, 45_000);
 /** Puts an upload on the agent's computer, in ~/Uploads only. */
 export const pushDesktop = (userId: string, path: string, data: Buffer) => call<{ ok?: boolean; path?: string; error?: string }>("/push", { user: desktopUser(userId), path, b64: data.toString("base64") }, 45_000);
+
+/** Long jobs on the agent's computer (lx-job in the container): they outlive the 20 s command limit and the chat turn. */
+export type JobStatus = { running?: boolean; exit?: number | null; secs?: number; log?: string; status?: Record<string, unknown>; gone?: boolean; error?: string };
+export const jobStart = (userId: string, id: string, cmd: string) => call<{ ok?: boolean; error?: string; running?: string[] }>("/job/start", { user: desktopUser(userId), id, cmd }, 70_000);
+export const jobStatus = (userId: string, id: string) => call<JobStatus>("/job/status", { user: desktopUser(userId), id }, 20_000);
+/** soft: only ask the job to stop (it finishes up itself, e.g. a meeting still writes its transcript). */
+export const jobStop = (userId: string, id: string, soft = false) => call<{ ok?: boolean; error?: string }>("/job/stop", { user: desktopUser(userId), id, soft }, 20_000);

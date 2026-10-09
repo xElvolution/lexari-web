@@ -35,6 +35,9 @@ import { draftFromTag, emailContext, emailRequest, hasEmailTag, stripEmailTags }
 import { createSecretRequest, hasSecretTag, scrubber, secretEnv, secretNames, secretRequestTag, secretsHint, stripSecretTags, stripTakeover, takeoverTag, type Scrubber } from "@/server/secrets";
 import { findSecrets, redactPatterns } from "@/lib/secretScan";
 import type { SecretCard, TakeoverCard } from "@/content/secrets";
+import { TASKS_HINT, hasTaskTag, runTaskTags, stripTaskTags } from "@/server/tasks/chat";
+import { tasksContext } from "@/server/tasks/tasks";
+import type { MeetAsk, TaskRef } from "@/content/tasks";
 
 export const runtime = "nodejs";
 
@@ -144,6 +147,12 @@ export async function POST(req: Request) {
   const agentSlug = speakerRow?.slug || "home";
   const vaultNames = !call ? await secretNames(userId, agentSlug).catch(() => [] as { name: string; service: string }[]) : [];
   prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${call ? "Never ask for a password, API key, recovery phrase or private key out loud; say you'll put a secure card in the chat instead." : secretsHint(vaultNames, tools)}` };
+  // Meetings, background jobs and schedules (server/tasks): your own agents, on their computer.
+  const taskTools = tools && !event && speakerRow?.kind !== "hired";
+  if (taskTools) {
+    const open = await tasksContext(userId, speakerRow?.slug || "home").catch(() => "");
+    prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${TASKS_HINT}${open ? `\n${open}` : ""}` };
+  }
   // The wallet tools (send, read) are for chat turns; every turn (calls too) reads the wallet history below.
   const owner = session.wallet || "";
   const wallet = call ? "" : owner;
@@ -290,6 +299,17 @@ export async function POST(req: Request) {
           }
           if (!full.trim() && email) full = "Here's the draft. Check it and tap Send when it looks right.";
         }
+        // Task tags: a meeting Join card, a background job, or a schedule (each shows as a card under the reply).
+        let meet: MeetAsk | undefined, taskCard: TaskRef | undefined;
+        if (taskTools && hasTaskTag(full)) {
+          const r = await runTaskTags(userId, { agent: speakerRow?.slug || "home", convo: body.convo, messageId: body.replyMsgId, tz, agentName: speakerName, userName: (home.meta as { you?: string })?.you || "", said: body.text }, full)
+            .catch((e: Error) => { console.error(`[tasks] tags: ${e.message}`); return { meet: undefined, task: undefined, notes: ["that didn't work on my computer"] }; });
+          meet = r.meet; taskCard = r.task;
+          full = stripTaskTags(full);
+          if (r.notes.length) full = `${full}${full ? "\n\n" : ""}(I couldn't do that: ${r.notes.join("; ")}.)`;
+          if (!full.trim()) full = meet ? "Here's the join card. Pick how I should join." : taskCard ? "On it. I'll report back here when it's done." : "";
+          if (meet || taskCard) send({ card: { ...(meet ? { meet } : {}), ...(taskCard ? { task: taskCard } : {}) } });
+        }
         // Integration tags: reads come back to the agent as live data; a trade or transfer becomes a confirm card.
         let action: ActionCard | null = null;
         let markets: MarketsCard | null = null;
@@ -386,7 +406,7 @@ export async function POST(req: Request) {
         if (!split.reply) throw new ModelError("The agent sent an empty reply. Try again.");
         if (split.remember) send({ remember: split.remember });
         if (call) { send({ done: true }); return; } // a call is not saved as chat messages
-        const replyMeta = pay || files.length || action || markets || email || secret || takeover ? { ...(pay ? { send: pay } : {}), ...(files.length ? { files } : {}), ...(action ? { action } : {}), ...(markets ? { markets } : {}), ...(email ? { email } : {}), ...(secret ? { secret } : {}), ...(takeover ? { takeover } : {}) } : event ? { about: event.tx } : null;
+        const replyMeta = pay || files.length || action || markets || email || secret || takeover || meet || taskCard ? { ...(pay ? { send: pay } : {}), ...(files.length ? { files } : {}), ...(action ? { action } : {}), ...(markets ? { markets } : {}), ...(email ? { email } : {}), ...(secret ? { secret } : {}), ...(takeover ? { takeover } : {}), ...(meet ? { meet } : {}), ...(taskCard ? { task: taskCard } : {}) } : event ? { about: event.tx } : null;
         await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, replyMeta, userSaved);
         if (!body.follow && !event && !(await counted)) await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).

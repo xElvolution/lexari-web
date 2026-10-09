@@ -19,6 +19,7 @@ import { setSeatGate } from "./overlays";
 import UpgradeSheet from "./UpgradeSheet";
 import BillingSheets from "./billing/BillingSheets";
 import MailSheetHost from "./email/MailSheet";
+import TasksSheetHost from "./tasks/TasksSheet";
 import BalancePaySheet from "./billing/BalancePaySheet";
 import Celebrate from "./Celebrate";
 import AppLock from "./lock/AppLock";
@@ -214,6 +215,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <BalancePaySheet />
       <BillingSheets />
       <MailSheetHost />
+      <TasksSheetHost />
       <Celebrate />
       <AppLock />
       {s.tour?.on && <Tour s={s} />}
