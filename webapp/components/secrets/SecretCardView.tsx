@@ -71,8 +71,8 @@ export function SecretCardView({ convo, m }: { convo: string; m: Msg & { secret:
           <button type="submit" disabled={!!busy || !filled} aria-label="Save securely" title="Save securely" data-secret-save className={`${ibtn} bg-grape text-white hover:bg-grape-deep`}>{busy === "save" ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Icon name="check" size={16} stroke={2.6} />}</button>
         </form>
       ) : (
-        <p className="flex items-center gap-1.5 px-3 pb-3 pt-2 text-[12px] font-semibold text-ink/55">
-          {c.status === "saved" ? <><Icon name="key" size={13} />Saved as <code className="font-mono text-ink/75">{c.name}</code> · {who} never sees it</> : "Nothing was saved."}
+        <p className="px-3 pb-3 pt-2 text-[12px] font-semibold leading-snug text-ink/55">
+          {c.status === "saved" ? <><Icon name="key" size={12} className="mr-1 inline -translate-y-px" />Saved as <code className="break-all font-mono text-ink/75">{c.name}</code>. {who} can use it, never see it.</> : "Nothing was saved."}
         </p>
       )}
       {c.status === "pending" && <p className="flex items-center gap-1.5 px-3 pb-3 -mt-1 text-[11px] text-ink/45"><Icon name="eyeoff" size={12} />Encrypted in your vault. Never shown to {who} or in chat.</p>}

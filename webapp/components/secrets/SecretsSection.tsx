@@ -30,8 +30,8 @@ export default function SecretsSection({ s }: { s: State }) {
   const put = (x: SecretInfo) => setList((cur) => { const l = cur || []; const i = l.findIndex((y) => y.id === x.id); return i < 0 ? [x, ...l] : l.map((y) => (y.id === x.id ? x : y)); });
 
   return (
-    <div data-secrets-section className="grid gap-5 max-[430px]:gap-4">
-      <section>
+    <div data-secrets-section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 max-[430px]:gap-4">
+      <section className="min-w-0">
         <div className="mb-1.5 flex items-end justify-between px-1">
           <h3 className="label text-[9.5px] text-ink/50">Vault</h3>
           <button onClick={() => setEdit({ kind: "add" })} data-secret-add className="inline-flex h-8 items-center gap-1.5 rounded-full bg-grape px-3 text-[12.5px] font-bold text-white hover:bg-grape-deep"><Icon name="plus" size={14} stroke={2.4} />Add</button>
@@ -60,7 +60,7 @@ export default function SecretsSection({ s }: { s: State }) {
           ))}
         </div>
       </section>
-      <section>
+      <section className="min-w-0">
         <h3 className={h3}>How it works</h3>
         <ul className={`${card} space-y-2.5 p-4 text-[13px] leading-snug text-ink/70`}>
           <li className="flex gap-2.5"><Icon name="lock" size={15} className="mt-0.5 shrink-0 text-brand-ink" />Encrypted on our server (AES-256). Nobody, not even your agents, can read a saved value back.</li>
