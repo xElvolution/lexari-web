@@ -34,7 +34,7 @@ export function IntSheet({ label, onClose, head, children, footer }: { label: st
           <div className="flex justify-center pt-2.5 sm:hidden"><span aria-hidden className="h-1.5 w-11 rounded-full bg-ink/20" /></div>
           {head}
         </div>
-        <div className="no-bar min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 sm:px-6 max-[430px]:px-4" style={{ WebkitOverflowScrolling: "touch" }}>{children}</div>
+        <div className="no-bar min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-1 sm:px-6 max-[430px]:px-4" style={{ WebkitOverflowScrolling: "touch" }}>{children}</div>
         {footer && <div className="shrink-0 border-t border-line px-5 py-4 sm:px-6 max-[430px]:px-4 max-[430px]:py-3">{footer}</div>}
       </div>
     </div>

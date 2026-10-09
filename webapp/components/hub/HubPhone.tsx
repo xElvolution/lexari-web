@@ -218,7 +218,7 @@ function QuestItem({ q }: { q: QuestView }) {
       <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[10px] ${q.claimed ? "bg-grape text-white" : "bg-tint text-brand-ink"}`}><Icon name={q.claimed ? "check" : q.icon} size={15} /></span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5"><span className="truncate text-[14.5px] font-semibold text-ink">{q.title}</span><span className="flex shrink-0 items-center gap-0.5 text-[12px] font-bold text-brand-ink"><Coin size={12} />{q.reward}</span></div>
-        <div className="flex items-center gap-2"><span className={`${meta} truncate`}>{q.hint}</span></div>
+        <div className="flex items-center gap-2"><span className={meta}>{q.hint}</span></div>
         <div className="mt-1 flex items-center gap-2"><span className="h-1 flex-1 overflow-hidden rounded-full bg-tint"><span className="block h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></span><span className="text-[11px] tabular-nums text-ink/50">{q.have}/{q.goal}</span></div>
       </div>
       {q.claimed ? <span className={`${pill} bg-tint text-ink/55`}>Done</span>

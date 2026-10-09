@@ -99,7 +99,7 @@ export function AppCard({ a, wide = false, fill = false }: { a: Specialist; wide
       <span className="mt-2.5 flex items-start gap-2">
         <Link href={href} className="min-w-0 flex-1">
           <span className="block truncate text-[15px] font-bold text-ink hover:text-brand-ink">{a.name}</span>
-          <span className="block truncate text-[12.5px] text-ink/55">{m.maker} · {m.cat}</span>
+          <span className="line-clamp-2 block text-[12.5px] leading-snug text-ink/55 sm:truncate">{m.maker} · {m.cat}</span>
         </Link>
         <span className="pt-0.5"><HireBtn a={a} faceEl={() => face.current} /></span>
       </span>
@@ -125,7 +125,7 @@ export function ShelfRow({ title, sub, children, more }: { title: string; sub?: 
           <button onClick={() => go(1)} disabled={!edge.r} aria-label={`Scroll ${title} right`} className="hidden h-9 w-9 place-items-center rounded-full bg-tint text-ink transition hover:bg-grape hover:text-white disabled:opacity-30 disabled:hover:bg-tint disabled:hover:text-ink md:grid"><Icon name="right" size={17} /></button>
         </div>
       </div>
-      <div ref={row} onScroll={measure} className="no-bar -mx-4 mt-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto scroll-smooth px-4 pb-2 sm:-mx-8 sm:scroll-px-8 sm:px-8">{children}</div>
+      <div ref={row} onScroll={measure} className="no-bar -mx-4 mt-3 flex snap-x scroll-px-4 gap-4 overflow-x-auto scroll-smooth px-4 pb-2 pt-1 sm:-mx-8 sm:scroll-px-8 sm:px-8">{children}</div>
     </section>
   );
 }

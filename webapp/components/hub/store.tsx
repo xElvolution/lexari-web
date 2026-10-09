@@ -101,7 +101,7 @@ export function StoreSheet({ s, onClose }: { s: State; onClose: () => void }) {
                 <button type="button" data-store-more={c.kind} onClick={() => setFull(c.kind)} className="ml-auto flex items-center gap-0.5 text-[13px] font-bold text-brand-ink">See more<Icon name="arrow" size={14} /></button>
               </div>
               <p className="mt-1 px-0.5 text-[12px] text-ink/55">{c.sub}</p>
-              <ul className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 mt-2 flex snap-x gap-2 overflow-x-auto px-4 pb-1 pt-0.5">{STORE_ITEMS.filter((x) => x.kind === c.kind).map((it) => card(it, true))}</ul>
+              <ul className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 mt-2 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 pt-0.5">{STORE_ITEMS.filter((x) => x.kind === c.kind).map((it) => card(it, true))}</ul>
             </section>
           ))}
         </div>

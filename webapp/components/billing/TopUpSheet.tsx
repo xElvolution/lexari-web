@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { TOPUP_MAX_USD, TOPUP_PACKS } from "@/content/billing";
-import { PREMIUM, turnCostUsd } from "@/content/models";
 import { api, friendly } from "@/lib/api";
 import { closeBillingSheet, payCrypto, startCard, startCrypto, usdcBalance, verifyPayment, useBilling, type CryptoRequest, type BuyIntent, type PayStep, type TopUpIntent } from "@/lib/billing";
 import { balanceOf, isEmbedded, payer } from "@/lib/pay";
@@ -13,7 +12,6 @@ import { CardGlyph, Sheet, Spinner, UsdcGlyph, money } from "./parts";
 
 type Rail = "card" | "crypto";
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
-const sonnetTurns = (usd: number) => Math.floor(usd / (turnCostUsd(PREMIUM[0].price) * 1.2));
 /** SOL a USDC payment needs for fees and, the first time, the treasury's token account rent. */
 const SOL_FOR_FEES = 3_000_000;
 
@@ -44,9 +42,9 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
       )}
       <div className={`grid gap-2 ${amounts.length === 1 ? "grid-cols-1" : "grid-cols-3"}`} role="radiogroup" aria-label="Amount">
         {amounts.map((v) => (
-          <button key={v} role="radio" aria-checked={pack === v} data-pack={v} disabled={busy} onClick={() => setPack(v)} className={`rounded-[18px] p-3 text-left transition max-[430px]:p-2.5 ${pack === v ? "bg-grape text-white ring-1 ring-grape" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
-            <span className="display block text-[28px] leading-none tabular-nums max-[430px]:text-[24px]">${v}</span>
-            <span className={`mt-1.5 block text-[11.5px] leading-tight ${pack === v ? "text-white/80" : "text-ink/55"}`}>{amounts.length === 1 && need ? "Exactly what's missing, rounded up to the dollar" : `about ${sonnetTurns(v).toLocaleString()} Sonnet replies`}</span>
+          <button key={v} role="radio" aria-checked={pack === v} data-pack={v} disabled={busy} onClick={() => setPack(v)} className={`rounded-[16px] px-3 py-2.5 text-center transition ${pack === v ? "bg-grape text-white ring-1 ring-grape" : "bg-card ring-1 ring-line hover:ring-grape/50"}`}>
+            <span className="display block text-[24px] leading-none tabular-nums max-[430px]:text-[21px]">${v}</span>
+            {amounts.length === 1 && need && <span className="mt-1 block text-[11.5px] leading-tight text-white/80">Exactly what&apos;s missing, rounded up to the dollar</span>}
           </button>
         ))}
       </div>

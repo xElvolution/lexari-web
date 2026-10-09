@@ -32,7 +32,7 @@ export function Sheet({ title, sub, icon, onClose, children, footer, label, clos
           <div className="min-w-0 flex-1"><h2 className="display text-[24px] leading-[1.05] text-ink max-[430px]:text-[21px]">{title}</h2>{sub && <p className="mt-1 text-[13.5px] leading-snug text-ink/65 max-[430px]:text-[12.5px]">{sub}</p>}</div>
           <button onClick={onClose} disabled={!closable} aria-label="Close" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink/70 hover:bg-tint disabled:opacity-40"><Icon name="x" size={19} /></button>
         </div>
-        <div className="no-bar min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-6 max-[430px]:px-4 max-[430px]:pb-4">{children}</div>
+        <div className="no-bar min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-1 sm:px-6 max-[430px]:px-4 max-[430px]:pb-4">{children}</div>
         {footer && <div className="border-t border-line px-5 py-4 sm:px-6 max-[430px]:px-4 max-[430px]:py-3">{footer}</div>}
       </div>
     </div>

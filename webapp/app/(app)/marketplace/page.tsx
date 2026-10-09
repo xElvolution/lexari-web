@@ -28,7 +28,7 @@ function Hero() {
           return (
             <article key={a.slug} aria-roledescription="slide" aria-label={`${k + 1} of ${list.length}`} className="relative flex min-h-[300px] w-full shrink-0 snap-start overflow-hidden text-white sm:min-h-[340px]" style={{ background: `radial-gradient(90% 120% at 85% 30%, color-mix(in oklab, ${col} 70%, transparent) 0%, transparent 60%), linear-gradient(120deg, #0a0a0a 0%, #1d0f5c 55%, #5b2bff 100%)` }}>
               <div className="grain pointer-events-none absolute inset-0" />
-              <div className="relative z-10 flex max-w-[560px] flex-col justify-end p-6 sm:p-9">
+              <div className="relative z-10 flex max-w-[560px] flex-col justify-end p-6 max-sm:pb-[60px] sm:p-9">
                 <span className="label w-fit rounded-full bg-white/15 px-2.5 py-1 text-[9px] backdrop-blur">{k === 0 ? "Agent of the week" : k === 1 ? "Editors' choice" : "Staff favourite"}</span>
                 <h2 className="display mt-4 text-[56px] leading-[.9] sm:text-[80px]">{a.name}</h2>
                 <p className="mt-2 text-[17px] font-semibold text-white/90 sm:text-[19px]">{a.quip}</p>
@@ -40,12 +40,12 @@ function Hero() {
                 </div>
               </div>
               <div className="pointer-events-none absolute -right-6 bottom-[-30px] hidden sm:block md:right-8 md:bottom-[-10px]"><AgentTile id={a.slug} look={null} size={300} radius={80} face={250} className="rotate-[-6deg] shadow-[0_40px_80px_-30px_rgba(0,0,0,.8)]" /></div>
-              <div className="pointer-events-none absolute -right-8 -top-8 sm:hidden"><AgentTile id={a.slug} look={null} size={150} radius={44} className="rotate-[-8deg] opacity-90" /></div>
+              <div className="pointer-events-none absolute right-4 top-4 sm:hidden"><AgentTile id={a.slug} look={null} size={72} radius={22} className="rotate-[-6deg]" /></div>
             </article>
           );
         })}
       </div>
-      <div className="absolute bottom-5 right-6 z-10 flex items-center gap-2">
+      <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2 sm:bottom-5 sm:right-6">
         <button onClick={() => go(i - 1)} aria-label="Previous" className="grid h-9 w-9 place-items-center rounded-full bg-black/40 text-white backdrop-blur hover:bg-black/60"><Icon name="left" size={17} /></button>
         <div className="flex gap-1.5">{list.map((_, k) => <button key={k} onClick={() => go(k)} aria-label={`Slide ${k + 1}`} aria-current={k === i} className={`h-2 rounded-full transition-all ${k === i ? "w-6 bg-white" : "w-2 bg-white/45"}`} />)}</div>
         <button onClick={() => go(i + 1)} aria-label="Next" className="grid h-9 w-9 place-items-center rounded-full bg-black/40 text-white backdrop-blur hover:bg-black/60"><Icon name="right" size={17} /></button>
@@ -140,7 +140,7 @@ export default function Marketplace() {
         </div>
       </div>
 
-      <div data-rise className="no-bar -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 sm:-mx-8 sm:px-8" role="tablist" aria-label="Categories">
+      <div data-rise className="no-bar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 py-1 sm:-mx-8 sm:mt-5 sm:px-8" role="tablist" aria-label="Categories">
         {(["All", ...STORE_CATS.map((c) => c.id)] as const).map((c) => (
           <button key={c} role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={`flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-[14px] font-bold transition ${cat === c ? "bg-ink text-[var(--bg)]" : "bg-card text-ink/75 ring-1 ring-line hover:text-ink hover:ring-grape/50"}`}>
             {c !== "All" && <Icon name={STORE_CATS.find((x) => x.id === c)!.icon} size={15} />}{c}

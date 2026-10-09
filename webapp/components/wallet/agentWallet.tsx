@@ -101,7 +101,7 @@ export function AgentWalletCard({ a, name, look, funding, fundings = [], compact
         <AgentTile id={a.slug} look={look as never} size={compact ? 38 : 44} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15.5px] font-bold text-ink">{name}&apos;s wallet</div>
-          <div className="truncate text-[12.5px] text-ink/60">{a.kind === "hired" ? "Its own wallet for tasks" : "Its own wallet, separate from your balance"}</div>
+          <div className="text-[12.5px] leading-snug text-ink/60">{a.kind === "hired" ? "Its own wallet for tasks" : "Its own wallet, separate from your balance"}</div>
         </div>
         {devnet && <span className="label shrink-0 rounded-full bg-[#ffd84d] px-2 py-0.5 text-[8px] text-[#0a0a0a]">Test funds</span>}
       </div>

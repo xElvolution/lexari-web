@@ -38,7 +38,7 @@ export default function GroupDialog({ s, editId, onClose, onDone }: { s: State; 
           <input autoFocus value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} onKeyDown={(e) => { if (e.key === "Enter") save(); }} placeholder="Launch crew" className="mt-1.5 h-12 w-full rounded-2xl bg-tint px-4 text-[16px] text-ink outline-none ring-grape placeholder:text-ink/40 focus:ring-2" />
         </label>
         <div className="mt-5 flex items-baseline justify-between"><span className="label text-[9.5px] text-ink/60">Add agents</span><span className="text-[12.5px] text-ink/55">{pick.length} picked · at least 2</span></div>
-        <ul className="no-bar mt-2 max-h-[300px] space-y-1 overflow-y-auto">
+        <ul className="no-bar -mx-1.5 mt-1.5 max-h-[300px] space-y-1 overflow-y-auto p-1.5">
           {agents.map((a) => {
             const on = pick.includes(a.id);
             return (

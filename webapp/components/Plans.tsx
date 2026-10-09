@@ -21,9 +21,9 @@ export function PeriodToggle({ period, onChange, className = "" }: { period: Per
       <span aria-hidden data-period-thumb className="period-thumb absolute bottom-1 left-1 top-1 w-[calc(50%-4px)] rounded-full bg-grape shadow-[0_8px_18px_-8px_rgba(91,43,255,.9)]" style={{ transform: period === "yearly" ? "translateX(100%)" : "translateX(0)" }} />
       {(["monthly", "yearly"] as const).map((p) => (
         <button key={p} type="button" role="radio" aria-checked={period === p} tabIndex={period === p ? 0 : -1} data-period={p} onClick={() => onChange(p)}
-          className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-[14px] font-bold transition-colors duration-300 ${period === p ? "text-white" : "text-ink/65 hover:text-ink"}`}>
+          className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-[14px] max-[430px]:gap-1 font-bold transition-colors duration-300 ${period === p ? "text-white" : "text-ink/65 hover:text-ink"}`}>
           {p === "monthly" ? "Monthly" : "Yearly"}
-          {p === "yearly" && <span data-free-pill className={`label whitespace-nowrap rounded-full px-1.5 py-[3px] text-[8px] leading-none transition-colors duration-300 ${period === p ? "bg-white text-[#137a3d]" : "bg-[#1fbf6a] text-white"}`}>2 months free</span>}
+          {p === "yearly" && <span data-free-pill className={`label whitespace-nowrap rounded-full px-1.5 py-[3px] text-[8px] leading-none max-[430px]:!text-[9px] max-[430px]:!tracking-[.02em] transition-colors duration-300 ${period === p ? "bg-white text-[#137a3d]" : "bg-[#1fbf6a] text-white"}`}>2 months free</span>}
         </button>
       ))}
     </div>

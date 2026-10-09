@@ -154,7 +154,7 @@ export default function Badge({ name, setName, look }: { name: string; setName: 
             <span className="label absolute right-3 top-3 rounded-full bg-grape px-2 py-1 text-[9px] text-white">● online</span>
           </div>
           <div className="px-1.5 pt-3">
-            <div className="display truncate text-[40px] leading-[0.95] sm:text-[50px]">{shown}</div>
+            <div className="display truncate pb-[.1em] text-[40px] leading-[0.95] sm:text-[50px]">{shown}</div>
             <div className="label mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[9.5px] text-black/60"><span>{B.role}</span><span>·</span><span>{B.seat}</span><span>·</span><span>{B.since}</span></div>
             <label className="mt-3 block rounded-xl border-2 border-dashed border-grape/40 bg-white px-3 py-2 focus-within:border-grape">
               <span className="label block text-[8.5px] text-grape">{B.inputLabel}</span>
@@ -178,7 +178,7 @@ export default function Badge({ name, setName, look }: { name: string; setName: 
               <span className="label rounded-full bg-grape px-2 py-1 text-[8.5px] text-white">{B.back.kind}</span>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5 text-[12px] sm:mt-4 sm:gap-y-3 sm:text-[13px]">
-              <div className="col-span-2"><dt className="label text-[8.5px] text-black/50">{B.back.holder}</dt><dd className="display truncate text-[26px] leading-none sm:text-[30px]">{shown}</dd></div>
+              <div className="col-span-2"><dt className="label text-[8.5px] text-black/50">{B.back.holder}</dt><dd className="display truncate pb-[.1em] text-[26px] leading-none sm:text-[30px]">{shown}</dd></div>
               {B.back.fields.map(([k, val]) => <div key={k}><dt className="label text-[8.5px] text-black/50">{k}</dt><dd className="font-semibold leading-tight">{val}</dd></div>)}
               <div><dt className="label text-[8.5px] text-black/50">{B.back.issuedLabel}</dt><dd className="font-semibold leading-tight">{issued}</dd></div>
             </dl>

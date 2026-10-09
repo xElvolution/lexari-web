@@ -20,8 +20,8 @@ export default function TxReceipt({ tx }: { tx: Tx }) {
         {st === "pending" ? <i className="h-3 w-3 animate-spin rounded-full border-2 border-[#0a0a0a] border-t-transparent" /> : <Icon name={st === "confirmed" ? (tx.kind === "incoming" ? "arrow" : "check") : "x"} size={12} stroke={3} className={tx.kind === "incoming" && st === "confirmed" ? "rotate-90" : ""} />}
       </span>
       <span className="min-w-0 flex-1 leading-tight">
-        <span className="block truncate text-[12.5px] font-bold">{title}{tx.sol ? ` · ${sol(tx.sol)}` : ""}{who ? ` ${who}` : ""}</span>
-        <span className="block truncate text-[11px] font-semibold opacity-75">
+        <span className="block break-words text-[12.5px] font-bold">{title}{tx.sol ? ` · ${sol(tx.sol)}` : ""}{who ? ` ${who}` : ""}</span>
+        <span className="block break-words text-[11px] font-semibold leading-snug opacity-75">
           {st === "pending" ? "Waiting for Solana devnet…" : st === "confirmed" ? `Confirmed on devnet${tx.balance !== undefined && tx.balance >= 0 ? ` · balance ${sol(tx.balance)}` : ""}` : st === "failed" ? tx.error || "Didn't go through" : "Nothing was sent"}
           {tx.sig ? ` · ${short(tx.sig)}` : ""}
         </span>
