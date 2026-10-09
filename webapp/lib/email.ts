@@ -29,3 +29,8 @@ export const saveMailbox = (agent: string, patch: { senderMode?: "agent" | "user
 export const testMail = (agent: string, kind: "mail" | "gmail_verify") => api(`/api/email/${encodeURIComponent(agent)}/test`, { body: { kind } });
 export const actOnEmail = (id: string, op: "send" | "cancel", edits?: { subject?: string; text?: string }) => api<{ email: EmailCard }>(`/api/email/item/${id}`, { body: { op, ...edits } }).then((r) => r.email);
 export const setUnread = (agent: string, n: number) => set({ unread: { ...store.unread, [agent]: n } });
+
+/** Your email name: agents are <agent>.<handle>@domain. Chosen once in Settings > Account. */
+export type HandleInfo = { handle: string; chosen: boolean; domain: string; check?: { handle: string; available: boolean; reason: string | null } };
+export const loadHandle = (check?: string) => api<HandleInfo>(`/api/email/handle${check !== undefined ? `?check=${encodeURIComponent(check)}` : ""}`);
+export const chooseHandle = (handle: string) => api<HandleInfo>("/api/email/handle", { method: "PUT", body: { handle } });

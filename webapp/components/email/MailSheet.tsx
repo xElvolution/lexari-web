@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { MailItem } from "@/content/email";
 import { closeMail, loadMailbox, readMail, refreshUnread, saveMailbox, setUnread, testMail, useEmail, type MailState } from "@/lib/email";
@@ -58,7 +59,7 @@ function MailSheet({ agent }: { agent: string }) {
   const list = tab === "in" ? st?.inbox ?? [] : st?.sent ?? [];
   const title = view.kind === "setup" ? "Forwarding" : `${name}'s email`;
   return (
-    <Sheet label="mailbox" title={title} sub={box ? <span className="flex items-center gap-1.5"><span data-mail-address className="truncate font-mono text-[12px]">{box.address}</span><button onClick={() => copy(box.address, "Address")} aria-label="Copy address" className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink/60 hover:bg-tint hover:text-ink"><Icon name="copy" size={13} /></button></span> : "Loading…"}
+    <Sheet label="mailbox" title={title} sub={box ? <span className="flex items-center gap-1.5"><span data-mail-address className="truncate font-mono text-[12px]">{box.address}</span><button onClick={() => copy(box.address, "Address")} aria-label="Copy address" className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink/60 hover:bg-tint hover:text-ink"><Icon name="copy" size={13} /></button><Link href="/settings#accounts" onClick={closeMail} data-mail-name-link aria-label="Change your email name" title="Change your email name" className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink/60 hover:bg-tint hover:text-ink"><Icon name="edit" size={12} /></Link></span> : "Loading…"}
       icon={<AgentTile id={agent} look={s?.agent?.look} size={40} status={false} />} onClose={closeMail}>
       {!st ? (err ? <p className="py-6 text-center text-[13.5px] text-ink/65">{err} <button onClick={() => void load()} className="font-bold text-brand-ink">Try again</button></p> : <div className="grid h-40 place-items-center text-ink/50"><Spinner /></div>) : view.kind === "read" ? (
         <ReadView id={view.id} name={name} onBack={() => { setView({ kind: "list" }); void load(); }} onAsk={ask} />

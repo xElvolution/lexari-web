@@ -19,6 +19,7 @@ import LockSettings from "@/components/lock/LockSettings";
 import SocialLinks from "@/components/social/SocialLinks";
 import IntegrationsSection from "@/components/integrations/IntegrationsSection";
 import ModelsSection from "@/components/models/ModelsSection";
+import EmailNameSetting from "@/components/email/EmailNameSetting";
 import { disablePush, enablePush, pushOnHere, pushPermission } from "@/lib/notifications";
 
 const SECTIONS = [
@@ -267,6 +268,7 @@ function Accounts({ s }: { s: State }) {
         </div>
         <Row title={google ? "Lexari wallet" : "Wallet"} desc={addr ? `${shortAddr(addr)} signs your check-ins, quests, ID cards and hires.` : "Your wallet is still loading."}>{addr && <button onClick={() => copy(addr, "Address")} className={smallBtn}><Icon name="copy" size={14} />Copy</button>}</Row>
       </Group>
+      <EmailNameSetting agent={agentName(s)} />
       {s.referralCode && (
         <Group title="Invite friends">
           <Row title={`Your code · ${s.referralCode}`} desc="Friends who sign up with your link count toward your referral tiers in the Hub."><button onClick={() => copy(link, "Invite link")} className={smallBtn}><Icon name="copy" size={14} />Copy link</button></Row>

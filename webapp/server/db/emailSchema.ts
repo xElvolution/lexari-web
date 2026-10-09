@@ -6,7 +6,10 @@ export const agentMailboxes = pgTable("agent_mailboxes", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   agentSlug: text("agent_slug").notNull(),
-  local: text("local").notNull().unique(),
+  /** <agent_part>.<your email handle>; null until it's filled in on next open */
+  local: text("local").unique(),
+  /** the agent's name part, unique per person */
+  agentPart: text("agent_part"),
   /** agent: from the agent's name; user: "<You> via Lexari" with Reply-To your address */
   senderMode: text("sender_mode").notNull().default("agent"),
   replyTo: text("reply_to"),

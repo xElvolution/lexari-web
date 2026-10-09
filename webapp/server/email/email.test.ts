@@ -37,3 +37,16 @@ test("the <email> tag", () => {
 test("HTML-only mail becomes readable text", () => {
   assert.equal(htmlToText('<p>Hi <b>Ada</b></p><p><a href="https://x.com">link</a></p><style>p{}</style>'), "Hi Ada\nlink (https://x.com)");
 });
+
+test("email names: agent part and handle rules, no random letters", async () => {
+  const { slugPart, handleProblem } = await import("./mail");
+  assert.equal(slugPart("Rika"), "rika");
+  assert.equal(slugPart("Zoë Ann"), "zoeann");
+  assert.equal(handleProblem("elvolution"), null);
+  assert.equal(handleProblem("elv-dev"), null);
+  assert.ok(handleProblem("a"));
+  assert.ok(handleProblem("Bad_Name"));
+  assert.ok(handleProblem("double--hyphen"));
+  assert.ok(handleProblem("-lead"));
+  assert.ok(handleProblem("postmaster"));
+});

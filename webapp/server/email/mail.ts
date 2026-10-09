@@ -2,7 +2,6 @@
  * SERVER ONLY. Agent email: each agent's address, its inbox and outbox, what the agent is told about its mail, and
  * the <email> tag an agent writes to prepare an email (a draft card in chat; it only goes out when you tap Send).
  */
-import { randomInt } from "node:crypto";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { EmailCard, Mailbox, MailItem } from "@/content/email";
 import { db } from "../db";
@@ -14,17 +13,92 @@ import { emailDomain, emailMode, forwardingRequest, htmlToText, sendLive, type R
 
 type Box = typeof agentMailboxes.$inferSelect;
 type Row = typeof agentEmails.$inferSelect;
-const ABC = "abcdefghjkmnpqrstuvwxyz23456789";
 export const SENDS_PER_DAY = Number(process.env.EMAIL_SENDS_PER_DAY || 40);
 const EMAIL_RE = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[a-z]{2,}$/i;
 export const validEmail = (s: string) => s.length <= 254 && EMAIL_RE.test(s);
 
-export const addressOf = (b: Pick<Box, "local">) => `${b.local}@${emailDomain()}`;
-function localBase(name: string) {
-  const s = name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 16);
-  return s || "agent";
+/* ---------- addresses: <agent>.<your email name>@agents.lexari.ai ---------- */
+
+export const addressOf = (b: Pick<Box, "local">) => (b.local ? `${b.local}@${emailDomain()}` : "");
+/** Lowercase letters and digits only (accents dropped). */
+export const slugPart = (s: string, max = 24) => s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, max);
+/** Your email name: 2 to 30 lowercase letters, digits or single hyphens. */
+export const HANDLE_RE = /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,29}$/;
+const RESERVED = new Set(["admin", "administrator", "postmaster", "hostmaster", "webmaster", "abuse", "security", "support", "help", "info", "mail", "email", "noreply", "no-reply", "root", "lexari", "billing", "team", "agents", "agent", "system", "official", "staff", "test", "null", "undefined"]);
+
+export function handleProblem(h: string): string | null {
+  if (!HANDLE_RE.test(h)) return h.length < 2 ? "Use at least 2 characters." : "Use lowercase letters, numbers and single hyphens (up to 30).";
+  if (RESERVED.has(h)) return "That name is reserved.";
+  return null;
 }
-const shortTag = () => Array.from({ length: 4 }, () => ABC[randomInt(ABC.length)]).join("");
+
+/** Whether an email name is free for this person (their own counts as free). */
+export async function handleAvailable(userId: string, h: string) {
+  const problem = handleProblem(h);
+  if (problem) return { available: false, reason: problem };
+  const [taken] = await db().select({ id: users.id }).from(users).where(eq(users.emailHandle, h)).limit(1);
+  if (taken && taken.id !== userId) return { available: false, reason: "Someone already has that name." };
+  return { available: true, reason: null };
+}
+
+/** Your first name (profile, else what your agent calls you, else your email's name part), for the default email name. */
+async function nameParts(userId: string) {
+  const [[u], [home]] = await Promise.all([
+    db().select({ profile: users.profile, email: users.email }).from(users).where(eq(users.id, userId)).limit(1),
+    db().select({ meta: agents.meta }).from(agents).where(and(eq(agents.userId, userId), eq(agents.slug, "home"))).limit(1),
+  ]);
+  const prof = (u?.profile ?? {}) as { name?: string; username?: string };
+  const full = String(prof.name || (home?.meta as { you?: string })?.you || prof.username || (u?.email ? u.email.split("@")[0] : "")).trim();
+  const words = full.split(/[\s._-]+/).map((w) => slugPart(w, 30)).filter(Boolean);
+  return words;
+}
+
+/** Your email name, set on first use: your first name, else first and last name, else first name with a number. */
+export async function emailHandle(userId: string): Promise<string> {
+  const [u] = await db().select({ h: users.emailHandle }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!u) throw new HttpError(404, "Account not found.");
+  if (u.h) return u.h;
+  const words = await nameParts(userId);
+  const first = words[0] && words[0].length >= 2 ? words[0] : "member";
+  const tries = [first, ...(words.length > 1 ? [`${first}${words[words.length - 1]}`.slice(0, 30)] : []), ...Array.from({ length: 98 }, (_, i) => `${first.slice(0, 27)}${i + 2}`)];
+  for (const h of tries) {
+    if (handleProblem(h)) continue;
+    const r = await db().update(users).set({ emailHandle: h }).where(and(eq(users.id, userId), isNull(users.emailHandle), sql`not exists (select 1 from users x where x.email_handle = ${h})`)).returning({ h: users.emailHandle }).catch(() => []);
+    if (r.length) return h;
+    const [again] = await db().select({ h: users.emailHandle }).from(users).where(eq(users.id, userId)).limit(1);
+    if (again?.h) return again.h;
+  }
+  throw new HttpError(500, "Couldn't make your email name. Pick one in Settings > Account.");
+}
+
+export async function handleInfo(userId: string) {
+  const h = await emailHandle(userId);
+  const [u] = await db().select({ chosen: users.emailHandleChosen }).from(users).where(eq(users.id, userId)).limit(1);
+  return { handle: h, chosen: !!u?.chosen, domain: emailDomain() };
+}
+
+/**
+ * Choose your email name (once). Every agent's address moves to <agent>.<name> at the same moment. The old addresses
+ * stop receiving mail.
+ */
+export async function chooseHandle(userId: string, raw: string) {
+  const h = raw.trim().toLowerCase();
+  const [u] = await db().select({ h: users.emailHandle, chosen: users.emailHandleChosen }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!u) throw new HttpError(404, "Account not found.");
+  if (u.chosen) throw new HttpError(409, "You've already chosen your email name.");
+  const ok = await handleAvailable(userId, h);
+  if (!ok.available) throw new HttpError(409, ok.reason || "That name isn't available.");
+  try {
+    await db().transaction(async (tx) => {
+      await tx.update(users).set({ emailHandle: h, emailHandleChosen: true }).where(eq(users.id, userId));
+      await tx.update(agentMailboxes).set({ local: sql`case when ${agentMailboxes.agentPart} is null then null else ${agentMailboxes.agentPart} || '.' || ${h} end`, updatedAt: new Date() }).where(eq(agentMailboxes.userId, userId));
+    });
+  } catch (e) {
+    if (/unique|duplicate/i.test(String((e as Error).message))) throw new HttpError(409, "Someone just took that name. Try another.");
+    throw e;
+  }
+  return handleInfo(userId);
+}
 
 /** The agent's display name (your nickname wins), from its row. */
 async function agentName(userId: string, slug: string) {
@@ -33,20 +107,42 @@ async function agentName(userId: string, slug: string) {
   return (a.meta as { nick?: string })?.nick || a.name;
 }
 
-/** The agent's mailbox, made on first use (address <name>.<4 chars>@domain). Throws 404 for an agent you don't have. */
-export async function ensureMailbox(userId: string, slug: string, name?: string): Promise<Box> {
+/** Gives a mailbox its address: the agent's name (a number added if another of your agents has it) and your email name. */
+async function assignAddress(userId: string, box: Box | null, slug: string, name: string): Promise<Box> {
   const database = db();
-  const [have] = await database.select().from(agentMailboxes).where(and(eq(agentMailboxes.userId, userId), eq(agentMailboxes.agentSlug, slug))).limit(1);
-  if (have) return have;
-  const n = name ?? (await agentName(userId, slug));
-  if (!n) throw new HttpError(404, "That agent is not on your team.");
-  for (let i = 0; i < 6; i++) {
-    const [row] = await database.insert(agentMailboxes).values({ userId, agentSlug: slug, local: `${localBase(n)}.${shortTag()}` }).onConflictDoNothing().returning();
-    if (row) return row;
-    const [again] = await database.select().from(agentMailboxes).where(and(eq(agentMailboxes.userId, userId), eq(agentMailboxes.agentSlug, slug))).limit(1);
-    if (again) return again;
+  const handle = await emailHandle(userId);
+  const base = box?.agentPart || slugPart(name) || "agent";
+  const used = new Set((await database.select({ p: agentMailboxes.agentPart, slug: agentMailboxes.agentSlug }).from(agentMailboxes).where(eq(agentMailboxes.userId, userId))).filter((r) => r.slug !== slug && r.p).map((r) => r.p!));
+  for (let i = 1; i < 60; i++) {
+    const part = box?.agentPart && i === 1 ? box.agentPart : i === 1 ? base : `${base.slice(0, 22)}${i}`;
+    if (used.has(part)) continue;
+    const local = `${part}.${handle}`;
+    try {
+      if (box) {
+        const [row] = await database.update(agentMailboxes).set({ agentPart: part, local, updatedAt: new Date() }).where(eq(agentMailboxes.id, box.id)).returning();
+        if (row) return row;
+      } else {
+        const [row] = await database.insert(agentMailboxes).values({ userId, agentSlug: slug, agentPart: part, local }).onConflictDoNothing().returning();
+        if (row) return row;
+        const [again] = await database.select().from(agentMailboxes).where(and(eq(agentMailboxes.userId, userId), eq(agentMailboxes.agentSlug, slug))).limit(1);
+        if (again?.local) return again;
+        if (again) box = again;
+      }
+    } catch (e) {
+      if (!/unique|duplicate/i.test(String((e as Error).message))) throw e;
+      used.add(part);
+    }
   }
   throw new HttpError(500, "Couldn't make an address. Try again.");
+}
+
+/** The agent's mailbox, made on first use (address <agent>.<your email name>@domain). Throws 404 for an agent you don't have. */
+export async function ensureMailbox(userId: string, slug: string, name?: string): Promise<Box> {
+  const [have] = await db().select().from(agentMailboxes).where(and(eq(agentMailboxes.userId, userId), eq(agentMailboxes.agentSlug, slug))).limit(1);
+  if (have?.local) return have;
+  const n = name ?? (await agentName(userId, slug));
+  if (!n) throw new HttpError(404, "That agent is not on your team.");
+  return assignAddress(userId, have ?? null, slug, n);
 }
 
 async function unread(boxId: string) {
@@ -101,7 +197,7 @@ export async function updateMailbox(userId: string, slug: string, patch: { sende
 /** Stores one received email for every agent address it was sent or forwarded to. Returns how many inboxes got it. */
 export async function ingest(m: Received, provider: string) {
   const domain = emailDomain();
-  const locals = [...new Set([...m.to, ...m.cc, ...m.receivedFor].filter((a) => a.endsWith(`@${domain}`)).map((a) => a.slice(0, -domain.length - 1)))];
+  const locals = [...new Set([...m.to, ...m.cc, ...m.receivedFor].map((a) => a.trim().toLowerCase()).filter((a) => a.endsWith(`@${domain}`)).map((a) => a.slice(0, -domain.length - 1)))];
   if (!locals.length) return 0;
   const boxes = await db().select().from(agentMailboxes).where(inArray(agentMailboxes.local, locals));
   const text = (m.text || htmlToText(m.html)).slice(0, 60_000);
