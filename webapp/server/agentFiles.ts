@@ -67,6 +67,7 @@ export const stripFileTags = (t: string) => t.replace(/<file\b[^>]*\/>/gi, "").r
 export const view = (r: { id: string; name: string; size: number; mime: string }): FileItem => ({ id: r.id, name: r.name, size: r.size, mime: r.mime, kind: kindOf(r.name, r.mime) });
 export function kindOf(name: string, mime: string): FileKind {
   if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("video/")) return "video";
   if (mime === "application/pdf") return "pdf";
   if (mime.startsWith("text/")) return CODE.test(name) ? "code" : "text";
   return "other";

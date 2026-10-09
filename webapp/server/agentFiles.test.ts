@@ -51,7 +51,9 @@ test("the image tool is hidden without a key", () => {
   process.env.LEXARI_IMAGE_GEN = "off";
   assert.equal(imageProvider(), null);
   for (const [k, v] of [["XAI_API_KEY", keep.x], ["OPENROUTER_API_KEY", keep.o], ["LEXARI_IMAGE_GEN", keep.g]] as const) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
-  assert.equal(imagineTask("Sure! <imagine>a red fox\n in snow</imagine>"), "a red fox in snow");
+  assert.deepEqual(imagineTask("Sure! <imagine>a red fox\n in snow</imagine>"), { prompt: "a red fox in snow" });
+  assert.deepEqual(imagineTask('<imagine edit="/home/agent/Uploads/me.jpg">make it a pencil sketch</imagine>'), { prompt: "make it a pencil sketch", edit: "/home/agent/Uploads/me.jpg" });
+  assert.equal(sniff("a.mp4", Buffer.from("000000206674797069736f6d00000200", "hex")).kind, "video");
   assert.equal(imagineTask("no tool here"), null);
   assert.equal(stripImagine("Sure! <imagine>a red fox</imagine>"), "Sure!");
 });

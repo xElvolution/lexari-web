@@ -23,7 +23,7 @@ function Peek({ id }: { id: string }) {
 
 /** A file in a chat bubble: preview (images inline, text and code as their first lines), name, size, type and Download. */
 export default function FileCard({ f, mine = false }: { f: CardFile; mine?: boolean }) {
-  const kind: FileKind = f.kind || (f.mime?.startsWith("image/") ? "image" : "other");
+  const kind: FileKind = f.kind && f.kind !== "other" ? f.kind : f.mime?.startsWith("image/") ? "image" : f.mime?.startsWith("video/") ? "video" : f.kind || "other";
   const [big, setBig] = useState(false);
   const [broken, setBroken] = useState(false);
   const size = typeof f.size === "number" ? sizeLabel(f.size) : f.size;
