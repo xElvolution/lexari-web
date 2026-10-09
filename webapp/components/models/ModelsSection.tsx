@@ -174,7 +174,7 @@ function KeyRow({ provider, saved, ready }: { provider: KeyProvider; saved: KeyI
       <div className="mt-2 flex items-center gap-1.5">
         <span className="relative min-w-0 flex-1">
           <input data-key-input={provider} value={key} onChange={(e) => { setKey(e.target.value); setErr(""); setConfirm(false); }} type={show ? "text" : "password"} disabled={!ready} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false}
-            placeholder={saved ? `••••••••${saved.last4}` : `${p.name} API key (${p.keyHint})`} aria-label={`${p.name} API key`} className="field h-9 !rounded-full !py-0 !pl-3.5 !pr-9 font-mono !text-[13px]" />
+            placeholder={saved ? `••••••••${saved.last4}` : "API key"} aria-label={`${p.name} API key`} className="field h-9 !rounded-full !py-0 !pl-3.5 !pr-9 font-mono !text-[13px]" />
           {key && <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide key" : "Show key"} className="absolute right-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-ink/50 hover:bg-tint"><Icon name={show ? "eyeoff" : "eye"} size={14} /></button>}
         </span>
         <button data-key-verify={provider} onClick={() => void verify()} disabled={!ready || !!busy || (!fresh && !saved)} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-grape px-3 text-[13px] font-bold text-white transition hover:brightness-110 disabled:bg-tint disabled:text-ink/40">
