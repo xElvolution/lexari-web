@@ -35,7 +35,7 @@ const screens = new Map(); // user -> Set<ws> (VNC viewers)
 const name = (user) => `lx-${user}`;
 const okUser = (u) => typeof u === "string" && /^[a-f0-9]{32}$/.test(u);
 const sh = (args, opts = {}) => new Promise((resolve) => {
-  execFile("docker", args, { timeout: opts.timeout ?? 30_000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => resolve({ code: err ? (err.code ?? 1) : 0, out: String(stdout), err: String(stderr), killed: !!err?.killed }));
+  execFile("docker", args, { timeout: opts.timeout ?? 30_000, maxBuffer: 1 << 20, ...(opts.env ? { env: opts.env } : {}) }, (err, stdout, stderr) => resolve({ code: err ? (err.code ?? 1) : 0, out: String(stdout), err: String(stderr), killed: !!err?.killed }));
 });
 
 // ---- filtering web proxy (one unix socket per user) ----
@@ -144,11 +144,33 @@ function broadcast(user, msg) {
   for (const ws of sockets.get(user) || []) { try { ws.send(JSON.stringify(msg)); } catch {} }
 }
 
-async function execCmd(user, cmd, quiet = false) {
+// Secrets from the person's vault for one command: passed to `docker exec -e NAME` through the docker client's own
+// environment (never on a command line, never written to disk), and blocked out of the output as [secret:NAME].
+const ENV_NAME = /^[A-Z][A-Z0-9_]{1,63}$/;
+function cleanEnv(env) {
+  const out = {};
+  if (!env || typeof env !== "object") return out;
+  for (const [k, v] of Object.entries(env).slice(0, 12)) if (ENV_NAME.test(k) && !(k in process.env) && typeof v === "string" && v.length && v.length <= 8192 && !/^(PATH|HOME|DOCKER_.*|LD_.*|BASH_ENV|ENV)$/.test(k)) out[k] = v;
+  return out;
+}
+function hideSecrets(text, env) {
+  let out = text;
+  for (const [k, v] of Object.entries(env).sort((a, b) => b[1].length - a[1].length)) {
+    if (v.length < 4) continue;
+    out = out.split(v).join(`[secret:${k}]`);
+    const b64 = Buffer.from(v).toString("base64").replace(/=+$/, "");
+    if (b64.length >= 8) out = out.split(b64).join(`[secret:${k}]`);
+  }
+  return out;
+}
+
+async function execCmd(user, cmd, quiet = false, rawEnv = null) {
   const c = await ensure(user);
+  const env = cleanEnv(rawEnv);
+  const names = Object.keys(env);
   if (!quiet) broadcast(user, { t: "agent", cmd });
-  const r = await sh(["exec", "-w", "/home/agent", c, "timeout", "20", "bash", "-lc", cmd], { timeout: 25_000 });
-  const out = (r.out + r.err).slice(0, 8000);
+  const r = await sh(["exec", ...names.flatMap((k) => ["-e", k]), "-w", "/home/agent", c, "timeout", "20", "bash", "-lc", cmd], { timeout: 25_000, ...(names.length ? { env: { ...process.env, ...env } } : {}) });
+  const out = hideSecrets((r.out + r.err).slice(0, 8000), env);
   if (!quiet) broadcast(user, { t: "agentOut", cmd, out, code: r.code });
   last.set(c, Date.now());
   return { code: r.code, out };
@@ -261,7 +283,7 @@ const server = http.createServer(async (req, res) => {
     if (!okUser(body.user)) return send(400, { error: "bad user" });
     if (req.url === "/pull" && req.method === "POST") return send(200, await pullFile(body.user, String(body.path || "")));
     if (req.url === "/push" && req.method === "POST") return send(200, await pushFile(body.user, String(body.path || ""), body.b64));
-    if (req.url === "/exec" && req.method === "POST") return send(200, await execCmd(body.user, String(body.cmd || "").slice(0, 2000), !!body.quiet));
+    if (req.url === "/exec" && req.method === "POST") return send(200, await execCmd(body.user, String(body.cmd || "").slice(0, 2000), !!body.quiet, body.env));
     if (req.url === "/shot" && req.method === "POST") return send(200, await screenshot(body.user));
     if (req.url === "/files" && req.method === "POST") return send(200, await listFiles(body.user, body.path));
     if (req.url === "/read" && req.method === "POST") {

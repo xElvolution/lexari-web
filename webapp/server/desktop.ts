@@ -26,7 +26,8 @@ async function call<T>(path: string, body: Record<string, unknown>, ms = 30_000)
   return res.json() as Promise<T>;
 }
 
-export const runInDesktop = (userId: string, cmd: string) => call<{ code: number; out: string }>("/exec", { user: desktopUser(userId), cmd });
+/** Runs an agent command. `env`: vault secrets the command references, injected at exec time (see server/secrets.ts). */
+export const runInDesktop = (userId: string, cmd: string, env?: Record<string, string>) => call<{ code: number; out: string }>("/exec", { user: desktopUser(userId), cmd, ...(env && Object.keys(env).length ? { env } : {}) });
 /** Single-quote a string for bash. */
 export const shq = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
 export const runQuiet = (userId: string, cmd: string) => call<{ code: number; out: string }>("/exec", { user: desktopUser(userId), cmd, quiet: true });
