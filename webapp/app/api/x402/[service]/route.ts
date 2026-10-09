@@ -17,8 +17,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ service: string
   const reqs = requirements(`${origin}/api/x402/${s.id}${url.search}`, s.priceAtoms, s.description);
   const header = req.headers.get("x-payment");
   if (!header) return paymentRequired(reqs);
+  // The resource first: if it can't be served, nothing is charged.
+  let data: unknown;
+  try { data = await s.run(url.searchParams); } catch (e) { return jsonError(502, `The service couldn't answer: ${(e as Error).message.slice(0, 120)} Nothing was charged.`); }
   const paid = await settlePayment(header, reqs, s.id);
   if (!paid.ok) return paymentRequired(reqs, paid.error);
-  const data = await s.run(url.searchParams).catch((e: Error) => ({ error: e.message.slice(0, 120) }));
   return Response.json({ service: s.id, data }, { headers: { "X-PAYMENT-RESPONSE": paymentResponse(paid.sig, paid.payer), "Access-Control-Expose-Headers": "X-PAYMENT-RESPONSE" } });
 }

@@ -164,7 +164,8 @@ async function settleOnce(userId: string, convo: string, id: string, wallet: str
   let ev = await readTx(userId, convo, id);
   if (!ev) return null;
   const end = Date.now() + waitMs;
-  while (ev.sig && (ev.status === "pending" || (ev.status === "confirmed" && ev.balance === undefined))) {
+  // Receipts with a non-SOL amount (agent payments, Tempo, top-ups) are written final by the server: no SOL balance.
+  while (!ev.amount && ev.sig && (ev.status === "pending" || (ev.status === "confirmed" && ev.balance === undefined))) {
     const payerWallet = ev.kind === "return" && ev.from ? ev.from : wallet;
     const r = await checkSig(ev.sig, payerWallet, ev.to).catch(() => ({ status: "pending" as TxStatus }));
     if (r.status !== "pending") {
