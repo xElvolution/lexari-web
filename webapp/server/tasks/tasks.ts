@@ -17,6 +17,7 @@ import { buildPrompt } from "../engram/spinal";
 import { notify } from "../notify";
 import { attachFromComputer, type FileItem } from "../agentFiles";
 import { HttpError } from "../http";
+import { secretEnv } from "../secrets";
 import { meetName } from "./meet";
 import { everyLabel, everyText, nextRun, okTz, parseEvery, type Every } from "./schedule";
 import type { MeetPlatform, TaskKind, TaskRef, TaskStatus, TaskView } from "@/content/tasks";
@@ -48,7 +49,11 @@ export async function names(userId: string, agent: string) {
     db().select({ profile: users.profile }).from(users).where(eq(users.id, userId)).limit(1),
     db().select().from(agents).where(and(eq(agents.userId, userId), eq(agents.slug, agent))).limit(1),
   ]);
-  const userName = String((u?.profile as { name?: string })?.name || "").trim();
+  let userName = String((u?.profile as { name?: string })?.name || "").trim();
+  if (!userName) { // what the person told their home agent to call them
+    const [h] = await db().select({ meta: agents.meta }).from(agents).where(and(eq(agents.userId, userId), eq(agents.slug, "home"))).limit(1);
+    userName = String((h?.meta as { you?: string })?.you || "").trim();
+  }
   const agentName = String((a?.meta as { nick?: string })?.nick || a?.name || "Your agent");
   return { userName, agentName, row: a };
 }
@@ -89,7 +94,9 @@ export async function startJob(userId: string, input: { agent: string; convo: st
     .where(and(eq(agentTasks.userId, userId), inArray(agentTasks.kind, ["job", "video", "deploy"]), gte(agentTasks.createdAt, new Date(Date.now() - 3_600_000))));
   if (n >= JOBS_PER_HOUR) throw new HttpError(429, "That's a lot of background jobs this hour. Give it a bit.");
   const id = jobId();
-  const r = await jobStart(userId, id, input.cmd);
+  // Saved credentials the command names ($CLOUDFLARE_API_TOKEN …) go in as env, never into the command or its log.
+  const { env } = await secretEnv(userId, input.agent, input.cmd).catch(() => ({ env: {} as Record<string, string> }));
+  const r = await jobStart(userId, id, input.cmd, env);
   if (!r.ok) throw new HttpError(r.error === "busy" ? 409 : 502, r.error === "busy" ? "My computer is already running three jobs. Stop one first." : "My computer couldn't start that job.");
   const [row] = await database.insert(agentTasks).values({
     userId, agent: input.agent, convo: input.convo, kind: input.kind || "job", status: "running", title: input.title.slice(0, 120) || "Background job",
@@ -261,7 +268,8 @@ async function finishMeeting(row: Row, st: JobStatus) {
 
 async function finishJob(row: Row, st: JobStatus) {
   const ok = st.exit === 0;
-  const log = (st.log || "").slice(-2500);
+  const { scrub } = await secretEnv(row.userId, row.agent, "").catch(() => ({ scrub: (t: string) => t }));
+  const log = scrub((st.log || "").slice(-2500));
   const ctx = { agent: row.agent, convo: row.convo, messageId: `task-${row.id}-done` };
   // files the job listed in $LX_JOB_DIR/files (one path per line)
   const listed = await pullDesktop(row.userId, `/home/agent/.lexari/jobs/${row.jobId}/files`).catch(() => ({ b64: "" } as { b64?: string }));

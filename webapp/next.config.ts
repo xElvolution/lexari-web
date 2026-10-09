@@ -19,7 +19,8 @@ const nextConfig: NextConfig = {
   // NEXT_PUBLIC_RPC_PROXY: the server has a private Solana RPC (Helius or SOLANA_RPC), so the browser uses /api/rpc (server/rpc.ts).
   env: { NEXT_PUBLIC_BUILD: process.env.LEXARI_BUILD || Date.now().toString(36), NEXT_PUBLIC_RPC_PROXY: privateRpcConfigured() ? "1" : "" },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders(true).filter((h) => h.value) }];
+    // /p/ (published agent sites) sets its own sandbox policy in its route
+    return [{ source: "/((?!p/).*)", headers: securityHeaders(true).filter((h) => h.value) }];
   },
 };
 

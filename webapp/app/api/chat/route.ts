@@ -306,9 +306,10 @@ export async function POST(req: Request) {
         let meet: MeetAsk | undefined, taskCard: TaskRef | undefined;
         if (taskTools && hasTaskTag(full)) {
           const r = await runTaskTags(userId, { agent: speakerRow?.slug || "home", convo: body.convo, messageId: body.replyMsgId, tz, agentName: speakerName, userName: (home.meta as { you?: string })?.you || "", said: body.text }, full)
-            .catch((e: Error) => { console.error(`[tasks] tags: ${e.message}`); return { meet: undefined, task: undefined, notes: ["that didn't work on my computer"] }; });
+            .catch((e: Error) => { console.error(`[tasks] tags: ${e.message}`); return { meet: undefined, task: undefined, notes: ["that didn't work on my computer"], site: undefined }; });
           meet = r.meet; taskCard = r.task;
           full = stripTaskTags(full);
+          if (r.site && !full.includes(r.site.url)) full = `${full}${full ? "\n\n" : ""}${r.site.url}`;
           if (r.notes.length) full = `${full}${full ? "\n\n" : ""}(I couldn't do that: ${r.notes.join("; ")}.)`;
           if (!full.trim()) full = meet ? "Here's the join card. Pick how I should join." : taskCard ? "On it. I'll report back here when it's done." : "";
           if (meet || taskCard) send({ card: { ...(meet ? { meet } : {}), ...(taskCard ? { task: taskCard } : {}) } });

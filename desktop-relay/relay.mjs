@@ -320,7 +320,7 @@ async function pushFile(user, p, b64) {
 // Long jobs (meetings, renders, builds, scheduled work): the command is written to ~/.lexari/jobs/<id>/cmd and run
 // detached with lx-job, so it outlives the 20 s /exec limit and the chat turn. A running job keeps the computer awake.
 const okJob = (id) => typeof id === "string" && /^[a-z0-9-]{6,64}$/.test(id);
-async function jobStart(user, id, cmd) {
+async function jobStart(user, id, cmd, rawEnv = null) {
   if (!okJob(id) || !cmd) return { error: "bad job" };
   if (overQuota(user)) return { error: "storage full", ...quotaInfo(user) };
   const c = await ensure(user);
@@ -333,7 +333,10 @@ async function jobStart(user, id, cmd) {
     k.stdin.end(String(cmd));
   });
   if (w !== 0) return { error: "could not write the job" };
-  const r = await sh(["exec", "-d", "-w", "/home/agent", c, "lx-job", "run", id]);
+  // saved credentials the command names: passed by name (-e KEY) with values in docker's env, never in argv or the job files
+  const env = cleanEnv(rawEnv);
+  const keys = Object.keys(env);
+  const r = await sh(["exec", "-d", ...keys.flatMap((k) => ["-e", k]), "-w", "/home/agent", c, "lx-job", "run", id], keys.length ? { env: { ...process.env, ...env } } : {});
   last.set(c, Date.now());
   return r.code === 0 ? { ok: true, id } : { error: "could not start the job" };
 }
@@ -359,7 +362,7 @@ const server = http.createServer(async (req, res) => {
     if (req.url === "/push" && req.method === "POST") return send(200, await pushFile(body.user, String(body.path || ""), body.b64));
     if (req.url === "/exec" && req.method === "POST") return send(200, await execCmd(body.user, String(body.cmd || "").slice(0, 2000), !!body.quiet, body.env));
     if (req.url === "/shot" && req.method === "POST") return send(200, await screenshot(body.user));
-    if (req.url === "/job/start" && req.method === "POST") return send(200, await jobStart(body.user, body.id, String(body.cmd || "").slice(0, 8000)));
+    if (req.url === "/job/start" && req.method === "POST") return send(200, await jobStart(body.user, body.id, String(body.cmd || "").slice(0, 8000), body.env));
     if (req.url === "/job/status" && req.method === "POST") return send(200, await jobCmd(body.user, "status", body.id));
     if (req.url === "/job/stop" && req.method === "POST") return send(200, await jobCmd(body.user, "stop", body.id, body.soft === true));
     if (req.url === "/files" && req.method === "POST") return send(200, await listFiles(body.user, body.path));

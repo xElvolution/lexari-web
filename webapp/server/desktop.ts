@@ -53,7 +53,7 @@ export const pushDesktop = (userId: string, path: string, data: Buffer) => call<
 
 /** Long jobs on the agent's computer (lx-job in the container): they outlive the 20 s command limit and the chat turn. */
 export type JobStatus = { running?: boolean; exit?: number | null; secs?: number; log?: string; status?: Record<string, unknown>; gone?: boolean; error?: string };
-export const jobStart = (userId: string, id: string, cmd: string) => call<{ ok?: boolean; error?: string; running?: string[] }>("/job/start", { user: desktopUser(userId), id, cmd }, 70_000);
+export const jobStart = (userId: string, id: string, cmd: string, env?: Record<string, string>) => call<{ ok?: boolean; error?: string; running?: string[] }>("/job/start", { user: desktopUser(userId), id, cmd, ...(env && Object.keys(env).length ? { env } : {}) }, 70_000);
 export const jobStatus = (userId: string, id: string) => call<JobStatus>("/job/status", { user: desktopUser(userId), id }, 20_000);
 /** soft: only ask the job to stop (it finishes up itself, e.g. a meeting still writes its transcript). */
 export const jobStop = (userId: string, id: string, soft = false) => call<{ ok?: boolean; error?: string }>("/job/stop", { user: desktopUser(userId), id, soft }, 20_000);

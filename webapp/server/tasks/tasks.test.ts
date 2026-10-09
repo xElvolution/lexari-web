@@ -34,3 +34,21 @@ test("meetingLink finds real meeting links only", () => {
   assert.equal(meetName("me", "Rika", "Ada Obi"), "Ada Obi");
   assert.equal(meetName("agent", "Nova", ""), "Nova (notetaker)");
 });
+
+test("site tarballs unpack to clean relative paths", async () => {
+  const { execFileSync } = await import("node:child_process");
+  const fs = await import("node:fs");
+  const zlib = await import("node:zlib");
+  const { untar, cleanPath } = await import("./sites");
+  const d = fs.mkdtempSync("/tmp/lxsite-");
+  fs.mkdirSync(`${d}/assets/${"deep/".repeat(30)}`, { recursive: true });
+  fs.writeFileSync(`${d}/index.html`, "<h1>hi</h1>");
+  fs.writeFileSync(`${d}/assets/${"deep/".repeat(30)}app.js`, "1");
+  fs.writeFileSync(`${d}/.env`, "x");
+  const files = untar(zlib.gunzipSync(execFileSync("tar", ["-czf", "-", "-C", d, "."])));
+  const paths = files.map((f) => f.path).sort();
+  assert.deepEqual(paths, [`assets/${"deep/".repeat(30)}app.js`, "index.html"]);
+  assert.equal(files.find((f) => f.path === "index.html")!.data.toString(), "<h1>hi</h1>");
+  assert.equal(cleanPath("../etc/passwd"), "");
+  assert.equal(cleanPath("./a//b.css"), "a/b.css");
+});
