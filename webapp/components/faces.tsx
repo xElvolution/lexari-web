@@ -3,6 +3,7 @@
 import { lookVariant, type FaceState } from "@shared/components/avatar";
 import { agentLevelOf, isLocked, primaryOf, useAgentActive, useApp, type AgentLook } from "@/lib/store";
 import { usePresence } from "@/lib/presence";
+import { useMood } from "@/lib/mood";
 import Face from "@shared/components/Face";
 import { specialistBySlug } from "@/content/appData";
 import { tileBg } from "./agents";
@@ -25,8 +26,8 @@ export function WhoFace({ who, look, size = 40, className = "", animated = false
   return who === "home" || who === "you" ? <AgentFace look={look} size={size} className={className} animated={animated} state={state} /> : <SpecFace slug={who} size={size} className={className} animated={animated} state={state} />;
 }
 
-/** An agent's face on its soft colour tile. Rounded square, sized in px. */
-export function AgentTile({ id, look, size = 48, face, className = "", radius, status = true, ring = true }: { id: string; look: AgentLook | undefined; size?: number; face?: number; className?: string; radius?: number; status?: boolean; ring?: boolean }) {
+/** An agent's face on its soft colour tile. Rounded square, sized in px. `mood` off keeps it still (older chat bubbles). */
+export function AgentTile({ id, look, size = 48, face, className = "", radius, status = true, ring = true, mood = true }: { id: string; look: AgentLook | undefined; size?: number; face?: number; className?: string; radius?: number; status?: boolean; ring?: boolean; mood?: boolean }) {
   // big tiles shrink a little on phones (--av-scale is set in mobile-compact.css)
   const big = size >= 44;
   const s = useApp();
@@ -39,14 +40,16 @@ export function AgentTile({ id, look, size = 48, face, className = "", radius, s
   const active = useAgentActive(id);
   const live = !!online && active && !(s && isLocked(s, id));
   const dot = status && mine && size >= 26 && online !== null;
+  // thinking while it writes a reply, talking while it streams or speaks, happy after thanks (lib/mood.ts)
+  const state = useMood(id, mood);
   const r = radius ?? Math.round(size * 0.32);
   const d = Math.max(8, Math.round(size * 0.24));
   // Level perks: a glow from level 4 (Card glow), gold from level 10 (Legend)
   const lv = mine && size >= 26 && s ? agentLevelOf(s, id) : 1;
   const perk = lv >= 10 ? "legend" : lv >= 4 ? "glow" : undefined;
   return (
-    <span data-agent-tile={id} data-tile-perk={perk} {...(primary ? { "data-primary": "" } : {})} data-ring={kind ? kind.replace("-ring", "") : undefined} className={`relative grid shrink-0 place-items-center ${primary ? "primary-ring" : kind} ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: r, background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)", ["--r" as string]: `${r}px` }}>
-      <span className="grid place-items-center" style={big ? { transform: "scale(var(--av-scale, 1))" } : undefined}><WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} /></span>
+    <span data-agent-tile={id} data-face-state={state} data-tile-perk={perk} {...(primary ? { "data-primary": "" } : {})} data-ring={kind ? kind.replace("-ring", "") : undefined} className={`relative grid shrink-0 place-items-center ${primary ? "primary-ring" : kind} ${className}`} style={{ width: big ? `calc(${size}px * var(--av-scale, 1))` : size, height: big ? `calc(${size}px * var(--av-scale, 1))` : size, borderRadius: r, background: tileBg(id), boxShadow: "inset 0 0 0 1px var(--line)", ["--r" as string]: `${r}px` }}>
+      <span className="grid place-items-center" style={big ? { transform: "scale(var(--av-scale, 1))" } : undefined}><WhoFace who={id} look={look} size={face ?? Math.round(size * 0.8)} state={state} animated={state !== "idle"} /></span>
       {dot && <i data-presence={live ? "active" : online && !(s && isLocked(s, id)) ? "idle" : "offline"} aria-label={live ? "Active now" : "Idle"} title={live ? "Active now" : s && isLocked(s, id) ? "Offline · locked on your plan" : online ? "Idle" : "Offline"} className={`absolute rounded-full ${live ? "bg-[#22c55e]" : "bg-[#8a8797]"}`} style={{ width: d, height: d, right: -Math.round(d * 0.15), bottom: -Math.round(d * 0.15), boxShadow: "0 0 0 2px var(--alt, var(--bg))" }} />}
     </span>
   );
@@ -59,12 +62,18 @@ export function GroupTile({ members, look, size = 48, className = "" }: { member
     <span className={`relative block shrink-0 ${className}`} style={{ width: size, height: size }}>
       {m.map((id, i) => (
         <span key={id} className="absolute grid place-items-center" style={{ width: sub, height: sub, borderRadius: Math.round(sub * 0.34), left: i ? size - sub : 0, top: i ? size - sub : 0, background: tileBg(id), boxShadow: i ? `0 0 0 ${Math.max(2, Math.round(size / 22))}px var(--alt)` : undefined }}>
-          <WhoFace who={id} look={look} size={Math.round(sub * 0.8)} />
+          <GroupMember id={id} look={look} size={Math.round(sub * 0.8)} />
         </span>
       ))}
       {extra > 0 && <span className="absolute grid place-items-center rounded-full bg-ink font-bold text-[var(--bg)]" style={{ right: -2, top: -2, minWidth: Math.round(size * 0.36), height: Math.round(size * 0.36), fontSize: Math.max(9, Math.round(size * 0.2)), boxShadow: `0 0 0 2px var(--alt)` }}>+{extra}</span>}
     </span>
   );
+}
+
+/** One face inside a group tile: only the member answering right now shows it. */
+function GroupMember({ id, look, size }: { id: string; look: AgentLook | undefined; size: number }) {
+  const state = useMood(id);
+  return <span className="contents" data-face-state={state}><WhoFace who={id} look={look} size={size} state={state} animated={state !== "idle"} /></span>;
 }
 
 /** The ring legend: what gold, purple and silver mean. */

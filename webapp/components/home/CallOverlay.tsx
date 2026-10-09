@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { callTurn, get, logCall, setCalling, speakerFor, type State } from "@/lib/store";
+import { cheer, isWarm, setMood } from "@/lib/mood";
 import { BLOCKED, ensureMic, hush, listen, ready, speakAndListen, transcribe, type Feed, type Transcriber } from "@/lib/voice";
 import { voiceOf } from "@/lib/voices";
 import Icon from "../Icon";
@@ -83,6 +84,7 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
         said = afterStop(said);
         const who = speakerFor(get(), id, said, lastWho);
         lastWho = who;
+        if (isWarm(said)) cheer(who);
         setSpeaker(who);
         setPhase("thinking"); setNote("");
         // stream the reply into a feed; speech starts on the first full sentence
@@ -153,6 +155,14 @@ export default function CallOverlay({ s, id, onClose }: { s: State; id: string; 
     })();
     return () => { stop = true; abort?.abort(); ear?.abort(); hush(); };
   }, [id, c.name]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // the face on the call follows the turn: thinking, then talking, idle while it listens
+  const face = c.group ? speaker : id;
+  useEffect(() => {
+    if (!face) return;
+    setMood(face, phase === "thinking" ? "thinking" : phase === "speaking" ? "speaking" : "idle");
+    return () => setMood(face, "idle");
+  }, [face, phase]);
 
   const end = () => { if (ended.current) return; ended.current = true; hush(); logCall(id, secsRef.current); onClose(); };
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") end(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }); // eslint-disable-line react-hooks/exhaustive-deps

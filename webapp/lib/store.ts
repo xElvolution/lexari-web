@@ -5,6 +5,7 @@
  * This module loads it once from /api/me, keeps it in memory for the UI, and sends every change
  * to the API. Memories are encrypted in the browser (lib/vault.ts) before they leave it.
  */
+import { cheer, isWarm, isWarmReaction, setMood } from "./mood";
 import type { FaceLook } from "@shared/components/avatar";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
@@ -653,8 +654,12 @@ const TRANSIENT = /busy|could not answer|did not answer|couldn't reply|could not
 const tzName = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; } };
 async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: string, follow: boolean, peers: { from: string; text: string }[], event?: string): Promise<{ bubble: string; text: string }> {
   const st = get();
-  typingWho.set(convo, speaker); emit();
+  typingWho.set(convo, speaker); setMood(speaker, "thinking"); emit();
   const bubble = pushAfter(convo, afterId, { from: speaker, text: "" });
+  try { return await oneReplyRun(convo, userMsg, speaker, follow, peers, bubble, st, event); }
+  finally { setMood(speaker, "idle"); if (!event && isWarm(userMsg.text)) cheer(speaker, 2600); }
+}
+async function oneReplyRun(convo: string, userMsg: Msg, speaker: string, follow: boolean, peers: { from: string; text: string }[], bubble: string, st: State, event?: string): Promise<{ bubble: string; text: string }> {
   const all = st.threads[convo] || []; const upto = all.findIndex((m) => m.id === userMsg.id);
   const history = (upto >= 0 ? all.slice(0, upto) : all).filter((m) => m.id !== userMsg.id && m.id !== "hello" && m.text && m.from !== "system").slice(-12).map((m) => ({ from: m.from, text: m.text.slice(0, 2000) }));
   const memoryOn = st.prefs.memory !== false && st.meta[speaker]?.memory !== false;
@@ -707,8 +712,8 @@ async function oneReply(convo: string, userMsg: Msg, speaker: string, afterId: s
             if (payload.action) { const ac = payload.action; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, action: ac } : mm)) } })); }
             if (payload.markets) { const mk = payload.markets; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, markets: mk } : mm)) } })); }
             if (payload.files?.length) { const fl = payload.files; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, files: fl } : mm)) } })); }
-            if (typeof payload.replace === "string") { full = payload.replace; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
-            if (payload.token) { full += payload.token; setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
+            if (typeof payload.replace === "string") { full = payload.replace; if (full.trim()) setMood(speaker, "speaking"); setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
+            if (payload.token) { full += payload.token; if (full.trim()) setMood(speaker, "speaking"); setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
             if (payload.remember && memoryOn) addNote(payload.remember, "About you", "Chat", true, isCustom(speaker) ? speaker : "home");
             if (payload.done && event) set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, about: event } : mm)) } }));
             if (payload.done && !event && speaker !== "home" && text.trim().length >= 12) void refreshJobs();
@@ -801,6 +806,8 @@ export function sendTo(id: string, text: string, extra: Pick<Msg, "file" | "voic
   const v = text.trim(); if (!v && !extra.file && !extra.voice) return Promise.resolve("");
   const msgId = push(id, { from: "you", text: v, ...extra });
   const msg = (get().threads[id] || []).find((m) => m.id === msgId)!;
+  // Thanks or praise: whoever it's for smiles right away (and again once it has answered).
+  if (isWarm(v)) for (const who of isGroup(id) ? groupOrder(get(), id, v, extra.reply) : [id]) cheer(who);
   // Counts for the message quests right away (the reply may still be generating, or this message may wait its turn).
   void api("/api/chat/sent", { body: { convo: id, userMsgId: msgId } }).then(() => refreshHub(), () => {});
   // One reply at a time per chat: a message sent while the agent is still answering waits its turn
@@ -916,6 +923,9 @@ export function toggleReaction(convo: string, msgId: string, emoji: string, who 
     if (!re[emoji].length) delete re[emoji];
     return { ...m, re };
   }) } }));
+  // A warm reaction from you on an agent's message makes that agent happy for a moment.
+  const author = (get().threads[convo] || []).find((m) => m.id === msgId)?.from;
+  if (who === "you" && author && author !== "you" && author !== "system" && (re[emoji] || []).includes("you") && isWarmReaction(emoji)) cheer(author);
   if (msgId !== "hello") sync(api("/api/messages", { method: "PATCH", body: { convo, clientId: msgId, re } }));
 }
 /** Nothing waits for a reply after a reload: the server saved finished turns only. */

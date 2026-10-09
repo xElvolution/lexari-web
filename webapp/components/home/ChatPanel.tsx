@@ -1,6 +1,7 @@
 "use client";
 
 import { usePresence } from "@/lib/presence";
+import { setMood } from "@/lib/mood";
 import { speak } from "@/lib/voice";
 import { voiceOf } from "@/lib/voices";
 
@@ -152,7 +153,7 @@ function MsgMenu({ m, convo, mine, open, more, below, onMore, onReply, onClose }
           </div>
           <div className={`mt-1.5 flex gap-1 ${mine ? "justify-end" : ""}`}>
             <button role="menuitem" onClick={onReply} className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13.5px] font-bold text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="reply" size={15} />Reply</button>
-            {!mine && m.text && m.from !== "system" && <button role="menuitem" data-read-aloud onClick={() => { void speak(m.text, voiceOf(m.from)); onClose(); }} className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13.5px] font-bold text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="speaker" size={15} />Read aloud</button>}
+            {!mine && m.text && m.from !== "system" && <button role="menuitem" data-read-aloud onClick={() => { const who = m.from; setMood(who, "speaking"); void speak(m.text, voiceOf(who)).finally(() => setMood(who, "idle")); onClose(); }} className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13.5px] font-bold text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="speaker" size={15} />Read aloud</button>}
             {(m.text || m.file) && <button role="menuitem" onClick={copy} className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13.5px] font-bold text-ink shadow ring-1 ring-line hover:text-brand-ink"><Icon name="copy" size={15} />Copy</button>}
           </div>
         </div>
@@ -274,6 +275,9 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
   const msgs = s.threads[id] || [];
   const typing = useTyping(id);
   const now = useNow(30000);
+  // each agent's newest bubble: only that avatar reacts (thinks, talks, smiles); older ones stay still
+  const latest = new Map<string, number>();
+  msgs.forEach((m, i) => { if (m.from !== "you" && m.from !== "system") latest.set(m.from, i); });
   const scroller = useRef<HTMLDivElement>(null);
   const seen = useRef(msgs.length);
   const look = s.agent?.look;
@@ -386,7 +390,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
                     <div className={`flex justify-end ${first ? "mt-4" : ""}`}><div className="min-w-0 max-w-[80%]">{bub}</div></div>
                   ) : (
                     <div className={`flex items-end gap-2.5 ${first ? "mt-4" : ""}`}>
-                      {lastOfRun ? <button onClick={() => openAgent(m.from)} aria-label={`${nameOf(s, m.from)}'s profile`} className={`shrink-0 ${m.re && Object.keys(m.re).length ? "mb-[22px]" : ""}`}><AgentTile id={m.from} look={look} size={30} radius={10} /></button> : <span className="w-[30px] shrink-0" />}
+                      {lastOfRun ? <button onClick={() => openAgent(m.from)} aria-label={`${nameOf(s, m.from)}'s profile`} className={`shrink-0 ${m.re && Object.keys(m.re).length ? "mb-[22px]" : ""}`}><AgentTile id={m.from} look={look} size={30} radius={10} mood={latest.get(m.from) === i} /></button> : <span className="w-[30px] shrink-0" />}
                       <div className="min-w-0 max-w-[80%]">
                         {first && <span className="mb-1 block text-[12px] font-bold text-ink/60">{nameOf(s, m.from)}</span>}
                         {bub}
