@@ -18,12 +18,14 @@ import BillingSection from "@/components/billing/BillingSection";
 import LockSettings from "@/components/lock/LockSettings";
 import SocialLinks from "@/components/social/SocialLinks";
 import IntegrationsSection from "@/components/integrations/IntegrationsSection";
+import ModelsSection from "@/components/models/ModelsSection";
 import { disablePush, enablePush, pushOnHere, pushPermission } from "@/lib/notifications";
 
 const SECTIONS = [
   { id: "general", label: "General", icon: "settings" },
   { id: "personal", label: "Personalization", icon: "spark" },
   { id: "agents", label: "Agents", icon: "team" },
+  { id: "models", label: "Models", icon: "chip" },
   { id: "notifications", label: "Notifications", icon: "chat" },
   { id: "data", label: "Data controls", icon: "folder" },
   { id: "security", label: "Security", icon: "pin" },
@@ -309,7 +311,7 @@ export default function SettingsPage() {
   useEffect(() => { const h = window.location.hash.slice(1) as Sec; if (SECTIONS.some((x) => x.id === h)) { setSec(h); setOpen(true); } }, []);
   const pick = (id: Sec) => { setSec(id); setOpen(true); window.history.replaceState(null, "", `#${id}`); window.scrollTo({ top: 0 }); };
   const cur = SECTIONS.find((x) => x.id === sec)!;
-  const body = { general: <General s={s} />, personal: <Personal s={s} />, agents: <Agents s={s} />, notifications: <Notifications s={s} />, data: <Data s={s} />, security: <Security s={s} />, accounts: <Accounts s={s} />, social: <SocialLinks s={s} />, integrations: <IntegrationsSection s={s} />, billing: <Billing s={s} />, about: <About /> }[sec];
+  const body = { general: <General s={s} />, personal: <Personal s={s} />, agents: <Agents s={s} />, models: <ModelsSection s={s} />, notifications: <Notifications s={s} />, data: <Data s={s} />, security: <Security s={s} />, accounts: <Accounts s={s} />, social: <SocialLinks s={s} />, integrations: <IntegrationsSection s={s} />, billing: <Billing s={s} />, about: <About /> }[sec];
 
   return (
     <div data-rise className="grid gap-6 lg:grid-cols-[240px_1fr] lg:gap-10">

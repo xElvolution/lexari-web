@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { LAMINA, PREMIUM, type ModelInfo } from "@/content/models";
+import { INCLUDED, LAMINA, PREMIUM, customInfo, type ModelInfo } from "@/content/models";
 import type { PlanId } from "@/content/appData";
 import { CREDITS_ON_FREE } from "@/content/billing";
 import { billingBlocked, closeBillingSheet, modelFor, openTopUp, setModel, useBilling, type BillingState } from "@/lib/billing";
@@ -24,7 +24,7 @@ export default function ModelSheet({ convo, agent, group }: { convo: string; age
   // A group chat has one model for everyone in it. A one-to-one chat can pick for itself or for the agent everywhere.
   const [scope, setScope] = useState<Scope>(group || !agent ? "chat" : cur.from === "chat" ? "chat" : "agent");
   const [busy, setBusy] = useState<string | null>(null);
-  const selected = scope === "agent" && agent ? (state?.models.agents[agent] || LAMINA.id) : cur.model.id;
+  const selected = scope === "agent" && agent ? (state?.models.agents[agent] || state?.models.default || LAMINA.id) : cur.model.id;
 
   const pick = async (m: ModelInfo) => {
     if (!state) return;
@@ -68,6 +68,14 @@ export default function ModelSheet({ convo, agent, group }: { convo: string; age
       {!state ? <div className="grid h-40 place-items-center text-ink/50"><Spinner /></div> : (
         <div className="grid gap-2">
           <Row m={LAMINA} on={selected === LAMINA.id} busy={busy === LAMINA.id} onPick={pick} note="Lexari's own model. Fast, tuned for your agents." />
+          {INCLUDED.filter((m) => state.models.available[m.id]).map((m) => <Row key={m.id} m={m} on={selected === m.id} busy={busy === m.id} onPick={pick} />)}
+          <div className="mt-3 flex items-center justify-between px-1">
+            <h3 className="label text-[9.5px] text-ink/50">Your models</h3>
+            <Link href="/settings#models" onClick={closeBillingSheet} data-add-own-model className="inline-flex items-center gap-1 text-[12px] font-bold text-brand-ink hover:underline"><Icon name="plus" size={13} stroke={2.6} />Add</Link>
+          </div>
+          {(state.models.custom ?? []).length === 0
+            ? <p className="px-1 text-[12.5px] leading-snug text-ink/55">Add OpenAI, Claude, Gemini or any model with your own API key. It never uses your Lexari balance.</p>
+            : (state.models.custom ?? []).map((c) => { const m = customInfo(c); return <Row key={m.id} m={m} on={selected === m.id} busy={busy === m.id} onPick={pick} />; })}
           <div className="mt-3 flex items-center justify-between px-1">
             <h3 className="label text-[9.5px] text-ink/50">Premium</h3>
             <span className="text-[11.5px] text-ink/45">Uses premium usage at API price + 20%</span>
@@ -90,13 +98,14 @@ export default function ModelSheet({ convo, agent, group }: { convo: string; age
 
 /** Why a model can't be picked right now: "soon" (not on this server), "plan" (Free with no credits), or null. */
 function lockedWhy(s: BillingState, m: ModelInfo): "soon" | "plan" | null {
+  if (m.pool === "byo") return null;
   if (!s.models.available[m.id]) return "soon";
   if (m.pool === "premium" && s.plan.id === "free" && (!CREDITS_ON_FREE || s.credits.balance <= 0)) return "plan";
   return null;
 }
 
 function Row({ m, on, busy, onPick, locked = null, note }: { m: ModelInfo; on: boolean; busy: boolean; onPick: (m: ModelInfo) => void; locked?: "soon" | "plan" | null; note?: string }) {
-  const lamina = m.pool === "lamina";
+  const lamina = m.id === "lamina";
   return (
     <button
       data-model={m.id}

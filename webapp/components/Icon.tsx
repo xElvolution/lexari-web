@@ -69,7 +69,10 @@ const P: Record<string, React.ReactNode> = {
   box: <><rect x="4" y="4" width="16" height="16" rx="4" strokeDasharray="3 3" /></>,
   verified: <><path d="M12 2.8l2.3 1.7 2.8-.2.9 2.7 2.3 1.6-.9 2.7.9 2.7-2.3 1.6-.9 2.7-2.8-.2L12 21.2l-2.3-1.7-2.8.2-.9-2.7-2.3-1.6.9-2.7-.9-2.7 2.3-1.6.9-2.7 2.8.2z" /><path d="m8.6 12.2 2.3 2.3 4.5-4.6" /></>,
   link: <><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" /></>,
-  plug: <><path d="M9 3.5V8M15 3.5V8" /><path d="M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0z" /><path d="M12 17v3.5" /></>,
+  plug: <><path d="M9 3.5V8M15 3.5V8" /><path d="M6.5 8h11v3.5a5.5 5.5 0 0 1-11 0z" /><path d="M12 17v3.5" /></>,  chip: <><rect x="6" y="6" width="12" height="12" rx="2.5" /><path d="M9.5 9.5h5v5h-5zM9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" /></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7.5 8 5.5 8-5.5" /></>,
+  inbox: <><path d="M3.5 13.5 6 5.5h12l2.5 8V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z" /><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5" /></>,
+  forward: <><path d="M14 6l6 5.5-6 5.5" /><path d="M19.5 11.5H10a6 6 0 0 0-6 6v1" /></>,
 };
 
 export default function Icon({ name, size = 20, className = "", stroke = 2 }: { name: keyof typeof P | string; size?: number; className?: string; stroke?: number }) {

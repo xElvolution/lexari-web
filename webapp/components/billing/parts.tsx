@@ -51,13 +51,16 @@ export function LaminaMark({ size = 18, className = "" }: { size?: number; class
 }
 
 const MAKER: Record<string, { bg: string; fg: string; t: string }> = {
+  OpenAI: { bg: "#10a37f", fg: "#fff", t: "O" },
+  OpenRouter: { bg: "#6467f2", fg: "#fff", t: "R" },
+  Custom: { bg: "var(--ink)", fg: "var(--bg)", t: "{}" },
   Anthropic: { bg: "#d97757", fg: "#fff", t: "A" },
   xAI: { bg: "#111111", fg: "#fff", t: "x" },
   Google: { bg: "#1a73e8", fg: "#fff", t: "G" },
 };
 /** A model's tile: Lamina's mark on grape, or the maker's initial. */
 export function ModelMark({ m, size = 40 }: { m: ModelInfo; size?: number }) {
-  if (m.pool === "lamina") return <span className="grid shrink-0 place-items-center rounded-[14px] bg-grape text-white" style={{ width: size, height: size }}><LaminaMark size={Math.round(size * 0.5)} /></span>;
+  if (m.id === "lamina") return <span className="grid shrink-0 place-items-center rounded-[14px] bg-grape text-white" style={{ width: size, height: size }}><LaminaMark size={Math.round(size * 0.5)} /></span>;
   const k = MAKER[m.maker] ?? { bg: "var(--tint)", fg: "var(--ink)", t: m.maker[0] };
   return <span className="grid shrink-0 place-items-center rounded-[14px] font-bold" style={{ width: size, height: size, background: k.bg, color: k.fg, fontSize: Math.round(size * 0.42) }}>{k.t}</span>;
 }
@@ -65,6 +68,7 @@ export function ModelMark({ m, size = 40 }: { m: ModelInfo; size?: number }) {
 /** "Uses 2x" next to a premium model, against Claude Sonnet. */
 export function BurnChip({ m, on = false }: { m: ModelInfo; on?: boolean }) {
   if (m.pool === "lamina") return <span className={`label rounded-full px-1.5 py-0.5 text-[8px] ${on ? "bg-white/20 text-white" : "bg-grape/12 text-brand-ink"}`}>Included</span>;
+  if (m.pool === "byo") return <span title="Runs on your own API key. Never uses your Lexari balance." className={`label rounded-full px-1.5 py-0.5 text-[8px] ${on ? "bg-white/20 text-white" : "bg-[#e7f8ee] text-[#137a3d]"}`}>Your key</span>;
   const x = burnVsSonnet(m);
   return <span title="How fast it uses your premium usage, compared with Claude Sonnet" className={`label rounded-full px-1.5 py-0.5 text-[8px] tabular-nums ${on ? "bg-white/20 text-white" : x > 1 ? "bg-[#e5484d]/12 text-[#d13b40]" : "bg-tint text-ink/70"}`}>{x}x</span>;
 }

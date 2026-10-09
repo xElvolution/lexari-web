@@ -117,9 +117,17 @@ export class Turn {
     this.done = true;
     const { userId, model } = this.input;
     if (!this.usages.length) { await this.release(); return null; }
-    const cost = this.cost();
     const tokens = this.usages.reduce((a, u) => ({ p: a.p + u.promptTokens, c: a.c + u.completionTokens }), { p: 0, c: 0 });
     const served = [...new Set(this.usages.map((u) => u.model))].join(", ").slice(0, 200);
+    // Your own key: logged for your activity list, never charged to your Lexari balance or pools.
+    if (model.pool === "byo") {
+      await db().insert(usageLedger).values({
+        userId, convo: this.input.convo.slice(0, 120), agentSlug: this.input.agent.slice(0, 60), kind: this.input.kind, pool: "byo",
+        requestedModel: model.id, servedModel: served || model.id, promptTokens: tokens.p, completionTokens: tokens.c, costMicros: 0, billedMicros: 0, estimated: this.usages.some((u) => u.estimated),
+      });
+      return null;
+    }
+    const cost = this.cost();
     const cycle = await cycleFor(userId);
     const result = await db().transaction(async (tx) => {
       await lock(tx, userId);
@@ -160,6 +168,8 @@ export class Turn {
  */
 export async function beginTurn(input: TurnInput): Promise<Turn | Blocked> {
   const { userId, model } = input;
+  // A model on your own API key is never metered against Lexari usage.
+  if (model.pool === "byo") return new Turn(input, "free", [], null, false);
   const cycle = await cycleFor(userId);
   const out = input.kind === "call" ? HOLD_OUT_TOKENS.call : HOLD_OUT_TOKENS.chat;
   const estimate = costMicros(model.price, estimateTokens(input.prompt), out);

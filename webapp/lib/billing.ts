@@ -9,7 +9,7 @@ import { PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js"
 import { createAssociatedTokenAccountIdempotentInstruction, createTransferCheckedInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import type { BillingState } from "@/server/billing/state";
 import type { Blocked } from "@/server/billing/meter";
-import { LAMINA, modelById, type ModelInfo } from "@/content/models";
+import { LAMINA, customInfo, modelById, type ModelInfo } from "@/content/models";
 import { api, ApiError, friendly } from "./api";
 import { connection, payer } from "./pay";
 import { confirmSig } from "./rpc";
@@ -82,16 +82,25 @@ export const openTopUp = (intent: TopUpIntent = { product: "credits" }) => {
 export const openSpend = () => set({ sheet: { kind: "spend" } });
 export const closeBillingSheet = () => set({ sheet: null });
 
-/** The model that answers in a chat: the chat's pick, else the agent's, else Lamina. */
-export function modelFor(s: BillingState | null, convo: string, agent: string | null): { model: ModelInfo; from: "chat" | "agent" | "default" } {
-  const c = s ? modelById(s.models.chats[convo]) : null;
-  if (c) return { model: c, from: "chat" };
-  const a = s && agent ? modelById(s.models.agents[agent]) : null;
-  if (a && a.id !== LAMINA.id) return { model: a, from: "agent" };
-  return { model: LAMINA, from: "default" };
+/** A model by id: built in, or one you added with your own key. */
+export function infoFor(s: BillingState | null, id: string | null | undefined): ModelInfo | null {
+  if (!id) return null;
+  const b = modelById(id);
+  if (b) return b;
+  const c = s?.models.custom?.find((x) => x.id === id);
+  return c ? customInfo(c) : null;
 }
 
-export async function setModel(input: { scope: "agent"; agent: string; model: string } | { scope: "chat"; convo: string; model: string | null }) {
+/** The model that answers in a chat: the chat's pick, else the agent's, else the account default, else Lamina. */
+export function modelFor(s: BillingState | null, convo: string, agent: string | null): { model: ModelInfo; from: "chat" | "agent" | "default" } {
+  const c = infoFor(s, s?.models.chats[convo]);
+  if (c) return { model: c, from: "chat" };
+  const a = s && agent ? infoFor(s, s.models.agents[agent]) : null;
+  if (a) return { model: a, from: "agent" };
+  return { model: infoFor(s, s?.models.default) ?? LAMINA, from: "default" };
+}
+
+export async function setModel(input: { scope: "agent"; agent: string; model: string | null } | { scope: "chat"; convo: string; model: string | null }) {
   // optimistic: the chip changes at once, the server confirms
   const prev = store.state;
   if (prev) {

@@ -26,3 +26,9 @@ export const ENGINE_PRICES: Record<string, Price> = {
   "x-ai/grok-4.7": { in: 2, out: 6 },
   "google/gemini-3.8-flash": { in: 0.75, out: 3.75 },
 };
+
+/** Included models served by Lexari's own Grok relay (LLM_PROVIDER=grok-cli), by app id -> CLI model id. */
+export const RELAY: Record<string, string> = {
+  "grok-fast": "grok-4.7-build-fast",
+  "grok-4.6": "grok-4.6",
+};

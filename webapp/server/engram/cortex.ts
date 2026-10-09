@@ -12,6 +12,9 @@
 import type { ModelInfo } from "@/content/models";
 import { gatewayReady, streamGateway, type Usage } from "./gateway";
 import { grokCliConfig, streamGrokCli } from "./grokCli";
+import { houseNote } from "./gateway";
+import { RELAY } from "./engines";
+import { streamByo, type ByoTarget } from "./byo";
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 export type Provider = "openai" | "xai" | "grok-cli";
@@ -102,16 +105,39 @@ export type StreamOpts = {
   maxTokens?: number;
   /** called once per completion with what it used, for the meter */
   onUsage?: (u: Usage) => void;
+  /** a model the person added with their own key (Settings > Models); the turn's model then has pool "byo" */
+  byo?: ByoTarget | null;
 };
 
 /** True when a model can answer on this server right now. */
 export function modelReady(model: ModelInfo) {
+  if (model.pool === "byo") return true;
+  if (RELAY[model.id]) return provider() === "grok-cli" && llmConfig().ready;
   if (gatewayReady()) return true;
   return model.pool === "lamina" && llmConfig().ready;
 }
 
 export async function* streamCompletion(messages: ChatMessage[], signal?: AbortSignal, opts: StreamOpts = {}): AsyncGenerator<string> {
   const model = opts.model;
+  // Your own model: straight to your provider on your key, with the same note every Lexari model gets.
+  if (opts.byo && model) {
+    const sys = { role: "system" as const, content: houseNote(model, messages) };
+    const at = messages.findIndex((m) => m.role !== "system");
+    const withNote = at < 0 ? [...messages, sys] : [...messages.slice(0, at), sys, ...messages.slice(at)];
+    yield* streamByo(withNote, opts.byo, { signal, maxTokens: opts.maxTokens ?? (opts.fast ? 300 : 1500), onUsage: opts.onUsage });
+    return;
+  }
+  // Included Grok models run on the relay with their own CLI model id.
+  const relayModel = model ? RELAY[model.id] : undefined;
+  if (relayModel && provider() === "grok-cli") {
+    let out = "";
+    try {
+      for await (const t of streamGrokCli(messages, signal, relayModel, opts.priority ?? 0)) { out += t; yield t; }
+    } finally {
+      if (opts.onUsage && out) opts.onUsage({ model: `grok-cli:${relayModel}`, promptTokens: Math.ceil(messages.reduce((n, m) => n + m.content.length, 0) / 4), completionTokens: Math.ceil(out.length / 4), costUsd: null, estimated: true });
+    }
+    return;
+  }
   if (model && gatewayReady()) {
     let any = false;
     try {

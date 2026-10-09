@@ -8,7 +8,7 @@ import { LaminaMark, ModelMark } from "./parts";
 export default function ModelChip({ convo, agent, group }: { convo: string; agent: string | null; group: boolean }) {
   const { state } = useBilling();
   const { model } = modelFor(state, convo, agent);
-  const lamina = model.pool === "lamina";
+  const lamina = model.id === "lamina";
   return (
     <button
       data-model-chip={model.id}

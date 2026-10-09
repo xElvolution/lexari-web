@@ -5,7 +5,7 @@ import { PLANS, type PlanId } from "@/content/appData";
 import { MICROS } from "@/content/billing";
 import { LAMINA, PREMIUM, modelById } from "@/content/models";
 import { friendly } from "@/lib/api";
-import { devBilling, openModels, openSpend, openTopUp, refreshBilling, useBilling, verifyPayment, type BillingState } from "@/lib/billing";
+import { devBilling, infoFor, modelFor, openModels, openSpend, openTopUp, refreshBilling, useBilling, verifyPayment, type BillingState } from "@/lib/billing";
 import { setPlan, toast } from "@/lib/store";
 import { celebrate } from "../Celebrate";
 import Icon from "../Icon";
@@ -33,7 +33,7 @@ export default function BillingSection({ children }: { children?: ReactNode }) {
       : <div className={`${box} grid h-48 place-items-center`}><Spinner className="text-brand-ink" /></div>;
   }
   const paid = s.plan.id !== "free";
-  const home = modelById(s.models.agents.home) ?? LAMINA;
+  const home = modelFor(s, "home", "home").model;
   const nextPlan = s.plan.next ? PLANS.find((p) => p.id === s.plan.next!.id) : null;
   const yearly = s.plan.period === "yearly";
 
@@ -141,12 +141,12 @@ function Recent({ s }: { s: BillingState }) {
       <H>Recent usage</H>
       <ul data-recent-usage className={`${box} divide-y divide-[var(--line)] px-5`}>
         {s.recent.slice(0, 8).map((r, i) => {
-          const m = modelById(r.model) ?? LAMINA;
+          const m = infoFor(s, r.model) ?? modelById(r.model) ?? LAMINA;
           return (
             <li key={i} className="flex items-center gap-3 py-3">
               <ModelMark m={m} size={30} />
               <div className="min-w-0 flex-1"><div className="truncate text-[14px] font-semibold text-ink">{m.label}{r.agent ? <span className="font-normal text-ink/55"> · {r.agent}</span> : null}</div><div className="text-[12px] text-ink/50">{new Date(r.at).toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}{r.tokens ? ` · ${r.tokens.toLocaleString()} tokens` : ""}</div></div>
-              <span className="shrink-0 text-right text-[12.5px] font-bold tabular-nums text-ink">{r.pool === "free" ? "Free" : r.pool === "lamina" ? <span className="inline-flex items-center gap-1"><LaminaMark size={12} className="text-brand-ink" />Included</span> : money(r.billed, { cents: true })}</span>
+              <span className="shrink-0 text-right text-[12.5px] font-bold tabular-nums text-ink">{r.pool === "byo" ? <span className="text-[#137a3d]">Your key</span> : r.pool === "free" ? "Free" : r.pool === "lamina" ? <span className="inline-flex items-center gap-1"><LaminaMark size={12} className="text-brand-ink" />Included</span> : money(r.billed, { cents: true })}</span>
             </li>
           );
         })}

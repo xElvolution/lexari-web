@@ -16,11 +16,12 @@ import { creditsAvailable } from "./math";
 import { cycleFor, snapshot } from "./meter";
 import { cardProvider } from "./payments/card";
 import { planOffers } from "./planPurchase";
+import { accountDefault, listCustom } from "../models";
 
 export async function billingState(userId: string) {
   const database = db();
   const cycle = await cycleFor(userId);
-  const [snap, agentRows, chatRows, pays, usage, queued, offers, balancePlans] = await Promise.all([
+  const [snap, agentRows, chatRows, pays, usage, queued, offers, balancePlans, custom, def] = await Promise.all([
     snapshot(database, userId, cycle),
     database.select({ slug: agents.slug, model: agents.model }).from(agents).where(eq(agents.userId, userId)),
     database.select({ slug: chats.slug, model: chats.model }).from(chats).where(and(eq(chats.userId, userId), isNotNull(chats.model))),
@@ -29,6 +30,8 @@ export async function billingState(userId: string) {
     database.select({ plan: planPurchases.plan, period: planPurchases.period, startsAt: planPurchases.startsAt, expiresAt: planPurchases.expiresAt }).from(planPurchases).where(eq(planPurchases.userId, userId)).orderBy(desc(planPurchases.expiresAt)).limit(5),
     planOffers(userId),
     database.select().from(creditLedger).where(and(eq(creditLedger.userId, userId), eq(creditLedger.reason, "plan"))).orderBy(desc(creditLedger.createdAt)).limit(12),
+    listCustom(userId).catch(() => []),
+    accountDefault(userId).catch(() => null),
   ]);
   const { period, settings, meter } = snap;
   const now = Date.now();
@@ -69,7 +72,12 @@ export async function billingState(userId: string) {
       gateway: gatewayReady(),
       available: Object.fromEntries(MODELS.map((m) => [m.id, modelReady(m)])),
       laminaVia: gatewayReady() ? "gateway" : "relay",
-      agents: Object.fromEntries(agentRows.map((a) => [a.slug, a.model || LAMINA.id])),
+      /** an agent's own pick, or null when it follows the account default */
+      agents: Object.fromEntries(agentRows.map((a) => [a.slug, a.model || null])) as Record<string, string | null>,
+      /** the account default (Settings > Models) */
+      default: def || LAMINA.id,
+      /** your own models (key masked) */
+      custom,
       chats: Object.fromEntries(chatRows.map((c) => [c.slug, c.model!])),
     },
     rails: {

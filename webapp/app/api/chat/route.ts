@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { currentSession } from "@/server/auth/session";
 import { ModelError, llmConfig, modelReady, streamCompletion } from "@/server/engram/cortex";
 import { gatewayReady } from "@/server/engram/gateway";
-import { LAMINA, modelById } from "@/content/models";
+import { accountDefault, resolveTurnModel } from "@/server/models";
 import { beginTurn, isBlocked, type Blocked, type Turn } from "@/server/billing/meter";
 import { splitRemember } from "@/server/engram/hippocampus";
 import { buildPrompt } from "@/server/engram/spinal";
@@ -84,9 +84,13 @@ export async function POST(req: Request) {
   const speakerName = (speakerRow?.meta as { nick?: string })?.nick || speakerRow?.name || body.speaker;
   const role = speakerRow?.kind === "hired" ? house?.job || speakerRow.role : speakerRow?.role || home.role;
   const tone = speakerRow?.tone || home.tone || "short";
-  // The model: this chat's pick, else the agent's, else Lamina (content/models.ts).
-  const [chatPick] = await retryRead(() => database.select({ model: chats.model }).from(chats).where(and(eq(chats.userId, userId), eq(chats.slug, body.convo))).limit(1)).catch(() => []);
-  const model = modelById(chatPick?.model) ?? modelById(speakerRow?.model) ?? LAMINA;
+  // The model: this chat's pick, else the agent's, else the account default (Settings > Models), else Lamina.
+  // A model on your own key comes with its provider target and is never billed to your Lexari balance.
+  const [[chatPick], accountPick] = await Promise.all([
+    retryRead(() => database.select({ model: chats.model }).from(chats).where(and(eq(chats.userId, userId), eq(chats.slug, body.convo))).limit(1)).catch(() => []),
+    accountDefault(userId).catch(() => null),
+  ]);
+  const { model, byo } = await resolveTurnModel(userId, [chatPick?.model, speakerRow?.model, accountPick]);
   if (!modelReady(model)) return jsonError(409, `${model.label} isn't available on this server yet. Switch to Lamina to keep going.`, { billing: { reason: "model_unavailable", model: model.id, modelLabel: model.label } });
   // In a group, earlier turns by other members are labelled with their names, and the agent knows who else is in the room.
   const isGroupChat = body.convo.startsWith("g-");
@@ -157,7 +161,7 @@ export async function POST(req: Request) {
   } catch (error) {
     return toErrorResponse(error);
   }
-  const usage = { model, onUsage: turn.add };
+  const usage = { model, onUsage: turn.add, byo };
 
   // Your message is saved before the agent starts, so it never disappears if the reply fails or the page reloads.
   // The save starts before the wallet reads above and runs alongside them, so its timestamp sits close to when you sent it.

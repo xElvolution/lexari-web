@@ -19,6 +19,8 @@ export const users = pgTable("users", {
   lockHash: text("lock_hash"),
   /** WebAuthn credential ids allowed to unlock */
   lockCreds: jsonb("lock_creds").$type<{ id: string; at: number }[]>().notNull().default([]),
+  /** account default model for agents without their own (content/models.ts id or byo:<uuid>); null = Lamina */
+  defaultModel: text("default_model"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
