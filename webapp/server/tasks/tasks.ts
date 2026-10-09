@@ -182,7 +182,7 @@ export async function postedFor(userId: string, rows: Row[]) {
   const ids = rows.filter((r) => r.finishedAt && Date.now() - r.finishedAt.getTime() < 15 * 60_000 || r.lastRun && Date.now() - r.lastRun.getTime() < 15 * 60_000).map((r) => r.id);
   if (!ids.length) return [];
   const list = await db().select({ m: messages, slug: chats.slug }).from(messages).innerJoin(chats, eq(messages.chatId, chats.id))
-    .where(and(eq(chats.userId, userId), gte(messages.createdAt, new Date(Date.now() - 15 * 60_000)), sql`${messages.metaJson}->'task'->>'id' = any(${ids})`)).limit(20);
+    .where(and(eq(chats.userId, userId), gte(messages.createdAt, new Date(Date.now() - 15 * 60_000)), inArray(sql<string>`${messages.metaJson}->'task'->>'id'`, ids))).limit(20);
   return list.map(({ m, slug }) => ({ convo: slug, msg: { id: m.clientId || m.id, from: m.fromId, text: m.text, at: m.createdAt.getTime(), ...((m.metaJson as object) || {}) } }));
 }
 
