@@ -67,7 +67,7 @@ export async function recentEvents(userId: string) {
 export async function listSessions(userId: string, currentId: string) {
   const rows = await db().select({ id: sessions.id, device: sessions.device, ipHint: sessions.ipHint, createdAt: sessions.createdAt, lastSeenAt: sessions.lastSeenAt })
     .from(sessions).where(and(eq(sessions.userId, userId), gt(sessions.expiresAt, new Date()))).orderBy(desc(sessions.lastSeenAt)).limit(30);
-  return rows.map((r) => ({ id: r.id, device: r.device || "Unknown device", network: r.ipHint, createdAt: r.createdAt.getTime(), lastSeenAt: r.lastSeenAt.getTime(), current: r.id === currentId }));
+  return rows.map((r) => ({ id: r.id, device: r.device || "Earlier sign-in", network: r.ipHint, createdAt: r.createdAt.getTime(), lastSeenAt: r.lastSeenAt.getTime(), current: r.id === currentId }));
 }
 export async function revokeSession(user: SessionUser, id: string) {
   if (id === user.sessionId) throw new HttpError(400, "Use Sign out to end this session.");
