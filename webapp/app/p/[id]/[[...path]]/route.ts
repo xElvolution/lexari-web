@@ -12,7 +12,9 @@ const SANDBOX = "sandbox allow-scripts allow-forms allow-popups allow-modals all
 const NOTE = `<div style="position:fixed;left:8px;bottom:8px;z-index:2147483647;font:600 11px/1 system-ui,sans-serif;color:#fff;background:rgba(20,16,32,.78);padding:6px 9px;border-radius:999px;pointer-events:none">Preview made by an AI agent · not a Lexari page</div>`;
 
 function withBase(html: Buffer, base: string) {
-  const s = html.toString("utf8");
+  // Root-absolute asset links (a Vite build with the default base "/") point into the preview's own folder instead.
+  const root = `/p/${base.split("/")[2]}/`;
+  const s = html.toString("utf8").replace(/(\s(?:src|href)=["'])\/(?!\/|p\/)/gi, `$1${root}`);
   const tag = `<base href="${base.replace(/[^\w\-./~%]/g, encodeURIComponent)}">`;
   const at = /<head[^>]*>/i.exec(s);
   const out = /<base\s/i.test(s) ? s : at ? s.slice(0, at.index + at[0].length) + tag + s.slice(at.index + at[0].length) : tag + s;
@@ -23,7 +25,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; pa
   const { id, path } = await ctx.params;
   const p = (path || []).map((s) => decodeURIComponent(s)).join("/");
   const f = await siteFile(id, p).catch(() => null);
-  const head = { "Content-Security-Policy": SANDBOX, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY", "Cross-Origin-Resource-Policy": "same-origin" };
+  const head = { "Content-Security-Policy": SANDBOX, "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY", "Cross-Origin-Resource-Policy": "cross-origin",
+    // The sandboxed page has origin "null", so module scripts and crossorigin CSS/fonts are CORS requests: allow them
+    // (these are public files of the preview, sent without credentials).
+    "Access-Control-Allow-Origin": "*" };
   if (!f) {
     const nf = await siteFile(id, "404.html").catch(() => null);
     return new Response(nf ? new Uint8Array(nf.data) : "Not found", { status: 404, headers: { ...head, "Content-Type": nf ? nf.mime : "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
