@@ -60,7 +60,7 @@ export type Action =
   | { do: "type"; text: string } | { do: "key"; keys: string }
   | { do: "scroll"; dir: "up" | "down"; amount?: number; x?: number; y?: number }
   | { do: "navigate"; url: string } | { do: "wait"; seconds?: number } | { do: "readpage"; url: string };
-export type Step = { see?: string; label?: string; actions?: Action[]; keep?: boolean; done?: boolean; answer?: string; ask?: string };
+export type Step = { see?: string; label?: string; actions?: Action[]; keep?: boolean; done?: boolean; answer?: string; ask?: string; login?: boolean };
 
 /** The first JSON object in the model's answer. */
 export function parseStep(text: string): Step | null {
@@ -152,11 +152,12 @@ Rules:
 - Only act on what you can see. If something didn't work, look again and try another way; never repeat the same failing action more than twice.
 - Set keep:true when this turn's screenshot is worth showing the person (for example the result page).
 - When the task is complete and the relevant page is on screen, set done:true with no actions and write answer: a short, friendly reply to the person saying what you did and what you found (quote the key text exactly). Mention that the screenshot is attached when they asked for one.
-- Never type passwords, card or payment details, or 2FA/verification codes; never sign in, buy, pay, post publicly or submit forms that spend money. If the task needs any of that, or a login, CAPTCHA or payment page appears, stop: set done:true and ask: a short question telling the person what you need (they can do that part themselves in the Desktop view).
+- Never type passwords, card or payment details, or 2FA/verification codes; never sign in, buy, pay, post publicly or submit forms that spend money. If the task needs any of that, or a login, CAPTCHA or payment page appears, stop: set done:true, set "login":true when it is a sign-in, CAPTCHA or verification-code page, and ask: one short sentence asking the person to take over your desktop and do that part themselves (for example "Please take over my desktop and sign in to GitHub; I'll carry on after."). Never ask them to tell you a password or code in the chat.
 - Never use tools of your own; only the JSON above.`;
 
 export type Progress = { step: number; max: number; label: string };
-export type ComputerResult = { text: string; shots: number[] };
+/** takeover: the agent stopped at a sign-in (or CAPTCHA / 2FA) page and asks the person to take over its desktop. */
+export type ComputerResult = { text: string; shots: number[]; takeover?: string };
 
 /**
  * Runs one computer task for a person and returns the reply text plus the saved screenshot numbers (n in
@@ -171,7 +172,7 @@ export async function runComputer(userId: string, convo: string, replyId: string
   const started = Date.now();
   const log: string[] = [];
   const kept: Shot[] = [];
-  let read = "", lastShot: Shot | null = null, answer = "", ask = "", bad = 0;
+  let read = "", lastShot: Shot | null = null, answer = "", ask = "", bad = 0, login = false;
   try {
     for (let step = 1; step <= CU_MAX_STEPS; step++) {
       if (stop.signal.aborted) break;
@@ -198,7 +199,7 @@ export async function runComputer(userId: string, convo: string, replyId: string
       if (!s) { if (++bad >= 2) { log.push("(could not decide)"); break; } log.push(`Turn ${step}: (answer was not JSON; reply with the JSON object only)`); continue; }
       bad = 0;
       if (s.keep) kept.push(shot);
-      if (s.done || !s.actions?.length) { answer = String(s.answer || "").trim(); ask = String(s.ask || "").trim(); if (s.done || answer || ask) break; }
+      if (s.done || !s.actions?.length) { answer = String(s.answer || "").trim(); ask = String(s.ask || "").trim(); login = !!s.login || /\b(sign[ -]?in|log[ -]?in|password|captcha|verification code|2fa|two-factor)\b/i.test(ask); if (s.done || answer || ask) break; }
       const label = String(s.label || "Working").replace(/\s+/g, " ").slice(0, 60);
       onStep({ step, max: CU_MAX_STEPS, label });
       const notes: string[] = [];
@@ -230,7 +231,7 @@ export async function runComputer(userId: string, convo: string, replyId: string
     else if (!out) out = `I worked on it for ${log.length} step${log.length === 1 ? "" : "s"} but didn't finish in time. Here's where my screen is now; tell me if I should keep going.`;
     else if (ask && answer && ask !== answer) out = `${answer}\n\n${ask}`;
     console.log(`[computer] ${userId.slice(0, 8)} finished: ${stopped ? "stopped" : ask ? "asked the person" : answer ? "done" : "out of budget"}, ${log.length} turns, ${Math.round((Date.now() - started) / 1000)}s, ${saved.length} shots`);
-    return { text: out, shots: saved };
+    return { text: out, shots: saved, ...(login && ask && !stopped ? { takeover: ask.slice(0, 140) } : {}) };
   } finally {
     signal?.removeEventListener("abort", onAbort);
     running.delete(userId);

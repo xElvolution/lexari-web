@@ -32,6 +32,9 @@ import { agentRef } from "@/server/integrations/actions";
 import type { ActionCard, MarketsCard } from "@/content/integrations";
 import type { EmailCard } from "@/content/email";
 import { draftFromTag, emailContext, emailRequest, hasEmailTag, stripEmailTags } from "@/server/email/mail";
+import { createSecretRequest, hasSecretTag, scrubber, secretEnv, secretNames, secretRequestTag, secretsHint, stripSecretTags, stripTakeover, takeoverTag, type Scrubber } from "@/server/secrets";
+import { findSecrets, redactPatterns } from "@/lib/secretScan";
+import type { SecretCard, TakeoverCard } from "@/content/secrets";
 
 export const runtime = "nodejs";
 
@@ -53,6 +56,11 @@ export async function POST(req: Request) {
   if (!session) return jsonError(401, "You're signed out. Sign in again.");
   const body = await readJson(req, chatBody);
   if (body instanceof Response) return body;
+  // Privacy: a message that carries an API key, password, recovery phrase or private key never reaches the model or
+  // the chat history (the composer catches these first; this is the server's backstop). Nothing of it is logged.
+  if (!body.event && (await findSecrets(body.text)).length) return jsonError(422, "That message looks like it contains a password, key or recovery phrase, so it wasn't sent. Use Save securely instead.", { secret: true });
+  body.history = body.history.map((t) => ({ ...t, text: redactPatterns(t.text) }));
+  if (body.peers) body.peers = body.peers.map((t) => ({ ...t, text: redactPatterns(t.text) }));
   // both limits and the agents read go out together (a call turn waits on every round trip)
   const minePromise = retryRead(() => db().select().from(agents).where(eq(agents.userId, session.userId)));
   minePromise.catch(() => {});
@@ -132,6 +140,10 @@ export async function POST(req: Request) {
   // Email: the agent's own address and newest inbox mail; an <email> tag becomes a draft card only you can send.
   const mail = !call && !event ? await emailContext(userId, speakerRow?.slug || "home", speakerName).catch((e: Error) => { console.error(`[email] context: ${e.message}`); return null; }) : null;
   if (mail) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${mail}` };
+  // Secrets: agents ask for credentials with a secure card and only ever see names, never values.
+  const agentSlug = speakerRow?.slug || "home";
+  const vaultNames = !call ? await secretNames(userId, agentSlug).catch(() => [] as { name: string; service: string }[]) : [];
+  prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${call ? "Never ask for a password, API key, recovery phrase or private key out loud; say you'll put a secure card in the chat instead." : secretsHint(vaultNames, tools)}` };
   // The wallet tools (send, read) are for chat turns; every turn (calls too) reads the wallet history below.
   const owner = session.wallet || "";
   const wallet = call ? "" : owner;
@@ -139,7 +151,7 @@ export async function POST(req: Request) {
   // wallet and asks you to fund it for a task.
   const hiredSpeaker = speakerRow?.kind === "hired";
   if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${hiredSpeaker ? FUND_HINT(speakerName) : WALLET_HINT}` };
-  const hold = tools || !!wallet || imagineOn || !!integ || !!mail;
+  const hold = !call || tools || !!wallet || imagineOn || !!integ || !!mail;
   const tz = body.tz || "UTC";
   const savingUser: Promise<boolean> = !call && !(body.follow === true || !!event)
     ? saveUserMsg(userId, body).then(() => true, (error) => { console.error(`[chat] save user message: ${(error as Error).message}`); return false; })
@@ -189,6 +201,8 @@ export async function POST(req: Request) {
       const send = (payload: unknown) => { try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)); } catch {} };
       let full = "";
       let shownText = "";
+      let turnScrub: Scrubber | null = null;
+      let takeover: TakeoverCard | null = null;
       const show = (t: string) => { if (t) { shownText += t; send({ token: t }); } };
       // Second shift: one agent answers one turn at a time (two from level 5); a call turn never waits.
       let leave: (() => void) | null = null;
@@ -214,6 +228,7 @@ export async function POST(req: Request) {
               .catch((e: Error) => { console.error(`[computer] ${e.message}`); return { text: "My computer stopped responding, so I couldn't finish that. Try again in a moment.", shots: [] as number[] }; });
           clearTimeout(cuCap);
           if (r.shots.length) send({ shots: { id: body.replyMsgId, n: r.shots } });
+          if (r.takeover) { takeover = { reason: r.takeover }; send({ takeover }); }
           send({ cu: null });
           full = `${before && shown > 0 ? before + "\n\n" : ""}${r.text}`;
           show(full.slice(shown));
@@ -223,11 +238,15 @@ export async function POST(req: Request) {
         const cmds = tools && !task ? runRequests(full) : [];
         if (cmds.length) {
           // The agent asked to use its computer: run the commands in this person's container, then let it answer with the output.
+          // Vault secrets a command names ($NAME) are injected at exec time; every saved value is scrubbed from the
+          // output before the model (or anyone) sees it.
           const results: string[] = [];
           for (const cmd of cmds) {
             send({ tool: { cmd } });
-            const r = await runInDesktop(userId, cmd).catch((e: Error) => ({ code: 1, out: `could not run: ${e.message}` }));
-            results.push(`$ ${cmd}\n${r.out.slice(0, 3000)}${r.code ? `\n(exit ${r.code})` : ""}`);
+            const { env, scrub } = await secretEnv(userId, agentSlug, cmd).catch((e: Error) => { console.error(`[secrets] env: ${e.message}`); return { env: {} as Record<string, string>, scrub: scrubber([]) }; });
+            turnScrub = scrub;
+            const r = await runInDesktop(userId, cmd, env).catch((e: Error) => ({ code: 1, out: `could not run: ${e.message}` }));
+            results.push(scrub(`$ ${cmd}\n${r.out.slice(0, 3000)}${r.code ? `\n(exit ${r.code})` : ""}`));
           }
           const before = full.slice(0, full.indexOf("<run>")).trim();
           const follow = [...prompt, { role: "assistant" as const, content: full }, { role: "user" as const, content: `Output from your computer:\n${results.join("\n\n")}\n\nNow answer the person in plain sentences. Do not write <run> again.` }];
@@ -241,6 +260,24 @@ export async function POST(req: Request) {
           }
           full = `${before && shown > 0 ? before + "\n\n" : ""}${answer.replace(/<run>[\s\S]*?<\/run>/g, "").trim()}`;
         }
+        // A credential the agent needs: a secure card (the value goes straight to the vault, never through chat).
+        let secret: SecretCard | null = null;
+        if (!call && !event && hasSecretTag(full)) {
+          const sr = secretRequestTag(full);
+          full = stripSecretTags(full);
+          if (sr) {
+            secret = await createSecretRequest(userId, { agent: agentSlug, convo: body.convo, messageId: body.replyMsgId }, sr).catch((e: Error) => { console.error(`[secrets] request: ${e.message}`); return null; });
+            if (secret) send({ secret });
+          }
+          if (!full.trim() && secret) full = `I need your ${secret.label}. Add it in the secure card below; it goes straight into your encrypted vault and I never see it.`;
+        }
+        // The agent hit a sign-in page (or CAPTCHA / 2FA) on its computer: ask the person to take over the desktop.
+        if (!call && !event && tools) {
+          const tk = takeoverTag(full);
+          if (tk) { full = stripTakeover(full); takeover = { reason: tk }; send({ takeover }); }
+          if (!full.trim() && takeover) full = "This part needs you. Take over my desktop and sign in yourself; I never see your password.";
+        }
+        if (turnScrub) full = turnScrub(full);
         // An email the agent wrote becomes a draft card; nothing is sent until the person taps Send.
         let email: EmailCard | null = null;
         if (mail && hasEmailTag(full)) {
@@ -349,7 +386,7 @@ export async function POST(req: Request) {
         if (!split.reply) throw new ModelError("The agent sent an empty reply. Try again.");
         if (split.remember) send({ remember: split.remember });
         if (call) { send({ done: true }); return; } // a call is not saved as chat messages
-        const replyMeta = pay || files.length || action || markets || email ? { ...(pay ? { send: pay } : {}), ...(files.length ? { files } : {}), ...(action ? { action } : {}), ...(markets ? { markets } : {}), ...(email ? { email } : {}) } : event ? { about: event.tx } : null;
+        const replyMeta = pay || files.length || action || markets || email || secret || takeover ? { ...(pay ? { send: pay } : {}), ...(files.length ? { files } : {}), ...(action ? { action } : {}), ...(markets ? { markets } : {}), ...(email ? { email } : {}), ...(secret ? { secret } : {}), ...(takeover ? { takeover } : {}) } : event ? { about: event.tx } : null;
         await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, replyMeta, userSaved);
         if (!body.follow && !event && !(await counted)) await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).
