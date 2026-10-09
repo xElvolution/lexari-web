@@ -6,11 +6,11 @@ import { QUEST_RULES } from "./hub/catalog";
 import { periodNumber } from "./hub/catalog";
 import { progressFrom, questCounts } from "./hub/rules";
 
-export type NoteKind = "quest" | "box" | "hire" | "payment" | "card" | "reply" | "faucet";
+export type NoteKind = "quest" | "box" | "hire" | "payment" | "card" | "reply" | "faucet" | "mail";
 export type Note = { kind: NoteKind; title: string; body?: string; url?: string; key?: string };
 
 /** Which Settings › Notifications toggle silences the push for a kind. The bell always keeps it. */
-const PREF: Partial<Record<NoteKind, string>> = { reply: "replies", hire: "wallet", payment: "wallet", faucet: "wallet", card: "cards" };
+const PREF: Partial<Record<NoteKind, string>> = { reply: "replies", mail: "replies", hire: "wallet", payment: "wallet", faucet: "wallet", card: "cards" };
 
 let vapidReady: boolean | null = null;
 export function vapidPublicKey() { return process.env.VAPID_PUBLIC_KEY || ""; }

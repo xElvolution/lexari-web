@@ -30,6 +30,8 @@ import { queuePriority, recallSize, shifts } from "@/lib/perks";
 import { hasToolTag, runTurnTools, stripToolTags, turnTools } from "@/server/integrations/chat";
 import { agentRef } from "@/server/integrations/actions";
 import type { ActionCard, MarketsCard } from "@/content/integrations";
+import type { EmailCard } from "@/content/email";
+import { draftFromTag, emailContext, emailRequest, hasEmailTag, stripEmailTags } from "@/server/email/mail";
 
 export const runtime = "nodejs";
 
@@ -127,6 +129,9 @@ export async function POST(req: Request) {
   // Integrations (Settings > Integrations): only what the person added, switched on and granted to this agent.
   const integ = !call && !event ? await turnTools(userId, speakerRow?.slug || "home").catch(() => null) : null;
   if (integ) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${integ.hint}` };
+  // Email: the agent's own address and newest inbox mail; an <email> tag becomes a draft card only you can send.
+  const mail = !call && !event ? await emailContext(userId, speakerRow?.slug || "home", speakerName).catch((e: Error) => { console.error(`[email] context: ${e.message}`); return null; }) : null;
+  if (mail) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${mail}` };
   // The wallet tools (send, read) are for chat turns; every turn (calls too) reads the wallet history below.
   const owner = session.wallet || "";
   const wallet = call ? "" : owner;
@@ -134,7 +139,7 @@ export async function POST(req: Request) {
   // wallet and asks you to fund it for a task.
   const hiredSpeaker = speakerRow?.kind === "hired";
   if (wallet) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${hiredSpeaker ? FUND_HINT(speakerName) : WALLET_HINT}` };
-  const hold = tools || !!wallet || imagineOn || !!integ;
+  const hold = tools || !!wallet || imagineOn || !!integ || !!mail;
   const tz = body.tz || "UTC";
   const savingUser: Promise<boolean> = !call && !(body.follow === true || !!event)
     ? saveUserMsg(userId, body).then(() => true, (error) => { console.error(`[chat] save user message: ${(error as Error).message}`); return false; })
@@ -236,6 +241,18 @@ export async function POST(req: Request) {
           }
           full = `${before && shown > 0 ? before + "\n\n" : ""}${answer.replace(/<run>[\s\S]*?<\/run>/g, "").trim()}`;
         }
+        // An email the agent wrote becomes a draft card; nothing is sent until the person taps Send.
+        let email: EmailCard | null = null;
+        if (mail && hasEmailTag(full)) {
+          const er = emailRequest(full);
+          full = stripEmailTags(full);
+          if (er) {
+            const r = await draftFromTag(userId, speakerRow?.slug || "home", speakerName, er, { convo: body.convo, messageId: body.replyMsgId }).catch((e: Error) => { console.error(`[email] draft: ${e.message}`); return { note: "the draft couldn't be saved" } as { card?: EmailCard; note?: string }; });
+            if (r.card) { email = r.card; send({ email }); }
+            else if (r.note) full = `${full}${full ? "\n\n" : ""}(I couldn't prepare that email: ${r.note}.)`;
+          }
+          if (!full.trim() && email) full = "Here's the draft. Check it and tap Send when it looks right.";
+        }
         // Integration tags: reads come back to the agent as live data; a trade or transfer becomes a confirm card.
         let action: ActionCard | null = null;
         let markets: MarketsCard | null = null;
@@ -332,7 +349,7 @@ export async function POST(req: Request) {
         if (!split.reply) throw new ModelError("The agent sent an empty reply. Try again.");
         if (split.remember) send({ remember: split.remember });
         if (call) { send({ done: true }); return; } // a call is not saved as chat messages
-        const replyMeta = pay || files.length || action || markets ? { ...(pay ? { send: pay } : {}), ...(files.length ? { files } : {}), ...(action ? { action } : {}), ...(markets ? { markets } : {}) } : event ? { about: event.tx } : null;
+        const replyMeta = pay || files.length || action || markets || email ? { ...(pay ? { send: pay } : {}), ...(files.length ? { files } : {}), ...(action ? { action } : {}), ...(markets ? { markets } : {}), ...(email ? { email } : {}) } : event ? { about: event.tx } : null;
         await saveTurn(userId, body, speakerRow?.slug || "home", split.reply, sent, replyMeta, userSaved);
         if (!body.follow && !event && !(await counted)) await recordEvent(userId, "message", { ref: body.userMsgId });
         // Push only reaches you when no Lexari tab is in front (the service worker checks).

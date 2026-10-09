@@ -38,6 +38,7 @@ export type Msg = {
   about?: string; // an agent's follow-up on a receipt (its id)
   action?: import("@/content/integrations").ActionCard; // something an agent prepared with an integration; only you can confirm it
   markets?: import("@/content/integrations").MarketsCard; // live prediction markets an agent pulled in
+  email?: import("@/content/email").EmailCard; // an email an agent wrote; only you can send it
 };
 export type TxKind = "send" | "fund" | "return" | "hire" | "plan" | "card" | "mint" | "incoming";
 export type TxStatus = "pending" | "confirmed" | "failed" | "cancelled";
@@ -705,11 +706,12 @@ async function oneReplyRun(convo: string, userMsg: Msg, speaker: string, follow:
             const trimmed = line.trim();
             if (computerEvent(convo, bubble, trimmed)) { typingWho.set(convo, speaker); continue; }
             if (!trimmed.startsWith("data:")) continue;
-            let payload: { token?: string; replace?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"]; files?: Msg["files"]; action?: Msg["action"]; markets?: Msg["markets"] } = {};
+            let payload: { token?: string; replace?: string; remember?: string; error?: string; done?: boolean; send?: Msg["send"]; files?: Msg["files"]; action?: Msg["action"]; markets?: Msg["markets"]; email?: Msg["email"] } = {};
             try { payload = JSON.parse(trimmed.slice(5).trim()); } catch { continue; }
             if (payload.error) { error = payload.error; break read; }
             if (payload.send) { const sd = payload.send; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, send: sd } : mm)) } })); }
             if (payload.action) { const ac = payload.action; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, action: ac } : mm)) } })); }
+            if (payload.email) { const em = payload.email; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, email: em } : mm)) } })); }
             if (payload.markets) { const mk = payload.markets; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, markets: mk } : mm)) } })); }
             if (payload.files?.length) { const fl = payload.files; set((x) => ({ ...x, threads: { ...x.threads, [convo]: (x.threads[convo] || []).map((mm) => (mm.id === bubble ? { ...mm, files: fl } : mm)) } })); }
             if (typeof payload.replace === "string") { full = payload.replace; if (full.trim()) setMood(speaker, "speaking"); setMsg(convo, bubble, full.replace(/\n?REMEMBER:\s*.{0,180}\s*$/, "").trim()); }
@@ -728,7 +730,7 @@ async function oneReplyRun(convo: string, userMsg: Msg, speaker: string, follow:
       error = "Could not reach the agent.";
     }
     const cur = (get().threads[convo] || []).find((m) => m.id === bubble);
-    if (!error && (full.trim() || cur?.send || cur?.action || cur?.markets)) return { bubble, text: cur?.text || full };
+    if (!error && (full.trim() || cur?.send || cur?.action || cur?.markets || cur?.email)) return { bubble, text: cur?.text || full };
     if (!error) error = "The agent sent an empty reply.";
     // Retry only when nothing reached the screen yet and the failure looks temporary.
     if (attempt === 0 && !full.trim() && TRANSIENT.test(error)) { await new Promise((r) => setTimeout(r, 1500)); continue; }

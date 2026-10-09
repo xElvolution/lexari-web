@@ -21,6 +21,7 @@ import FaceCreator from "./FaceCreator";
 import OnchainCard from "./OnchainCard";
 import AgentMoney from "../wallet/AgentMoney";
 import AgentModelRow from "../billing/AgentModelRow";
+import AgentEmailRow from "../email/AgentEmailRow";
 import { lookVariant } from "@shared/components/avatar";
 import type { AgentLook } from "@/lib/store";
 
@@ -146,6 +147,7 @@ function Panel({ s, id }: { s: State; id: string }) {
                   <div className="mt-2 flex flex-wrap gap-1.5">{(k === "hired" ? sp?.skills.map((x) => x[0]) ?? [] : info.chips).map((x) => <span key={x} className="rounded-full bg-tint px-3 py-1.5 text-[13px] font-semibold text-ink/80">{x}</span>)}</div>
                 </section>
                 <AgentModelRow agent={id} name={info.name} />
+                <AgentEmailRow agent={id} name={info.name} />
                 <AgentMoney s={s} id={id} name={info.name} />
                 {k !== "hired" && <OnchainCard s={s} id={id} name={info.name} role={info.role} bg={info.bg}
                   v={k === "home" ? lookVariant(s.agent?.look) : variant({ shape: c!.shape, color: c!.color, eyes: c!.eyes, mouth: c!.mouth, extra: c!.extra, blush: c!.blush ?? (c!.tone === "warm" || c!.tone === "playful"), brows: c!.brows, orbit: c!.orbit, dots: c!.dots, bg: c!.bg })} />}

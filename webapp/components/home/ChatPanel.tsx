@@ -22,6 +22,8 @@ import ModelChip from "../billing/ModelChip";
 import { shotUrl, stopComputer, useComputer } from "@/lib/computer";
 import FileCard, { FileCards } from "./FileCard";
 import { ActionCardView, MarketsCardView } from "../integrations/ChatCards";
+import { EmailCardView } from "../email/EmailCardView";
+import InboxButton from "../email/InboxButton";
 
 /** Screenshots the agent attached after using its computer: the last one (the final screen) large, the others small. Tap to view. */
 function Shots({ m }: { m: Msg }) {
@@ -260,6 +262,7 @@ function Bubble({ m, s, convo, mine, lastOfRun, now, menu, setMenu, onReply }: {
       {m.send && <SendCard convo={convo} m={m as Msg & { send: NonNullable<Msg["send"]> }} />}
       {m.action && <ActionCardView key={m.action.id} convo={convo} m={m as Msg & { action: NonNullable<Msg["action"]> }} />}
       {m.markets && <MarketsCardView c={m.markets} />}
+      {m.email && <EmailCardView key={m.email.id} convo={convo} m={m as Msg & { email: NonNullable<Msg["email"]> }} />}
       <Shots m={m} />
       {m.files?.length ? <FileCards files={m.files} /> : null}
       <Pills m={m} s={s} convo={convo} mine={mine} />
@@ -354,6 +357,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
             </span>
           </button>
         )}
+        {!c.group && <InboxButton agent={id} name={c.name} />}
         <ModelChip convo={id} agent={c.group ? null : id} group={!!c.group} />
         {c.group && <button onClick={onEditGroup} aria-label="Edit group" title="Edit group" className="grid h-10 w-10 place-items-center rounded-full text-ink/75 transition hover:bg-tint hover:text-brand-ink"><Icon name="users" size={19} /></button>}
       </header>
@@ -375,7 +379,7 @@ export default function ChatPanel({ s, id, onBack, onCall, onDesktop, desktopOpe
               const lastOfRun = !next || next.from !== m.from;
               const day = newDay && now > 0 ? <div className="label my-5 text-center text-[9px] text-ink/45">{dayLabel(m.at, now)}</div> : null;
               // The reply bubble is empty until the first words arrive; the typing dots stand in for it (one bubble, not two).
-              if (m.from !== "system" && !m.text && !m.file && !m.files?.length && !m.voice && !m.send && !m.action && !m.markets) return null;
+              if (m.from !== "system" && !m.text && !m.file && !m.files?.length && !m.voice && !m.send && !m.action && !m.markets && !m.email) return null;
               if (m.from === "system" && m.tx) return <div key={m.id} id={`m-${m.id}`} data-msg>{day}<TxReceipt tx={m.tx} /></div>;
               if (m.from === "system") return (
                 <div key={m.id} data-msg>{day}
