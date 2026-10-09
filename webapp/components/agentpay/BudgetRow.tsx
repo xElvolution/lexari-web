@@ -24,7 +24,7 @@ export default function BudgetRow({ agent, name }: { agent: string; name: string
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-[#0f9f6e] text-white"><Icon name="gauge" size={17} /></span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5 text-[14px] font-bold text-ink">Budget<span className="font-semibold text-ink/55">· {usd(b.perTaskUsd)}/task · {usd(b.dailyUsd)}/day</span></span>
-          <span className="block truncate text-[12.5px] text-ink/60">{usd(b.spentTodayUsd)} spent today on services and other agents.</span>
+          <span className="block text-[12.5px] leading-snug text-ink/60">{usd(b.spentTodayUsd)} spent today on services and other agents.</span>
         </span>
         <Icon name="right" size={16} className="shrink-0 text-ink/35" />
       </button>

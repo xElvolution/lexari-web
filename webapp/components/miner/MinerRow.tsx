@@ -31,7 +31,7 @@ export default function MinerRow() {
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-[#1a1206] text-[#f5a524]"><Icon name="server" size={17} /></span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5 text-[14px] font-bold text-ink">Mining{mining.length > 0 && <span className="rounded-full bg-[#e7f8ee] px-1.5 py-0.5 text-[10px] font-bold text-[#137a3d]">{rate(mining.reduce((n, h) => n + (h.report?.hashrate || 0), 0))}</span>}</span>
-          <span className="block truncate text-[12.5px] text-ink/60">{!hosts?.length ? "Connect a server you own. Nothing mines on Lexari." : `${hosts.length} server${hosts.length === 1 ? "" : "s"} · ${live.length} online · ${mining.length} mining`}</span>
+          <span className="block text-[12.5px] leading-snug text-ink/60">{!hosts?.length ? "Connect a server you own. Nothing mines on Lexari." : `${hosts.length} server${hosts.length === 1 ? "" : "s"} · ${live.length} online · ${mining.length} mining`}</span>
         </span>
         <Icon name="right" size={16} className="shrink-0 text-ink/35" />
       </button>

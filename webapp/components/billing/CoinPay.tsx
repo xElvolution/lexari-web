@@ -102,7 +102,7 @@ export function CoinPicker({ value, onPick, onBack }: { value: string; onPick: (
 export function CoinTileLabel({ railKey }: { railKey: string }) {
   const r = railById(railKey)!;
   const c = coinById(r.coin)!;
-  return <><span className="block text-[14.5px] font-bold">{c.symbol}</span><span className="block truncate text-[11.5px] opacity-70">{CHAINS[r.chain].name}{r.chain === "solana" ? " devnet" : " testnet"}</span></>;
+  return <><span className="block text-[14.5px] font-bold">{c.symbol}</span><span className="block text-[11.5px] leading-tight opacity-70">{CHAINS[r.chain].name}{r.chain === "solana" ? " devnet" : " testnet"}</span></>;
 }
 
 function Steps({ phase }: { phase: string }) {

@@ -15,7 +15,7 @@ export default function AgentModelRow({ agent, name }: { agent: string; name: st
       <ModelMark m={m} size={36} />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 text-[14px] font-bold text-ink">Model<span className="font-semibold text-ink/55">· {m.label}</span><BurnChip m={m} /></span>
-        <span className="block truncate text-[12.5px] text-ink/60">{own ? `${name} answers with ${m.short} in chats without their own pick.` : `Your account default. ${name} answers with ${m.short} unless a chat picks another.`}</span>
+        <span className="block text-[12.5px] leading-snug text-ink/60">{own ? `${name} answers with ${m.short} in chats without their own pick.` : `Your account default. ${name} answers with ${m.short} unless a chat picks another.`}</span>
       </span>
       <Icon name="right" size={16} className="shrink-0 text-ink/35" />
     </button>

@@ -28,7 +28,7 @@ function Hero() {
           return (
             <article key={a.slug} aria-roledescription="slide" aria-label={`${k + 1} of ${list.length}`} className="relative flex min-h-[300px] w-full shrink-0 snap-start overflow-hidden text-white sm:min-h-[340px]" style={{ background: `radial-gradient(90% 120% at 85% 30%, color-mix(in oklab, ${col} 70%, transparent) 0%, transparent 60%), linear-gradient(120deg, #0a0a0a 0%, #1d0f5c 55%, #5b2bff 100%)` }}>
               <div className="grain pointer-events-none absolute inset-0" />
-              <div className="relative z-10 flex max-w-[560px] flex-col justify-end p-6 max-sm:pb-[60px] sm:p-9">
+              <div className="relative z-10 flex max-w-[560px] flex-col justify-end p-6 max-sm:!pb-[60px] sm:p-9">
                 <span className="label w-fit rounded-full bg-white/15 px-2.5 py-1 text-[9px] backdrop-blur">{k === 0 ? "Agent of the week" : k === 1 ? "Editors' choice" : "Staff favourite"}</span>
                 <h2 className="display mt-4 text-[56px] leading-[.9] sm:text-[80px]">{a.name}</h2>
                 <p className="mt-2 text-[17px] font-semibold text-white/90 sm:text-[19px]">{a.quip}</p>
@@ -77,7 +77,7 @@ function TopCharts() {
             <Link href={`/marketplace/${a.slug}`} className="group flex items-center gap-3.5 border-b border-line py-3">
               <span className="display tab-num w-7 shrink-0 text-center text-[26px] text-ink/35 group-hover:text-brand-ink">{k + 1}</span>
               <AgentTile id={a.slug} look={null} size={56} radius={16} />
-              <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-bold text-ink">{a.name}</span><span className="block truncate text-[12.5px] text-ink/55">{m.cat} · {m.maker}</span><span className="flex items-center gap-1.5 text-[12px] text-ink/65"><span className="flex items-center gap-0.5 font-semibold">{a.rating}<Icon name="star" size={10} className="text-brand-ink" /></span>· {compact(m.hires)}{tab === "free" && <span className="label ml-1 rounded bg-tint px-1 text-[8px] text-brand-ink">Free</span>}{tab === "rising" && <span className="ml-1 text-brand-ink">▲ {3 + ((k * 5) % 9)}</span>}</span></span>
+              <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-bold text-ink">{a.name}</span><span className="line-clamp-2 block text-[12.5px] leading-snug text-ink/55 sm:truncate">{m.cat} · {m.maker}</span><span className="flex items-center gap-1.5 text-[12px] text-ink/65"><span className="flex items-center gap-0.5 font-semibold">{a.rating}<Icon name="star" size={10} className="text-brand-ink" /></span>· {compact(m.hires)}{tab === "free" && <span className="label ml-1 rounded bg-tint px-1 text-[8px] text-brand-ink">Free</span>}{tab === "rising" && <span className="ml-1 text-brand-ink">▲ {3 + ((k * 5) % 9)}</span>}</span></span>
               <HireBtn a={a} />
             </Link>
           </li>
