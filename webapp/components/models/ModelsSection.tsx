@@ -3,11 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { KEY_PROVIDERS, LAMINA, MODEL_NAME_RE, type CatalogRow, type KeyInfo, type KeyProvider, type ModelInfo } from "@/content/models";
 import { catalogOf, enabledModels, infoFor, refreshBilling, setModel, useBilling, type BillingState } from "@/lib/billing";
-import { api, friendly } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { toast, type State } from "@/lib/store";
 import { myAgents } from "../agents";
 import { AgentTile } from "../faces";
 import Icon from "../Icon";
+
+/** The server's own message (keys, names), never the wallet wording. */
+const say = (e: unknown, fallback: string) => (e instanceof ApiError && e.status < 500 ? e.message : fallback);
 import { ModelMark, Sheet, Spinner } from "../billing/parts";
 
 type Pick = null | { kind: "default" } | { kind: "agent"; id: string; name: string };
@@ -75,7 +78,7 @@ function ModelList({ b }: { b: BillingState }) {
   const run = async (key: string, f: () => Promise<unknown>, ok?: string) => {
     setBusy(key);
     try { await f(); await refreshBilling(); if (ok) toast({ text: ok }); }
-    catch (e) { toast({ text: friendly(e, "Couldn't change that. Try again.") }); }
+    catch (e) { toast({ text: say(e, "Couldn't change that. Try again.") }); }
     finally { setBusy(null); }
   };
   const toggle = (r: CatalogRow, on: boolean) => run(r.m.id, () => api("/api/models", { method: "PATCH", body: { op: "toggle", id: r.m.id, on } }));
@@ -147,19 +150,19 @@ function KeyRow({ provider, saved, ready }: { provider: KeyProvider; saved: KeyI
       if (fresh) { const r = await api<{ note: string }>(`/api/models/keys/${provider}`, { method: "PUT", body: { key: key.trim() } }); setKey(""); setShow(false); toast({ text: `${p.name} key verified. ${r.note.replace(/^Verified in/, "Took")}` }); }
       else { const r = await api<{ result: { ok: boolean; error?: string } }>(`/api/models/keys/${provider}`, { body: { op: "verify" } }); if (!r.result.ok) setErr(r.result.error || "The key didn't pass."); else toast({ text: `${p.name} key works` }); }
       await refreshBilling();
-    } catch (e) { setErr(friendly(e, "Couldn't verify the key. Try again.")); }
+    } catch (e) { setErr(say(e, "Couldn't verify the key. Try again.")); }
     finally { setBusy(null); }
   };
   const remove = async () => {
     setBusy("remove"); setErr("");
     try { await api(`/api/models/keys/${provider}`, { method: "DELETE" }); await refreshBilling(); toast({ text: `${p.name} key removed` }); setConfirm(false); }
-    catch (e) { setErr(friendly(e, "Couldn't remove the key.")); }
+    catch (e) { setErr(say(e, "Couldn't remove the key.")); }
     finally { setBusy(null); }
   };
   const saveBase = async (url: string | null) => {
     setBusy("base"); setErr("");
     try { await api(`/api/models/keys/openai`, { method: "PATCH", body: { baseUrl: url } }); await refreshBilling(); toast({ text: url ? "OpenAI models now use your base URL" : "Back to api.openai.com" }); }
-    catch (e) { setErr(friendly(e, "Couldn't save the base URL.")); if (!url) setBaseOn(true); }
+    catch (e) { setErr(say(e, "Couldn't save the base URL.")); if (!url) setBaseOn(true); }
     finally { setBusy(null); }
   };
   const status = saved ? (saved.status === "ok" ? ["Verified", "text-[#2fbf71]"] : saved.status === "failed" ? ["Failed", "text-[#e5484d]"] : ["Not checked", "text-ink/50"]) : null;
@@ -210,7 +213,7 @@ function PickSheet({ b, title, sub, current, followDefault, onClose, onPick }: {
   const go = async (id: string | null, label: string) => {
     setBusy(id ?? "default");
     try { await onPick(id); toast({ text: id ? `Now using ${label}` : `Following the default (${label})` }); onClose(); }
-    catch (e) { toast({ text: friendly(e, "Couldn't change the model. Try again.") }); }
+    catch (e) { toast({ text: say(e, "Couldn't change the model. Try again.") }); }
     finally { setBusy(null); }
   };
   const list = enabledModels(b);

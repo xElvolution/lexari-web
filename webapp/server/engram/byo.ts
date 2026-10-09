@@ -228,7 +228,7 @@ export async function verifyKey(provider: Exclude<ByoProvider, "custom">, key: s
     const ms = Date.now() - t0;
     if (res.ok) return { ok: true, ms, note: `Verified in ${(ms / 1000).toFixed(1)}s` };
     if (baseUrl && (res.status === 404 || res.status === 405)) return { ok: true, ms, note: "Reachable. This endpoint has no model list." };
-    if (res.status === 401 || res.status === 403 || (provider === "gemini" && res.status === 400)) return { ok: false, error: `${name} rejected this key.` };
+    if (res.status === 401 || res.status === 403 || (provider === "gemini" && res.status === 400)) return { ok: false, error: `${name} says this key isn't valid. Check it and try again.` };
     if (res.status === 429) return { ok: false, error: `${name} says this key is over its rate limit. Try again in a minute.` };
     if (res.status === 402) return { ok: false, error: `Your ${name} account is out of credit.` };
     return { ok: false, error: `${name} answered with error ${res.status}. Try again.` };

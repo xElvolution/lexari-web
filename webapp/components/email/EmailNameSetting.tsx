@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { chooseHandle, loadHandle, refreshUnread, useEmail, type HandleInfo } from "@/lib/email";
-import { friendly } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { toast } from "@/lib/store";
 import Icon from "../Icon";
+
+/** The server's own message (keys, names), never the wallet wording. */
+const say = (e: unknown, fallback: string) => (e instanceof ApiError && e.status < 500 ? e.message : fallback);
 
 const slugAgent = (n: string) => n.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "agent";
 
@@ -39,7 +42,7 @@ export default function EmailNameSetting({ agent }: { agent: string }) {
     if (!confirm) { setConfirm(true); return; }
     setBusy(true);
     try { const r = await chooseHandle(name); setInfo(r); setEdit(false); setConfirm(false); toast({ text: `Your agents are now @${r.handle}` }); }
-    catch (e) { toast({ text: friendly(e, "Couldn't save that name. Try another.") }); setConfirm(false); }
+    catch (e) { toast({ text: say(e, "Couldn't save that name. Try another.") }); setConfirm(false); }
     finally { setBusy(false); }
   };
   return (
