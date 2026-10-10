@@ -1,0 +1,17 @@
+# Publisher portal config. Do not put a keypair here.
+# Docs: https://docs.solanamobile.com/dapp-publishing/intro
+publisher:
+  name: Lexari
+  website: https://lexari.ai
+  email: support@lexari.ai
+app:
+  name: Lexari
+  android_package: ai.lexari.app
+  urls:
+    website: https://lexari.ai
+    privacy: https://lexari.ai
+    support: mailto:support@lexari.ai
+release:
+  # Fill after `eas build -p android --profile preview` or production.
+  apk: ""
+  notes: "AI employees with a wallet. SKR payments, not staking."

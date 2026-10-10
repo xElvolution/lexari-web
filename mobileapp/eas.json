@@ -1,0 +1,42 @@
+{
+  "cli": { "version": ">= 16.0.0", "appVersionSource": "local" },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://app.lexari.ai",
+        "EXPO_PUBLIC_SOLANA_CLUSTER": "devnet",
+        "EXPO_PUBLIC_LEXARI_PROGRAM_ID": "BbnD28xf3kwfQRiRA6VQmw4p2R55WivUgozSoo81M6Po",
+        "EXPO_PUBLIC_SKR_MINT": "ExGnANupZkiSRMDQXiTY9JEwPZa33m8ZfA5kKDuf3n68",
+        "EXPO_PUBLIC_USDC_MINT": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://testnet.lexari.ai",
+        "EXPO_PUBLIC_SOLANA_CLUSTER": "devnet",
+        "EXPO_PUBLIC_LEXARI_PROGRAM_ID": "BbnD28xf3kwfQRiRA6VQmw4p2R55WivUgozSoo81M6Po",
+        "EXPO_PUBLIC_SKR_MINT": "ExGnANupZkiSRMDQXiTY9JEwPZa33m8ZfA5kKDuf3n68",
+        "EXPO_PUBLIC_USDC_MINT": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+      }
+    },
+    "production": {
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://app.lexari.ai",
+        "EXPO_PUBLIC_SOLANA_CLUSTER": "mainnet-beta",
+        "EXPO_PUBLIC_LEXARI_PROGRAM_ID": "BbnD28xf3kwfQRiRA6VQmw4p2R55WivUgozSoo81M6Po",
+        "EXPO_PUBLIC_SKR_MINT": "SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3",
+        "EXPO_PUBLIC_USDC_MINT": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      }
+    },
+    "production-aab": {
+      "extends": "production",
+      "android": { "buildType": "app-bundle" }
+    }
+  }
+}
