@@ -294,6 +294,17 @@ export const pushSubs = pgTable("push_subs", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Android phones registered for Expo push. Web push stays in push_subs. */
+export const pushDevices = pgTable("push_devices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expoPushToken: text("expo_push_token").notNull().unique(),
+  platform: text("platform").notNull().default("android"),
+  model: text("model").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ---------- Hub (offchain coins and levels) ---------- */
 export const hubPlayers = pgTable("hub_players", {
   userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),

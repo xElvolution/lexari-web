@@ -17,7 +17,13 @@ export async function POST(req: Request) {
     const session = await verifySignIn(body, { ua: req.headers.get("user-agent") || "", ip: clientIp(req) });
     const jar = await cookies();
     jar.set(SESSION_COOKIE, session.token, sessionCookieOptions(session.expires));
-    return Response.json({ wallet: session.wallet, referralCode: session.referralCode });
+    const mobile = new URL(req.url).searchParams.get("client") === "mobile"
+      || (req.headers.get("x-lexari-client") || "").toLowerCase() === "android";
+    return Response.json({
+      wallet: session.wallet,
+      referralCode: session.referralCode,
+      ...(mobile ? { token: session.token, expires: session.expires.toISOString() } : {}),
+    });
   } catch (error) {
     return toErrorResponse(error);
   }

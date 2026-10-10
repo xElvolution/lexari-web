@@ -1,7 +1,7 @@
 import webpush from "web-push";
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "./db";
-import { chainLedger, notifications, pushSubs, users } from "./db/schema";
+import { chainLedger, notifications, pushDevices, pushSubs, users } from "./db/schema";
 import { QUEST_RULES } from "./hub/catalog";
 import { periodNumber } from "./hub/catalog";
 import { progressFrom, questCounts } from "./hub/rules";
@@ -37,6 +37,7 @@ export async function notify(userId: string, note: Note): Promise<boolean> {
       if (n && n[pref] === false) return true;
     }
     void push(userId, { id: row[0].id, kind: note.kind, title: note.title, body: note.body || "", url: note.url || "/agents" }).catch(() => {});
+    void expoPush(userId, note).catch(() => {});
     return true;
   } catch (e) {
     console.error(`[notify] ${(e as Error)?.message || "failed"}`);
@@ -60,6 +61,37 @@ export async function push(userId: string, payload: Record<string, unknown>) {
     }
   }));
   return sent;
+}
+
+const EXPO_CHANNEL: Partial<Record<NoteKind, string>> = {
+  payment: "receipts", card: "receipts", hire: "receipts", faucet: "receipts",
+  reply: "replies", mail: "replies", quest: "quests", box: "quests", security: "approvals",
+};
+
+/** Also send to Lexari Android. Web push above is unchanged. Dead tokens are removed. */
+export async function expoPush(userId: string, note: Note) {
+  const rows = await db().select().from(pushDevices).where(eq(pushDevices.userId, userId));
+  if (!rows.length) return 0;
+  const url = note.url?.startsWith("lexari://") ? note.url : "lexari://hub";
+  const messages = rows.map((r) => ({
+    to: r.expoPushToken,
+    title: note.title.slice(0, 80),
+    body: (note.body || "").slice(0, 160),
+    data: { url },
+    channelId: EXPO_CHANNEL[note.kind] || "replies",
+  }));
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (process.env.EXPO_ACCESS_TOKEN) headers.authorization = `Bearer ${process.env.EXPO_ACCESS_TOKEN}`;
+  const res = await fetch("https://exp.host/--/api/v2/push/send", { method: "POST", headers, body: JSON.stringify(messages) });
+  if (!res.ok) return 0;
+  const json = await res.json() as { data?: { status?: string; details?: { error?: string } }[] };
+  const tickets = json.data || [];
+  await Promise.all(tickets.map(async (t, i) => {
+    if (t.status === "error" && t.details?.error === "DeviceNotRegistered") {
+      await db().delete(pushDevices).where(eq(pushDevices.expoPushToken, rows[i].expoPushToken));
+    }
+  }));
+  return tickets.filter((t) => t.status === "ok").length;
 }
 
 /** After something counts toward a quest: tell the person once per period when a quest is ready to claim. */

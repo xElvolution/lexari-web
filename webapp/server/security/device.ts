@@ -1,6 +1,8 @@
 /** Device labels for "Where you're signed in": a short name from the user agent and a coarse network hint. */
 
 export function deviceName(ua: string) {
+  const app = /^LexariAndroid\/[0-9.]+\s*\(([^)]{1,40})\)/.exec(ua || "");
+  if (app) return `Lexari Android · ${app[1].trim()}`;
   const u = ua || "";
   const browser = /Edg\//.test(u) ? "Edge" : /OPR\/|Opera/.test(u) ? "Opera" : /SamsungBrowser/.test(u) ? "Samsung Internet" : /Firefox\//.test(u) ? "Firefox"
     : /CriOS|Chrome\//.test(u) ? "Chrome" : /Safari\//.test(u) ? "Safari" : /curl|node|python|axios|Go-http/i.test(u) ? "Script" : "Browser";

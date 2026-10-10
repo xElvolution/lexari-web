@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { db } from "../db";
 import { referrals, sessions, users } from "../db/schema";
 import { HttpError } from "../http";
@@ -117,9 +117,19 @@ export async function verifySignIn(input: { wallet: string; message: string; sig
   return { token, expires, wallet: user.wallet, referralCode: user.referralCode };
 }
 
-export async function currentSession() {
+const BEARER = /^Bearer\s+([A-Za-z0-9_-]{20,200})$/;
+
+/** Cookie first. A phone with no cookie jar may send Authorization: Bearer. */
+export async function sessionToken(): Promise<string> {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  const cookie = jar.get(SESSION_COOKIE)?.value;
+  if (cookie) return cookie;
+  const header = (await headers()).get("authorization") || "";
+  return BEARER.exec(header)?.[1] || "";
+}
+
+export async function currentSession() {
+  const token = await sessionToken();
   if (!token) return null;
   const rows = await db()
     .select({ wallet: users.wallet, referralCode: users.referralCode, userId: users.id, privyDid: users.privyDid, email: users.email, createdAt: users.createdAt,
@@ -136,7 +146,7 @@ export async function currentSession() {
 
 export async function destroySession() {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  const token = await sessionToken();
   if (token) {
     await db().delete(sessions).where(eq(sessions.tokenHash, hashToken(token)));
   }
