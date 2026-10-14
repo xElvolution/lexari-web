@@ -1,21 +1,28 @@
-MIT License
+Copyright (c) 2026 Elvolution. All rights reserved.
 
-Copyright (c) 2026 Elvolution
+This repository and everything in it (source code, documentation, designs,
+images and other assets) is proprietary to Elvolution.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+What you may do:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+  - View the code on GitHub.
+  - Fork the repository on GitHub, only to prepare and submit a pull request
+    or other contribution back to this repository.
+
+What you may not do without prior written permission from Elvolution:
+
+  - Copy, clone or download the code for any use other than the above.
+  - Modify it, except inside a fork used only to send a contribution here.
+  - Redistribute, publish, sublicense or sell it, in whole or in part.
+  - Reuse any part of it in another project, product or service.
+  - Deploy or run it, or a modified version of it, for yourself or others.
+
+No other license or right is granted, whether by implication, estoppel or
+otherwise. Opening a pull request does not give you a license to the code.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED. IN NO EVENT SHALL ELVOLUTION BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY ARISING FROM OR IN CONNECTION WITH THE SOFTWARE.
+
+For permission requests, open an issue on this repository or contact
+Elvolution on GitHub (@xElvolution).
