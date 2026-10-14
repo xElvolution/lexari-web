@@ -701,3 +701,8 @@ Built on the shoulders of open-source work from Solana, Anchor, Metaplex, Orca, 
 <img src="webapp/public/icon-192.png" alt="" width="40" height="40" /><br/>
 <sub><b>Lexari</b> · Meet your own personalized AI agent. Onchain, across apps.</sub>
 </div>
+
+
+## Copyright
+
+Copyright (c) 2026 Elvolution. All rights reserved. This is proprietary software: see [LICENSE](LICENSE). Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
