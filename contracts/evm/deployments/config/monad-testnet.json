@@ -1,0 +1,7 @@
+{
+  "chainId": 10143,
+  "name": "Monad testnet",
+  "protocolFeeBps": 1000,
+  "paymentTokens": ["0x0000000000000000000000000000000000000000", "0xf817257fed379853cDe0fa4F97AB987181B1E5Ea"],
+  "transfersEnabled": false
+}
