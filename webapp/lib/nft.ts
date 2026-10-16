@@ -3,10 +3,11 @@
  * The card is a Metaplex Core asset on Solana. The registry that ties the asset
  * to a name, role and face lives in contracts/solana.
  */
+import { SOLANA_CLUSTER_FOR_MODE } from "@/lib/network";
 import type { Variant } from "@shared/components/avatar";
 import { BACKGROUNDS } from "@shared/lib/backgrounds";
 
-export const SOLANA_CLUSTER = (process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "mainnet-beta" ? "mainnet-beta" : "devnet") as "devnet" | "mainnet-beta";
+export const SOLANA_CLUSTER: "devnet" | "mainnet-beta" = SOLANA_CLUSTER_FOR_MODE;
 export const SOLANA_RPC = process.env.NEXT_PUBLIC_SOLANA_RPC
   || (SOLANA_CLUSTER === "mainnet-beta" ? "https://api.mainnet-beta.solana.com" : "https://api.devnet.solana.com");
 export const CHAIN_NAME = SOLANA_CLUSTER === "mainnet-beta" ? "Solana" : "Solana Devnet";

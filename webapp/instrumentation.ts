@@ -2,6 +2,11 @@
  * poller (meetings, background jobs, schedules) every 15 s. */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs" || process.env.NODE_ENV !== "production") return;
+  // Network lock: a server never runs jobs against a database stamped for the other network (server/network.ts).
+  const { checkDatabaseNetwork, networkConfigProblems } = await import("./server/network");
+  const problems = networkConfigProblems();
+  if (problems.length) console.error(`[network] config: ${problems.join("; ")}`);
+  if ((await checkDatabaseNetwork()) || problems.length) return;
   const run = () => import("./server/notify").then((m) => m.boxReminders()).catch((e) => console.error(`[notify] box reminders ${(e as Error)?.message}`));
   setTimeout(run, 60_000);
   setInterval(run, 60 * 60_000).unref?.();

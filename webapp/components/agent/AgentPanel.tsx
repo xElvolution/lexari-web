@@ -1,5 +1,6 @@
 "use client";
 
+import { ORE_PRACTICE_ENABLED } from "@/lib/network";
 import VoicePicker, { type AgentVoice } from "./VoicePicker";
 import { voiceOf } from "@/lib/voices";
 
@@ -152,7 +153,7 @@ function Panel({ s, id }: { s: State; id: string }) {
                 </section>
                 <AgentModelRow agent={id} name={info.name} />
                 <AgentEmailRow agent={id} name={info.name} />
-                {id === "ore" && <MinerRow />}
+                {id === "ore" && ORE_PRACTICE_ENABLED && <MinerRow />}
                 {k !== "hired" && <UnifiedBalance agent={id} name={info.name} />}
                 <BudgetRow agent={id} name={info.name} />
                 {/* Tempo cards are a paid feature of agents you made; hired agents are funded agent to agent. */}

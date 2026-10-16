@@ -1,11 +1,9 @@
 import nacl from "tweetnacl";
+import { SOLANA_CLUSTER_FOR_MODE } from "@/lib/network";
 import { PublicKey } from "@solana/web3.js";
 
 export function clusterChain() {
-  const cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "devnet";
-  if (cluster === "mainnet-beta" || cluster === "mainnet") return "solana:mainnet";
-  if (cluster === "testnet") return "solana:testnet";
-  return "solana:devnet";
+  return SOLANA_CLUSTER_FOR_MODE === "mainnet-beta" ? "solana:mainnet" : "solana:devnet";
 }
 
 export function buildSignInMessage(opts: {

@@ -8,6 +8,8 @@
  * moves), "needskey" is built but waits for an API key on the server, "soon" is listed but can't be added.
  * `builtin` ones aren't in the catalog: every agent has them (payments) or one agent does (the ORE Miner's servers).
  */
+import { IS_MAINNET, IS_TESTNET, SPEND_LIMITS } from "@/lib/network";
+
 export type IntegrationId = "solana" | "orca" | "jupiter" | "bridge" | "polymarket" | "panta" | "base" | "ethereum" | "tempo" | "prices" | "payments" | "ore" | "solami" | "hyperliquid" | "self" | "monad" | "nansen" | "kuru" | "intents" | "mera" | "agora" | "alchemy" | "skr" | "arbitrum" | "robinhood" | "zcash" | "uniswap";
 export type IntegrationCategory = "chains" | "trading" | "prediction" | "data";
 export type IntegrationStatus = "devnet" | "live" | "testnet" | "market" | "needskey" | "soon";
@@ -42,15 +44,15 @@ export const CATEGORIES: { id: IntegrationCategory; label: string }[] = [
 ];
 
 export const STATUS_LABEL: Record<IntegrationStatus, string> = {
-  devnet: "Live on devnet",
-  live: "Live on testnet",
+  devnet: IS_MAINNET ? "Live" : "Live on devnet",
+  live: IS_MAINNET ? "Live" : "Live on testnet",
   testnet: "Testnet wallet",
   needskey: "Setup needed",
   market: "Market data",
   soon: "Coming soon",
 };
 
-export const INTEGRATIONS: IntegrationInfo[] = [
+const ALL_INTEGRATIONS: IntegrationInfo[] = [
   {
     id: "solana", name: "Solana", category: "chains", status: "devnet", addable: true, moves: true, chains: ["Solana"],
     blurb: "Agent wallets, balances and transfers on Solana.",
@@ -242,14 +244,66 @@ export const INTEGRATIONS: IntegrationInfo[] = [
   },
 ];
 
+/**
+ * Integrations with a real, wired mainnet path (lib/network.ts). Everything else is hidden on a mainnet build: not in
+ * the catalog, not grantable, and its tools are not offered to agents.
+ *  - Chains: Solana mainnet-beta; Base 8453, Ethereum 1, Arbitrum One 42161 and Monad 143 with Circle USDC.
+ *  - Read-only market data: Jupiter, LI.FI cross-chain quotes, Polymarket, Zcash, market prices, Nansen, Alchemy.
+ *  - Aurora Intents (already mainnet), agent payments, SKR, Solami (mainnet only), Mera, and an agent's own settings.
+ * Hidden on mainnet: Orca (devnet pools), Uniswap (Sepolia contracts), Robinhood Chain (no public mainnet), Tempo and
+ * Hyperliquid (mainnets exist, Lexari's code is only verified on testnet), Agora AUSD and Kuru (testnet contracts),
+ * Panta (paper trading on devnet) and ORE practice mining.
+ */
+export const MAINNET_INTEGRATIONS: ReadonlySet<IntegrationId> = new Set<IntegrationId>([
+  "solana", "jupiter", "bridge", "polymarket", "base", "ethereum", "arbitrum", "monad", "zcash", "prices", "nansen",
+  "alchemy", "intents", "payments", "skr", "solami", "mera", "self",
+]);
+/** True when this integration exists in this build's network mode. */
+export const availableOnNetwork = (id: IntegrationId) => IS_TESTNET || MAINNET_INTEGRATIONS.has(id);
+
+/** Mainnet wording for integrations whose testnet copy talks about test funds. */
+const MAINNET_COPY: Partial<Record<IntegrationId, Partial<IntegrationInfo>>> = {
+  solana: {
+    status: "live", blurb: "Agent wallets, balances and transfers on Solana.", tags: "sol wallet transfer send usdc mainnet",
+    about: "Your agents use their own Solana wallets: check what they hold and send USDC or SOL to an address you approve. Every transfer waits for your Confirm in chat, inside your per trade and daily limits. Real funds.",
+    can: [{ text: "Read its wallet address and balances", live: true }, { text: "Send USDC or SOL, after you confirm", live: true }],
+  },
+  base: {
+    chains: ["Base"], blurb: "Agent wallet and sends on Base.", tags: "evm base base usdc send transfer",
+    about: "Each agent has its own address on Base. Agents read their balances and send ETH or USDC to an address you approve. Every send waits for your Confirm, inside your per trade and daily limits. Real funds.",
+    can: [{ text: "Its Base address and balances", live: true }, { text: "Send ETH or USDC, after you confirm", live: true }],
+  },
+  ethereum: {
+    chains: ["Ethereum"], blurb: "Agent wallet and sends on Ethereum.", tags: "evm ethereum ethereum usdc send transfer",
+    about: "Each agent has its own address on Ethereum. Agents read their balances and send ETH or USDC to an address you approve. Every send waits for your Confirm, inside your per trade and daily limits. Real funds.",
+    can: [{ text: "Its Ethereum address and balances", live: true }, { text: "Send ETH or USDC, after you confirm", live: true }],
+  },
+  arbitrum: {
+    chains: ["Arbitrum One"], blurb: "Agent wallet and sends on Arbitrum One.", tags: "evm arbitrum arbitrum usdc send transfer",
+    about: "Each agent has its own address on Arbitrum One. Agents read their balances and send ETH or USDC to an address you approve. Every send waits for your Confirm, inside your per trade and daily limits. Real funds.",
+    can: [{ text: "Its Arbitrum One address and balances", live: true }, { text: "Send ETH or USDC, after you confirm", live: true }],
+  },
+  monad: {
+    chains: ["Monad"], blurb: "Agent wallet and sends on Monad.", tags: "evm monad monad usdc send transfer",
+    about: "Each agent has its own address on Monad. Agents read their balances and send MON or USDC to an address you approve. Every send waits for your Confirm, inside your per trade and daily limits. Real funds.",
+    can: [{ text: "Its Monad address and balances", live: true }, { text: "Send MON or USDC, after you confirm", live: true }],
+  },
+  alchemy: { chains: ["Monad"] },
+  payments: {
+    status: "live",
+    about: "Agents pay per request for x402 services and hire other agents per task, in USDC from their own wallet. Every payment waits for your Confirm, and the card flags anything over the agent's budget.",
+    can: [{ text: "Pay x402 services in USDC", live: true }, { text: "Hire another agent per task", live: true }],
+  },
+};
+
+/** The catalog for this build's network mode. */
+export const INTEGRATIONS: IntegrationInfo[] = ALL_INTEGRATIONS.filter((i) => availableOnNetwork(i.id)).map((i) => (IS_MAINNET ? { ...i, ...MAINNET_COPY[i.id] } : i));
+
 export const integrationById = (id: string) => INTEGRATIONS.find((i) => i.id === id);
 
 /** Limits for integrations that move money, in whole dollars and basis points. Enforced on the server. */
-export const LIMITS = {
-  perTx: { min: 1, max: 25, def: 5 },
-  daily: { min: 1, max: 100, def: 20 },
-  slippageBps: { min: 10, max: 500, def: 100 },
-} as const;
+/** Per-trade, daily and slippage limits for grants and Confirm cards. Lower on mainnet (lib/network.ts). */
+export const LIMITS = SPEND_LIMITS;
 
 export type ActionStatus = "done" | "prepared" | "rejected" | "cancelled" | "expired" | "submitting" | "submitted" | "confirmed" | "failed";
 

@@ -1,4 +1,5 @@
 /** Server settings, all from env. See webapp/.env.example. */
+import { databaseNetworkProblem, networkConfigProblems } from "./network";
 /** Solana cluster and RPC endpoint: see server/rpc.ts (Helius or a custom endpoint when configured). */
 export { cluster, rpcUrl } from "./rpc";
 
@@ -18,7 +19,7 @@ export function appOrigin(): { domain: string; uri: string } | null {
 export const treasury = () => process.env.LEXARI_TREASURY || process.env.NEXT_PUBLIC_LEXARI_TREASURY || "";
 export const usdcMint = () => process.env.NEXT_PUBLIC_USDC_MINT || "";
 export const HIRE_LAMPORTS = Number(process.env.NEXT_PUBLIC_HIRE_LAMPORTS || 10_000_000);
-/** Devnet price of one agent card, paid in SOL to the treasury. */
+/** Price of one agent card (devnet SOL on testnet), paid in SOL to the treasury. */
 export const CARD_LAMPORTS = Number(process.env.NEXT_PUBLIC_CARD_LAMPORTS || 20_000_000);
 export const HIRE_USDC = Number(process.env.NEXT_PUBLIC_HIRE_USDC || 1_000_000);
 
@@ -28,5 +29,8 @@ export function missingConfig(): string[] {
   if (!process.env.DATABASE_URL) out.push("DATABASE_URL");
   if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) out.push("SESSION_SECRET");
   if (process.env.NODE_ENV === "production" && !appOrigin()) out.push("NEXT_PUBLIC_WEBAPP_URL");
+  out.push(...networkConfigProblems());
+  const dbNet = databaseNetworkProblem();
+  if (dbNet) out.push(dbNet);
   return out;
 }

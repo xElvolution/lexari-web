@@ -1,10 +1,11 @@
 /**
- * Agent wallets and sends on EVM testnets: Base Sepolia, Ethereum Sepolia, Arbitrum Sepolia, Robinhood Chain testnet
- * and Monad testnet. One address per agent works on all of them (evm.ts). Reads are free; a send is a sign tool: it
+ * Agent wallets and sends on the EVM chains of this build's network mode (lib/network.ts). Testnet: Base Sepolia,
+ * Ethereum Sepolia, Arbitrum Sepolia, Robinhood Chain testnet and Monad testnet. Mainnet: Base, Ethereum, Arbitrum
+ * One and Monad. One address per agent works on all of them (evm.ts). Reads are free; a send is a sign tool: it
  * only prepares a Confirm card, and Lexari signs it from the agent's key after the person confirms.
  *
  * To fund one of these wallets from the person's USD balance on a mainnet, the agent uses intents.route (Aurora
- * Intents). These tools stay on testnets: there is no mainnet path here.
+ * Intents).
  */
 import { z } from "zod";
 import { createPublicClient, createWalletClient, defineChain, encodeFunctionData, erc20Abi, formatUnits, http, parseUnits, type Hex } from "viem";
@@ -17,7 +18,8 @@ import type { AgentRef, Executed, GrantLimits, Prepared, ToolDef } from "./regis
 const isAddr = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s);
 export function viemChain(c: EvmChain) {
   const e = EVM[c];
-  return defineChain({ id: e.chainId, name: e.network, nativeCurrency: { name: e.native, symbol: e.native, decimals: 18 }, rpcUrls: { default: { http: [e.rpc()] } }, testnet: true });
+  if (!e.available) throw new Reject(`${e.name} is not available on this Lexari network.`);
+  return defineChain({ id: e.chainId, name: e.network, nativeCurrency: { name: e.native, symbol: e.native, decimals: 18 }, rpcUrls: { default: { http: [e.rpc()] } }, testnet: e.testnet });
 }
 export const publicClient = (c: EvmChain) => createPublicClient({ chain: viemChain(c), transport: http(EVM[c].rpc(), { timeout: 15_000, retryCount: 2 }) });
 export function walletClient(c: EvmChain, agent: AgentRef) {

@@ -3,6 +3,7 @@
  * Per-person cap (lifetime), per-wallet cap, a cooldown and a daily total keep it from being drained.
  * Mainnet never pays out.
  */
+import { FAUCETS_ENABLED } from "@/lib/network";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { and, eq, gt, sql } from "drizzle-orm";
 import { b58decode } from "./hub/keys";
@@ -36,7 +37,8 @@ function b58encode(bytes: Uint8Array) {
 }
 /** The faucet wallet's public address (so a top-up shows as "Lexari faucet" in your wallet history). */
 export const faucetAddress = () => faucetKey()?.publicKey.toBase58() || "";
-export const faucetOn = () => cluster() === "devnet" && !!faucetKey();
+/** Never on a mainnet build (lib/network.ts), whatever keys are set. */
+export const faucetOn = () => FAUCETS_ENABLED && cluster() === "devnet" && !!faucetKey();
 
 export async function granted(userId: string, wallet: string) {
   const database = db();
@@ -47,7 +49,7 @@ export async function granted(userId: string, wallet: string) {
 
 /** Sends up to `want` lamports (default FAUCET_STEP) to the person's wallet. Returns the signature and amount. */
 export async function drip(userId: string, wallet: string, want?: number) {
-  if (cluster() !== "devnet") throw new HttpError(400, "The faucet only runs on devnet.");
+  if (!FAUCETS_ENABLED || cluster() !== "devnet") throw new HttpError(400, "The faucet only runs on devnet.");
   const key = faucetKey();
   if (!key) throw new HttpError(503, "The devnet faucet is not set up on this server.");
   const database = db();

@@ -5,6 +5,7 @@
  * This module loads it once from /api/me, keeps it in memory for the UI, and sends every change
  * to the API. Memories are encrypted in the browser (lib/vault.ts) before they leave it.
  */
+import { SOLANA_EXPLORER_QS } from "@/lib/network";
 import { applyServerHide } from "./privacy";
 import { cheer, isWarm, isWarmReaction, setMood } from "./mood";
 import type { FaceLook } from "@shared/components/avatar";
@@ -891,7 +892,7 @@ export type TxInput = { id: string; kind: Exclude<TxKind, "incoming" | "return" 
 /** Writes a Confirm card's outcome into the chat as a receipt (the server checks it on chain). */
 export async function logTx(convo: string, ev: TxInput): Promise<TxReceipt | null> {
   const mid = `tx-${ev.id}`;
-  upsertReceipt(convo, mid, { ...ev, at: Date.now(), ...(ev.sig ? { url: `https://explorer.solana.com/tx/${ev.sig}?cluster=devnet` } : {}) } as TxReceipt);
+  upsertReceipt(convo, mid, { ...ev, at: Date.now(), ...(ev.sig ? { url: `https://explorer.solana.com/tx/${ev.sig}${SOLANA_EXPLORER_QS}` } : {}) } as TxReceipt);
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const r = await api<{ tx: TxReceipt }>("/api/tx", { body: { convo, ...ev, ...(ev.error ? { error: ev.error.slice(0, 200) } : {}) } });

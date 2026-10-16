@@ -1,5 +1,6 @@
 "use client";
 
+import { ORE_PRACTICE_ENABLED } from "@/lib/network";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -85,7 +86,7 @@ export default function Onboarding() {
       <div className="pointer-events-none absolute left-1/2 top-1/3 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[var(--glow)] blur-[130px]" />
       <div className="relative w-full max-w-[760px]">
         {finale === "setup"
-          ? <SetupSequence name={agentName} v={v} bg={bg} onDone={() => setFinale(s.hired.includes("ore") ? "done" : "gift")} tone="page" />
+          ? <SetupSequence name={agentName} v={v} bg={bg} onDone={() => setFinale(!ORE_PRACTICE_ENABLED || s.hired.includes("ore") ? "done" : "gift")} tone="page" />
           : finale === "gift"
           ? <OreGift agentName={agentName} onDone={() => setFinale("done")} />
           : <div className="rounded-[30px] bg-card p-5 ring-1 ring-line sm:p-7"><MintFinish s={s} id="home" v={v} title={`Meet ${agentName}.`}

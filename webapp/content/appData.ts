@@ -4,6 +4,7 @@
  * product can be shown moving. Nothing talks to a server yet.
  * House rules: plain words, no em dashes, no prices or payment talk.
  */
+import { ORE_PRACTICE_ENABLED } from "@/lib/network";
 import type { Brows, ColorKey, Extra, Eyes, Mouth, Orbit, Shape, Variant } from "@shared/components/avatar";
 
 export const DEMO_LABEL = "Demo data";
@@ -91,7 +92,7 @@ const ROSTER_COLORS: ColorKey[] = ["orange", "blue", "green", "yellow", "red", "
 const EXTRA_COLORS: ColorKey[] = ["purple", "lilac", "red", "green"];
 const face = (i: number) => ({ seed: i * 11 + 5, color: i < 8 ? ROSTER_COLORS[i] : EXTRA_COLORS[(i - 8) % 4] });
 
-export const SPECIALISTS: Specialist[] = [
+const ALL_SPECIALISTS: Specialist[] = [
   { slug: "scout", name: "Scout", job: "Web research", cat: "Research", quip: "I read so you do not have to.", back: "Reads dozens of pages and returns the three facts that matter, with links.", rating: 4.9, jobs: 1840, reviews: 312, ...face(0), speed: "Usually done in 10 min",
     skills: [["Deep web reading", 96], ["Source checking", 92], ["Short summaries", 88], ["Comparison tables", 81]], tools: ["Browser", "Terminal", "Notes"],
     examples: ["Compare three budgeting apps on one page", "Find every grant open to student builders", "Check what people say about a product launch"],
@@ -158,6 +159,8 @@ export const SPECIALISTS: Specialist[] = [
     words: ["ore", "mine", "mining", "miner", "hashrate", "rig"],
     review: [] },
 ];
+/** Agents for hire in this network mode: the ORE Miner only runs practice mining today, so it is testnet only. */
+export const SPECIALISTS: Specialist[] = ALL_SPECIALISTS.filter((a) => ORE_PRACTICE_ENABLED || a.slug !== "ore");
 /* ---------- agents you create (demo: saved in this browser only) ---------- */
 export type CustomAgent = {
   id: string; name: string; role: string; about: string; template: string | null;

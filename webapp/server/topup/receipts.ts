@@ -1,4 +1,5 @@
 /** A crypto top-up written into the chat you topped up from, as a receipt row the agent can follow up on. */
+import { SOLANA_EXPLORER_QS } from "@/lib/network";
 import { and, eq } from "drizzle-orm";
 import { CHAINS, coinById, railById } from "@/content/topup";
 import { db } from "../db";
@@ -6,7 +7,7 @@ import { topupCredits } from "../db/topupSchema";
 import { recordTx, type TxEvent } from "../txlog";
 
 const EXPLORER: Partial<Record<string, (h: string) => string>> = {
-  solana: (h) => `https://explorer.solana.com/tx/${h}?cluster=devnet`,
+  solana: (h) => `https://explorer.solana.com/tx/${h}${SOLANA_EXPLORER_QS}`,
   xrpl: (h) => `https://testnet.xrpl.org/transactions/${h}`,
 };
 

@@ -1,5 +1,5 @@
 /**
- * Monad testnet (chain 10143) plus the Monad sponsor data and trading venues:
+ * Monad (testnet 10143 or mainnet 143, from lib/network.ts) plus the Monad sponsor data and trading venues:
  *  - monad.wallet: the agent's EVM address on Monad testnet and its MON balance (public RPC, no key).
  *  - nansen.wallet: Nansen wallet profile (balances and labels) for any address. Needs NANSEN_API_KEY.
  *  - kuru.quote / kuru.swap: Kuru routes and swaps on Monad testnet through @kuru-labs/kuru-sdk. The swap is a sign
@@ -11,12 +11,14 @@
 import { z } from "zod";
 import { evmAddress, evmKey } from "./evm";
 import { Reject } from "./reject";
+import { EVM_NETS, IS_TESTNET, evmRpcFor } from "@/lib/network";
 import type { AgentRef, Executed, GrantLimits, Prepared, ToolDef } from "./registry";
 
+/** Monad for this build's network mode (lib/network.ts): testnet 10143 or mainnet 143. */
 export const MONAD = {
-  name: "Monad", network: "Monad testnet", chainId: 10143,
-  rpc: () => process.env.MONAD_RPC || (process.env.ALCHEMY_API_KEY ? `https://monad-testnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : "https://testnet-rpc.monad.xyz"),
-  explorerAddr: (a: string) => `https://testnet.monadexplorer.com/address/${a}`,
+  name: "Monad", network: EVM_NETS.monad.network, chainId: EVM_NETS.monad.chainId,
+  rpc: () => evmRpcFor("monad"),
+  explorerAddr: (a: string) => `${EVM_NETS.monad.explorer}/address/${a}`,
 };
 const isAddr = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s);
 
@@ -31,7 +33,7 @@ async function monadRpc<T>(method: string, params: unknown[]): Promise<T> {
       return j.result as T;
     } catch (e) { last = (e as Error).message; await new Promise((s) => setTimeout(s, 400 * 2 ** i)); }
   }
-  throw new Reject(`Monad testnet didn't answer (${last}). Try again in a moment.`);
+  throw new Reject(`${MONAD.network} didn't answer (${last}). Try again in a moment.`);
 }
 export async function monBalance(address: string) {
   const wei = await monadRpc<string>("eth_getBalance", [address, "latest"]);
@@ -40,11 +42,11 @@ export async function monBalance(address: string) {
 
 const monadWallet: ToolDef = {
   name: "monad.wallet", connector: "monad", risk: "read", input: z.object({}).passthrough(),
-  hint: "monad.wallet {} : your Monad testnet address (your EVM address) and its MON balance.",
+  hint: `monad.wallet {} : your ${EVM_NETS.monad.network} address (your EVM address) and its MON balance.`,
   run: async (_i: never, agent: AgentRef) => {
     const a = evmAddress(agent.userId, agent.slug);
     const mon = await monBalance(a);
-    return { summary: "Checked its Monad wallet", text: `Your Monad testnet address: ${a}. It holds ${+mon.toFixed(6)} MON (test MON, no real value). Explorer: ${MONAD.explorerAddr(a)}` };
+    return { summary: "Checked its Monad wallet", text: `Your ${MONAD.network} address: ${a}. It holds ${+mon.toFixed(6)} MON${IS_TESTNET ? " (test MON, no real value)" : ""}. Explorer: ${MONAD.explorerAddr(a)}` };
   },
 };
 

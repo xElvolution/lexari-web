@@ -1,26 +1,30 @@
 /**
  * Reading deposits on each chain family in content/topup.ts: the CONFIRMED amount an address holds (what we credit
  * from) and the latest amount including unconfirmed (shown as "on its way"). Amounts are base units as bigint.
- * Endpoints are public testnet RPCs / indexers, overridable by env (TOPUP_RPC_<CHAIN>, e.g. TOPUP_RPC_ETHEREUM).
+ * Endpoints follow the network mode (lib/network.ts), overridable by env (TOPUP_RPC_<CHAIN>, e.g. TOPUP_RPC_ETHEREUM).
  */
 import type { ChainId, Rail } from "@/content/topup";
 import { CHAINS } from "@/content/topup";
 import { tronHex } from "./derive";
 import { rpcUrl } from "../rpc";
+import { IS_MAINNET, evmRpcFor } from "@/lib/network";
 
-const RPC: Partial<Record<ChainId, string>> = {
-  ethereum: "https://ethereum-sepolia-rpc.publicnode.com",
-  base: "https://sepolia.base.org",
-  arbitrum: "https://sepolia-rollup.arbitrum.io/rpc",
-  bnb: "https://bsc-testnet-rpc.publicnode.com",
-  tempo: "https://rpc.moderato.tempo.xyz",
-  monad: "https://testnet-rpc.monad.xyz",
-  hyperevm: "https://rpc.hyperliquid-testnet.xyz/evm",
-  bitcoin: "https://mempool.space/testnet4/api",
-  litecoin: "https://litecoinspace.org/testnet/api",
-  tron: "https://nile.trongrid.io",
-  xrpl: "https://testnet.xrpl-labs.com/",
-};
+/** Public endpoints per mode; mainnet BTC/LTC/Tron/XRPL rails are not live (content/topup.ts), so they have none. */
+const RPC: Partial<Record<ChainId, string>> = IS_MAINNET
+  ? { ethereum: evmRpcFor("ethereum"), base: evmRpcFor("base"), arbitrum: evmRpcFor("arbitrum"), bnb: evmRpcFor("bnb"), monad: evmRpcFor("monad") }
+  : {
+    ethereum: "https://ethereum-sepolia-rpc.publicnode.com",
+    base: "https://sepolia.base.org",
+    arbitrum: "https://sepolia-rollup.arbitrum.io/rpc",
+    bnb: "https://bsc-testnet-rpc.publicnode.com",
+    tempo: "https://rpc.moderato.tempo.xyz",
+    monad: "https://testnet-rpc.monad.xyz",
+    hyperevm: "https://rpc.hyperliquid-testnet.xyz/evm",
+    bitcoin: "https://mempool.space/testnet4/api",
+    litecoin: "https://litecoinspace.org/testnet/api",
+    tron: "https://nile.trongrid.io",
+    xrpl: "https://testnet.xrpl-labs.com/",
+  };
 export const rpcFor = (c: ChainId) => process.env[`TOPUP_RPC_${c.toUpperCase()}`]
   || (c === "solana" ? rpcUrl() : "")
   || (c === "solmain" ? process.env.SOLANA_MAINNET_RPC || "https://api.mainnet-beta.solana.com" : "")
@@ -128,6 +132,7 @@ export async function xrplPayments(account: string, tag: number) {
 }
 /** The testnet faucet opens (funds) the Lexari account the first time. MAINNET: fund it once by hand. */
 export async function xrplEnsureAccount(account: string) {
+  if (IS_MAINNET) return;
   const info = await xrplCall<{ error?: string }>("account_info", { account, ledger_index: "validated" });
   if (info.error !== "actNotFound") return;
   await fetch("https://faucet.altnet.rippletest.net/accounts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ destination: account }), signal: AbortSignal.timeout(15000) }).catch(() => null);

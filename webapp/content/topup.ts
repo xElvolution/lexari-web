@@ -27,6 +27,8 @@
  * chains and contracts in this table), so the sheet says which network in bold above the address.
  */
 
+import { IS_MAINNET, SOLANA_TOKENS } from "@/lib/network";
+
 export type ChainId =
   | "solana" | "solmain" | "ethereum" | "base" | "arbitrum" | "bnb" | "tempo" | "monad" | "hyperevm" | "bitcoin" | "litecoin" | "tron" | "xrpl" | "dogecoin";
 export type Family = "solana" | "evm" | "btc" | "tron" | "xrpl";
@@ -49,7 +51,7 @@ export type ChainInfo = {
   why?: string;
 };
 
-export const CHAINS: Record<ChainId, ChainInfo> = {
+const TESTNET_CHAINS: Record<ChainId, ChainInfo> = {
   solana: { id: "solana", name: "Solana", network: "Solana", family: "solana", confirmations: 1, eta: "a few seconds", live: true, explorerAddress: (a) => `https://explorer.solana.com/address/${a}?cluster=devnet` },
   // Real USDC on Solana mainnet: where Aurora Intents delivers every other coin you top up with (never picked directly).
   solmain: { id: "solmain", name: "Solana", network: "Solana", family: "solana", confirmations: 1, eta: "about a minute", live: true, explorerAddress: (a) => `https://solscan.io/account/${a}` },
@@ -144,7 +146,7 @@ const SOL_DEVNET_TEST = {
 export const SOLANA_DEVNET_USDC = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 
 /** Every coin per chain, in the order the chain picker shows them. */
-export const RAILS: Rail[] = [
+const TESTNET_RAILS: Rail[] = [
   // Solana (wallet payments)
   { coin: "SOL", chain: "solana", decimals: 9, min: 0.005, test: false, live: true },
   { coin: "USDC", chain: "solana", token: SOLANA_DEVNET_USDC, decimals: 6, min: 1, test: false, live: true },
@@ -182,6 +184,57 @@ export const RAILS: Rail[] = [
   { coin: "DOGE", chain: "dogecoin", decimals: 8, min: 10, test: false, live: false, why: "Dogecoin has no public testnet indexer, so it opens with mainnet." },
 ];
 
+/**
+ * MAINNET build (lib/network.ts): real tokens only, no test stand-ins. Addresses from Circle (USDC), Tether (USDT),
+ * the token issuers' own docs for Solana mints, and docs.monad.xyz. Chains whose deposit addresses are derived in a
+ * testnet format today (Bitcoin, Litecoin, Tron, XRP Ledger, Dogecoin) and chains whose Lexari integration is only
+ * verified on testnet (Tempo, HyperEVM) are not live on mainnet: see docs/MAINNET.md, open decisions.
+ */
+const notOnMainnet = "Not open on Lexari mainnet yet.";
+const MAINNET_CHAINS: Record<ChainId, ChainInfo> = {
+  solana: { ...TESTNET_CHAINS.solana, explorerAddress: (a) => `https://solscan.io/account/${a}` },
+  solmain: TESTNET_CHAINS.solmain,
+  monad: { id: "monad", name: "Monad", network: "Monad mainnet", family: "evm", chainId: 143, confirmations: 2, eta: "a few seconds", live: true, explorerAddress: (a) => `https://monadscan.com/address/${a}` },
+  ethereum: { id: "ethereum", name: "Ethereum", network: "Ethereum mainnet", family: "evm", chainId: 1, confirmations: 12, eta: "about 3 minutes", live: true, explorerAddress: (a) => `https://etherscan.io/address/${a}` },
+  base: { id: "base", name: "Base", network: "Base mainnet", family: "evm", chainId: 8453, confirmations: 10, eta: "about 30 seconds", live: true, explorerAddress: (a) => `https://basescan.org/address/${a}` },
+  arbitrum: { id: "arbitrum", name: "Arbitrum", network: "Arbitrum One", family: "evm", chainId: 42161, confirmations: 20, eta: "about 30 seconds", live: true, explorerAddress: (a) => `https://arbiscan.io/address/${a}` },
+  bnb: { id: "bnb", name: "BNB Chain", network: "BNB Smart Chain", family: "evm", chainId: 56, confirmations: 15, eta: "about 1 minute", live: true, explorerAddress: (a) => `https://bscscan.com/address/${a}` },
+  tempo: { ...TESTNET_CHAINS.tempo, network: "Tempo mainnet", chainId: 4217, live: false, why: notOnMainnet },
+  hyperevm: { ...TESTNET_CHAINS.hyperevm, network: "HyperEVM", chainId: 999, live: false, why: notOnMainnet },
+  bitcoin: { ...TESTNET_CHAINS.bitcoin, network: "Bitcoin", confirmations: 2, live: false, why: notOnMainnet },
+  litecoin: { ...TESTNET_CHAINS.litecoin, network: "Litecoin", confirmations: 6, live: false, why: notOnMainnet },
+  tron: { ...TESTNET_CHAINS.tron, network: "Tron", live: false, why: notOnMainnet },
+  xrpl: { ...TESTNET_CHAINS.xrpl, network: "XRP Ledger", live: false, why: notOnMainnet },
+  dogecoin: { ...TESTNET_CHAINS.dogecoin, live: false, why: notOnMainnet },
+};
+
+const MAINNET_RAILS: Rail[] = [
+  { coin: "SOL", chain: "solana", decimals: 9, min: 0.005, test: false, live: true },
+  { coin: "USDC", chain: "solana", token: SOLANA_TOKENS.USDC, decimals: 6, min: 1, test: false, live: true },
+  { coin: "USDT", chain: "solana", token: SOLANA_TOKENS.USDT, decimals: 6, min: 1, test: false, live: true },
+  { coin: "SKR", chain: "solmain", token: SKR_MINT, decimals: 6, min: 1, test: false, live: true },
+  { coin: "ORE", chain: "solana", token: "oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp", decimals: 11, min: 0.005, test: false, live: true },
+  { coin: "BONK", chain: "solana", token: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", decimals: 5, min: 20_000, test: false, live: true },
+  { coin: "JUP", chain: "solana", token: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", decimals: 6, min: 1, test: false, live: true },
+  { coin: "USDC", chain: "solmain", token: SOLANA_TOKENS.USDC, decimals: 6, min: 1, test: false, live: true, hidden: true },
+  { coin: "USDC", chain: "ethereum", token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals: 6, min: 1, test: false, live: true },
+  { coin: "USDC", chain: "base", token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals: 6, min: 1, test: false, live: true },
+  { coin: "USDC", chain: "arbitrum", token: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", decimals: 6, min: 1, test: false, live: true },
+  { coin: "USDC", chain: "monad", token: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603", decimals: 6, min: 1, test: false, live: true },
+  { coin: "USDC", chain: "bnb", token: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", decimals: 18, min: 1, test: false, live: true },
+  { coin: "USDT", chain: "ethereum", token: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6, min: 1, test: false, live: true },
+  { coin: "USDT", chain: "bnb", token: "0x55d398326f99059fF775485246999027B3197955", decimals: 18, min: 1, test: false, live: true },
+  { coin: "MON", chain: "monad", decimals: 18, min: 0.01, test: false, live: true },
+  { coin: "ETH", chain: "ethereum", decimals: 18, min: 0.0005, test: false, live: true },
+  { coin: "ETH", chain: "base", decimals: 18, min: 0.0005, test: false, live: true },
+  { coin: "ETH", chain: "arbitrum", decimals: 18, min: 0.0005, test: false, live: true },
+  { coin: "BNB", chain: "bnb", decimals: 18, min: 0.002, test: false, live: true },
+];
+
+/** The chains and rails of this build's network mode. */
+export const CHAINS: Record<ChainId, ChainInfo> = IS_MAINNET ? MAINNET_CHAINS : TESTNET_CHAINS;
+export const RAILS: Rail[] = IS_MAINNET ? MAINNET_RAILS : TESTNET_RAILS;
+
 export const railId = (r: Pick<Rail, "coin" | "chain">) => `${r.coin}:${r.chain}`;
 export const railById = (id: string) => RAILS.find((r) => railId(r) === id);
 export const coinById = (id: string) => COINS.find((c) => c.id === id);
@@ -197,5 +250,8 @@ export const railLabel = (r: Rail) => `${r.test ? "test " : ""}${coinById(r.coin
 /** Display decimals for an amount of this coin. */
 export const coinDigits = (r: Pick<Rail, "decimals" | "coin">) => (coinById(r.coin)?.stable ? 2 : Math.min(r.decimals, 8));
 
-/** Testnet deposits credit real AI usage, so they're capped per person per day. MAINNET: remove. */
-export const TESTNET_TOPUP_DAILY_USD = 50;
+/**
+ * Testnet deposits credit real AI usage, so they're capped per person per day. Mainnet deposits are real money: no
+ * cap unless MAINNET_TOPUP_DAILY_USD is set (a launch safety valve).
+ */
+export const TESTNET_TOPUP_DAILY_USD = IS_MAINNET ? Number(process.env.MAINNET_TOPUP_DAILY_USD || Number.POSITIVE_INFINITY) : 50;

@@ -11,9 +11,11 @@
  * endpoint is down the request is tried once on the public endpoint, so a provider outage degrades instead of failing.
  * The key never leaves the server: the browser reaches the private endpoint through /api/rpc.
  */
+import { SOLANA_CLUSTER_FOR_MODE } from "@/lib/network";
 import { Connection, type Commitment } from "@solana/web3.js";
 
-export const cluster = () => (process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "mainnet-beta" ? "mainnet-beta" : "devnet");
+/** From the network mode (lib/network.ts): mainnet-beta on a mainnet build, devnet on testnet. */
+export const cluster = () => SOLANA_CLUSTER_FOR_MODE;
 export const publicRpcUrl = () => (cluster() === "mainnet-beta" ? "https://api.mainnet-beta.solana.com" : "https://api.devnet.solana.com");
 const isPublicSolana = (u: string) => /^https?:\/\/api\.(devnet|mainnet-beta|testnet)\.solana\.com\/?$/i.test(u.trim());
 
