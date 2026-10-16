@@ -26,6 +26,15 @@ try {
     });
     console.log(`applied ${name}`);
   }
+  // Network lock (0036_network_lock.sql): stamp this database for LEXARI_NETWORK, or stop when it belongs to the other mode.
+  const network = (process.env.LEXARI_NETWORK || "testnet").trim().toLowerCase();
+  if (network !== "mainnet" && network !== "testnet") throw new Error(`LEXARI_NETWORK must be mainnet or testnet (got ${network})`);
+  await sql`insert into lexari_network (id, network) values (1, ${network}) on conflict (id) do nothing`;
+  const [row] = await sql`select network from lexari_network where id = 1`;
+  if (row.network !== network) {
+    console.error(`This database belongs to ${row.network}; LEXARI_NETWORK is ${network}. Nothing else was changed.`);
+    process.exitCode = 1;
+  } else console.log(`network ${network}`);
 } finally {
   await sql.end();
 }

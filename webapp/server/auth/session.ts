@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { ORE_PRACTICE_ENABLED } from "@/lib/network";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { db } from "../db";
@@ -166,6 +167,7 @@ export async function startSession(userId: string, from: { ua?: string; ip?: str
 
 /** "Your free ORE Miner is waiting": once per account (the notification key makes it idempotent), new or existing. */
 export async function oreGift(userId: string) {
+  if (!ORE_PRACTICE_ENABLED) return; // mainnet: ORE practice mining is hidden (lib/network.ts)
   const { notify } = await import("../notify");
   const { agents } = await import("../db/schema");
   const { and: a2, eq: e2 } = await import("drizzle-orm");

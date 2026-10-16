@@ -12,6 +12,7 @@ import type { Keypair } from "@solana/web3.js";
 import type { IntegrationId, MarketsCard } from "@/content/integrations";
 import { jupiterQuote, polymarketMarkets, spotUsd } from "./market";
 import { EXTRA_TOOLS } from "./extra";
+import { availableOnNetwork } from "@/content/integrations";
 import { EVMCHAIN_TOOLS } from "./evmchains";
 import { UNISWAP_TOOLS } from "./uniswap";
 import { POLYMARKET_TOOLS } from "./polymarket";
@@ -232,5 +233,6 @@ const pricesTool: ToolDef = {
   },
 };
 
-export const TOOLS: ToolDef[] = [solanaWallet, solanaTransfer, orcaQuoteTool, orcaSwapTool, jupiterQuoteTool, bridgeQuoteTool, polymarketTool, ...POLYMARKET_TOOLS, ...EVMCHAIN_TOOLS, ...UNISWAP_TOOLS, ...ZCASH_TOOLS, pricesTool, ...EXTRA_TOOLS, ...HL_TOOLS, ...MONAD_TOOLS, cardPay, cardMpp, ...INTENTS_TOOLS, ...AUSD_TOOLS, ...ALCHEMY_TOOLS, ...SELF_TOOLS];
+/** Every tool for this build's network mode: tools of integrations hidden on mainnet are left out. */
+export const TOOLS: ToolDef[] = ([solanaWallet, solanaTransfer, orcaQuoteTool, orcaSwapTool, jupiterQuoteTool, bridgeQuoteTool, polymarketTool, ...POLYMARKET_TOOLS, ...EVMCHAIN_TOOLS, ...UNISWAP_TOOLS, ...ZCASH_TOOLS, pricesTool, ...EXTRA_TOOLS, ...HL_TOOLS, ...MONAD_TOOLS, cardPay, cardMpp, ...INTENTS_TOOLS, ...AUSD_TOOLS, ...ALCHEMY_TOOLS, ...SELF_TOOLS] as ToolDef[]).filter((t) => availableOnNetwork(t.connector));
 export const toolByName = (name: string) => TOOLS.find((t) => t.name === name.trim().toLowerCase());

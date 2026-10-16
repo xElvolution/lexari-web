@@ -5,6 +5,8 @@ import { llmConfig } from "@/server/engram/cortex";
 import { programStatus } from "@/server/hub/chain";
 import { attestorKeypair } from "@/server/hub/keys";
 import { rpcChoice } from "@/server/rpc";
+import { NETWORK } from "@/lib/network";
+import { checkDatabaseNetwork } from "@/server/network";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   let database = false;
   if (process.env.DATABASE_URL) {
-    try { await db().execute(sql`select 1`); database = true; } catch { database = false; }
+    try { await db().execute(sql`select 1`); database = !(await checkDatabaseNetwork()); } catch { database = false; }
   }
   let program = false, attestor = false;
   try {
@@ -25,5 +27,5 @@ export async function GET() {
   } catch { /* RPC down */ }
   const llm = llmConfig();
   const configured = missingConfig().length === 0;
-  return Response.json({ ok: configured && database, configured, database, llm: { provider: llm.provider, ready: llm.ready }, rpc: rpcChoice().source, program, attestor }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ ok: configured && database, network: NETWORK, configured, database, llm: { provider: llm.provider, ready: llm.ready }, rpc: rpcChoice().source, program, attestor }, { headers: { "cache-control": "no-store" } });
 }

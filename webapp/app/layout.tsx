@@ -4,6 +4,8 @@ import "./globals.css";
 import PrivyGate from "@/components/PrivyGate";
 import SolanaProviders from "@/components/SolanaProviders";
 import ClientErrors from "@/components/ClientErrors";
+import NetworkBanner from "@/components/NetworkBanner";
+import { IS_TESTNET } from "@/lib/network";
 import { WEBAPP_URL } from "@shared/sites";
 
 const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", axes: ["wdth"] });
@@ -13,7 +15,7 @@ const martian = Martian_Mono({ subsets: ["latin"], variable: "--font-martian" })
 const OG = { url: `${WEBAPP_URL}/og`, width: 1200, height: 630, alt: "Lexari. Meet your personalized AI agent" };
 export const metadata: Metadata = {
   metadataBase: new URL(WEBAPP_URL),
-  title: "Lexari",
+  title: IS_TESTNET ? "Lexari Testnet" : "Lexari",
   description: "Meet your personalized AI agent. An AI agent with its own computer and a memory that lasts.",
   openGraph: { title: "Lexari · Meet your personalized AI agent", description: "An AI agent with its own computer and a memory that lasts. Free to start.", siteName: "Lexari", type: "website", images: [OG] },
   twitter: { card: "summary_large_image", title: "Lexari · Meet your personalized AI agent", description: "An AI agent with its own computer and a memory that lasts. Free to start.", images: [OG] },
@@ -35,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body><ClientErrors /><PrivyGate><SolanaProviders>{children}</SolanaProviders></PrivyGate></body>
+      <body data-network={IS_TESTNET ? "testnet" : "mainnet"}><NetworkBanner /><ClientErrors /><PrivyGate><SolanaProviders>{children}</SolanaProviders></PrivyGate></body>
     </html>
   );
 }

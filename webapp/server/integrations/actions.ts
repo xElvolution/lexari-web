@@ -198,7 +198,7 @@ export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: un
   return { kind: "action", tool: tool.name, card: cardOf(row) };
 }
 
-const netOf = (chain: string) => (isEvmChain(chain) ? EVM[chain].network : chain === "polygon" ? "Polygon mainnet" : chain === "tempo" ? TEMPO.network : chain === "panta" ? "Panta (paper, devnet)" : chain === "lexari" ? "Lexari settings" : chain === "hyperliquid" ? HL_NETWORK : chain === "monad" ? "Monad testnet" : chain === "intents" ? "Aurora Intents" : network());
+const netOf = (chain: string) => (isEvmChain(chain) ? EVM[chain].network : chain === "polygon" ? "Polygon mainnet" : chain === "tempo" ? TEMPO.network : chain === "panta" ? "Panta (paper, devnet)" : chain === "lexari" ? "Lexari settings" : chain === "hyperliquid" ? HL_NETWORK : chain === "monad" ? EVM.monad.network : chain === "intents" ? "Aurora Intents" : network());
 
 /** The chat receipt row for something that moved money (agent payments, Tempo). */
 async function receipt(userId: string, a: typeof integrationActions.$inferSelect, r: Executed) {
