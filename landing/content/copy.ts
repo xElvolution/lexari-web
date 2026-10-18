@@ -24,6 +24,7 @@ export const copy = {
       { label: "Roster", href: "#roster" },
       { label: "Seats", href: "#seats" },
       { label: "Questions", href: "#questions" },
+      { label: "Download", href: "/download" },
     ],
     signin: "Sign in",
     cta: "Hire your agent",
@@ -207,6 +208,7 @@ export const copy = {
         links: [
           { label: "Open the app", href: APP },
           { label: "Marketplace", href: `${APP}/marketplace` },
+          { label: "Download", href: "/download" },
           { label: "Docs", href: "https://docs.lexari.ai" },
           { label: "Sign in", href: SIGNIN },
         ],
