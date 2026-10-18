@@ -41,6 +41,7 @@ export const entrySchema = z.object({
   contracts: z.array(z.object({ chain: text(2, 40), address: z.string().min(8).max(80), label: text(2, 60) }).strict()).max(30),
   contact: z.object({ name: text(2, 60), github: z.string().regex(/^[A-Za-z0-9-]{1,39}$/), email: z.string().email().optional(), x: z.string().regex(/^[A-Za-z0-9_]{1,15}$/).optional() }).strict(),
   logo: z.enum(["logo.svg", "logo.png"]),
+  logoBackground: z.enum(["light", "dark"]).optional(),
   actions: z.array(z.object({ text: text(4, 120), live: z.boolean() }).strict()).min(1).max(10),
   agent: z.unknown().optional(),
 }).strict();

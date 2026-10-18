@@ -33,6 +33,7 @@ export const NAV = [
   { href: "/marketplace", label: "Market", icon: "market" },
   { href: "/team", label: "Team", icon: "team" },
   { href: "/hub", label: "Hub", icon: "hub" },
+  { href: "/integrations", label: "Integrations", icon: "bond" },
   { href: "/wallets", label: "Wallets", icon: "wallet" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ];
@@ -67,7 +68,7 @@ function Rail({ s, path }: { s: State; path: string }) {
 }
 
 type Item = { key: string; label: string; icon: string; href?: string; run?: () => void };
-const MORE_PATHS = ["/wallets", "/settings", "/profile", "/hub"];
+const MORE_PATHS = ["/wallets", "/settings", "/profile", "/hub", "/integrations"];
 const PRIMARY = new Set(["/agents", "/brain", "/marketplace", "/team"]);
 
 /** Phone header and bottom nav. "More" lifts the main items away and brings up a second row. */
@@ -83,6 +84,7 @@ function MobileBars({ s, path }: { s: State; path: string }) {
     { key: "/settings", label: "Settings", icon: "settings", href: "/settings" },
     { key: "/profile", label: "Profile", icon: "user", href: "/profile" },
     { key: "/hub", label: "Hub", icon: "hub", href: "/hub" },
+    { key: "/integrations", label: "dApps", icon: "bond", href: "/integrations" },
     { key: "close", label: "Close", icon: "x", run: () => setMore(false) },
   ];
 

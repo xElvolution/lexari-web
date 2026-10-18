@@ -811,6 +811,7 @@
       "github": "xElvolution"
     },
     "logo": "/integrations/panta.svg",
+    "logoBackground": "dark",
     "actions": [
       {
         "text": "Browse markets and live YES / NO prices",

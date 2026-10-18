@@ -18,6 +18,7 @@
     "github": "xElvolution"
   },
   "logo": "logo.svg",
+  "logoBackground": "dark",
   "actions": [
     {
       "text": "Browse markets and live YES / NO prices",
