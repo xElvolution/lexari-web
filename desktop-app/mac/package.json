@@ -14,7 +14,84 @@
     "dist": "npm run sync && electron-builder --mac --universal --publish never",
     "release": "npm run sync && electron-builder --mac --universal --publish always"
   },
-  "dependencies": { "electron-updater": "^6.3.9" },
-  "devDependencies": { "electron": "^33.2.1", "electron-builder": "^25.1.8" },
-  "build": { "appId": "ai.lexari.desktop", "files": ["main.js", "shared-build/**/*", "!shared-build/**/*.md"], "directories": { "output": "dist", "buildResources": "shared-build/assets" }, "protocols": [{ "name": "Lexari", "schemes": ["lexari"] }], "publish": [{ "provider": "github", "owner": "xElvolution", "repo": "lexari", "releaseType": "draft" }], "mac": { "category": "public.app-category.productivity", "icon": "shared-build/assets/icon.png", "target": [{ "target": "dmg", "arch": ["universal"] }, { "target": "zip", "arch": ["universal"] }], "hardenedRuntime": true, "entitlements": "entitlements.mac.plist", "entitlementsInherit": "entitlements.mac.plist", "identity": null }, "dmg": { "title": "Lexari", "window": { "width": 540, "height": 360 } } }
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ai.lexari.desktop",
+    "files": [
+      "main.js",
+      "shared-build/**/*",
+      "!shared-build/**/*.md"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "shared-build/assets"
+    },
+    "protocols": [
+      {
+        "name": "Lexari",
+        "schemes": [
+          "lexari"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "xElvolution",
+        "repo": "lexari",
+        "releaseType": "draft"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "shared-build/assets/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "identity": null
+    },
+    "dmg": {
+      "title": "Lexari",
+      "icon": "shared-build/assets/icon.icns",
+      "background": "shared-build/assets/dmg-background.png",
+      "window": {
+        "width": 540,
+        "height": 360
+      },
+      "iconSize": 96,
+      "contents": [
+        {
+          "x": 140,
+          "y": 190,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
 }
