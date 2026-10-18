@@ -1,0 +1,68 @@
+{
+  "network": "monad-testnet",
+  "chainId": 10143,
+  "deployedAt": "2026-10-18",
+  "deployer": "0x4df6f4B18558D583Ef4a3652305AEA57dFE723C2",
+  "admin": "0x4df6f4B18558D583Ef4a3652305AEA57dFE723C2",
+  "treasury": "0x4df6f4B18558D583Ef4a3652305AEA57dFE723C2",
+  "rolesNote": "Testnet only: DEFAULT_ADMIN, PAUSER, REGISTRAR, CURATOR and treasury all stay on the deployer. Nothing renounced. Not a Safe.",
+  "compiler": {
+    "solc": "0.8.28",
+    "evmVersion": "cancun",
+    "optimizerRuns": 10000
+  },
+  "contracts": {
+    "LexariAgentRegistry": {
+      "address": "0xaC1B6ac569EE1FDF7337AF14f6456E4cC1c6A100",
+      "deployTx": "0xa3c5b653fd7304b9c9382fd5e9aa6b8f714d1065e0ccc07c7b73ca884100bd5c",
+      "block": 72030046,
+      "explorer": "https://testnet.monadexplorer.com/address/0xaC1B6ac569EE1FDF7337AF14f6456E4cC1c6A100",
+      "verification": "sourcify: match"
+    },
+    "LexariSpendVault": {
+      "address": "0x2F56499a336151B5dfa797a9B3936057a415bbe5",
+      "deployTx": "0xfc8788e06a28c7e7030233c3dfe93f38c7b499c1ce92cdd7d161d312fc6c0a73",
+      "block": 72030051,
+      "explorer": "https://testnet.monadexplorer.com/address/0x2F56499a336151B5dfa797a9B3936057a415bbe5",
+      "verification": "sourcify: match"
+    },
+    "LexariSkillRegistry": {
+      "address": "0x60f6a4E89946f52A88e745991B2D93DCF8ac3Fc1",
+      "deployTx": "0x4e867e0a9bb8e3a0330f8de70506c2f2926b8587f0e5f1b42e21d2e67f8ed4a6",
+      "block": 72030058,
+      "explorer": "https://testnet.monadexplorer.com/address/0x60f6a4E89946f52A88e745991B2D93DCF8ac3Fc1",
+      "verification": "sourcify: match"
+    }
+  },
+  "configTxs": {
+    "setPaymentToken(native)": "0xc18f9cece1c22c1d3c4d6ed2951607d940abf05a78ec1c4c051a8844d6dec47f",
+    "setPaymentToken(0xf817257fed379853cDe0fa4F97AB987181B1E5Ea)": "0xaf601fe258a71fcf1ae613dfef3fa5eefa9f54fc2df09888999912ea76a2c76c"
+  },
+  "smokeTests": {
+    "registerAgent": {
+      "tx": "0x3fa9f58b3e2cfddceaa6d0090b4efdc348278f3cf9d8c0f3400691b01c2ea38f",
+      "agentId": 1,
+      "wallet": "0x1111111111111111111111111111111111111111",
+      "metadataURI": "ipfs://lexari-smoke-test-agent"
+    },
+    "setVaultPolicy": {
+      "tx": "0x6fbdd42716f3ecee04d1e1a13d43da78b9844945def13b36f44e7d7db7df6dd5",
+      "agentId": 1,
+      "token": "native",
+      "perTxLimitWei": "10000000000000000",
+      "dailyLimitWei": "50000000000000000",
+      "enabled": true
+    },
+    "publishSkill": {
+      "tx": "0x52cb01facf5aa9a9a2dc3ec38b2267e209537c81b87ec7454c66af3ec7351489",
+      "skillId": 1,
+      "uri": "ipfs://lexari-smoke-test-skill",
+      "price": "0"
+    }
+  },
+  "monSpent": {
+    "deployAndConfig": "1.01755605",
+    "smokeTests": "0.045330197",
+    "total": "1.062886247"
+  }
+}

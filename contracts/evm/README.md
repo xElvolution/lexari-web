@@ -2,7 +2,7 @@
 
 Foundry project with OpenZeppelin 5.4. Deployable to Monad testnet (10143) today and to Monad mainnet (143), Base,
 Arbitrum, Ethereum or any EVM chain later with the same bytecode (solc 0.8.28, `evm_version = cancun`, no metadata
-hash). Nothing here has been deployed yet. A full simulation of `script/Deploy.s.sol` against the live Monad testnet
+hash). Deployed and verified on Monad testnet (see below). Before the deploy, a full simulation of `script/Deploy.s.sol` against the live Monad testnet
 RPC (no broadcast, no key) succeeds and uses 9,884,418 gas for all three contracts plus configuration.
 
 ## Why these three contracts
@@ -20,6 +20,28 @@ chain, and nothing more:
 Left out on purpose: an onchain memory store (memory is private and large, so only the root is committed), a Lexari
 token (no product need yet), and upgradeable proxies (simpler to audit; a new version is a new deployment, and the
 registry is the stable point other contracts read).
+
+
+## Deployments
+
+### Monad testnet (chain 10143)
+
+Deployed 2026-10-18 with `script/Deploy.s.sol`. Full record: [`deployments/monad-testnet.json`](deployments/monad-testnet.json).
+
+| Contract | Address | Deploy tx | Verification |
+| --- | --- | --- | --- |
+| `LexariAgentRegistry` | [`0xaC1B6ac569EE1FDF7337AF14f6456E4cC1c6A100`](https://testnet.monadexplorer.com/address/0xaC1B6ac569EE1FDF7337AF14f6456E4cC1c6A100) | [tx](https://testnet.monadexplorer.com/tx/0xa3c5b653fd7304b9c9382fd5e9aa6b8f714d1065e0ccc07c7b73ca884100bd5c) | Sourcify: match |
+| `LexariSpendVault` | [`0x2F56499a336151B5dfa797a9B3936057a415bbe5`](https://testnet.monadexplorer.com/address/0x2F56499a336151B5dfa797a9B3936057a415bbe5) | [tx](https://testnet.monadexplorer.com/tx/0xfc8788e06a28c7e7030233c3dfe93f38c7b499c1ce92cdd7d161d312fc6c0a73) | Sourcify: match |
+| `LexariSkillRegistry` | [`0x60f6a4E89946f52A88e745991B2D93DCF8ac3Fc1`](https://testnet.monadexplorer.com/address/0x60f6a4E89946f52A88e745991B2D93DCF8ac3Fc1) | [tx](https://testnet.monadexplorer.com/tx/0x4e867e0a9bb8e3a0330f8de70506c2f2926b8587f0e5f1b42e21d2e67f8ed4a6) | Sourcify: match |
+
+Smoke tests (all succeeded and were read back): register agent #1
+([tx](https://testnet.monadexplorer.com/tx/0x3fa9f58b3e2cfddceaa6d0090b4efdc348278f3cf9d8c0f3400691b01c2ea38f)), set a native vault policy for agent #1
+([tx](https://testnet.monadexplorer.com/tx/0x6fbdd42716f3ecee04d1e1a13d43da78b9844945def13b36f44e7d7db7df6dd5)), publish skill #1
+([tx](https://testnet.monadexplorer.com/tx/0x52cb01facf5aa9a9a2dc3ec38b2267e209537c81b87ec7454c66af3ec7351489)).
+
+**Testnet roles:** `DEFAULT_ADMIN_ROLE`, `PAUSER_ROLE`, `REGISTRAR_ROLE`, `CURATOR_ROLE` and the treasury all sit on the
+deployer `0x4df6f4B18558D583Ef4a3652305AEA57dFE723C2`. There is no Safe yet and nothing was renounced, so the contracts stay manageable. The
+"deployer keeps no power" handover applies only when `LEXARI_ADMIN` is a different address, which is required for mainnet.
 
 ## Security model
 
