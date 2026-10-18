@@ -14,7 +14,62 @@
     "dist": "npm run sync && electron-builder --win --x64 --arm64 --publish never",
     "release": "npm run sync && electron-builder --win --x64 --arm64 --publish always"
   },
-  "dependencies": { "electron-updater": "^6.3.9" },
-  "devDependencies": { "electron": "^33.2.1", "electron-builder": "^25.1.8" },
-  "build": { "appId": "ai.lexari.desktop", "files": ["main.js", "shared-build/**/*", "!shared-build/**/*.md"], "directories": { "output": "dist", "buildResources": "shared-build/assets" }, "protocols": [{ "name": "Lexari", "schemes": ["lexari"] }], "publish": [{ "provider": "github", "owner": "xElvolution", "repo": "lexari", "releaseType": "draft" }], "win": { "icon": "shared-build/assets/icon.png", "target": ["nsis", "msi"] }, "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "shortcutName": "Lexari" }, "msi": { "oneClick": false, "perMachine": false } }
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ai.lexari.desktop",
+    "files": [
+      "main.js",
+      "shared-build/**/*",
+      "!shared-build/**/*.md"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "shared-build/assets"
+    },
+    "protocols": [
+      {
+        "name": "Lexari",
+        "schemes": [
+          "lexari"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "xElvolution",
+        "repo": "lexari",
+        "releaseType": "draft"
+      }
+    ],
+    "win": {
+      "icon": "shared-build/assets/icon.ico",
+      "target": [
+        "nsis",
+        "msi"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Lexari",
+      "installerIcon": "shared-build/assets/icon.ico",
+      "uninstallerIcon": "shared-build/assets/icon.ico",
+      "installerHeaderIcon": "shared-build/assets/icon.ico",
+      "installerSidebar": "shared-build/assets/nsis-sidebar.bmp",
+      "uninstallerSidebar": "shared-build/assets/nsis-sidebar.bmp",
+      "installerHeader": "shared-build/assets/nsis-header.bmp"
+    },
+    "msi": {
+      "oneClick": false,
+      "perMachine": false
+    }
+  }
 }
