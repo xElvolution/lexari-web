@@ -1,4 +1,4 @@
-body.quick{display:flex;flex-direction:column;border:1px solid rgba(143,107,255,.35);border-radius:14px;background:linear-gradient(180deg,#1a1036,#0d0820);overflow:hidden}
+body.quick{display:flex;flex-direction:column;border:1px solid rgba(165,139,255,.3);border-radius:16px;background:radial-gradient(90% 50% at 50% 0%,rgba(91,43,255,.3),transparent 70%),#0b0915;overflow:hidden}
 .q-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);-webkit-app-region:drag}
 .q-head select{margin-left:auto;-webkit-app-region:no-drag;background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:3px 6px}
 .q-log{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;user-select:text}
@@ -13,3 +13,8 @@ body.quick{display:flex;flex-direction:column;border:1px solid rgba(143,107,255,
 .q-form button{width:36px;border:0;border-radius:10px;background:linear-gradient(135deg,var(--p1),var(--p2));color:#fff;cursor:pointer}
 .q-form svg{width:16px;height:16px;fill:currentColor}
 .q-foot{display:flex;justify-content:space-between;padding:0 14px 10px;color:var(--mute);font-size:11px}.q-foot a{color:var(--p3);cursor:pointer}
+
+.q-head .word{font-size:19px;margin-top:-3px}.q-t{color:var(--mute);font-weight:600;margin-left:4px;font-size:12px}
+.mark.big{--s:58px;margin:0 auto 14px;box-shadow:0 12px 40px rgba(91,43,255,.5)}.q-empty .mark i{background:#000;animation:blink 2.6s 1s infinite}
+.m.you{background:var(--grape)!important;box-shadow:0 3px 0 var(--p2)}
+.q-form button{background:var(--grape)!important;box-shadow:0 3px 0 var(--p2)}

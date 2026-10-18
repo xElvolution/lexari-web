@@ -6,7 +6,7 @@
 <div class="aurora"><i></i><i></i><i></i></div>
 <header class="titlebar" id="titlebar">
   <div class="tl-space"></div>
-  <div class="brand"><span class="orb"></span><b>Lexari</b><span class="net" id="net">Testnet</span></div>
+  <div class="brand"><span class="mark sm"><i></i></span><span class="word">lexari</span><span class="net" id="net">Testnet</span></div>
   <div class="crumbs" id="crumb">Agents</div>
   <button class="search" id="openPalette"><span>Search or jump to</span><kbd id="kbd">Ctrl K</kbd></button>
   <div class="spacer"></div>
@@ -17,16 +17,19 @@
   </div>
 </header>
 <div class="body">
-  <nav class="rail" id="rail"><div class="pill" id="pill"></div></nav>
+  <nav class="rail" id="rail"><button class="railmark" id="railmark" aria-label="Lexari home"><span class="mark"><i></i></span></button><div class="pill" id="pill"></div></nav>
   <main class="stage">
     <webview id="view" partition="persist:lexari" allowpopups></webview>
     <div class="loadbar" id="loadbar"></div>
     <section class="splash" id="splash">
-      <div class="rings"><span></span><span></span><span></span><div class="core"></div></div>
-      <h1>Lexari</h1><p>Your onchain agents are waking up</p>
+      <div class="halo"><span></span><span></span><span></span></div>
+      <div class="mark xl pop"><i></i></div>
+      <h1 class="word reveal" aria-label="lexari"><span>l</span><span>e</span><span>x</span><span>a</span><span>r</span><span>i</span></h1>
+      <p class="fade">Your onchain agents are waking up</p>
+      <div class="dots"><i></i><i></i><i></i></div>
     </section>
     <section class="offline hidden" id="offline">
-      <div class="glyph"><svg viewBox="0 0 64 64"><path d="M8 24a34 34 0 0 1 48 0M16 33a22 22 0 0 1 32 0M24 42a10 10 0 0 1 16 0"/><circle cx="32" cy="50" r="3"/><path class="slash" d="M10 10l44 44"/></svg></div>
+      <div class="offmark"><div class="mark xl sleepy"><i></i></div><span class="badge" id="offBadge"><svg viewBox="0 0 24 24"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"/><circle cx="12" cy="19" r="1.4"/><path class="slash" d="M3 3l18 18"/></svg><svg class="bang" viewBox="0 0 24 24"><path d="M12 5v9"/><circle cx="12" cy="18.5" r="1.4"/></svg></span></div>
       <h2 id="offTitle">You're offline</h2>
       <p id="offBody">Lexari needs a connection to reach your agents. We'll reconnect as soon as you're back.</p>
       <div class="row"><button class="primary" id="retry">Try again</button><button id="browser">Open in browser</button></div>

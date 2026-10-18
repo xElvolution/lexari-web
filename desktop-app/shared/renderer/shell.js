@@ -22,6 +22,12 @@ let cfg, current = "agents", firstLoad = true;
   const top = ["agents", "chat", "brain", "marketplace", "team", "hub", "wallets"], bottom = ["settings", "profile"];
   const mk = (r) => { const b = document.createElement("button"); b.dataset.r = r; b.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[r]}</svg><span class="tip">${LABEL[r]}</span>`; b.onclick = () => go(r); rail.appendChild(b); };
   top.forEach(mk); const g = document.createElement("div"); g.className = "gap"; rail.appendChild(g); bottom.forEach(mk);
+  $("railmark").onclick = () => go("agents");
+  markRail("agents");
+  const demo = new URLSearchParams(location.search).get("demo") || "";
+  if (demo === "splash") return; // QA: hold the splash for screenshots
+  if (demo === "offline") return showOffline();
+  if (demo === "error") return showOffline(["Lexari can't be reached", "The server didn't answer. Your agents are safe. Try again in a moment."]);
   view.src = cfg.network.appUrl + "/agents";
   markRail("agents");
   window.lexari.onNavigate((u) => { view.src = u; });
@@ -56,6 +62,7 @@ function showOffline(msg) {
   $("splash").classList.add("hidden");
   $("offTitle").textContent = msg ? msg[0] : "You're offline";
   $("offBody").textContent = msg ? msg[1] : "Lexari needs a connection to reach your agents. We'll reconnect as soon as you're back.";
+  $("offline").classList.toggle("error", !!msg);
   $("offline").classList.remove("hidden"); view.classList.remove("ready");
 }
 $("retry").onclick = () => go(current);
@@ -69,6 +76,7 @@ $("titlebar").addEventListener("dblclick", (e) => { if (e.target.closest("button
 const items = () => [
   ...Object.keys(LABEL).map((r) => ({ t: "Go to " + LABEL[r], i: ICONS[r], run: () => go(r) })),
   { t: "Sign in with the system browser (Google, passkeys)", i: ICONS.profile, run: () => window.lexari.signInBrowser() },
+  { t: "About Lexari", i: ICONS.profile, run: () => window.lexari.about() },
   { t: "Reload", i: ICONS.hub, run: () => view.reload() },
   { t: "Open this page in your browser", i: ICONS.marketplace, run: () => window.lexari.external(view.getURL()) },
 ];
