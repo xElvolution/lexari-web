@@ -21,7 +21,7 @@ export type IntroMode = "memory" | "think" | "team";
 type P = { mode: IntroMode; x: SharedValue<number>; index: number; width: number; page: number; height: number; active: boolean };
 
 // short on purpose: the orbit has to clear the face and the screen edge, so each chip is a word or two
-const MEMS = ["One page", "Tables", "Maya", "Fridays", "Lagos"];
+const MEMS = ["One page", "Tables", "Maya", "Fridays", "Mornings"];
 const TEAM = ["scout", "quill", "tally", "frame", "patch"] as const;
 
 /** depth: how far this layer slides while you swipe between pages (0 = pinned to the page) */

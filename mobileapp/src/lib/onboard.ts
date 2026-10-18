@@ -23,7 +23,7 @@ export const KNOW_SUGGESTIONS = [
 export const NAMES = ["Juniper", "Nova", "Pip", "Otto", "Mika", "Sol"];
 export const cleanName = (s: string) => s.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 12);
 
-export type HomeAgent = { name: string; look: unknown; you: string; role: string; tone: ToneId };
+export type HomeAgent = { name: string; look: unknown; you: string; role: string; tone: ToneId; country?: string };
 
 export async function memoryKeys(wallet?: string) {
   const have = await savedKeys(wallet);
@@ -36,7 +36,7 @@ export async function memoryKeys(wallet?: string) {
 /** Returns how many first memories were filed (they need the memory key on this phone). */
 export async function finishOnboarding(token: string, wallet: string | undefined, a: HomeAgent, knows: string[]): Promise<{ saved: number; total: number }> {
   await api("/api/agents", { method: "POST", body: JSON.stringify({ slug: "home", kind: "home", name: a.name, role: a.role, tone: a.tone, look: a.look ?? null, meta: { you: a.you } }) }, token);
-  const notes = [...knows.filter(Boolean), ...(a.you ? [`Calls you ${a.you}${a.role ? `, ${a.role.toLowerCase()}` : ""}`] : [])];
+  const notes = [...knows.filter(Boolean), ...(a.you ? [`Calls you ${a.you}${a.role ? `, ${a.role.toLowerCase()}` : ""}`] : []), ...(a.country ? [`Based in ${a.country}`] : [])];
   if (!notes.length) return { saved: 0, total: 0 };
   let keys = null;
   try { keys = await memoryKeys(wallet); } catch (e) { console.warn("[lexari] memory key", e); }

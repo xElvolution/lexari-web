@@ -1,4 +1,5 @@
 import { useHideBalance } from "@/lib/privacy";
+import { Stage } from "@/web/anim";
 import { useLocalSearchParams } from "expo-router";
 /** Port of webapp/components/wallet/WalletsView.tsx at phone width: Wallet / Cards tabs, Lexari balance (Top up, History), each agent's wallet (Fund, Move to balance). */
 import { useEffect, useState } from "react";
@@ -90,7 +91,7 @@ export default function Wallets() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 18, paddingBottom: 32 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await reload(); setRefreshing(false); }} tintColor={k.ink} />}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 18, paddingBottom: 32 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await reload(); setRefreshing(false); }} tintColor={k.ink} />}><Stage>
         <Label>Money</Label>
         <T f="display" s={20.5} style={{ marginTop: 10, letterSpacing: -1.1 }}>{tab === "cards" ? "Cards." : "Wallet."}</T>
         <T s={15} c={k.ink75} style={{ marginTop: 8, lineHeight: 21 }}>{tab === "cards" ? "A card lets an agent pay for tools and compute inside a limit you set. Each agent gets its own." : "Your Lexari balance, and the wallets your agents hold."}</T>
@@ -194,7 +195,7 @@ export default function Wallets() {
             {cards === null ? <T s={13.5} c={k.ink60}>Loading cards…</T> : null}
           </View>
         )}
-      </ScrollView>
+      </Stage></ScrollView>
       {note ? <View pointerEvents="none" style={{ position: "absolute", left: 16, right: 16, bottom: 16, backgroundColor: k.ink, borderRadius: 16, padding: 12 }}><T f="semi" s={13.5} c={k.bg}>{note}</T></View> : null}
       <TopUpSheet open={sheet === "topup"} onClose={() => setSheet(null)} />
       <HistorySheet open={sheet === "history"} onClose={() => setSheet(null)} wallet={wallet} onTopUp={() => setSheet("topup")} />

@@ -9,6 +9,7 @@ import { ROSTER, specialist, type Specialist } from "@/content/roster";
 import { AgentTile, GRAPE, T, useC } from "@/web/kit";
 import { useData } from "@/web/data";
 import { UpgradeSheet } from "@/web/Plans";
+import { Burst, Pop, PopIn, toast } from "@/web/anim";
 import PayWithSkr from "@/components/PayWithSkr";
 
 const HIRE_USD = 1;
@@ -33,7 +34,9 @@ export function useHire() {
   };
 
   const finish = async (a: Specialist, charged: boolean) => {
+    const back = !a.free && !!me?.hires?.some((h) => h.slug === a.slug);
     await reload();
+    toast(back ? `${a.name} is back on your team` : `${a.name} joined your team · ${a.free ? "Free" : `$${HIRE_USD}`}`);
     setPaidNow(charged);
     setParty(a);
     setPay(null);
@@ -101,15 +104,20 @@ export function useHire() {
       <Modal visible={!!party} transparent animationType="fade" onRequestClose={() => setParty(null)}>
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 22, backgroundColor: "rgba(0,0,0,0.62)" }}>
           {party ? (
-            <View style={{ width: "100%", maxWidth: 400, borderRadius: 28, backgroundColor: k.card, borderWidth: 1, borderColor: k.line, padding: 24, alignItems: "center" }}>
-              <AgentTile slug={party.slug} size={96} radius={30} dot={false} />
+            <PopIn style={{ width: "100%", maxWidth: 400 }}><View style={{ width: "100%", borderRadius: 28, backgroundColor: k.card, borderWidth: 1, borderColor: k.line, padding: 24, alignItems: "center", overflow: "hidden" }}>
+              <View pointerEvents="none" style={{ position: "absolute", top: -96, width: 192, height: 192, borderRadius: 96, backgroundColor: "rgba(91,43,255,0.3)" }} />
+              <View style={{ width: 140, height: 120, alignItems: "center", justifyContent: "center" }}>
+                <Burst n={16} base={70} />
+                <Pop k={party.slug} from={0.3}><AgentTile slug={party.slug} size={96} radius={30} dot={false} mood="happy" /></Pop>
+                <Pop k={`c${party.slug}`} from={0} style={{ position: "absolute", right: 10, bottom: 4 }}><View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: GRAPE, borderWidth: 3, borderColor: k.card, alignItems: "center", justifyContent: "center" }}><Icon name="check" size={14} stroke={3} color="#fff" /></View></Pop>
+              </View>
               <T f="display" s={28} style={{ marginTop: 16, textAlign: "center", letterSpacing: -1 }}>{`${party.name} joined your team`}</T>
               <T s={14.5} c={k.ink60} style={{ marginTop: 8, textAlign: "center", lineHeight: 21 }}>{party.free ? `${party.job}. Free, and it doesn't take a seat.` : paidNow ? `${party.job}. Paid $${HIRE_USD} from your balance.` : `${party.job}. Back on your team, no charge.`}</T>
               <View style={{ flexDirection: "row", gap: 8, marginTop: 18, alignSelf: "stretch" }}>
                 <Pressable onPress={() => { const slug = party.slug; setParty(null); router.push(`/chat/${slug}`); }} style={{ flex: 1, height: 46, borderRadius: 16, borderWidth: 1, borderColor: k.line, alignItems: "center", justifyContent: "center" }}><T f="bold" s={15}>Say hi</T></Pressable>
                 <Pressable onPress={() => setParty(null)} style={{ flex: 1, height: 46, borderRadius: 16, backgroundColor: GRAPE, alignItems: "center", justifyContent: "center" }}><T f="bold" s={15} c="#fff">Nice</T></Pressable>
               </View>
-            </View>
+            </View></PopIn>
           ) : null}
         </View>
       </Modal>

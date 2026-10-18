@@ -8,7 +8,7 @@ export type Msg = { id: string; from: string; text?: string; at: number; call?: 
 export type Chat = { slug: string; kind: string; title: string; members: string[]; messages: Msg[]; createdAt?: number };
 export type Me = {
   user: { wallet?: string; referralCode?: string; method?: string; email?: string | null; createdAt?: number };
-  profile: { name?: string; username?: string; avatar?: string };
+  profile: { name?: string; username?: string; avatar?: number | string; cover?: number | string; bio?: string };
   plan: { id: string; name: string; seats: number };
   prefs?: { defaultAgent?: string; hideBalance?: boolean; language?: string; voice?: string; tourDone?: boolean };
   agents: Agent[]; chats: Chat[]; jobs?: { id: string; assignee?: string; title?: string; prompt: string; status: string; output?: string; startedAt: number; finishedAt?: number }[];

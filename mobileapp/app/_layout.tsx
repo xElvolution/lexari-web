@@ -12,6 +12,7 @@ import { PrivacySync } from "@/lib/privacy";
 import Tour from "@/components/Tour";
 import { env } from "@/lib/env";
 import { DataProvider } from "@/web/data";
+import { Toaster } from "@/web/anim";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { setUserAgent } from "@/lib/api";
@@ -41,6 +42,7 @@ function Navigator() {
         <Tour />
         <StepUpSheet />
         <PrivacySync />
+        <Toaster />
       </LockGate>
     </View>
   );

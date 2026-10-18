@@ -1,7 +1,9 @@
 /** Port of webapp/app/(app)/settings/page.tsx at phone width: the section list first, then one section with a back button. */
-import { useEffect, useState, type ReactNode } from "react";
+import { Stage, toast } from "@/web/anim";
+import { linkPasskey, loadKeys, passkeyError, passkeySupported, type MeraKeys as MeraKeysT } from "@/lib/passkey";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Linking, Pressable, ScrollView, TextInput, View } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import Icon from "@/components/Icon";
 import { SecurityRows } from "@/components/SecurityRows";
@@ -281,6 +283,47 @@ function Data() {
   );
 }
 
+/** Port of webapp/components/security/MeraKeys.tsx, native: the passkey is made and used right here with Android's Credential Manager. */
+function MeraKeys() {
+  const k = useC();
+  const { token } = useSession();
+  const { me } = useData();
+  const [keys, setKeys] = useState<MeraKeysT | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const ok = passkeySupported();
+  const agents = (me?.agents ?? []).map((a) => ({ slug: a.slug, name: a.name }));
+  const load = useCallback(() => { if (token) loadKeys(token).then(setKeys, () => setKeys({ passkeys: [], keys: [] })); }, [token]);
+  useEffect(() => { load(); }, [load]);
+  const go = async (create: boolean) => {
+    if (!token) return;
+    setBusy(true); setErr("");
+    try {
+      await linkPasskey(agents.map((a) => a.slug), create, token, me?.user.email || me?.profile?.username || "Lexari");
+      load(); toast(create ? "Passkey connected" : "Agent keys refreshed");
+    } catch (e) { setErr(passkeyError(e)); }
+    setBusy(false);
+  };
+  const linked = !!keys?.passkeys.length;
+  const name = (sl: string) => agents.find((a) => a.slug === sl)?.name || sl;
+  return (
+    <View style={{ paddingVertical: 16, gap: 10 }}>
+      <T s={13.5} c={k.ink60} style={{ lineHeight: 19 }}>One passkey, many keys. Link a passkey to this account to sign in with your fingerprint, face or a security key, and each agent gets its own key derived from it. Powered by Mera; nothing secret is stored.</T>
+      {!ok ? <T s={13} c={k.ink60}>{"This phone doesn't support passkeys."}</T> : null}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        <Pill h={42} icon="lock" label={busy ? "Waiting for passkey…" : linked ? "Refresh agent keys" : "Connect a passkey"} disabled={busy || !ok} onPress={() => void go(!linked)} />
+        {!linked ? <Pill h={42} kind="ghost" label="Use a passkey I have" disabled={busy || !ok} onPress={() => void go(false)} /> : null}
+      </View>
+      {err ? <T s={13} c="#e5484d">{err}</T> : null}
+      {keys?.keys.length ? (
+        <View style={{ borderRadius: 16, backgroundColor: k.tint, paddingHorizontal: 12 }}>
+          {keys.keys.map((x, i) => <View key={x.agent} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 9, borderTopWidth: i ? 1 : 0, borderTopColor: k.line }}><T f="bold" s={13.5}>{name(x.agent)}</T><T s={12} c={k.ink75} style={{ fontFamily: F.mono }}>{`${x.address.slice(0, 6)}…${x.address.slice(-4)}`}</T></View>)}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function Security() {
   const { me } = useData();
   const { signOut } = useSession();
@@ -291,9 +334,7 @@ function Security() {
         <Row title={google ? "Google or email" : "Wallet signature"} desc={google ? "Privy checks your Google account or a one-time email code. Your Lexari wallet is created and kept by Privy." : "You sign a one-time message with your wallet. Lexari never sees your keys."} />
         <Row last title="Session" desc="Sessions last up to 30 days on a device. See every device below and sign out the ones you don't know." />
       </Group>
-      <Group title="Passkey">
-        <Row last title="Connect a passkey" desc="Link a passkey to this account, then sign in with it. A passkey never creates an account. Set it up in Lexari on the web, Settings, Security."><Small icon="lock" label="Connect" onPress={() => Linking.openURL("https://app.lexari.ai/settings#security")} /></Row>
-      </Group>
+      <Group title="Passkey"><MeraKeys /></Group>
       <Group title="App lock"><SecurityRows /></Group>
       <SecurityCenter />
       <Group title="This device"><Row last title="Sign out" desc="Ends this session."><Small icon="out" label="Sign out" onPress={() => signOut().then(() => router.replace("/(auth)/sign-in"))} /></Row></Group>
@@ -435,10 +476,13 @@ function About() {
 export default function Settings() {
   const k = useC();
   const [sec, setSec] = useState<Sec | null>(null);
+  // a deep link into one section (the Add a passkey prompt opens Security)
+  const want = useLocalSearchParams<{ sec?: string }>().sec;
+  useEffect(() => { if (want && SECTIONS.some((x) => x.id === want)) setSec(want as Sec); }, [want]);
   const cur = SECTIONS.find((x) => x.id === sec);
   const body: Record<Sec, ReactNode> = { general: <General />, personal: <Personal />, agents: <AgentsSec />, models: <Models />, notifications: <Notifs />, data: <Data />, security: <Security />, accounts: <Accounts />, social: <Social />, wallets: <WalletsSec />, integrations: <IntegrationsSec />, secrets: <Secrets />, billing: <Billing />, about: <About /> };
   if (!cur) return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 16, paddingBottom: 32 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 16, paddingBottom: 32 }}><Stage>
       <T f="display" s={22} style={{ letterSpacing: -0.99, lineHeight: 20.9 }}>Settings</T>
       <View style={{ marginTop: 16, gap: 2 }}>
         {SECTIONS.map((x) => (
@@ -447,15 +491,15 @@ export default function Settings() {
           </Pressable>
         ))}
       </View>
-    </ScrollView>
+    </Stage></ScrollView>
   );
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 16.5, paddingBottom: 32 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 16.5, paddingBottom: 32 }}><Stage key={cur.id}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <Pressable accessibilityLabel="All settings" onPress={() => setSec(null)} style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" }}><Icon name="back" size={19} color={k.ink} /></Pressable>
         <T f="display" s={22} style={{ letterSpacing: -0.99, lineHeight: 20.9 }}>{cur.label}</T>
       </View>
       <View style={{ marginTop: 1.5 }}>{body[cur.id]}</View>
-    </ScrollView>
+    </Stage></ScrollView>
   );
 }

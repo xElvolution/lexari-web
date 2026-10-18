@@ -1,4 +1,5 @@
 /** Port of webapp/app/(app)/team/page.tsx at phone width: floor plan with seats and ring legend, plan card, Plans summary. */
+import { Stage } from "@/web/anim";
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { router } from "expo-router";
@@ -41,7 +42,7 @@ export default function Team() {
   const cell = gridW ? Math.floor((gridW - 4 * 8) / 5) : 58;
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 18, paddingBottom: 32 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 18, paddingBottom: 32 }}><Stage>
       <Label>Team</Label>
       <T f="display" s={23} style={{ marginTop: 10, letterSpacing: -1.1 }}>Your team floor.</T>
       <T s={15} c={k.ink75} style={{ marginTop: 8, lineHeight: 22 }}>{`Everyone on your team has a seat: ${youName}, the agents you made and the specialists you hired.`}</T>
@@ -105,6 +106,6 @@ export default function Team() {
         <View style={{ flex: 1 }}><T f="bold" s={16}>{`${plan.name} plan`}</T><T s={13} c={k.ink60}>{`${used} of ${plan.seats} seat${plan.seats === 1 ? "" : "s"} used`}</T></View>
         <Pill h={40} fs={14} label="Upgrade plan" onPress={() => router.push("/settings/billing")} />
       </View>
-    </ScrollView>
+    </Stage></ScrollView>
   );
 }

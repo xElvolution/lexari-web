@@ -1,4 +1,5 @@
 /** Port of webapp/app/(app)/marketplace/page.tsx at phone width: search, category chips, Agent of the week hero, Trending now, Top charts, New & notable, Editors' picks, Browse categories. */
+import { Stage } from "@/web/anim";
 import { useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, TextInput, View, useWindowDimensions } from "react-native";
 import Icon from "@/components/Icon";
@@ -7,7 +8,7 @@ import { ROSTER, STORE_CATS, compact, storeMeta, type StoreCat } from "@/content
 import { AgentTile, F, Grad, Label, T, useC } from "@/web/kit";
 import { useData } from "@/web/data";
 import { useHire } from "@/web/hire";
-import { AppCard, HireBtn, HireCtx, Shelf, open } from "@/components/Market";
+import { AppCard, HScroll, HireBtn, HireCtx, Shelf, open } from "@/components/Market";
 
 const FEATURED = ["scout", "frame", "atlas"];
 const byHires = [...ROSTER].sort((a, b) => storeMeta(b).hires - storeMeta(a).hires);
@@ -58,7 +59,9 @@ export default function Marketplace() {
   const { me } = useData();
   const hire = useHire();
   const mine = new Set((me?.agents ?? []).map((a) => a.slug));
+  // web: w-[44vw] min-w-[176px] tiles (two and a peek per screen), wide 300px banners that leave the next one peeking
   const card = Math.max(176, Math.round(width * 0.44));
+  const wideW = Math.min(300, width - 32 - 40);
   const filtered = useMemo(() => { const t = q.trim().toLowerCase(); return ROSTER.filter((a) => (cat === "All" || storeMeta(a).cat === cat) && (!t || `${a.name} ${a.job} ${a.cat} ${a.back} ${storeMeta(a).maker}`.toLowerCase().includes(t))); }, [q, cat]);
   const browsing = !!q.trim() || cat !== "All";
   const trending = [...ROSTER].sort((a, b) => b.reviews / b.jobs - a.reviews / a.jobs);
@@ -71,21 +74,21 @@ export default function Marketplace() {
   return (
     <HireCtx.Provider value={hire.start}>
     <View style={{ flex: 1 }}>
-    <ScrollView ref={scroll} contentContainerStyle={{ padding: 16, paddingTop: 18, paddingBottom: 40 }}>
+    <ScrollView ref={scroll} contentContainerStyle={{ padding: 16, paddingTop: 18, paddingBottom: 40 }}><Stage>
       <Label>Marketplace</Label>
       <T f="display" s={23} style={{ marginTop: 10, letterSpacing: -1.1 }}>Find your next hire.</T>
       <View style={{ marginTop: 14, height: 46, borderRadius: 23, backgroundColor: k.tint, flexDirection: "row", alignItems: "center", paddingHorizontal: 16, gap: 10 }}>
         <Icon name="search" size={18} color={k.ink45} />
         <TextInput value={q} onChangeText={setQ} placeholder="Search agents, makers, skills" placeholderTextColor={k.ink45} style={{ flex: 1, color: k.ink, fontFamily: F.sans, fontSize: 15 }} />
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16, marginTop: 14 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+      <HScroll gap={8} style={{ marginTop: 14 }}>
         {(["All", ...STORE_CATS.map((c) => c.id)] as const).map((c) => { const on = cat === c; return (
           <Pressable key={c} onPress={() => setCat(c)} style={{ height: 40, paddingHorizontal: 16, borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: on ? k.ink : k.card, borderWidth: on ? 0 : 1, borderColor: k.line }}>
             {c !== "All" ? <Icon name={STORE_CATS.find((x) => x.id === c)!.icon} size={15} color={on ? k.bg : k.ink75} /> : null}
             <T f="bold" s={14} c={on ? k.bg : k.ink75}>{c}</T>
           </Pressable>
         ); })}
-      </ScrollView>
+      </HScroll>
 
       {browsing ? (
         <View style={{ marginTop: 28 }}>
@@ -96,7 +99,7 @@ export default function Marketplace() {
       ) : (
         <>
           <Hero />
-          <Shelf title="Trending now" sub="What people are hiring this week">{trending.map((a) => <AppCard key={a.slug} a={a} width={card} />)}</Shelf>
+          <Shelf title="Trending now" sub="What people are hiring this week" snap={card}>{trending.map((a) => <AppCard key={a.slug} a={a} width={card} />)}</Shelf>
           <View style={{ marginTop: 40 }}>
             <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
               <View><T f="bold" s={20}>Top charts</T><T s={13.5} c={k.ink45}>Updated daily</T></View>
@@ -119,7 +122,7 @@ export default function Marketplace() {
               ); })}
             </View>
           </View>
-          <Shelf title="New & notable" sub="Fresh on the marketplace">{fresh.map((a) => <AppCard key={a.slug} a={a} wide width={300} />)}</Shelf>
+          <Shelf title="New & notable" sub="Fresh on the marketplace" snap={wideW}>{fresh.map((a, n) => <AppCard key={`${a.slug}-${n}`} a={a} wide width={wideW} />)}</Shelf>
           <T f="bold" s={20} style={{ marginTop: 40 }}>{"Editors' picks"}</T>
           <View style={{ gap: 14, marginTop: 14 }}>
             {picks.map((p) => (
@@ -145,7 +148,7 @@ export default function Marketplace() {
           </View>
         </>
       )}
-    </ScrollView>
+    </Stage></ScrollView>
     {hire.node}
     </View>
     </HireCtx.Provider>

@@ -1,6 +1,8 @@
 /** Port of webapp/app/(app)/profile/page.tsx at phone width: cover + picture, Edit profile / Sign out, name with plan badge, stats, Account / Security / Preferences tabs. */
+import { Stage } from "@/web/anim";
 import { useEffect, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Avatar, Cover, pickAndUpload, removeMedia, type MediaKind } from "@/web/media";
 import { router } from "expo-router";
 import Icon from "@/components/Icon";
 import { SecurityRows } from "@/components/SecurityRows";
@@ -8,7 +10,7 @@ import { api } from "@/lib/api";
 import { useSession } from "@/state/session";
 import { usePrefs } from "@/state/prefs";
 import { AgentTile, F, GRAPE, Grad, Label, Pill, T, WSheet, short, useC } from "@/web/kit";
-import { useData, youName } from "@/web/data";
+import { initialsOf, useData, youName } from "@/web/data";
 
 const SOCIAL_NAME: Record<string, string> = { twitter: "X", discord: "Discord", telegram: "Telegram" };
 
@@ -50,20 +52,32 @@ export default function Profile() {
   const team = me?.agents ?? [];
   const groups = (me?.chats ?? []).filter((c) => c.kind === "group").length;
   const since = me?.user.createdAt ? new Date(me.user.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+  // Tap the picture or cover: pick one, or with one already there, choose another or remove it (web profile tap()).
+  const edit_ = (kind: MediaKind) => {
+    const run = (f: () => Promise<unknown>) => f().then(() => reload()).catch((e: Error) => Alert.alert(kind === "avatar" ? "Profile picture" : "Cover photo", e.message || "That didn't save. Try again."));
+    const has = kind === "avatar" ? !!p.avatar : !!p.cover;
+    if (!has) return void run(() => pickAndUpload(kind, token));
+    Alert.alert(kind === "avatar" ? "Profile picture" : "Cover photo", undefined, [
+      { text: "Choose another", onPress: () => void run(() => pickAndUpload(kind, token)) },
+      { text: "Remove", style: "destructive", onPress: () => void run(() => removeMedia(kind, token)) },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
   const out = () => signOut().then(() => router.replace("/(auth)/sign-in"));
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 14, paddingBottom: 32, gap: 16 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 14, paddingBottom: 32, gap: 16 }}><Stage>
       <View style={{ borderRadius: 26, backgroundColor: k.card, borderWidth: 1, borderColor: k.line, overflow: "hidden" }}>
-        <View style={{ height: 112 }}>
-          <Grad angle={120} stops={[["#3514b0", 0], ["#5b2bff", 0.6], ["#8f6bff", 1]]} />
-          <Pressable accessibilityLabel="Add a cover photo" style={{ position: "absolute", right: 12, bottom: 12, width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center" }}><Icon name="camera" size={15} color="#fff" /></Pressable>
-        </View>
+        <Pressable onPress={() => edit_("cover")} accessibilityLabel={p.cover ? "Edit cover photo" : "Add a cover photo"} style={{ height: 112 }}>
+          <Grad angle={120} stops={[["#2a0f9a", 0], ["#5b2bff", 0.55], ["#8f6bff", 1]]} />
+          <Cover at={p.cover} />
+          <View style={{ position: "absolute", right: 10, bottom: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" }}><Icon name="camera" size={15} color="#fff" /></View>
+        </Pressable>
         <View style={{ paddingHorizontal: 18, paddingBottom: 14 }}>
-          <View style={{ marginTop: -46, width: 92, height: 92, borderRadius: 46, backgroundColor: k.ink, borderWidth: 5, borderColor: k.card, alignItems: "center", justifyContent: "center" }}>
-            <T f="bold" s={20} c={k.bg}>{youName(me).split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "Y"}</T>
-            <View style={{ position: "absolute", right: -4, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: GRAPE, borderWidth: 2, borderColor: k.card, alignItems: "center", justifyContent: "center" }}><Icon name="camera" size={12} color="#fff" /></View>
-          </View>
+          <Pressable onPress={() => edit_("avatar")} accessibilityLabel={p.avatar ? "Edit profile picture" : "Add a profile picture"} style={{ marginTop: -46, width: 92, height: 92, borderRadius: 46, borderWidth: 5, borderColor: k.card, backgroundColor: k.card }}>
+            <Avatar at={p.avatar} size={82} fs={26} initials={initialsOf(me)} />
+            <View style={{ position: "absolute", right: -4, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: GRAPE, borderWidth: 3, borderColor: k.card, alignItems: "center", justifyContent: "center" }}><Icon name="camera" size={12} color="#fff" /></View>
+          </Pressable>
           <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
             <Pill kind="ghost" icon="edit" label="Edit profile" h={42} style={{ flex: 1 }} onPress={() => setEdit(true)} />
             <Pill kind="outline" icon="out" label="Sign out" h={42} style={{ flex: 1 }} onPress={out} />
@@ -74,6 +88,7 @@ export default function Profile() {
           </View>
           <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 6, rowGap: 12, marginTop: 6 }}>
             {p.username ? <T f="semi" s={15} c={k.ink45}>{`@${p.username}`}</T> : <Pressable onPress={() => setEdit(true)}><T f="semi" s={14} c={k.brandInk}>Add a username</T></Pressable>}
+          {p.bio ? <T s={15} c={k.ink75} style={{ width: "100%", marginTop: 4, lineHeight: 21 }}>{p.bio}</T> : null}
           {/* as on the web: the link pill flows inline after "Add a username" and wraps when it doesn't fit */}
           {social?.links.length ? (
             <View style={{ width: "100%", flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
@@ -142,7 +157,7 @@ export default function Profile() {
         </>
       )}
       <EditSheet open={edit} onClose={() => setEdit(false)} initial={{ name: p.name ?? name, username: p.username ?? "", bio: (p as { bio?: string }).bio ?? "" }} onSave={async (v) => { if (token) await api("/api/me", { method: "PATCH", body: JSON.stringify({ profile: v }) }, token).catch(() => {}); await reload(); setEdit(false); }} />
-    </ScrollView>
+    </Stage></ScrollView>
   );
 }
 

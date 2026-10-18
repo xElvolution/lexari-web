@@ -16,7 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: { bundleIdentifier: mainnet ? "ai.lexari.app" : "ai.lexari.app.testnet", supportsTablet: false },
   android: {
     package: mainnet ? "ai.lexari.app" : "ai.lexari.app.testnet",
-    versionCode: 1,
+    versionCode: 2,
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       monochromeImage: "./assets/adaptive-monochrome.png",
@@ -35,6 +35,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ["expo-local-authentication", { faceIDPermission: "Unlock Lexari." }],
     ["expo-audio", { microphonePermission: "Lexari uses the microphone for voice notes and calls with your agent." }],
     ["expo-speech-recognition", { microphonePermission: "Lexari uses the microphone for calls with your agent.", speechRecognitionPermission: "Lexari turns what you say on a call into text for your agent." }],
+    ["expo-image-picker", { photosPermission: "Lexari uses your photos to set your profile picture and cover.", cameraPermission: false, microphonePermission: false }],
     ["expo-splash-screen", { backgroundColor: "#14072e", image: "./assets/splash-icon.png", imageWidth: 96 }],
   ],
   experiments: { typedRoutes: false },

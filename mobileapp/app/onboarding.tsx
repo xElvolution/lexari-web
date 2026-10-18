@@ -24,7 +24,8 @@ import { KNOW_SUGGESTIONS, LOOKS, NAMES, ROLES, TONES, cleanName, finishOnboardi
 import { usePrefs } from "@/state/prefs";
 import { useSession } from "@/state/session";
 import { useData } from "@/web/data";
-import { Btn, Chip, F, GRAPE, Rise, useC } from "@/web/kit";
+import { Btn, Chip, F, GRAPE, Rise, WSheet, useC } from "@/web/kit";
+import { COUNTRIES } from "@/content/countries";
 
 type Look = number | null | FaceLook;
 
@@ -98,6 +99,31 @@ function Backdrop({ width, height, center }: { width: number; height: number; ce
 
 const STEPS = ["Name", "Look", "About you", "Meet"];
 
+/** Where you're based: a searchable country list (no city or country is assumed). */
+function CountrySheet({ open, value, onClose, onPick }: { open: boolean; value: string; onClose: () => void; onPick: (c: string) => void }) {
+  const k = useC();
+  const [q, setQ] = useState("");
+  const t = q.trim().toLowerCase();
+  const list = t ? COUNTRIES.filter((c) => c.toLowerCase().includes(t)) : COUNTRIES;
+  return (
+    <WSheet open={open} title="Where you're based" sub="Your agent keeps your country in mind for times, money and spelling." onClose={() => { setQ(""); onClose(); }}>
+      <View style={{ height: 44, borderRadius: 22, backgroundColor: k.tint, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, gap: 8 }}>
+        <Icon name="search" size={16} color={k.ink45} />
+        <TextInput value={q} onChangeText={setQ} autoFocus={false} placeholder="Search countries" placeholderTextColor={k.ink45} accessibilityLabel="Search countries" style={{ flex: 1, color: k.ink, fontFamily: F.sans, fontSize: 15, ...(Platform.OS === "web" ? { outlineStyle: "none" } as object : null) }} />
+      </View>
+      <View style={{ marginTop: 8 }}>
+        {list.map((c) => (
+          <Pressable key={c} accessibilityRole="button" accessibilityState={{ selected: c === value }} onPress={() => { tap(); setQ(""); onPick(c); }} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 8, borderRadius: 12, backgroundColor: pressed ? k.tint : "transparent" })}>
+            <Text style={{ flex: 1, fontFamily: c === value ? F.bold : F.semi, fontSize: 15, color: k.ink }}>{c}</Text>
+            {c === value ? <Icon name="check" size={16} stroke={3} color={k.brandInk} /> : null}
+          </Pressable>
+        ))}
+        {!list.length ? <Text style={{ fontFamily: F.sans, fontSize: 14, color: k.ink60, textAlign: "center", paddingVertical: 20 }}>No country matches.</Text> : null}
+      </View>
+    </WSheet>
+  );
+}
+
 export default function Onboarding() {
   const k = useC();
   const insets = useSafeAreaInsets();
@@ -112,6 +138,8 @@ export default function Onboarding() {
   const [base, setBase] = useState<number | null | undefined>(undefined);
   const [you, setYou] = useState("");
   const [role, setRole] = useState("");
+  const [country, setCountry] = useState("");
+  const [picker, setPicker] = useState(false);
   const [tone, setTone] = useState<ToneId>("short");
   const [knows, setKnows] = useState<string[]>([KNOW_SUGGESTIONS[0]]);
   const [custom, setCustom] = useState("");
@@ -133,7 +161,7 @@ export default function Onboarding() {
   const shown = name.trim() || "your agent";
   const agentName = name.trim() || "Juniper";
   const can = step === 0 ? !!name.trim() : true;
-  const knownCount = knows.length + (you ? 1 : 0);
+  const knownCount = knows.length + (you ? 1 : 0) + (country ? 1 : 0);
   const v = lookVariant(look);
   const bg = look && typeof look === "object" ? look.bg : undefined;
   const toggleKnow = (t: string) => setKnows((l) => (l.includes(t) ? l.filter((x) => x !== t) : [...l, t].slice(0, 8)));
@@ -145,7 +173,7 @@ export default function Onboarding() {
     setSaving(true); setErr("");
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     try {
-      const r = await finishOnboarding(token, wallet || me?.user.wallet, { name: agentName, look, you: you.trim(), role, tone }, knows);
+      const r = await finishOnboarding(token, wallet || me?.user.wallet, { name: agentName, look, you: you.trim(), role, tone, country }, knows);
       if (r.total && r.saved < r.total) setNote(r.saved ? `${r.saved} of ${r.total} first memories were filed. Add the rest from its brain.` : "Its first memories need your wallet's memory key. Open its brain to add them.");
       void reload();
       setTimeout(() => setFinale("setup"), 380);
@@ -270,6 +298,12 @@ export default function Onboarding() {
               lead("These become its first memories. You can edit or forget any of them later in its brain."),
               <View key="form" style={{ marginTop: 20, gap: 16, maxWidth: 560 }}>
                 <View>{small("Your first name")}<TextInput value={you} onChangeText={(t) => setYou(t.slice(0, 20))} placeholder="Ada" placeholderTextColor={k.ink45} accessibilityLabel="Your first name" style={[field, { marginTop: 8 }]} /></View>
+                <View>{small("Where you're based")}
+                  <Pressable accessibilityRole="button" accessibilityLabel={country ? `Country, ${country}. Change` : "Choose your country"} onPress={() => setPicker(true)} style={[field, { marginTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+                    <Text style={{ flex: 1, fontFamily: country ? F.semi : F.sans, fontSize: 16, color: country ? k.ink : k.ink45 }}>{country || "Choose your country"}</Text>
+                    {country ? <Pressable accessibilityLabel="Clear country" hitSlop={8} onPress={() => setCountry("")}><Icon name="x" size={16} color={k.ink45} /></Pressable> : <Icon name="globe" size={16} color={k.ink45} />}
+                  </Pressable>
+                </View>
                 <View>{small("What you do")}<View style={{ marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{ROLES.map((r) => <Chip key={r} label={r} on={role === r} onPress={() => setRole(role === r ? "" : r)} />)}</View></View>
                 <View>{small("How it should talk")}<View style={{ marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>{TONES.map((t) => <Chip key={t.id} label={t.label} on={tone === t.id} onPress={() => setTone(t.id)} />)}</View></View>
                 <View>
@@ -280,7 +314,7 @@ export default function Onboarding() {
                     ))}
                   </View>
                   <View style={{ marginTop: 12, flexDirection: "row", gap: 8 }}>
-                    <TextInput value={custom} onChangeText={(t) => setCustom(t.slice(0, 80))} placeholder="Add your own, like: I work from Lagos" placeholderTextColor={k.ink45} accessibilityLabel="Add a memory" onSubmitEditing={addCustom} returnKeyType="done" style={[field, { flex: 1 }]} />
+                    <TextInput value={custom} onChangeText={(t) => setCustom(t.slice(0, 80))} placeholder="Add your own, like: I start at 9" placeholderTextColor={k.ink45} accessibilityLabel="Add a memory" onSubmitEditing={addCustom} returnKeyType="done" style={[field, { flex: 1 }]} />
                     <Btn kind="ghost" h={46} fs={13.5} label="Add" disabled={!custom.trim()} onPress={addCustom} />
                   </View>
                 </View>
@@ -322,6 +356,7 @@ export default function Onboarding() {
               </Btn>}
         </View>
       </View>
+      <CountrySheet open={picker} value={country} onClose={() => setPicker(false)} onPick={(c) => { setCountry(c); setPicker(false); }} />
     </KeyboardAvoidingView>
   );
 }

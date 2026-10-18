@@ -1,6 +1,7 @@
 /** Phone kit that mirrors app.lexari.ai at 390px: colours, type scale, top bar, agent tiles with rings, labels, pills. */
 import { useEffect, useState, type ReactNode } from "react";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
+import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from "react-native-reanimated";
+import { useData } from "@/web/data";
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import { Modal, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { router } from "expo-router";
@@ -11,6 +12,7 @@ import AgentFace from "@/components/AgentFace";
 import { lookVariant } from "@/components/avatar";
 import { usePrefs } from "@/state/prefs";
 import { NotifyBell } from "@/components/Notifications";
+import { Avatar } from "@/web/media";
 
 export const GRAPE = "#5b2bff", GRAPE_SOFT = "#8f6bff", GOLD = "#f5c542", SILVER = "#c4c8d2", ONLINE = "#22c55e", IDLE = "#8a8797";
 export const F = {
@@ -35,9 +37,9 @@ export function T({ f = "sans", s = 14, c, style, children, lines, ...rest }: { 
   return <Text numberOfLines={lines} {...rest} style={[{ fontFamily: F[f], fontSize: s, color: c ?? k.ink }, style as TextStyle]}>{children}</Text>;
 }
 /** The mono uppercase eyebrow (.label). */
-export function Label({ children, c, s = 10, style }: { children: ReactNode; c?: string; s?: number; style?: TextStyle }) {
+export function Label({ children, c, s = 10, style, lines }: { children: ReactNode; c?: string; s?: number; style?: TextStyle; lines?: number }) {
   const k = useC();
-  return <Text style={[{ fontFamily: F.mono, fontSize: s, letterSpacing: s * 0.06, textTransform: "uppercase", color: c ?? k.brandInk }, style]}>{children}</Text>;
+  return <Text numberOfLines={lines} style={[{ fontFamily: F.mono, fontSize: s, letterSpacing: s * 0.06, textTransform: "uppercase", color: c ?? k.brandInk }, style]}>{children}</Text>;
 }
 export function Card({ children, style, onPress }: { children: ReactNode; style?: ViewStyle | ViewStyle[]; onPress?: () => void }) {
   const k = useC();
@@ -45,10 +47,10 @@ export function Card({ children, style, onPress }: { children: ReactNode; style?
   return onPress ? <Pressable onPress={() => { tap(); onPress(); }} style={({ pressed }) => [...st, pressed && { opacity: 0.85 }]}>{children}</Pressable> : <View style={st}>{children}</View>;
 }
 /** Rounded pill button: brand (purple), light (white), ghost (tint), outline. */
-export function Pill({ label, onPress, kind = "brand", icon, h = 40, style, disabled, fs = 14 }: { label: string; onPress?: () => void; kind?: "brand" | "light" | "ghost" | "outline" | "soft"; icon?: string; h?: number; style?: ViewStyle; disabled?: boolean; fs?: number }) {
+export function Pill({ label, onPress, kind = "brand", icon, h = 40, style, disabled, fs = 14 }: { label: string; onPress?: () => void; kind?: "brand" | "light" | "ghost" | "outline" | "soft" | "white"; icon?: string; h?: number; style?: ViewStyle; disabled?: boolean; fs?: number }) {
   const k = useC();
-  const bg = kind === "brand" ? GRAPE : kind === "light" ? (k.dark ? "#fff" : "#0a0a0a") : kind === "ghost" ? k.tint : kind === "soft" ? "rgba(255,255,255,0.15)" : "transparent";
-  const fg = kind === "brand" || kind === "soft" ? "#fff" : kind === "light" ? (k.dark ? "#0a0a0a" : "#fff") : k.ink;
+  const bg = kind === "white" ? "#fff" : kind === "brand" ? GRAPE : kind === "light" ? (k.dark ? "#fff" : "#0a0a0a") : kind === "ghost" ? k.tint : kind === "soft" ? "rgba(255,255,255,0.15)" : "transparent";
+  const fg = kind === "white" ? "#0a0a0a" : kind === "brand" || kind === "soft" ? "#fff" : kind === "light" ? (k.dark ? "#0a0a0a" : "#fff") : k.ink;
   return (
     <Pressable disabled={disabled} onPress={() => { tap(); onPress?.(); }} style={({ pressed }) => [{ height: h, borderRadius: h / 2, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: bg, borderWidth: kind === "outline" ? 1.5 : 0, borderColor: k.ink, opacity: disabled ? 0.5 : pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }, style]}>
       {icon ? <Icon name={icon} size={fs + 2} color={fg} /> : null}
@@ -82,25 +84,44 @@ export function ringOf(slug: string, kind?: string, primary = "home"): Ring {
   return slug === "home" || kind === "custom" || slug.startsWith("c-") ? "made" : "hired";
 }
 /** An agent face on its tile with the gold / purple / silver ring and a presence dot (faces.tsx AgentTile). */
-export function AgentTile({ slug, look, size = 48, ring, dot = true, live = false, mood, radius, face: faceSize }: { slug: string; look?: unknown; size?: number; ring?: Ring; dot?: boolean; live?: boolean; mood?: "idle" | "thinking" | "speaking" | "happy"; radius?: number; /** face size inside the tile (default 74% of it) */ face?: number }) {
+export function AgentTile({ slug, look, size = 48, ring, dot = true, live = false, mood, radius, face: faceSize, animate }: { slug: string; look?: unknown; size?: number; ring?: Ring; dot?: boolean; live?: boolean; mood?: "idle" | "thinking" | "speaking" | "happy"; radius?: number; /** face size inside the tile (default 74% of it) */ face?: number; /** keep the face alive (blink, glance, orbit dots) even when idle */ animate?: boolean }) {
   const k = useC();
   const r = radius ?? Math.round(size * 0.32), d = Math.max(8, Math.round(size * 0.24));
   const rc = ring === "primary" ? GOLD : ring === "made" ? GRAPE_SOFT : ring === "hired" ? (k.dark ? SILVER : "#a9aebb") : null;
   const face = faceSize ?? Math.round(size * 0.74);
   const lk = look && typeof look === "object" && Object.keys(look as object).some((x) => x !== "v") ? lookVariant(look as never) : null;
+  // Level perks (webapp faces.tsx AgentTile): a breathing purple glow from level 4 (Card glow), gold from level 10 (Legend)
+  const { me, hub } = useData();
+  const mine = size >= 26 && !!me?.agents.some((a) => a.slug === slug);
+  const lv = mine ? hub?.levels?.find((l) => l.slug === slug)?.level ?? 1 : 1;
+  const perk = lv >= 10 ? "legend" : lv >= 4 ? "glow" : null;
   return (
     <View style={{ width: size, height: size }}>
+      {perk ? <PerkGlow kind={perk} radius={r} pad={2} /> : null}
       {rc ? <View style={{ position: "absolute", left: -4, top: -4, right: -4, bottom: -4, borderRadius: r + 4, borderWidth: 2, borderColor: rc, ...(ring === "primary" ? { shadowColor: GOLD, shadowOpacity: 0.7, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } } : null) }} /> : null}
       <View style={{ width: size, height: size, borderRadius: r, backgroundColor: k.faceTile, borderWidth: 1, borderColor: k.line, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-        {lk ? <AgentFace variant={lk} size={face} state={mood} animated={!!mood && mood !== "idle"} /> : <Face slug={slug === "home" ? undefined : slug} size={face} mood={mood} />}
+        {lk ? <AgentFace variant={lk} size={face} state={mood} animated={animate ?? (!!mood && mood !== "idle")} /> : <Face slug={slug === "home" ? undefined : slug} size={face} mood={mood} animated={animate} />}
       </View>
       {dot && ring ? <View style={{ position: "absolute", width: d, height: d, borderRadius: d / 2, right: -d * 0.15, bottom: -d * 0.15, backgroundColor: live ? ONLINE : IDLE, borderWidth: 2, borderColor: k.alt }} /> : null}
     </View>
   );
 }
 
+/** [data-tile-perk] / [data-card-perk]: a soft halo that breathes every 3.2s, purple (glow) or gold (legend). */
+export function PerkGlow({ kind, radius, pad = 0, strong }: { kind: "glow" | "legend"; radius: number; pad?: number; strong?: boolean }) {
+  const p = useSharedValue(0);
+  useEffect(() => { p.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.sin) }), -1, true); return () => cancelAnimation(p); }, [p]);
+  const gold = kind === "legend";
+  const lo = gold ? "rgba(233,183,58,0.55)" : "rgba(139,92,246,0.5)", hi = gold ? "rgba(247,215,116,0.85)" : "rgba(168,120,255,0.8)";
+  const st = useAnimatedStyle(() => ({ opacity: 0.55 + 0.45 * p.value, transform: [{ scale: 1 + 0.03 * p.value }] }));
+  const blur = strong ? 30 : 10, spread = strong ? 5 : 2;
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: "absolute", left: -pad, top: -pad, right: -pad, bottom: -pad, borderRadius: radius + pad, boxShadow: `0 0 ${blur}px ${spread}px ${lo}, 0 0 ${blur * 1.6}px ${spread * 2}px ${hi}` }, st]} />
+  );
+}
+
 /** The phone top bar: logo, bell, theme toggle, profile initials. */
-export function TopBar({ initials = "A" }: { initials?: string }) {
+export function TopBar({ initials = "A", avatar }: { initials?: string; avatar?: unknown }) {
   const k = useC();
   const { setTheme, isDark } = usePrefs();
   return (
@@ -109,7 +130,7 @@ export function TopBar({ initials = "A" }: { initials?: string }) {
       <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
         <NotifyBell />
         <Round label="Theme" icon={isDark ? "sun" : "moon"} onPress={() => setTheme(isDark ? "light" : "dark")} />
-        <Round label="Profile" filled={<Text style={{ fontFamily: F.bold, fontSize: 13, color: k.bg }}>{initials}</Text>} onPress={() => router.navigate("/(tabs)/profile")} />
+        <Round label="Profile" filled={<Avatar at={avatar} initials={initials} size={44} fs={13} />} onPress={() => router.navigate("/(tabs)/profile")} />
       </View>
     </View>
   );

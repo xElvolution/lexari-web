@@ -39,7 +39,11 @@ export default function AgentFace({ seed, variant, size = 96, state = "idle", an
   const tRaw = useClock(animated);
   const live = animated && tRaw > 0;
   const t = live ? tRaw : 0.6; // still faces use a pleasant frame
-  const v0: Variant = { ...(seed === undefined ? HOME : variantFor(seed)), ...variant };
+  const base = seed === undefined ? HOME : variantFor(seed);
+  const v0: Variant = { ...base, ...(variant ? Object.fromEntries(Object.entries(variant).filter(([, x]) => x !== undefined && x !== null)) : null) } as Variant;
+  // a look saved by a newer or older app may name a colour or shape this build doesn't know: fall back instead of crashing
+  if (!PALETTE[v0.color]) v0.color = base.color in PALETTE ? base.color : HOME.color;
+  if (!LAYOUT[v0.shape]) v0.shape = base.shape in LAYOUT ? base.shape : HOME.shape;
   const v: Variant = { ...v0, extra: safeExtra(v0.extra) }; // headwear retired
   const c = PALETTE[v.color];
   const fc = c.fc, L = LAYOUT[v.shape], ey0 = L.eye, my = L.mouth;
