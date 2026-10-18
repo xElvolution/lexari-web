@@ -158,7 +158,7 @@ Every integration is **off until you add it**, granted to specific agents, and b
 | Kimi K3 and Qwen 3.8 Max as house models | 🟢 | Live in the model picker on Lexari's own Moonshot and Alibaba Model Studio keys, each with a fallback chain. Kimi K2.5 already powers Lamina |
 | 0G Compute router | 🟢 | A house provider on the 0G Compute Router (OpenAI-compatible). Kimi, Qwen, OpenAI and Claude in the picker run through it with one `ZG_COMPUTE_API_KEY` (direct Moonshot and DashScope keys are optional overrides). Set on the production server and answering |
 | Per-model fallback chains | 🟢 | Each house model has its own chain (Kimi, then Qwen, then OpenAI on 0G, then Lamina), tried only before any text reaches you. `HOUSE_FALLBACKS` reorders or empties a chain per model and `HOUSE_FALLBACK_LAMINA=0` turns off the Lamina last resort |
-| Cost dashboard and per-agent model caps | ⚪ | Model router v2 |
+| Cost dashboard and per-agent model caps | 🟢 | Settings > Billing > Costs: this cycle's model spend by agent, model and day. Each agent can have a cap per cycle, checked before the model runs; your own API keys never count |
 
 <br/>
 
