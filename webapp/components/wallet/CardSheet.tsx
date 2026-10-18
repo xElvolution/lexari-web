@@ -9,6 +9,7 @@ import { toast, useApp } from "@/lib/store";
 import Icon from "../Icon";
 import PinPad from "../lock/PinPad";
 import CardVisual from "./CardVisual";
+import TempoCardRow from "../agentpay/TempoCardRow";
 import { CARD_LIMITS } from "./cards";
 import { updateCard } from "./useCards";
 import { useMask } from "@/lib/privacy";
@@ -91,6 +92,8 @@ export default function CardSheet({ agent, name, card, onClose }: { agent: strin
             <div className="flex items-baseline justify-between text-[13.5px]"><span className="text-ink/65">Spent this month</span><span className="tab-num font-mono font-semibold text-ink">{mask(`$${card.spent}`)} / ${card.limit}</span></div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink/10"><div className="h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></div>
           </div>
+          {/* Tempo balance, limits, spend and address: only here, never on the Cards tab itself */}
+          <div data-card-tempo className="mt-3 animate-[price-in_.45s_cubic-bezier(.2,.8,.2,1)_.08s_both] motion-reduce:animate-none"><TempoCardRow agent={agent} name={name} summary /></div>
           <div className="mt-3 divide-y divide-[var(--line)] rounded-2xl px-4 ring-1 ring-line">
             <div className="flex items-center gap-3 py-3"><div className="min-w-0 flex-1"><div className="text-[14.5px] font-semibold text-ink">Freeze card</div><div className="text-[12.5px] text-ink/55">Stops new purchases until you unfreeze.</div></div>
               <button role="switch" aria-checked={card.frozen} aria-label="Freeze card" onClick={() => act({ frozen: !card.frozen }, card.frozen ? "Card unfrozen" : "Card frozen")} className={`relative h-7 w-12 rounded-full transition ${card.frozen ? "bg-grape" : "bg-ink/20"}`}><i className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${card.frozen ? "left-6" : "left-1"}`} /></button></div>

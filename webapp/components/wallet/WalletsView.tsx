@@ -14,7 +14,6 @@ import { cardFor, useCards } from "./useCards";
 import type { Card } from "@/lib/pay";
 import { MASK, setHideBalance, useHideBalance } from "@/lib/privacy";
 import CardSheet from "./CardSheet";
-import TempoCardRow from "../agentpay/TempoCardRow";
 import { cardPriceLabel } from "@/lib/prices";
 import { AgentWalletCard, useWallet, type WalletData } from "./agentWallet";
 import HistorySheet from "./HistorySheet";
@@ -70,7 +69,6 @@ function CardRow({ a, card, onGet, onOpen }: { a: MyAgent; card: Card | null; on
             <div className="h-1 overflow-hidden rounded-full bg-ink/10"><div className="h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></div>
             <div className="mt-1.5 text-right text-[11.5px] font-semibold tabular-nums text-ink/55">{pct}% used</div>
           </div>
-          <TempoCardRow agent={a.id} name={a.name} summary />
           <button data-view-card-row onClick={onOpen} className="btn btn-brand btn-sm"><Icon name="eye" size={15} />Card details</button>
         </>
       ) : (
