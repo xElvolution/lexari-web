@@ -265,3 +265,5 @@ export default function HireDetail() {
     </HireCtx.Provider>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

@@ -122,3 +122,5 @@ export default function TabsLayout() {
     </>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

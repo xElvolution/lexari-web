@@ -6,10 +6,12 @@ import Animated, { Easing, cancelAnimation, interpolate, runOnJS, useAnimatedSty
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "@/components/Icon";
+import { useMotion } from "@/lib/motion";
 import { F, GRAPE, useC } from "@/web/kit";
 
 /** A looping 0→1 clock: `linear` for spins, ease-in-out ping-pong otherwise. */
-function useLoop(ms: number, on = true, linear = false) {
+function useLoop(ms: number, want = true, linear = false) {
+  const on = useMotion(want);
   const p = useSharedValue(0);
   useEffect(() => {
     if (!on) { cancelAnimation(p); p.value = withTiming(0, { duration: 200 }); return; }

@@ -90,7 +90,7 @@ export function AppCard({ a, wide, width }: { a: Specialist; wide?: boolean; wid
           ) : (
             <View style={{ flex: 1, borderRadius: 22, backgroundColor: k.faceTile, borderWidth: 1, borderColor: k.line, alignItems: "center", justifyContent: "center" }}>
               {/* the web tile: the whole card is the agent's face tile, the face drawn at 136px */}
-              <Face slug={a.slug} size={Math.min(136, Math.round(width * 0.72))} animated />
+              <Face slug={a.slug} size={Math.min(136, Math.round(width * 0.72))} />
             </View>
           )}
           <FlipChip />

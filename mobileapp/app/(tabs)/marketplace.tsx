@@ -155,3 +155,5 @@ export default function Marketplace() {
   );
 }
 
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

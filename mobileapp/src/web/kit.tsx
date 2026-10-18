@@ -1,5 +1,6 @@
 /** Phone kit that mirrors app.lexari.ai at 390px: colours, type scale, top bar, agent tiles with rings, labels, pills. */
 import { useEffect, useState, type ReactNode } from "react";
+import { useMotion } from "@/lib/motion";
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from "react-native-reanimated";
 import { useData } from "@/web/data";
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
@@ -110,10 +111,11 @@ export function AgentTile({ slug, look, size = 48, ring, dot = true, live = fals
 /** [data-tile-perk] / [data-card-perk]: a soft halo that breathes every 3.2s, purple (glow) or gold (legend). */
 export function PerkGlow({ kind, radius, pad = 0, strong }: { kind: "glow" | "legend"; radius: number; pad?: number; strong?: boolean }) {
   const p = useSharedValue(0);
-  useEffect(() => { p.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.sin) }), -1, true); return () => cancelAnimation(p); }, [p]);
+  const on = useMotion();
+  useEffect(() => { if (!on) { cancelAnimation(p); return; } p.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.sin) }), -1, true); return () => cancelAnimation(p); }, [p, on]);
   const gold = kind === "legend";
   const lo = gold ? "rgba(233,183,58,0.55)" : "rgba(139,92,246,0.5)", hi = gold ? "rgba(247,215,116,0.85)" : "rgba(168,120,255,0.8)";
-  const st = useAnimatedStyle(() => ({ opacity: 0.55 + 0.45 * p.value, transform: [{ scale: 1 + 0.03 * p.value }] }));
+  const st = useAnimatedStyle(() => ({ opacity: 0.55 + 0.45 * p.value, }));
   const blur = strong ? 30 : 10, spread = strong ? 5 : 2;
   return (
     <Animated.View pointerEvents="none" style={[{ position: "absolute", left: -pad, top: -pad, right: -pad, bottom: -pad, borderRadius: radius + pad, boxShadow: `0 0 ${blur}px ${spread}px ${lo}, 0 0 ${blur * 1.6}px ${spread * 2}px ${hi}` }, st]} />

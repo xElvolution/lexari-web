@@ -150,3 +150,5 @@ export default function Call() {
     </View>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

@@ -360,3 +360,5 @@ export default function Onboarding() {
     </KeyboardAvoidingView>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

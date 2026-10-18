@@ -66,3 +66,5 @@ export default function Root() {
     </GestureHandlerRootView>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

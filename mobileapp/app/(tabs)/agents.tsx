@@ -179,3 +179,5 @@ function GroupTile({ members, look, size = 44 }: { members: string[]; look: (s: 
     </View>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

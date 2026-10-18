@@ -2,20 +2,21 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AccessibilityInfo } from "react-native";
 import Svg, { Circle, Ellipse, G, Path, Rect } from "react-native-svg";
+import { useMotion, subscribeClock } from "@/lib/motion";
 import { HOME, PALETTE, safeExtra, variantFor, type FaceState, type Shape, type Variant } from "./avatar";
 
 type Props = { seed?: number; variant?: Partial<Variant>; size?: number; state?: FaceState; animated?: boolean; /** where the eyes look, -1..1 each way (overrides the idle glance) */ gaze?: { x: number; y: number } | null };
 
-/** seconds since mount at ~30 fps while `on` (paused when the tab is hidden or motion is reduced) */
-function useClock(on: boolean) {
+/** seconds on a shared ~24 fps clock while `on` and the screen is focused (paused when hidden, backgrounded or motion is reduced) */
+let reduceMotion = false;
+AccessibilityInfo.isReduceMotionEnabled().then((r) => { reduceMotion = r; }).catch(() => {});
+AccessibilityInfo.addEventListener?.("reduceMotionChanged", (r) => { reduceMotion = r; });
+function useClock(want: boolean) {
+  const on = useMotion(want);
   const [t, setT] = useState(0);
   useEffect(() => {
     if (!on) return;
-    let reduce = false, raf = 0, last = 0; const t0 = Date.now();
-    AccessibilityInfo.isReduceMotionEnabled().then((r) => { reduce = r; }).catch(() => {});
-    const loop = () => { raf = requestAnimationFrame(loop); const now = Date.now(); if (reduce || now - last < 33) return; last = now; setT((now - t0) / 1000); };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return subscribeClock((now) => { if (!reduceMotion) setT(now); });
   }, [on]);
   return t;
 }

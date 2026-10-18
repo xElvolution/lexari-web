@@ -109,3 +109,5 @@ export default function Team() {
     </Stage></ScrollView>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

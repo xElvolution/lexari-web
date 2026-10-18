@@ -11,3 +11,5 @@ export default function Billing() {
     </View>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

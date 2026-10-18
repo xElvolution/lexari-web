@@ -483,3 +483,5 @@ function StoreSheet({ open, onClose, hub, coins, onBuy, onWear }: { open: boolea
     </WSheet>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

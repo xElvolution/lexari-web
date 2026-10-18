@@ -63,14 +63,15 @@ function CardRow({ a, card, onGet, onOpen }: { a: MyAgent; card: Card | null; on
   const pct = card ? Math.min(100, Math.round((card.spent / Math.max(1, card.limit)) * 100)) : 0;
   return (
     <article data-rise data-card-row={a.id} className="mx-auto flex w-full max-w-[400px] flex-col items-center gap-3 rounded-[24px] bg-card p-4 ring-1 ring-line">
-      {card ? <div data-open-card={a.id} className="w-full"><TempoCardRow agent={a.id} name={a.name} /></div> : <CardVisual id={a.id} name={a.name} card={card} className="w-full opacity-90" />}
+      {card ? <button data-open-card={a.id} onClick={onOpen} aria-label={`Open ${a.name}'s card`} className="flex w-full justify-center text-left transition active:scale-[.98]"><CardVisual id={a.id} name={a.name} card={card} /></button> : <CardVisual id={a.id} name={a.name} card={card} className="w-full opacity-90" />}
       {card ? (
         <>
           <div data-card-usage className="w-full px-1" aria-label={`${pct}% of the monthly limit used`}>
             <div className="h-1 overflow-hidden rounded-full bg-ink/10"><div className="h-full rounded-full bg-grape" style={{ width: `${pct}%` }} /></div>
             <div className="mt-1.5 text-right text-[11.5px] font-semibold tabular-nums text-ink/55">{pct}% used</div>
           </div>
-          <button data-view-card-row onClick={onOpen} className="btn btn-ghost btn-sm"><Icon name="eye" size={15} />Card details</button>
+          <TempoCardRow agent={a.id} name={a.name} summary />
+          <button data-view-card-row onClick={onOpen} className="btn btn-brand btn-sm"><Icon name="eye" size={15} />Card details</button>
         </>
       ) : (
         <button onClick={onGet} className="btn btn-brand btn-sm"><Icon name="plus" size={15} />Get a Tempo card for {a.name} · {cardPriceLabel()}</button>

@@ -4,6 +4,7 @@
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { AccessibilityInfo, Pressable, Text, View } from "react-native";
+import { useMotion } from "@/lib/motion";
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient as SvgGrad, Rect, Stop } from "react-native-svg";
 import AgentFace from "./AgentFace";
@@ -28,7 +29,8 @@ const SPRING = Easing.bezier(0.3, 1.35, 0.5, 1);
 /** .holo-sheen: a rainbow foil band sweeping across the face panel every 4.5s. */
 function HoloSheen() {
   const p = useSharedValue(0);
-  useEffect(() => { p.value = withRepeat(withTiming(1, { duration: 4500, easing: Easing.linear }), -1, false); return () => cancelAnimation(p); }, [p]);
+  const on = useMotion();
+  useEffect(() => { if (!on) { cancelAnimation(p); return; } p.value = withRepeat(withTiming(1, { duration: 4500, easing: Easing.linear }), -1, false); return () => cancelAnimation(p); }, [p, on]);
   const st = useAnimatedStyle(() => ({ transform: [{ translateX: -520 + 780 * p.value }, { translateY: -60 + 120 * p.value }, { rotate: "-25deg" }] }));
   return (
     <Animated.View pointerEvents="none" style={[{ position: "absolute", left: 0, top: -120, width: 520, height: 380, opacity: 0.9 }, st]}>

@@ -27,6 +27,12 @@ const LOGO: Record<string, number> = { "Moonshot AI": require("../../assets/mode
 
 type Billing = { plan: { id: string }; usage: { lamina: { used: number; limit: number }; free?: { resetsAt: number } }; credits: { balance: number; spent: number }; models: { gateway: boolean; available: Record<string, boolean>; agents: Record<string, string | null>; chats: Record<string, string>; default: string; keys: unknown[]; prefs: { off: string[] } } };
 
+/** The server sends model prefs as stored ({} for most accounts, so no "off" list) and may omit maps; never trust the shape in render. */
+function normBilling(b: Billing): Billing {
+  const m = (b?.models ?? {}) as Partial<Billing["models"]>;
+  return { ...b, plan: b?.plan ?? { id: "free" }, credits: { balance: b?.credits?.balance ?? 0, spent: b?.credits?.spent ?? 0 }, usage: { ...(b?.usage ?? {}), lamina: { used: b?.usage?.lamina?.used ?? 0, limit: b?.usage?.lamina?.limit ?? 0 } }, models: { gateway: !!m.gateway, available: m.available ?? {}, agents: m.agents ?? {}, chats: m.chats ?? {}, default: m.default || "lamina", keys: Array.isArray(m.keys) ? m.keys : [], prefs: { ...(m.prefs ?? {}), off: Array.isArray(m.prefs?.off) ? m.prefs!.off : [] } } };
+}
+
 export function LaminaMark({ size = 20, color = "#fff" }: { size?: number; color?: string }) {
   return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"><Path d="M12 3.5 20.5 8 12 12.5 3.5 8z" fill={color} /><Path d="m3.5 12 8.5 4.5 8.5-4.5" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.75} /><Path d="m3.5 16 8.5 4.5 8.5-4.5" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.45} /></Svg>;
 }
@@ -45,7 +51,7 @@ export function ModelSheet({ open, onClose, convo, agent, agentName, group, onCh
   const [s, setS] = useState<Billing | null>(null);
   const [scope, setScope] = useState<"chat" | "agent">("agent");
   const [busy, setBusy] = useState<string | null>(null);
-  useEffect(() => { if (open && token) api<Billing>("/api/billing", {}, token).then((b) => { setS(b); setScope(group || !agent ? "chat" : b.models.chats[convo] ? "chat" : "agent"); }).catch(() => {}); }, [open, token]);
+  useEffect(() => { if (open && token) api<Billing>("/api/billing", {}, token).then((raw) => { const b = normBilling(raw); setS(b); setScope(group || !agent ? "chat" : b.models.chats[convo] ? "chat" : "agent"); }).catch(() => {}); }, [open, token]);
   const cur = s ? (s.models.chats[convo] || (agent && s.models.agents[agent]) || s.models.default || "lamina") : "lamina";
   const selected = s && scope === "agent" && agent ? (s.models.agents[agent] || s.models.default || "lamina") : cur;
   const pick = async (m: M) => {

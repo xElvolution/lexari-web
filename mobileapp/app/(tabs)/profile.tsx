@@ -182,3 +182,5 @@ function EditSheet({ open, onClose, initial, onSave }: { open: boolean; onClose:
     </WSheet>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

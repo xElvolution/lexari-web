@@ -203,3 +203,5 @@ export default function Desktop() {
     </View>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

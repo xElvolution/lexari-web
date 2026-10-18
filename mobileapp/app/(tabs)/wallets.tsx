@@ -1,5 +1,6 @@
 import { useHideBalance } from "@/lib/privacy";
 import { Stage } from "@/web/anim";
+import { CardDetailsSheet, PayCardFace, TempoSummary, type PayCard, type Tempo } from "@/components/PayCard";
 import { useLocalSearchParams } from "expo-router";
 /** Port of webapp/components/wallet/WalletsView.tsx at phone width: Wallet / Cards tabs, Lexari balance (Top up, History), each agent's wallet (Fund, Move to balance). */
 import { useEffect, useState } from "react";
@@ -19,45 +20,6 @@ import { AgentTile, F, GRAPE, Label, Pill, Segs, T, WSheet, ringOf, short, useC 
 import { primaryOf, useData, type Wallet } from "@/web/data";
 
 const usd = (micros: number) => `$${(Math.max(0, micros) / 1e6).toFixed(2)}`;
-type PayCard = { agent: string; last4: string; limit: number; spent: number; frozen: boolean; test?: boolean };
-
-type Tempo = { address: string; frozen: boolean; perTxUsd: number; dailyUsd: number; spentTodayUsd: number; balances: { symbol: string; amount: number }[] | null };
-/** The real Tempo card face (same as webapp/components/agentpay/TempoCardRow.tsx). */
-function TempoFace({ slug, name, token }: { slug: string; name: string; token?: string | null }) {
-  const [c, setC] = useState<Tempo | null>(null);
-  useEffect(() => { if (token) api<Tempo>(`/api/agents/card?agent=${encodeURIComponent(slug)}`, {}, token).then(setC).catch(() => setC(null)); }, [slug, token]);
-  if (!c) return <T s={13} c="#888">Loading card…</T>;
-  const tot = (c.balances || []).reduce((n, b) => n + b.amount, 0);
-  return (
-    <View style={{ alignSelf: "stretch", borderRadius: 16, padding: 16, backgroundColor: c.frozen ? "#5b5b66" : "#3b2a8f" }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}><Label s={9} c="rgba(255,255,255,0.7)">Tempo card</Label><Label s={9} c="rgba(255,255,255,0.7)">{c.frozen ? "Frozen" : "Active"}</Label></View>
-      <T f="xbold" s={24} c="#fff" style={{ marginTop: 10 }}>{c.balances ? `$${tot.toFixed(2)}` : "Balance unavailable"}</T>
-      <T s={12.5} c="rgba(255,255,255,0.75)" style={{ marginTop: 4 }}>{`${name} · $${c.perTxUsd} a payment · $${c.dailyUsd} a day · $${c.spentTodayUsd.toFixed(2)} spent today`}</T>
-      <T f="mono" s={11.5} c="rgba(255,255,255,0.6)" style={{ marginTop: 8 }}>{`${c.address.slice(0, 6)}…${c.address.slice(-4)}`}</T>
-    </View>
-  );
-}
-
-function PayCardFace({ name, card, home }: { name: string; card: PayCard | null; home?: boolean }) {
-  const num = card ? `•••• •••• •••• ${card.last4}` : "•••• •••• •••• ••••";
-  return (
-    <View style={{ alignSelf: "stretch", aspectRatio: 1.586, borderRadius: 20, overflow: "hidden", padding: 18, backgroundColor: home ? "#5b2bff" : "#14111c" }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <T f="display" s={20} c="#fff">lexari</T>
-        <View style={{ borderRadius: 999, backgroundColor: card?.test ? "#ffd84d" : "rgba(255,255,255,0.15)", paddingHorizontal: 8, paddingVertical: 3 }}>
-          <Label s={8} c={card?.test ? "#0a0a0a" : "#fff"}>{card ? (card.frozen ? "Frozen" : card.test ? "Virtual · test" : "Virtual") : "Preview"}</Label>
-        </View>
-      </View>
-      <View style={{ marginTop: 16, width: 36, height: 26, borderRadius: 6, backgroundColor: "#d9ccff" }} />
-      <T s={18} c="rgba(255,255,255,0.9)" style={{ marginTop: 14, letterSpacing: 1, fontFamily: F.mono }}>{num}</T>
-      <View style={{ marginTop: "auto", flexDirection: "row", justifyContent: "space-between" }}>
-        <View><Label s={8} c="rgba(255,255,255,0.6)">Card holder</Label><T f="semi" s={13} c="#fff">{name.toUpperCase()}</T></View>
-        <View><Label s={8} c="rgba(255,255,255,0.6)">Valid thru</Label><T s={13} c="rgba(255,255,255,0.85)">••/••</T></View>
-        <View><Label s={8} c="rgba(255,255,255,0.6)">CVV</Label><T s={13} c="rgba(255,255,255,0.85)">•••</T></View>
-      </View>
-    </View>
-  );
-}
 const day = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 export default function Wallets() {
@@ -73,10 +35,16 @@ export default function Wallets() {
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [openCard, setOpenCard] = useState<string | null>(null);
+  const [tempos, setTempos] = useState<Record<string, Tempo | null>>({});
   const [cards, setCards] = useState<PayCard[] | null>(null);
   const loadCards = async () => {
     if (!token) return;
-    try { const r = await api<{ cards: PayCard[] }>("/api/cards", {}, token); setCards(r.cards || []); }
+    try {
+      const r = await api<{ cards: PayCard[] }>("/api/cards", {}, token); const list = r.cards || []; setCards(list);
+      const got = await Promise.all(list.map((c) => api<Tempo>(`/api/agents/card?agent=${encodeURIComponent(c.agent)}`, {}, token).then((t) => [c.agent, t] as const).catch(() => [c.agent, null] as const)));
+      setTempos(Object.fromEntries(got));
+    }
     catch { setCards([]); }
   };
   useEffect(() => { loadCards().catch(() => {}); }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -170,14 +138,16 @@ export default function Wallets() {
               const pct = card ? Math.min(100, Math.round((card.spent / Math.max(1, card.limit)) * 100)) : 0;
               return (
                 <View key={a.slug} style={{ borderRadius: 24, backgroundColor: k.card, borderWidth: 1, borderColor: k.line, padding: 16, alignItems: "center", gap: 12 }}>
-                  {card ? <TempoFace slug={a.slug} name={a.name} token={token} /> : <PayCardFace name={a.name} card={card} home={a.slug === "home"} />}
+                  {card ? <Pressable accessibilityRole="button" accessibilityLabel={`Open ${a.name}'s card`} onPress={() => setOpenCard(a.slug)} style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}><PayCardFace name={a.name} card={card} home={a.slug === "home"} /></Pressable> : <PayCardFace name={a.name} card={card} home={a.slug === "home"} />}
                   {card ? (
                     <>
                       <View style={{ alignSelf: "stretch" }}>
                         <View style={{ height: 4, borderRadius: 2, backgroundColor: "rgba(127,127,127,0.18)", overflow: "hidden" }}><View style={{ width: `${pct}%`, height: 4, backgroundColor: GRAPE }} /></View>
-                        <T f="semi" s={11.5} c={k.ink60} style={{ marginTop: 6, textAlign: "right" }}>{`${pct}% used`}</T>
+                        <T f="semi" s={11.5} c={k.ink60} style={{ marginTop: 6, textAlign: "right" }}>{`${pct}% used · $${card.limit} a month`}</T>
                       </View>
-                      <T s={13} c={k.ink60}>{card.frozen ? "Frozen" : `Ending ${card.last4} · $${card.limit} a month`}</T>
+                      <TempoSummary c={tempos[a.slug] ?? null} />
+                      <Pill label="Card details" icon="eye" h={40} onPress={() => setOpenCard(a.slug)} />
+                      <CardDetailsSheet open={openCard === a.slug} onClose={() => setOpenCard(null)} agent={a.slug} name={a.name} home={a.slug === "home"} card={card} tempo={tempos[a.slug] ?? null} />
                     </>
                   ) : (
                     <Pill label={busy === `card:${a.slug}` ? "Paying…" : busy === `ask:${a.slug}` ? "Confirm: pay $2 from balance" : "Get a Tempo card · $2"} icon="plus" h={40} onPress={async () => {
@@ -296,3 +266,5 @@ function usdcTx(me: PublicKey, r: CryptoReq) {
 function TopUpSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return <TopUpFlow open={open} onClose={onClose} />;
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

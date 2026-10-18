@@ -92,3 +92,5 @@ export default function AgentPage() {
     </View>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

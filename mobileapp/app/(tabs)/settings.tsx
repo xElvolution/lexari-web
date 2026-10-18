@@ -503,3 +503,5 @@ export default function Settings() {
     </Stage></ScrollView>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

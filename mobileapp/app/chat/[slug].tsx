@@ -364,3 +364,5 @@ export default function Chat() {
     </KeyboardAvoidingView>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";

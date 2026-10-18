@@ -144,3 +144,5 @@ export default function Brain() {
     </View>
   );
 }
+
+export { default as ErrorBoundary } from "@/components/ScreenError";
