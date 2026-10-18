@@ -116,8 +116,8 @@ export default function IntegrationsPage() {
           <h2 className="display mt-4 text-[40px] leading-[.95] sm:text-[56px]">Bring your protocol to Lexari.</h2>
           <p className="mt-3 text-[15.5px] text-white/75">Open a pull request with your protocol&apos;s entry in the integrations folder. Once it&apos;s reviewed and merged, your protocol becomes a dApp people add to their team. Your tools run on your servers, never see a key, and every payment is a Confirm card the person approves. Testnet only during the alpha.</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <a href={APPLY_URL} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-[15px] font-bold text-ink transition hover:scale-[1.03]">Read the apply guide</a>
-            <a href={NEW_PR_URL} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center rounded-full bg-white/15 px-6 text-[15px] font-bold backdrop-blur transition hover:bg-white/25">Open a pull request</a>
+            <a href={APPLY_URL} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-[15px] font-bold text-[#0a0a0a] transition hover:scale-[1.03]">Read the apply guide</a>
+            <a href={NEW_PR_URL} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center rounded-full bg-white/15 px-6 text-[15px] font-bold text-white backdrop-blur transition hover:bg-white/25">Open a pull request</a>
           </div>
         </div>
       </section>
