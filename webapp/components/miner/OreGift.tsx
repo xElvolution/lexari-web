@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api, friendly } from "@/lib/api";
+import { ApiError, api, friendly } from "@/lib/api";
 import { get, hire, refreshHub } from "@/lib/store";
 import Icon from "../Icon";
 import { AgentTile } from "../faces";
 import { burst } from "../fly";
 
-type Phase = "closed" | "opening" | "open" | "claiming" | "claimed";
+type Phase = "closed" | "opening" | "open" | "claiming" | "claimed" | "plan";
 
 /** The honest lines shown on the gift. The ORE bot never earns anything on devnet and never mines on Lexari's machines. */
 export const ORE_GIFT_FACTS: { icon: "spark" | "server" | "undo"; title: string; body: string }[] = [
@@ -18,13 +18,15 @@ export const ORE_GIFT_FACTS: { icon: "spark" | "server" | "undo"; title: string;
 
 /**
  * Right after your first agent: a wrapped gift opens to reveal the ORE bot (the ORE Miner specialist, free to hire).
- * One tap claims it: the same free hire the marketplace does. Skipping is fine; it stays free in the marketplace.
+ * One tap claims it: the same free hire the marketplace does (free with any paid plan, no seat). On the free plan the
+ * gift says so up front and the button opens Plans instead of failing. Skipping is fine; it stays in the marketplace.
  */
 export default function OreGift({ agentName, onDone }: { agentName: string; onDone: (claimed: boolean) => void }) {
   const [phase, setPhase] = useState<Phase>("closed");
   const [err, setErr] = useState("");
   const cta = useRef<HTMLButtonElement>(null);
   const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const [needsPlan, setNeedsPlan] = useState(() => get().plan === "free" && !get().paid.includes("ore"));
 
   // The box wobbles in on its own, then opens after a beat (a tap opens it sooner).
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function OreGift({ agentName, onDone }: { agentName: string; onDo
       burst(cta.current, 26);
       setPhase("claimed");
     } catch (e) {
+      if (e instanceof ApiError && e.status === 402 && (e.data as { reason?: string } | undefined)?.reason === "plan_required") { setNeedsPlan(true); setPhase("open"); return; }
       setErr(friendly(e, "Couldn't add the ORE bot. Try again."));
       setPhase("open");
     }
@@ -104,11 +107,13 @@ export default function OreGift({ agentName, onDone }: { agentName: string; onDo
         ) : (
           <>
             <button data-ore-skip onClick={() => onDone(false)} disabled={phase === "claiming"} className="btn btn-line w-full shrink-0 text-ink disabled:opacity-50 sm:flex-1">Maybe later</button>
-            <button ref={cta} data-ore-claim onClick={() => void claim()} disabled={phase === "claiming"} className="btn btn-brand w-full shrink-0 disabled:opacity-70 sm:flex-[1.4]">{phase === "claiming" ? "Adding…" : "Claim ORE bot"}</button>
+            {needsPlan
+              ? <a data-ore-plans href="/settings#billing" className="btn btn-brand w-full shrink-0 sm:flex-[1.4]">See plans</a>
+              : <button ref={cta} data-ore-claim onClick={() => void claim()} disabled={phase === "claiming"} className="btn btn-brand w-full shrink-0 disabled:opacity-70 sm:flex-[1.4]">{phase === "claiming" ? "Adding…" : "Claim ORE bot"}</button>}
           </>
         )}
       </div>
-      <p className="mt-3 text-[12px] text-ink/50">{phase === "claimed" ? "Open its chat to connect a computer when you're ready." : "Free. You can also add it later from the marketplace."}</p>
+      <p className="mt-3 text-[12px] text-ink/50">{phase === "claimed" ? "Open its chat to connect a computer when you're ready." : needsPlan ? "The ORE bot is free with any paid plan. Claim it from the marketplace once you have one." : "Free. You can also add it later from the marketplace."}</p>
     </div>
   );
 }
