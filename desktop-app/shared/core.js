@@ -29,8 +29,19 @@ function start(opts = {}) {
     // lexari://auth/callback?next=/agents  -> finish sign-in in the app session
     // lexari://open/agents/abc            -> open a route
     let target;
-    if (u.host === "auth") target = network.appUrl + "/sign-in?desktop=1&" + u.searchParams.toString();
-    else if (u.host === "open") target = network.appUrl + (u.pathname || "/");
+    if (u.host === "auth") {
+      // lexari://auth/callback?code=...: trade the one-time code for a session cookie in the app session.
+      const code = u.searchParams.get("code") || "";
+      session.fromPartition(PARTITION).fetch(network.apiUrl + "/auth/desktop/exchange", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ code }) })
+        .then(async (r) => {
+          if (r.ok) { win.webContents.send("lexari:navigate", network.appUrl + "/agents"); return; }
+          const j = await r.json().catch(() => ({}));
+          new Notification({ title: "Sign-in didn't finish", body: j.error || "Sign in again from the app.", icon: path.join(__dirname, "assets", "icon.png") }).show();
+        })
+        .catch(() => {});
+      summon(); return;
+    }
+    if (u.host === "open") target = network.appUrl + (u.pathname || "/");
     if (target && target.startsWith(network.appUrl)) win.webContents.send("lexari:navigate", target);
     summon();
   }
