@@ -180,7 +180,7 @@ export default function Onboarding() {
                 <div>
                   <span className="label text-[10px] text-ink/70">Things to remember · {knows.length}/8</span>
                   <div className="mt-2 flex flex-wrap gap-2">{[...KNOW_SUGGESTIONS, ...knows.filter((k) => !KNOW_SUGGESTIONS.includes(k))].map((k) => <button key={k} onClick={() => toggleKnow(k)} aria-pressed={knows.includes(k)} className="chip">{knows.includes(k) && <Icon name="check" size={14} stroke={3} />}{k}</button>)}</div>
-                  <form onSubmit={(e) => { e.preventDefault(); addCustom(); }} className="mt-3 flex gap-2"><input value={custom} onChange={(e) => setCustom(e.target.value.slice(0, 80))} placeholder="Add your own, like: I work from Lagos" className="field" aria-label="Add a memory" /><button className="btn btn-ghost btn-sm shrink-0 !h-auto" disabled={!custom.trim()}>Add</button></form>
+                  <form onSubmit={(e) => { e.preventDefault(); addCustom(); }} className="mt-3 flex gap-2"><input value={custom} onChange={(e) => setCustom(e.target.value.slice(0, 80))} placeholder="Add your own, like: I start at 9" className="field" aria-label="Add a memory" /><button className="btn btn-ghost btn-sm shrink-0 !h-auto" disabled={!custom.trim()}>Add</button></form>
                 </div>
               </div>
             </div>
