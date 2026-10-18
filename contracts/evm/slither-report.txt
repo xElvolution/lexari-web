@@ -1,0 +1,48 @@
+'forge clean' running (wd: .)
+'forge config --json' running
+'forge build --build-info --deny never --skip ./test/** ./script/** --force' running (wd: .)
+INFO:Detectors:
+Detector: arbitrary-send-eth
+LexariSpendVault._send(address,address,uint256) (src/LexariSpendVault.sol#230-237) sends eth to arbitrary user
+	Dangerous calls:
+	- (ok,None) = to.call{value: amount}() (src/LexariSpendVault.sol#232)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#functions-that-send-ether-to-arbitrary-destinations
+INFO:Detectors:
+Detector: incorrect-equality
+LexariSpendVault.deposit(uint256,address,uint256) (src/LexariSpendVault.sol#92-102) uses a dangerous strict equality:
+	- received == 0 (src/LexariSpendVault.sol#99)
+LexariSpendVault.spend(uint256,address,address,uint256,bytes32) (src/LexariSpendVault.sol#122-146) uses a dangerous strict equality:
+	- p.day == today (src/LexariSpendVault.sol#137)
+LexariSpendVault.spendableNow(uint256,address) (src/LexariSpendVault.sol#204-212) uses a dangerous strict equality:
+	- p.day == uint64(block.timestamp / 86400) (src/LexariSpendVault.sol#207)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-strict-equalities
+INFO:Detectors:
+Detector: unused-return
+LexariSpendVault.depositNative(uint256) (src/LexariSpendVault.sol#84-89) ignores return value by registry.agentOwner(agentId) (src/LexariSpendVault.sol#86)
+LexariSpendVault.deposit(uint256,address,uint256) (src/LexariSpendVault.sol#92-102) ignores return value by registry.agentOwner(agentId) (src/LexariSpendVault.sol#95)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
+INFO:Detectors:
+Detector: timestamp
+LexariSpendVault.spend(uint256,address,address,uint256,bytes32) (src/LexariSpendVault.sol#122-146) uses timestamp for comparisons
+	Dangerous comparisons:
+	- p.day == today (src/LexariSpendVault.sol#137)
+LexariSpendVault.spendableNow(uint256,address) (src/LexariSpendVault.sol#204-212) uses timestamp for comparisons
+	Dangerous comparisons:
+	- ! p.enabled || frozen[agentId] || paused() (src/LexariSpendVault.sol#206)
+	- left > p.perTxLimit (src/LexariSpendVault.sol#209)
+	- p.day == uint64(block.timestamp / 86400) (src/LexariSpendVault.sol#207)
+	- p.dailyLimit > spent (src/LexariSpendVault.sol#208)
+	- left < bal (src/LexariSpendVault.sol#211)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+INFO:Detectors:
+Detector: cyclomatic-complexity
+LexariSkillRegistry.install(uint256,uint256) (src/LexariSkillRegistry.sol#188-227) has a high cyclomatic complexity (13).
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#cyclomatic-complexity
+INFO:Detectors:
+Detector: low-level-calls
+Low level call in LexariSkillRegistry.claim(address) (src/LexariSkillRegistry.sol#230-241):
+	- (ok,None) = msg.sender.call{value: amount}() (src/LexariSkillRegistry.sol#235)
+Low level call in LexariSpendVault._send(address,address,uint256) (src/LexariSpendVault.sol#230-237):
+	- (ok,None) = to.call{value: amount}() (src/LexariSpendVault.sol#232)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls
+INFO:Slither:. analyzed (27 contracts with 102 detectors), 11 result(s) found

@@ -1,0 +1,17 @@
+{
+  "name": "lexari-evm-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lexari EVM contracts (Foundry + OpenZeppelin): agent registry, spend-policy vault, skills registry.",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test -vv",
+    "gas": "forge test --gas-report",
+    "snapshot": "forge snapshot",
+    "fmt": "forge fmt"
+  },
+  "devDependencies": {
+    "@openzeppelin/contracts": "5.4.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.10.0"
+  }
+}
