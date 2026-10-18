@@ -1,6 +1,6 @@
 import { useHideBalance } from "@/lib/privacy";
 import { Stage } from "@/web/anim";
-import { CardDetailsSheet, PayCardFace, TempoSummary, type PayCard, type Tempo } from "@/components/PayCard";
+import { CardDetailsSheet, PayCardFace, type PayCard, type Tempo } from "@/components/PayCard";
 import { useLocalSearchParams } from "expo-router";
 /** Port of webapp/components/wallet/WalletsView.tsx at phone width: Wallet / Cards tabs, Lexari balance (Top up, History), each agent's wallet (Fund, Move to balance). */
 import { useEffect, useState } from "react";
@@ -145,7 +145,6 @@ export default function Wallets() {
                         <View style={{ height: 4, borderRadius: 2, backgroundColor: "rgba(127,127,127,0.18)", overflow: "hidden" }}><View style={{ width: `${pct}%`, height: 4, backgroundColor: GRAPE }} /></View>
                         <T f="semi" s={11.5} c={k.ink60} style={{ marginTop: 6, textAlign: "right" }}>{`${pct}% used · $${card.limit} a month`}</T>
                       </View>
-                      <TempoSummary c={tempos[a.slug] ?? null} />
                       <Pill label="Card details" icon="eye" h={40} onPress={() => setOpenCard(a.slug)} />
                       <CardDetailsSheet open={openCard === a.slug} onClose={() => setOpenCard(null)} agent={a.slug} name={a.name} home={a.slug === "home"} card={card} tempo={tempos[a.slug] ?? null} />
                     </>

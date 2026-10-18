@@ -1,6 +1,7 @@
 /** Port of webapp/components/wallet/CardVisual.tsx and the Wallets > Cards row: the premium card face (masked until you ask), the Tempo summary strip and the Card details sheet. */
 import { useEffect, useState } from "react";
 import { Pressable, View, useWindowDimensions } from "react-native";
+import Animated, { Easing, FadeInDown, ReduceMotion } from "react-native-reanimated";
 import * as Clipboard from "expo-clipboard";
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import Icon from "@/components/Icon";
@@ -163,10 +164,10 @@ export function CardDetailsSheet({ open, onClose, agent, name, home, card, tempo
             {full ? <Pill label="Hide details" icon="eyeoff" kind="ghost" h={44} onPress={() => setFull(null)} /> : <Pill label="View card" icon="eye" h={44} onPress={() => { setErr(""); setPin(true); }} />}
           </View>
           <View style={{ marginTop: 14 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}><T f="semi" s={14}>Monthly limit</T><T f="bold" s={14}>{`$${card.spent.toFixed(2)} of $${card.limit}`}</T></View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}><T f="semi" s={14}>Spent this month</T><T f="bold" s={14}>{`$${card.spent.toFixed(2)} of $${card.limit}`}</T></View>
             <View style={{ marginTop: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(127,127,127,0.18)", overflow: "hidden" }}><View style={{ width: `${pct}%`, height: 8, backgroundColor: GRAPE }} /></View>
           </View>
-          {tempo ? <View style={{ marginTop: 14 }}><TempoSummary c={tempo} /></View> : null}
+          {tempo ? <Animated.View entering={FadeInDown.duration(450).delay(80).easing(Easing.bezier(0.2, 0.8, 0.2, 1)).reduceMotion(ReduceMotion.System)} style={{ marginTop: 14 }}><TempoSummary c={tempo} /></Animated.View> : null}
         </>
       )}
     </WSheet>
