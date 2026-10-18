@@ -14,6 +14,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { evmAddress, evmKey } from "./evm";
 import { MONAD, monBalance } from "./monad";
 import { Reject } from "./reject";
+import { simulateEvm } from "./evmsim";
 import type { AgentRef, Executed, GrantLimits, Prepared, ReadResult, ToolDef } from "./registry";
 
 export const AUSD = (process.env.AUSD_ADDRESS || "0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC") as `0x${string}`;
@@ -68,7 +69,8 @@ const faucetTool: ToolDef = {
   prepare: async (_i: never, agent: AgentRef): Promise<Prepared> => {
     const a = evmAddress(agent.userId, agent.slug);
     await needGas(a);
-    return { title: "Get test AUSD from Agora", chain: "monad", usdMicros: 0, summary: "Agora AUSD faucet", plan: { kind: "ausd-faucet" } satisfies FaucetPlan, rows: [["From", "Agora AUSD testnet faucet"], ["To", `${a.slice(0, 6)}…${a.slice(-4)}`], ["Network", MONAD.network], ["Cost", "A little test MON for gas"]] };
+    const sim = await simulateEvm("monad", a as `0x${string}`, [{ to: FAUCET, data: encodeFunctionData({ abi: faucetAbi, functionName: "requestFunds", args: [a as `0x${string}`] }) }], [{ sym: "AUSD", addr: AUSD, decimals: DECIMALS }]);
+    return { title: "Get test AUSD from Agora", chain: "monad", usdMicros: 0, summary: "Agora AUSD faucet", plan: { kind: "ausd-faucet" } satisfies FaucetPlan, rows: [["From", "Agora AUSD testnet faucet"], ["To", `${a.slice(0, 6)}…${a.slice(-4)}`], ["Network", MONAD.network], ["Cost", "A little test MON for gas"], ...sim.rows] };
   },
   execute: async (p: never, agent: AgentRef): Promise<Executed> => {
     if ((p as FaucetPlan).kind !== "ausd-faucet") throw new Reject("That can't run any more.");
@@ -88,8 +90,9 @@ async function preparePay(agent: AgentRef, limits: GrantLimits, to: string, amou
   const have = await ausdBalance(a);
   if (have < amount) throw new Reject(`I only hold ${have} AUSD. Ask me to get test AUSD from the Agora faucet first.`);
   await needGas(a);
+  const sim = await simulateEvm("monad", a as `0x${string}`, [{ to: AUSD, data: encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [to, parseUnits(String(amount), DECIMALS)] }) }], [{ sym: "AUSD", addr: AUSD, decimals: DECIMALS }]);
   return { title, chain: "monad", usdMicros: Math.round(amount * 1e6), summary, plan: { kind: "ausd-pay", to, amount, note, local } satisfies PayPlan,
-    rows: [["Pay", `${amount} AUSD`], ["To", `${to.slice(0, 6)}…${to.slice(-4)}`], ...extra, ...(note ? [["Note", note] as [string, string]] : []), ["Network", MONAD.network], ["From", `${a.slice(0, 6)}…${a.slice(-4)}`]] };
+    rows: [["Pay", `${amount} AUSD`], ["To", `${to.slice(0, 6)}…${to.slice(-4)}`], ...extra, ...(note ? [["Note", note] as [string, string]] : []), ["Network", MONAD.network], ["From", `${a.slice(0, 6)}…${a.slice(-4)}`], ...sim.rows] };
 }
 async function executePay(p: never, agent: AgentRef): Promise<Executed> {
   const pl = p as PayPlan;

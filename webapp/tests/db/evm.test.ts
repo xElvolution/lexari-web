@@ -33,6 +33,10 @@ test("Base Sepolia: send ETH after Confirm; the recipient gets exactly that much
   assert.ok(card, "a Confirm card");
   assert.equal(card.status, "prepared");
   assert.equal((await evmBalances("base", TO)).eth, before.eth, "nothing moves before Confirm");
+  const row = (k: string) => card.rows.find(([x]) => x === k)?.[1];
+  assert.match(row("Simulated") || "", /^Passed on Base Sepolia \(block \d+\)$/);
+  assert.equal(row("Your ETH"), "−0.001 ETH");
+  assert.match(row("Network fee") || "", /^About [\d.]+ ETH$/);
   const done = await confirmAction(u.id, card.id);
   assert.equal(done.status, "confirmed", done.error);
   assert.ok(done.explorer?.startsWith(EVM.base.txExplorer));
@@ -65,6 +69,8 @@ test("Uniswap on Base Sepolia: swap ETH for USDC, send USDC, swap USDC back, eac
   const s1 = (await say(u.id, a, `<tool name="uniswap.swap">{"chain":"base","sell":"ETH","buy":"USDC","amount":0.001,"slippage":5}</tool>`)).actions[0];
   assert.ok(s1, "swap card");
   assert.ok(s1.rows.some(([k]) => k === "Minimum"));
+  assert.equal(s1.rows.find(([k]) => k === "Your ETH")?.[1], "−0.001 ETH");
+  assert.match(s1.rows.find(([k]) => k === "Your USDC")?.[1] || "", /^\+[\d.]+ USDC$/, "the simulated USDC gain is on the card");
   const d1 = await confirmAction(u.id, s1.id);
   assert.equal(d1.status, "confirmed", d1.error);
   const b1 = await evmBalances("base", me);
@@ -78,9 +84,23 @@ test("Uniswap on Base Sepolia: swap ETH for USDC, send USDC, swap USDC back, eac
 
   const s2 = (await say(u.id, a, `<tool name="uniswap.swap">{"chain":"base","sell":"USDC","buy":"ETH","amount":${b2.usdc},"slippage":5}</tool>`)).actions[0];
   assert.ok(s2, "swap back card");
+  assert.equal(s2.rows.find(([k]) => k === "Your USDC")?.[1], `−${b2.usdc} USDC`, "approve and swap simulated together");
+  assert.match(s2.rows.find(([k]) => k === "Your ETH")?.[1] || "", /^\+[\d.]+ ETH$/, "ETH back from unwrapWETH9, traced");
   const d2 = await confirmAction(u.id, s2.id);
   assert.equal(d2.status, "confirmed", d2.error);
   assert.ok((await evmBalances("base", me)).usdc < 1e-6);
+});
+
+test("simulation: a send that would revert never becomes a card", async (t) => {
+  if (!base) return t.skip("anvil not installed");
+  const u = await person(); const a = await agent(u.id);
+  await grant(u.id, "base", a.slug);
+  const me = evmAddress(u.id, a.slug);
+  await base.rpc("anvil_setBalance", [me, "0xDE0B6B3A7640000"]);
+  // The USDC contract has no payable fallback, so sending it ETH reverts.
+  const r = await say(u.id, a, `<tool name="base.transfer">{"to":"${EVM.base.usdc}","asset":"ETH","amount":0.0001}</tool>`);
+  assert.equal(r.actions.length, 0);
+  assert.match(r.notes.join(" "), /simulation says this would fail/);
 });
 
 test("Ethereum Sepolia: send ETH after Confirm", async (t) => {

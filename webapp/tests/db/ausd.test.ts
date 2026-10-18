@@ -53,6 +53,8 @@ test("faucet, then pay: Confirm cards, real balances on a Monad testnet fork, li
   const pay = (await say(u.id, a, `<tool name="ausd.pay">{"to":"${to}","amount":${amt},"note":"test"}</tool>`)).actions[0];
   assert.equal(pay.status, "prepared");
   assert.ok(pay.rows.some(([k, v]) => k === "Pay" && v === `${amt} AUSD`));
+  assert.equal(pay.rows.find(([k]) => k === "Your AUSD")?.[1], `−${amt} AUSD`, "simulated balance change on the card");
+  assert.match(fc.rows.find(([k]) => k === "Your AUSD")?.[1] || "", /^\+[\d.]+ AUSD$/, "faucet card shows the simulated AUSD in");
   const pd = await confirmAction(u.id, pay.id);
   assert.equal(pd.status, "confirmed", pd.error);
   assert.match(pd.explorer || "", /^https:\/\/testnet\.monadexplorer\.com\/tx\/0x/);

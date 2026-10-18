@@ -11,6 +11,7 @@ import { createPublicClient, createWalletClient, defineChain, encodeFunctionData
 import { privateKeyToAccount } from "viem/accounts";
 import { EVM, evmAddress, evmBalances, evmKey, type EvmChain } from "./evm";
 import { spotUsd } from "./market";
+import { simulateEvm } from "./evmsim";
 import { Reject } from "./reject";
 import type { AgentRef, Executed, GrantLimits, Prepared, ToolDef } from "./registry";
 
@@ -82,9 +83,12 @@ function sendTool(c: EvmChain): ToolDef {
       if (isUsdc && b.eth <= 0) throw new Reject(`My ${e.network} wallet has no ${e.native} for the network fee. Send it a little test ${e.native} first.`);
       const atoms = parseUnits(String(p.amount), isUsdc ? 6 : 18).toString();
       const asset = isUsdc ? "USDC" : e.native;
+      const sim = await simulateEvm(c, from as Hex, [isUsdc
+        ? { to: e.usdc as Hex, data: encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [p.to as Hex, BigInt(atoms)] }) }
+        : { to: p.to as Hex, value: BigInt(atoms) }], isUsdc ? [{ sym: "USDC", addr: e.usdc as Hex, decimals: 6 }] : []);
       return {
         title: `Send ${p.amount} ${asset} on ${e.name}`, chain: c, usdMicros: Math.round(usd * 1e6), summary: `Send ${p.amount} ${asset} on ${e.name}`,
-        rows: [["Send", `${p.amount} test ${asset}`], ["Value", isUsdc ? `$${usd.toFixed(2)}` : `About $${usd.toFixed(2)} at the ${e.native} price`], ["To", `${p.to.slice(0, 6)}…${p.to.slice(-4)}`], ["From", `${agent.name}'s wallet`], ["Network", e.network]],
+        rows: [["Send", `${p.amount} test ${asset}`], ["Value", isUsdc ? `$${usd.toFixed(2)}` : `About $${usd.toFixed(2)} at the ${e.native} price`], ["To", `${p.to.slice(0, 6)}…${p.to.slice(-4)}`], ["From", `${agent.name}'s wallet`], ["Network", e.network], ...sim.rows],
         plan: { kind: "evm-send", chain: c, to: p.to, asset, atoms, amount: p.amount } satisfies SendPlan,
       };
     },

@@ -454,7 +454,7 @@ Package ids `ai.lexari.app.testnet` (preview) and `ai.lexari.app` (production), 
 | **ORE Miner** | Never mines on Lexari machines. One-time install code, hashed host token, uninstall on removal | 🟢 |
 | **Agent key custody** | HMAC-derived keys today (testnets only) | 🟡 |
 | **Policy-bound signing** | Trade-only venue keys are live. Privy server wallets with policies are next | 🟡 |
-| **Transaction simulation** | Simulate EVM signs and show the balance diff on the Confirm card | ⚪ |
+| **Transaction simulation** | Every EVM send, Uniswap swap and AUSD payment is simulated (eth_simulateV1) before its Confirm card exists; the card shows your balance change and the fee, and a call that would revert never becomes a card | 🟢 |
 | **Withdraw only to linked wallets, freeze all agents** | Consent with scopes, limits and expiry, audit log, revoke and switch off all | 🟢 |
 
 ### Custody migration plan
