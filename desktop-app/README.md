@@ -60,14 +60,31 @@ Wallet custody logic is untouched: wallets are the web app's own code running in
 ## Sign-in, Google and passkeys
 
 - Email sign-in works inside the app window.
-- Google sign-in and passkeys: the command palette has "Sign in with the system browser". It opens
-  `https://app.lexari.ai/sign-in?desktop=1&return=lexari://auth/callback`. When the web app redirects to
-  `lexari://auth/callback?...` the desktop app reopens and finishes sign-in in its own session.
-  The web side must handle `desktop=1` by redirecting to `return` with a one-time code after sign-in
-  (not wired in webapp yet, see "Blocked").
+- Google sign-in and passkeys use the system browser (command palette: "Sign in with the system browser"):
+  1. The app opens `https://app.lexari.ai/sign-in?desktop=1&return=lexari://auth/callback`.
+  2. After sign-in the web app calls `POST /api/auth/desktop/code` (needs the web session; `return` must match
+     `^lexari://[A-Za-z0-9/_.-]*$`, anything else is a 400) and redirects to `lexari://auth/callback?code=<code>`.
+     Codes are 32 random bytes (base64url, 43 chars), stored only as an HMAC hash, live 60 seconds and are single use.
+  3. The OS hands the link to the app, which calls `POST /api/auth/desktop/exchange {code}` through its own session.
+     The server burns the code atomically (`delete ... returning`), starts a new session and sets the
+     `lexari_session` cookie in the app. Replayed, expired or unknown codes get a 401.
+  Server code: `webapp/server/auth/desktop.ts`, `webapp/app/api/auth/desktop/{code,exchange}`, migration
+  `0036_desktop_auth_codes.sql`. Web client: `webapp/lib/desktopHandoff.ts`.
 - Passkeys inside the window: Electron's Chromium supports WebAuthn with security keys on all platforms and
   Windows Hello on Windows. macOS iCloud Keychain passkeys and Linux platform authenticators are not exposed to
-  Electron, so on those use the system browser fallback above.
+  Electron, so on those use the system browser flow above.
+
+## Brand
+
+Every asset comes from the real Lexari mark (white rounded square with the black dot, `shared/components/Logo.tsx`)
+and the Bricolage Grotesque `lexari` wordmark. `python3 shared/brand/make.py` regenerates them all (needs Chrome and Pillow):
+app icons (`icon.icns`, `icon.ico`, `icons/16..1024`), tray icons (colour and macOS template, @1x and @2x),
+the dmg background, NSIS sidebar and header, and the lockup. Fonts (Bricolage Grotesque, Figtree, Martian Mono, OFL)
+are bundled in `shared/assets/fonts` so the app looks right offline. Palette matches `shared/styles/theme.css`.
+
+## QA screens
+
+`LEXARI_DEMO=splash|offline|error|quick|about|tray` opens that screen on launch for screenshots.
 
 ## Code signing (not done yet, builds are unsigned)
 
