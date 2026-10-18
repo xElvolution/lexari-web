@@ -1,0 +1,867 @@
+[
+  {
+    "slug": "orca",
+    "name": "Orca",
+    "kind": "built-in",
+    "connector": "orca",
+    "category": "trading",
+    "status": "live-devnet",
+    "description": "Live quotes from Orca's SOL / USDC pool, and real swaps on Solana devnet from the agent's own wallet. You see the price and the minimum you get before you confirm.",
+    "website": "https://www.orca.so",
+    "docs": "https://dev.orca.so",
+    "chains": [
+      "Solana"
+    ],
+    "contracts": [
+      {
+        "chain": "Solana devnet",
+        "address": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+        "label": "Whirlpool program"
+      }
+    ],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/orca.png",
+    "actions": [
+      {
+        "text": "Live swap quotes",
+        "live": true
+      },
+      {
+        "text": "Swap SOL and test USDC on devnet, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Mainnet swaps",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "solana",
+    "name": "Solana",
+    "kind": "built-in",
+    "connector": "solana",
+    "category": "chains",
+    "status": "live-devnet",
+    "description": "Your agents use their own Solana wallets: check what they hold and send test USDC or SOL to an address you approve. Every transfer waits for your Confirm in chat.",
+    "website": "https://solana.com",
+    "docs": "https://solana.com/docs",
+    "chains": [
+      "Solana"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/solana.png",
+    "actions": [
+      {
+        "text": "Read its wallet address and balances",
+        "live": true
+      },
+      {
+        "text": "Send test USDC or SOL on devnet, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Mainnet transfers",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "agora",
+    "name": "Agora AUSD",
+    "kind": "built-in",
+    "connector": "agora",
+    "category": "trading",
+    "status": "live-testnet",
+    "description": "AUSD is Agora's fiat-backed dollar stablecoin. Your agent holds AUSD in its own Monad wallet, pays people in it, and sends it across borders with the recipient's local amount shown at today's rate. Every payment waits for your Confirm and stays inside your limits. Test AUSD from Agora's faucet.",
+    "website": "https://agora.finance",
+    "docs": "https://docs.agora.finance",
+    "chains": [
+      "Monad testnet"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/agora.png",
+    "actions": [
+      {
+        "text": "AUSD balance",
+        "live": true
+      },
+      {
+        "text": "Pay in AUSD, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Cross-border sends with the local amount shown",
+        "live": true
+      },
+      {
+        "text": "Test AUSD from the Agora faucet",
+        "live": true
+      }
+    ]
+  },
+  {
+    "slug": "arbitrum",
+    "name": "Arbitrum",
+    "kind": "built-in",
+    "connector": "arbitrum",
+    "category": "chains",
+    "status": "live-testnet",
+    "description": "Each agent uses its EVM address on Arbitrum Sepolia. Agents read their test ETH and USDC and send to an address you approve. Every send waits for your Confirm. Test funds only.",
+    "website": "https://arbitrum.io",
+    "docs": "https://docs.arbitrum.io",
+    "chains": [
+      "Arbitrum Sepolia"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/arbitrum.png",
+    "actions": [
+      {
+        "text": "Its Arbitrum Sepolia address and balances",
+        "live": true
+      },
+      {
+        "text": "Send test ETH or USDC, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Swaps through Uniswap",
+        "live": true
+      },
+      {
+        "text": "Mainnet",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "aurora-intents",
+    "name": "Aurora Intents",
+    "kind": "built-in",
+    "connector": "intents",
+    "category": "trading",
+    "status": "live-testnet",
+    "description": "Your agent keeps one balance. When a trade or payment needs funds on another chain, it routes them through Aurora Intents (any-chain liquidity, powered by NEAR Intents) in one Confirm card, with refunds back to your balance if it can't fill. Quotes work with an API key; moving real funds is switched on per server.",
+    "website": "https://intents.aurora.dev",
+    "docs": "https://intents.aurora.dev",
+    "chains": [
+      "Any chain"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/aurora-intents.png",
+    "actions": [
+      {
+        "text": "Cross-chain quotes to 25+ chains",
+        "live": true
+      },
+      {
+        "text": "One Confirm card that routes and delivers",
+        "live": true
+      },
+      {
+        "text": "Route status",
+        "live": true
+      }
+    ]
+  },
+  {
+    "slug": "base",
+    "name": "Base",
+    "kind": "built-in",
+    "connector": "base",
+    "category": "chains",
+    "status": "live-testnet",
+    "description": "Each agent has its own address on Base. Agents read their Base Sepolia ETH and test USDC and send to an address you approve. Every send waits for your Confirm. Test funds only.",
+    "website": "https://base.org",
+    "docs": "https://docs.base.org",
+    "chains": [
+      "Base Sepolia"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/base.png",
+    "actions": [
+      {
+        "text": "Its Base Sepolia address and balances",
+        "live": true
+      },
+      {
+        "text": "Send test ETH or USDC, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Swaps through Uniswap",
+        "live": true
+      },
+      {
+        "text": "Mainnet",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "ethereum",
+    "name": "Ethereum",
+    "kind": "built-in",
+    "connector": "ethereum",
+    "category": "chains",
+    "status": "live-testnet",
+    "description": "Each agent has its own Ethereum address. Agents read their Sepolia ETH and test USDC and send to an address you approve. Every send waits for your Confirm. Test funds only.",
+    "website": "https://ethereum.org",
+    "docs": "https://ethereum.org/developers",
+    "chains": [
+      "Sepolia"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/ethereum.png",
+    "actions": [
+      {
+        "text": "Its Sepolia address and balances",
+        "live": true
+      },
+      {
+        "text": "Send test ETH or USDC, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Swaps through Uniswap",
+        "live": true
+      },
+      {
+        "text": "Mainnet",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "hyperliquid",
+    "name": "Hyperliquid",
+    "kind": "built-in",
+    "connector": "hyperliquid",
+    "category": "trading",
+    "status": "live-testnet",
+    "description": "Each agent trades from its own Hyperliquid testnet account through an API wallet: a separate key that can place and cancel orders but can never withdraw or move funds. Agents read prices, positions and open orders, and every order waits for your Confirm inside your per-trade and daily limits. Test USDC only.",
+    "website": "https://hyperliquid.xyz",
+    "docs": "https://hyperliquid.gitbook.io/hyperliquid-docs",
+    "chains": [
+      "Hyperliquid testnet"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/hyperliquid.png",
+    "actions": [
+      {
+        "text": "Live prices, positions and open orders",
+        "live": true
+      },
+      {
+        "text": "Market and limit orders, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Trade-only API wallet, no withdrawals",
+        "live": true
+      },
+      {
+        "text": "Mainnet",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "mera",
+    "name": "Mera",
+    "kind": "built-in",
+    "connector": "mera",
+    "category": "chains",
+    "status": "live-testnet",
+    "description": "Mera derives keys from a passkey (WebAuthn PRF), with no seed phrase and nothing secret stored. Your passkey signs you in to Lexari and derives a separate EVM key for each agent, so one Face ID or Touch ID covers all of them. Add it in Settings, Security.",
+    "website": "https://mera.category.xyz",
+    "docs": "https://mera.category.xyz",
+    "chains": [
+      "Monad",
+      "Solana"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/mera.svg",
+    "actions": [
+      {
+        "text": "Passkey sign-in",
+        "live": true
+      },
+      {
+        "text": "A separate key for each agent from one passkey",
+        "live": true
+      },
+      {
+        "text": "Same keys on every device your passkey syncs to",
+        "live": true
+      }
+    ]
+  },
+  {
+    "slug": "monad",
+    "name": "Monad",
+    "kind": "built-in",
+    "connector": "monad",
+    "category": "chains",
+    "status": "live-testnet",
+    "description": "Each agent uses its EVM address on Monad testnet (chain 10143). Agents read their MON balance and send test MON or USDC to an address you approve. Every send waits for your Confirm. Test funds only.",
+    "website": "https://www.monad.xyz",
+    "docs": "https://docs.monad.xyz",
+    "chains": [
+      "Monad testnet"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/monad.png",
+    "actions": [
+      {
+        "text": "Its Monad testnet address and MON balance",
+        "live": true
+      },
+      {
+        "text": "Send test MON or USDC, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Swaps on Kuru",
+        "live": true
+      },
+      {
+        "text": "Mainnet",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "nansen",
+    "name": "Nansen",
+    "kind": "built-in",
+    "connector": "nansen",
+    "category": "data",
+    "status": "live-testnet",
+    "description": "Your agents look up any wallet on Nansen and read its current holdings in USD before they answer. Read only. Needs a Nansen API key on the server.",
+    "website": "https://www.nansen.ai",
+    "docs": "https://docs.nansen.ai",
+    "chains": [
+      "Ethereum",
+      "Solana",
+      "Base",
+      "Monad"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/nansen.png",
+    "actions": [
+      {
+        "text": "Current holdings of any wallet",
+        "live": true
+      },
+      {
+        "text": "Smart money flows, checked before every trade",
+        "live": true
+      }
+    ]
+  },
+  {
+    "slug": "robinhood-chain",
+    "name": "Robinhood Chain",
+    "kind": "built-in",
+    "connector": "robinhood",
+    "category": "chains",
+    "status": "live-testnet",
+    "description": "Each agent uses its EVM address on Robinhood Chain testnet (chain 46630). Agents read their test ETH and send to an address you approve. Every send waits for your Confirm. Test funds only.",
+    "website": "https://robinhood.com",
+    "docs": "https://docs.robinhood.com/chain",
+    "chains": [
+      "Robinhood Chain testnet"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/robinhood-chain.png",
+    "actions": [
+      {
+        "text": "Its Robinhood Chain testnet address and ETH balance",
+        "live": true
+      },
+      {
+        "text": "Send test ETH, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Tokenized stocks",
+        "live": false
+      },
+      {
+        "text": "Mainnet",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "skr",
+    "name": "SKR",
+    "kind": "built-in",
+    "connector": "skr",
+    "category": "chains",
+    "status": "live-testnet",
+    "description": "SKR (mint SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3) is a top up coin. Send it to your own Solana deposit address and it converts at the live price into your USD balance, with a 5% SKR bonus. Plans and agent hires can be paid with SKR from the same Confirm sheet. Your balance always shows in dollars.",
+    "website": "https://solanamobile.com",
+    "docs": "https://docs.solanamobile.com",
+    "chains": [
+      "Solana"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/skr.png",
+    "actions": [
+      {
+        "text": "Top up your balance with SKR on Solana",
+        "live": true
+      },
+      {
+        "text": "Pay for plans and hires with SKR, 5% bonus",
+        "live": true
+      }
+    ]
+  },
+  {
+    "slug": "tempo",
+    "name": "Tempo",
+    "kind": "built-in",
+    "connector": "tempo",
+    "category": "chains",
+    "status": "live-testnet",
+    "description": "Each agent gets its own Tempo address. Agents read their pathUSD and AlphaUSD balances, get test stablecoins from the Tempo faucet, send to an address you approve and top up your Lexari balance from their Tempo wallet. Fees are paid in the stablecoin itself. Every send waits for your Confirm.",
+    "website": "https://tempo.xyz",
+    "docs": "https://docs.tempo.xyz",
+    "chains": [
+      "Tempo Moderato testnet"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/tempo.png",
+    "actions": [
+      {
+        "text": "Pay APIs that charge over MPP (HTTP 402) with the agent card, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Its Tempo address and stablecoin balances",
+        "live": true
+      },
+      {
+        "text": "Test stablecoins from the faucet",
+        "live": true
+      },
+      {
+        "text": "Send pathUSD or AlphaUSD, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Top up your Lexari balance from its Tempo wallet",
+        "live": true
+      },
+      {
+        "text": "Pay merchants with its Tempo card, inside card limits, after you confirm",
+        "live": true
+      },
+      {
+        "text": "MPP machine payments",
+        "live": false
+      },
+      {
+        "text": "Mainnet",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "uniswap",
+    "name": "Uniswap",
+    "kind": "built-in",
+    "connector": "uniswap",
+    "category": "trading",
+    "status": "live-testnet",
+    "description": "Your agents get live Uniswap v3 quotes and swap ETH and test USDC from their own wallet on Base Sepolia, Ethereum Sepolia and Arbitrum Sepolia. You see the price and the minimum you get before you confirm. Testnet pool prices are not market prices.",
+    "website": "https://uniswap.org",
+    "docs": "https://docs.uniswap.org",
+    "chains": [
+      "Base Sepolia",
+      "Sepolia",
+      "Arbitrum Sepolia"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/uniswap.png",
+    "actions": [
+      {
+        "text": "Live quotes across pool fee tiers",
+        "live": true
+      },
+      {
+        "text": "Swap ETH and test USDC, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Mainnet swaps",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "0g",
+    "name": "0G Compute",
+    "kind": "built-in",
+    "connector": "0g",
+    "category": "compute",
+    "status": "live",
+    "description": "Lexari runs the Kimi, Qwen and GLM models through the 0G Compute router, so agents can answer on decentralized inference. Nothing on chain is signed by agents here.",
+    "website": "https://0g.ai",
+    "docs": "https://docs.0g.ai",
+    "chains": [
+      "0G"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/0g.png",
+    "actions": [
+      {
+        "text": "Chat on Kimi, Qwen and GLM through 0G Compute",
+        "live": true
+      }
+    ]
+  },
+  {
+    "slug": "jupiter",
+    "name": "Jupiter",
+    "kind": "built-in",
+    "connector": "jupiter",
+    "category": "trading",
+    "status": "market-data",
+    "description": "Your agents pull live Jupiter quotes from Solana mainnet as a price reference, for memecoins and blue chips alike. Read only: nothing is swapped.",
+    "website": "https://jup.ag",
+    "docs": "https://dev.jup.ag",
+    "chains": [
+      "Solana"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/jupiter.png",
+    "actions": [
+      {
+        "text": "Live mainnet quotes and routes",
+        "live": true
+      },
+      {
+        "text": "Swaps",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "lifi",
+    "name": "LI.FI",
+    "kind": "built-in",
+    "connector": "bridge",
+    "category": "trading",
+    "status": "market-data",
+    "description": "Your agents get live LI.FI quotes for moving a token from one chain to another (Solana, Ethereum, Base, Arbitrum, Optimism, Polygon, BNB Chain, Avalanche, Bitcoin): what you'd receive, the route, fees and time. Read only: nothing is bridged.",
+    "website": "https://li.fi",
+    "docs": "https://docs.li.fi",
+    "chains": [
+      "Solana",
+      "Ethereum",
+      "Base",
+      "Arbitrum",
+      "Bitcoin",
+      "+ more"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/lifi.png",
+    "actions": [
+      {
+        "text": "Live cross-chain quotes and routes",
+        "live": true
+      },
+      {
+        "text": "Bridging",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "polymarket",
+    "name": "Polymarket",
+    "kind": "built-in",
+    "connector": "polymarket",
+    "category": "prediction",
+    "status": "market-data",
+    "description": "Your agents search Polymarket, read live odds and each outcome's order book price. Polymarket only trades with real USDC on Polygon (there is no test order book), so placing orders stays off until it's switched on for your account. When it is on, every order waits for your Confirm inside your per-trade and daily limits.",
+    "website": "https://polymarket.com",
+    "docs": "https://docs.polymarket.com",
+    "chains": [
+      "Polygon"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/polymarket.png",
+    "actions": [
+      {
+        "text": "Trending markets and search",
+        "live": true
+      },
+      {
+        "text": "Live odds and order book prices",
+        "live": true
+      },
+      {
+        "text": "Buy an outcome on Polygon mainnet, after you confirm",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "zcash",
+    "name": "Zcash",
+    "kind": "built-in",
+    "connector": "zcash",
+    "category": "chains",
+    "status": "market-data",
+    "description": "Each agent has its own transparent Zcash address. Agents quote how much ZEC part of your balance buys, delivered straight to that address. Zcash has no test network for this, so buying uses real funds and stays off until it's switched on for your account. When it is on, every buy waits for your Confirm.",
+    "website": "https://z.cash",
+    "docs": "https://zcash.readthedocs.io",
+    "chains": [
+      "Zcash"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/zcash.png",
+    "actions": [
+      {
+        "text": "Its own Zcash address",
+        "live": true
+      },
+      {
+        "text": "Live ZEC quotes from your balance",
+        "live": true
+      },
+      {
+        "text": "Buy ZEC from your balance, after you confirm",
+        "live": false
+      },
+      {
+        "text": "Send ZEC from its address",
+        "live": false
+      },
+      {
+        "text": "Shielded addresses",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "alchemy",
+    "name": "Alchemy",
+    "kind": "built-in",
+    "connector": "alchemy",
+    "category": "data",
+    "status": "setup-needed",
+    "description": "Alchemy powers Lexari's Monad connection (RPC) and its Token API: your agent can list every token it or any address holds on Monad, with names and amounts. Read only; it never moves money.",
+    "website": "https://www.alchemy.com",
+    "docs": "https://www.alchemy.com/docs",
+    "chains": [
+      "Monad testnet"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/alchemy.png",
+    "actions": [
+      {
+        "text": "Monad RPC for every agent",
+        "live": true
+      },
+      {
+        "text": "Token balances and metadata",
+        "live": true
+      }
+    ]
+  },
+  {
+    "slug": "kuru",
+    "name": "Kuru",
+    "kind": "built-in",
+    "connector": "kuru",
+    "category": "trading",
+    "status": "setup-needed",
+    "description": "Your agents get Kuru routes on Monad testnet and swap from their own Monad wallet. Every swap waits for your Confirm inside your per-trade and slippage limits. Test tokens only.",
+    "website": "https://www.kuru.io",
+    "docs": "https://docs.kuru.io",
+    "chains": [
+      "Monad testnet"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/kuru.png",
+    "actions": [
+      {
+        "text": "Live routes and quotes on Monad testnet",
+        "live": true
+      },
+      {
+        "text": "Swaps, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Mainnet",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "panta",
+    "name": "Panta",
+    "kind": "built-in",
+    "connector": "panta",
+    "category": "prediction",
+    "status": "setup-needed",
+    "description": "Your agents browse Panta markets, read live YES / NO prices and get real quotes. On devnet a position you confirm is recorded as a paper position at Panta's real quote (Panta settles in mainnet USDC, so no money moves yet).",
+    "website": "https://panta.market",
+    "docs": "https://docs.panta.market",
+    "chains": [
+      "Solana"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/panta.svg",
+    "actions": [
+      {
+        "text": "Browse markets and live YES / NO prices",
+        "live": true
+      },
+      {
+        "text": "Real quotes for a position",
+        "live": true
+      },
+      {
+        "text": "Paper positions on devnet, after you confirm",
+        "live": true
+      },
+      {
+        "text": "Positions marked to live prices, closed with profit and loss",
+        "live": true
+      },
+      {
+        "text": "Real positions and claims (mainnet)",
+        "live": false
+      }
+    ]
+  },
+  {
+    "slug": "solami",
+    "name": "Solami",
+    "kind": "built-in",
+    "connector": "solami",
+    "category": "data",
+    "status": "coming-soon",
+    "description": "Solami's RPC, webhooks and Beam power wallet history, incoming transfers and faster transaction landing. Solami serves Solana mainnet, so it switches on with Lexari mainnet.",
+    "website": "https://solami.dev",
+    "docs": "https://solami.dev",
+    "chains": [
+      "Solana mainnet"
+    ],
+    "contracts": [],
+    "contact": {
+      "name": "Lexari",
+      "github": "xElvolution"
+    },
+    "logo": "/integrations/solami.png",
+    "actions": [
+      {
+        "text": "Incoming transfers by webhook",
+        "live": false
+      },
+      {
+        "text": "Transactions landed through Beam",
+        "live": false
+      }
+    ]
+  }
+]

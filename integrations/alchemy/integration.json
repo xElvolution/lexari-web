@@ -1,0 +1,31 @@
+{
+  "$schema": "../schema.json",
+  "slug": "alchemy",
+  "name": "Alchemy",
+  "kind": "built-in",
+  "connector": "alchemy",
+  "category": "data",
+  "status": "setup-needed",
+  "description": "Alchemy powers Lexari's Monad connection (RPC) and its Token API: your agent can list every token it or any address holds on Monad, with names and amounts. Read only; it never moves money.",
+  "website": "https://www.alchemy.com",
+  "docs": "https://www.alchemy.com/docs",
+  "chains": [
+    "Monad testnet"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Monad RPC for every agent",
+      "live": true
+    },
+    {
+      "text": "Token balances and metadata",
+      "live": true
+    }
+  ]
+}

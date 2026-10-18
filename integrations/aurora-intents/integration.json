@@ -1,0 +1,35 @@
+{
+  "$schema": "../schema.json",
+  "slug": "aurora-intents",
+  "name": "Aurora Intents",
+  "kind": "built-in",
+  "connector": "intents",
+  "category": "trading",
+  "status": "live-testnet",
+  "description": "Your agent keeps one balance. When a trade or payment needs funds on another chain, it routes them through Aurora Intents (any-chain liquidity, powered by NEAR Intents) in one Confirm card, with refunds back to your balance if it can't fill. Quotes work with an API key; moving real funds is switched on per server.",
+  "website": "https://intents.aurora.dev",
+  "docs": "https://intents.aurora.dev",
+  "chains": [
+    "Any chain"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Cross-chain quotes to 25+ chains",
+      "live": true
+    },
+    {
+      "text": "One Confirm card that routes and delivers",
+      "live": true
+    },
+    {
+      "text": "Route status",
+      "live": true
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "../schema.json",
+  "slug": "zcash",
+  "name": "Zcash",
+  "kind": "built-in",
+  "connector": "zcash",
+  "category": "chains",
+  "status": "market-data",
+  "description": "Each agent has its own transparent Zcash address. Agents quote how much ZEC part of your balance buys, delivered straight to that address. Zcash has no test network for this, so buying uses real funds and stays off until it's switched on for your account. When it is on, every buy waits for your Confirm.",
+  "website": "https://z.cash",
+  "docs": "https://zcash.readthedocs.io",
+  "chains": [
+    "Zcash"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Its own Zcash address",
+      "live": true
+    },
+    {
+      "text": "Live ZEC quotes from your balance",
+      "live": true
+    },
+    {
+      "text": "Buy ZEC from your balance, after you confirm",
+      "live": false
+    },
+    {
+      "text": "Send ZEC from its address",
+      "live": false
+    },
+    {
+      "text": "Shielded addresses",
+      "live": false
+    }
+  ]
+}

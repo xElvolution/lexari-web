@@ -1,0 +1,35 @@
+{
+  "$schema": "../schema.json",
+  "slug": "kuru",
+  "name": "Kuru",
+  "kind": "built-in",
+  "connector": "kuru",
+  "category": "trading",
+  "status": "setup-needed",
+  "description": "Your agents get Kuru routes on Monad testnet and swap from their own Monad wallet. Every swap waits for your Confirm inside your per-trade and slippage limits. Test tokens only.",
+  "website": "https://www.kuru.io",
+  "docs": "https://docs.kuru.io",
+  "chains": [
+    "Monad testnet"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Live routes and quotes on Monad testnet",
+      "live": true
+    },
+    {
+      "text": "Swaps, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Mainnet",
+      "live": false
+    }
+  ]
+}

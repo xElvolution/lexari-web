@@ -1,0 +1,36 @@
+{
+  "$schema": "../schema.json",
+  "slug": "lifi",
+  "name": "LI.FI",
+  "kind": "built-in",
+  "connector": "bridge",
+  "category": "trading",
+  "status": "market-data",
+  "description": "Your agents get live LI.FI quotes for moving a token from one chain to another (Solana, Ethereum, Base, Arbitrum, Optimism, Polygon, BNB Chain, Avalanche, Bitcoin): what you'd receive, the route, fees and time. Read only: nothing is bridged.",
+  "website": "https://li.fi",
+  "docs": "https://docs.li.fi",
+  "chains": [
+    "Solana",
+    "Ethereum",
+    "Base",
+    "Arbitrum",
+    "Bitcoin",
+    "+ more"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Live cross-chain quotes and routes",
+      "live": true
+    },
+    {
+      "text": "Bridging",
+      "live": false
+    }
+  ]
+}

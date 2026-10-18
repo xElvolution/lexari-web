@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/xElvolution/lexari/blob/main/integrations/schema.json",
+  "title": "Lexari integration",
+  "description": "One protocol on Lexari. Lives at integrations/<slug>/integration.json next to its logo and README. Checked by integrations/scripts/validate.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug", "name", "kind", "category", "status", "description", "website", "docs", "chains", "contracts", "contact", "logo", "actions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,31}$", "description": "Same as the folder name." },
+    "name": { "type": "string", "minLength": 2, "maxLength": 40 },
+    "kind": { "enum": ["built-in", "dapp"], "description": "built-in: a connector Lexari maintains (only Lexari can add these). dapp: your protocol, served by your own HTTPS tools through the agent manifest below." },
+    "connector": { "type": "string", "description": "built-in only: the connector id in webapp/content/integrations.ts." },
+    "category": { "enum": ["chains", "trading", "prediction", "data", "compute", "payments"] },
+    "status": { "enum": ["live-devnet", "live-testnet", "live", "market-data", "setup-needed", "coming-soon", "in-review"], "description": "New dapps start as in-review; Lexari sets live-testnet or live-devnet when merging." },
+    "description": { "type": "string", "minLength": 20, "maxLength": 600 },
+    "website": { "type": "string", "pattern": "^https://" },
+    "docs": { "type": "string", "pattern": "^https://" },
+    "api": { "type": "string", "pattern": "^https://", "description": "Optional public API base or reference." },
+    "chains": { "type": "array", "minItems": 1, "maxItems": 12, "items": { "type": "string", "minLength": 2, "maxLength": 40 } },
+    "contracts": {
+      "type": "array", "maxItems": 30,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["chain", "address", "label"],
+        "properties": { "chain": { "type": "string", "maxLength": 40 }, "address": { "type": "string", "maxLength": 80 }, "label": { "type": "string", "maxLength": 60 } }
+      }
+    },
+    "contact": {
+      "type": "object", "additionalProperties": false, "required": ["name", "github"],
+      "properties": {
+        "name": { "type": "string", "maxLength": 60 },
+        "github": { "type": "string", "pattern": "^[A-Za-z0-9-]{1,39}$" },
+        "email": { "type": "string", "format": "email" },
+        "x": { "type": "string", "pattern": "^[A-Za-z0-9_]{1,15}$" }
+      }
+    },
+    "logo": { "enum": ["logo.svg", "logo.png"], "description": "Square, at least 128 px (PNG) or an SVG, at most 200 KB." },
+    "actions": {
+      "type": "array", "minItems": 1, "maxItems": 10, "description": "What agents can do with it, in plain words. live false means coming soon.",
+      "items": { "type": "object", "additionalProperties": false, "required": ["text", "live"], "properties": { "text": { "type": "string", "minLength": 4, "maxLength": 120 }, "live": { "type": "boolean" } } }
+    },
+    "agent": {
+      "type": "object",
+      "description": "dapp only: a Lexari agent manifest (sdk/packages/manifest). Its id must be the slug. Tools are your HTTPS endpoints; money only moves through declared transfer or swap intents that the person confirms."
+    }
+  }
+}

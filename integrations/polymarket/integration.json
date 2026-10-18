@@ -1,0 +1,35 @@
+{
+  "$schema": "../schema.json",
+  "slug": "polymarket",
+  "name": "Polymarket",
+  "kind": "built-in",
+  "connector": "polymarket",
+  "category": "prediction",
+  "status": "market-data",
+  "description": "Your agents search Polymarket, read live odds and each outcome's order book price. Polymarket only trades with real USDC on Polygon (there is no test order book), so placing orders stays off until it's switched on for your account. When it is on, every order waits for your Confirm inside your per-trade and daily limits.",
+  "website": "https://polymarket.com",
+  "docs": "https://docs.polymarket.com",
+  "chains": [
+    "Polygon"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Trending markets and search",
+      "live": true
+    },
+    {
+      "text": "Live odds and order book prices",
+      "live": true
+    },
+    {
+      "text": "Buy an outcome on Polygon mainnet, after you confirm",
+      "live": false
+    }
+  ]
+}

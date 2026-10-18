@@ -1,0 +1,37 @@
+{
+  "$schema": "../schema.json",
+  "slug": "uniswap",
+  "name": "Uniswap",
+  "kind": "built-in",
+  "connector": "uniswap",
+  "category": "trading",
+  "status": "live-testnet",
+  "description": "Your agents get live Uniswap v3 quotes and swap ETH and test USDC from their own wallet on Base Sepolia, Ethereum Sepolia and Arbitrum Sepolia. You see the price and the minimum you get before you confirm. Testnet pool prices are not market prices.",
+  "website": "https://uniswap.org",
+  "docs": "https://docs.uniswap.org",
+  "chains": [
+    "Base Sepolia",
+    "Sepolia",
+    "Arbitrum Sepolia"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Live quotes across pool fee tiers",
+      "live": true
+    },
+    {
+      "text": "Swap ETH and test USDC, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Mainnet swaps",
+      "live": false
+    }
+  ]
+}

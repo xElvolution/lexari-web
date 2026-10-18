@@ -1,0 +1,28 @@
+name: integrations
+
+# Checks integrations/ on every pull request and push to main: each entry against the schema and the extra rules in
+# integrations/scripts/validate.ts, and that the app's generated copy is up to date.
+# Staged here because pushing workflow files needs a token with the workflow scope. To turn it on:
+#   mkdir -p .github/workflows && git mv integrations/ci/integrations.yml .github/workflows/integrations.yml
+on:
+  pull_request:
+    paths: ["integrations/**", "sdk/packages/manifest/**", "webapp/content/integrations*", "webapp/public/integrations/**", ".github/workflows/integrations.yml"]
+  push:
+    branches: [main]
+    paths: ["integrations/**", "sdk/packages/manifest/**", "webapp/content/integrations*", "webapp/public/integrations/**", ".github/workflows/integrations.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx tsx integrations/scripts/validate.ts --check
+      - run: npx tsx --test integrations/scripts/validate.test.ts

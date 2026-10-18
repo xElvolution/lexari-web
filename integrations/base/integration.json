@@ -1,0 +1,39 @@
+{
+  "$schema": "../schema.json",
+  "slug": "base",
+  "name": "Base",
+  "kind": "built-in",
+  "connector": "base",
+  "category": "chains",
+  "status": "live-testnet",
+  "description": "Each agent has its own address on Base. Agents read their Base Sepolia ETH and test USDC and send to an address you approve. Every send waits for your Confirm. Test funds only.",
+  "website": "https://base.org",
+  "docs": "https://docs.base.org",
+  "chains": [
+    "Base Sepolia"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Its Base Sepolia address and balances",
+      "live": true
+    },
+    {
+      "text": "Send test ETH or USDC, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Swaps through Uniswap",
+      "live": true
+    },
+    {
+      "text": "Mainnet",
+      "live": false
+    }
+  ]
+}
