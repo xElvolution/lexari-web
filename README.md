@@ -144,7 +144,7 @@ Every integration is **off until you add it**, granted to specific agents, and b
 | ORE mining | Your own server | 🟢 | 🟢 install, start, stop, watch (practice mode, no rewards) | 🟢 |
 | Solami (RPC, webhooks, Beam) | Solana mainnet | ⚪ | ⚪ | ⚪ arrives with mainnet |
 | Hyperliquid (trade-only API wallet, perps) | Hyperliquid testnet | 🟢 prices, positions, orders | 🟢 market and limit orders after Confirm | 🟢 |
-| Monad (Kuru, AUSD, Nansen data) | Monad testnet | 🟢 MON balance; 🟡 Nansen wallet reads and Kuru routes (need API keys) | 🟡 Kuru swaps after Confirm (need the Kuru API and router); ⚪ AUSD | 🟡 |
+| Monad (Kuru, AUSD, Nansen data) | Monad testnet | 🟢 MON balance; 🟡 Nansen wallet reads and Kuru routes (need API keys) | 🟡 Kuru swaps after Confirm (need the Kuru API and router); 🟢 AUSD balance, faucet, pay and cross-border sends after Confirm | 🟡 |
 | Tempo agent card | Tempo testnet | 🟢 balance, limits, history | 🟢 merchant payments in stablecoins after Confirm, per payment and daily limits, freeze | 🟢 web and phone |
 
 ### Models
@@ -640,7 +640,7 @@ Lexari gives everyone personalized AI agents that act onchain. These partners an
 | <img src="https://www.google.com/s2/favicons?domain=intents.aurora.dev&sz=64" width="20" height="20" alt="" /> | **Aurora Intents** | Cross-chain engine for the one balance. When a trade needs funds on another chain, the agent routes them through the Aurora Intents Swap API in a single Confirm card. | Signer layer to Adapter Registry (routing) |
 | <img src="https://www.google.com/s2/favicons?domain=nansen.ai&sz=64" width="20" height="20" alt="" /> | **Nansen** | Smart money flows and wallet profiles. Every trade Confirm card carries a Nansen check line, and agents consult it before proposing a trade. | Adapter Registry: data |
 | <img src="https://www.google.com/s2/favicons?domain=kuru.io&sz=64" width="20" height="20" alt="" /> | **Kuru** | Orderbook routes and swaps on Monad testnet through the Kuru SDK, behind Confirm cards. | Adapter Registry: Monad |
-| <img src="https://www.google.com/s2/favicons?domain=agora.finance&sz=64" width="20" height="20" alt="" /> | **Agora AUSD** | Planned stablecoin for holding and paying in the unified balance. | Adapter Registry: Monad |
+| <img src="https://www.google.com/s2/favicons?domain=agora.finance&sz=64" width="20" height="20" alt="" /> | **Agora AUSD** | Hold, pay and send AUSD across borders from the agent's Monad testnet wallet, each after a Confirm card. Test AUSD from Agora's faucet. | Adapter Registry: Monad |
 | <img src="https://www.google.com/s2/favicons?domain=mera.xyz&sz=64" width="20" height="20" alt="" /> | **Mera** | Planned passkey sign-in and per-agent keys. | Sign-in |
 | <img src="https://www.google.com/s2/favicons?domain=alchemy.com&sz=64" width="20" height="20" alt="" /> | **Alchemy** | RPC for Monad and EVM chains when ALCHEMY_API_KEY is set. | Adapter Registry: RPC |
 | <img src="https://www.google.com/s2/favicons?domain=hyperliquid.xyz&sz=64" width="20" height="20" alt="" /> | **Hyperliquid** | Perps on testnet with a trade-only API wallet, market and limit orders, take profit and stop loss. | Signer layer: HL API wallet |
