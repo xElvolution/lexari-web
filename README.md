@@ -118,7 +118,7 @@ flowchart LR
 | Hub (check-in, quests, mystery box, levels, referrals) | 🟢 | Runs offchain in Postgres today, with race-safe claims |
 | Billing and top-up | 🟢 | Plans and credits. Deposits verified on Solana devnet and EVM, Tempo, Bitcoin, Litecoin, Tron and XRPL testnets |
 | Rename your agent from its profile | 🟢 | Nickname and notes on the agent panel |
-| Agent manages itself by chat (rename, face, tone, model) | 🟡 | In active development: a built-in `self` connector where every change is a Confirm card. The agent can never change its own grants, limits, wallets or keys |
+| Agent manages itself by chat (rename, face, tone, model) | 🟢 | A built-in `self` connector: every change is a Confirm card, applied only on your Confirm and kept in the audit log. Never from email or web content it read. The agent can never change its own grants, limits, wallets or keys |
 | Onchain agent ID card (Metaplex Core + Lexari program) | 🟡 | Mint flow is built and gated: it switches on once the Lexari program is deployed to devnet |
 | Lexari Anchor program | 🟡 | Agent registry, memory records, Hub PDAs. Built with tests. Devnet deploy pending (rent for a ~416 KB program) |
 | ORE Miner gift reveal after your agent is created | ⚪ | Today the ORE Miner is a free specialist in the marketplace. The wrapped gift flow is designed, not built |
