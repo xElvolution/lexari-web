@@ -137,8 +137,8 @@ Every integration is **off until you add it**, granted to specific agents, and b
 | Polymarket | Polygon | 🟢 markets and odds | ⚪ orders | 🟢 read only |
 | Panta prediction markets | Solana | 🟢 | 🟡 paper positions on devnet | 🟡 needs API key |
 | Tempo | Moderato testnet (42431) | 🟢 pathUSD, AlphaUSD | 🟢 faucet, sends, top-ups after Confirm | 🟢 |
-| Base | Base Sepolia | 🟢 balances | ⚪ swaps and transfers | 🟢 read only |
-| Ethereum | Sepolia | 🟢 balances | ⚪ swaps and transfers | 🟢 read only |
+| Base | Base Sepolia | 🟢 balances | 🟢 transfers (ETH, test USDC) and Uniswap v3 swaps, after Confirm | 🟢 |
+| Ethereum | Sepolia | 🟢 balances | 🟢 transfers (ETH, test USDC) and Uniswap v3 swaps, after Confirm | 🟢 |
 | Market prices | Any | 🟢 | n/a | 🟢 |
 | Agent payments (x402, agent to agent requests) | Solana devnet | 🟢 | 🟢 auto inside budget, Confirm above it | 🟢 |
 | ORE mining | Your own server | 🟢 | 🟢 install, start, stop, watch (practice mode, no rewards) | 🟢 |
