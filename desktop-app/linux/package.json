@@ -14,7 +14,64 @@
     "dist": "npm run sync && electron-builder --linux AppImage deb --publish never",
     "release": "npm run sync && electron-builder --linux AppImage deb --publish always"
   },
-  "dependencies": { "electron-updater": "^6.3.9" },
-  "devDependencies": { "electron": "^33.2.1", "electron-builder": "^25.1.8" },
-  "build": { "appId": "ai.lexari.desktop", "files": ["main.js", "shared-build/**/*", "!shared-build/**/*.md"], "directories": { "output": "dist", "buildResources": "shared-build/assets" }, "protocols": [{ "name": "Lexari", "schemes": ["lexari"] }], "publish": [{ "provider": "github", "owner": "xElvolution", "repo": "lexari", "releaseType": "draft" }], "linux": { "icon": "shared-build/assets/icon.png", "category": "Network;Chat;Finance", "executableName": "lexari", "maintainer": "Lexari <hello@lexari.ai>", "synopsis": "Your onchain AI agents", "desktop": { "StartupWMClass": "Lexari" }, "target": ["AppImage", "deb"] }, "deb": { "depends": ["libnotify4", "libxtst6", "libnss3", "libsecret-1-0"] } }
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ai.lexari.desktop",
+    "files": [
+      "main.js",
+      "shared-build/**/*",
+      "!shared-build/**/*.md"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "shared-build/assets"
+    },
+    "protocols": [
+      {
+        "name": "Lexari",
+        "schemes": [
+          "lexari"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "xElvolution",
+        "repo": "lexari",
+        "releaseType": "draft"
+      }
+    ],
+    "linux": {
+      "icon": "shared-build/assets/icons",
+      "category": "Network;Chat;Finance",
+      "executableName": "lexari",
+      "maintainer": "Lexari <hello@lexari.ai>",
+      "synopsis": "Your onchain AI agents",
+      "desktop": {
+        "StartupWMClass": "Lexari",
+        "Name": "Lexari",
+        "Comment": "Your onchain AI agents",
+        "Icon": "lexari"
+      },
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "deb": {
+      "depends": [
+        "libnotify4",
+        "libxtst6",
+        "libnss3",
+        "libsecret-1-0"
+      ]
+    }
+  }
 }
