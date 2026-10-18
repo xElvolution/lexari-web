@@ -520,6 +520,7 @@ lexari-web/
 │   └── src/                 lib (MWA, Privy, session, lock), components, theme, brain
 ├── shared/                  Faces, logo, theme, badge copy and ID backgrounds for both web apps
 ├── contracts/solana/        Anchor program: agent registry, memory records, Hub PDAs, tests
+├── contracts/evm/          Foundry: agent registry, spend vault, skills registry (Monad testnet deployments)
 ├── desktop-relay/           Per-user locked-down desktop containers and their relay
 ├── deploy/                  Release script, pm2 config, Grok relay and its systemd unit
 └── scripts/                 Dev runner and the phone-width type generator
