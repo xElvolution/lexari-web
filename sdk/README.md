@@ -13,6 +13,7 @@ The safety model in one line: your code runs on your own server, Lexari calls it
 To move money it returns an intent (transfer or swap). Lexari turns that into a Confirm card, checks every limit, and
 only the person's tap runs it from the agent's own wallet.
 
-Run the tests from this folder with `npm test` (uses the repo's TypeScript tooling).
+Start with `docs/alpha-guide.md`. Run the tests from this folder with `npm test` and type-check with `npx tsc -p tsconfig.json`
+(both use the repo's TypeScript tooling).
 
 License: proprietary. See the LICENSE file at the root of the repository.
