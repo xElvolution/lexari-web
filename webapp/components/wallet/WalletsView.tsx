@@ -110,7 +110,7 @@ export default function WalletsView() {
           <AgentWallets s={s} d={d} />
         </div>
       ) : (
-        <div className="mt-6 grid gap-3">{agents.map((a) => <CardRow key={a.id} a={a} card={cardFor(cards, a.id)} onGet={() => setGetFor(a.id)} onOpen={() => setOpenFor(a.id)} />)}</div>
+        <div data-card-grid className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(min(100%,340px),1fr))] items-start gap-4">{agents.map((a) => <CardRow key={a.id} a={a} card={cardFor(cards, a.id)} onGet={() => setGetFor(a.id)} onOpen={() => setOpenFor(a.id)} />)}</div>
       )}
       {getFor && <GetCardDialog s={s} id={getFor} onClose={() => setGetFor(null)} />}
       {openFor && cardFor(cards, openFor) && <CardSheet agent={openFor} name={agents.find((a) => a.id === openFor)?.name || "Agent"} card={cardFor(cards, openFor)!} onClose={() => setOpenFor(null)} />}
