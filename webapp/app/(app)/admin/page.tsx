@@ -5,6 +5,7 @@ import { api, friendly } from "@/lib/api";
 import { PageHead } from "@/components/ui";
 import Icon from "@/components/Icon";
 import { Copyable, Section, input, primary, when } from "@/components/developer/parts";
+import ReviewQueue from "@/components/developer/ReviewQueue";
 
 type Invite = { id: string; note: string; used: boolean; usedAt: number | null; expiresAt: number; createdAt: number };
 
@@ -42,6 +43,7 @@ export default function AdminPage() {
     <>
       <PageHead kicker="Lexari review" title="Review queue." body="Check every new agent version before it reaches the Marketplace. Automated checks run first; approving lists the version." />
       <div className="max-w-[900px]">
+        <ReviewQueue />
         <Invites />
       </div>
     </>

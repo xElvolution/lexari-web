@@ -6,7 +6,7 @@
  *  - every call is recorded in integration_actions (reads as "done", refusals as "rejected" with the reason).
  * Sign tools never execute from chat: they make a confirm card, and only the person's Confirm runs them.
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { SCOPE_INFO, integrationById, scopeOfTool, type ActionCard, type MarketsCard } from "@/content/integrations";
 import { db } from "../db";
 import { chats, messages } from "../db/schema";
@@ -17,6 +17,7 @@ import { ownAgent, solanaKeypair } from "../agentWallets";
 import { COUNTED, grantScopes, isBuiltin, isLive, spentToday, type Grant } from "./grants";
 import { isOwnWallet, myWalletFor } from "../wallets";
 import { overBudget } from "../agentpay/budgets";
+import { DEV_CAPS } from "../market/config";
 import { recordTx } from "../txlog";
 import { TEMPO, tempoReceipt } from "./tempo";
 import { HL_NETWORK } from "./hyperliquid";
@@ -38,6 +39,7 @@ import { ChainError, SimError, isDevnet, network } from "./solana";
 import { EVM, isEvmChain } from "./evm";
 import { evmTxState } from "./evmchains";
 import { cardOf, type Preview } from "./cards";
+import { intentToCall, type DevProposal } from "../market/devtools";
 import { checkMoney, type SendCheck } from "../security";
 
 const EXPIRE_MS = 15 * 60_000;
@@ -50,7 +52,11 @@ export function agentRef(userId: string, a: { slug: string; kind: string; name: 
 }
 
 /** untrusted: this turn read content the person didn't write (email, web pages), so the card says why you're asked. */
-type Ctx = { userId: string; agent: AgentRef; convo: string; messageId: string; untrusted?: boolean };
+/**
+ * thirdParty: the speaker is a third-party agent (SDK). It may only call read tools and its own tools; money moves
+ * only through an intent from one of its tools, which arrives here as `proposal` (lower caps and a "Proposed by" row).
+ */
+type Ctx = { userId: string; agent: AgentRef; convo: string; messageId: string; untrusted?: boolean; thirdParty?: boolean; proposal?: DevProposal };
 export type CallResult =
   | { kind: "read"; tool: string; ok: true; text: string; markets?: MarketsCard }
   | { kind: "read"; tool: string; ok: false; text: string }
@@ -98,10 +104,16 @@ export async function scopeDenied(userId: string, grant: Grant, tool: ToolDef, p
 }
 
 /** One tool call from the agent's reply. `grants` are the integrations this agent may use right now. */
-export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: unknown): Promise<CallResult> {
-  const tool = toolByName(name);
+export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: unknown, extra: ToolDef[] = []): Promise<CallResult> {
+  const tool = extra.find((t) => t.name === name.trim().toLowerCase()) ?? toolByName(name);
   if (!tool) return { kind: "refused", tool: name, text: `there's no Lexari integration tool called ${name.slice(0, 40)}` };
-  const info = integrationById(tool.connector)!;
+  const info = integrationById(tool.connector) ?? { name: tool.dev?.label || "this agent's tools" };
+  // A third-party agent never signs directly: payments only come from its own tools as intents (below).
+  if (ctx.thirdParty && tool.risk === "sign" && !ctx.proposal) {
+    await record(ctx, tool, input, "rejected", { error: "Third-party agents can only propose payments through their own tools." }).catch(() => null);
+    return { kind: "refused", tool: tool.name, text: "I can only propose payments through my own tools, so nothing was prepared" };
+  }
+  if (ctx.proposal && (tool.risk !== "sign" || tool.dev || tool.offchain || tool.auto)) return { kind: "refused", tool: tool.name, text: "that proposal isn't something a third-party agent can make" };
   const grant = grants.find((g) => g.connector === tool.connector);
   if (!grant) {
     await record(ctx, tool, input, "rejected", { error: `${info.name} isn't available to this agent.` }).catch(() => null);
@@ -113,7 +125,7 @@ export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: un
     await record(ctx, tool, input, "rejected", { error: why }).catch(() => null);
     return { kind: "refused", tool: tool.name, text: why };
   }
-  if (tool.risk === "read" && !isBuiltin(tool.connector)) {
+  if (tool.risk === "read" && !isBuiltin(tool.connector) && !tool.dev) {
     const denied = await scopeDenied(ctx.userId, grant, tool, null);
     if (denied) { await record(ctx, tool, input, "rejected", { error: denied }).catch(() => null); return { kind: "refused", tool: tool.name, text: denied }; }
   }
@@ -122,11 +134,22 @@ export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: un
     await record(ctx, tool, input, "rejected", { error: "The request was missing details." }).catch(() => null);
     return { kind: "refused", tool: tool.name, text: `the ${info.name} request was missing details (${parsed.error.issues[0]?.path.join(".") || "input"})` };
   }
-  const limits = { perTxUsd: grant.perTxUsd, dailyUsd: grant.dailyUsd, maxSlippageBps: grant.maxSlippageBps };
+  const limits = ctx.proposal
+    ? { perTxUsd: Math.min(grant.perTxUsd, ctx.proposal.perTxUsd), dailyUsd: Math.min(grant.dailyUsd, ctx.proposal.dailyUsd), maxSlippageBps: grant.maxSlippageBps }
+    : { perTxUsd: grant.perTxUsd, dailyUsd: grant.dailyUsd, maxSlippageBps: grant.maxSlippageBps };
   if (tool.risk === "read") {
     try {
-      const r = await tool.run!(parsed.data as never, ctx.agent);
+      const r = await tool.run!(parsed.data as never, ctx.agent, { convo: ctx.convo, messageId: ctx.messageId });
       await record(ctx, tool, parsed.data, "done", { preview: { title: r.summary, rows: [], network: "" } });
+      // A third-party tool handed back an intent: the matching built-in sign tool prepares a Confirm card, inside
+      // the person's grant and limits and the lower third-party caps, labelled with who proposed it.
+      if (r.intent && tool.dev) {
+        if (ctx.untrusted) return { kind: "refused", tool: tool.name, text: "I won't propose a payment while reading content you didn't write" };
+        const call = intentToCall(r.intent);
+        const proposal: DevProposal = { label: tool.dev.label, listingId: tool.dev.listingId, perTxUsd: DEV_CAPS.perTxUsd, dailyUsd: DEV_CAPS.dailyUsd };
+        const out = await runCall({ ...ctx, proposal }, grants, call.tool, call.input);
+        return out.kind === "action" ? out : { kind: "refused", tool: tool.name, text: `${r.text ? `${r.text.slice(0, 300)} ` : ""}(the proposal didn't go through: ${out.kind === "refused" ? out.text : "it couldn't be prepared"})` };
+      }
       return { kind: "read", tool: tool.name, ok: true, text: r.text, markets: r.markets };
     } catch (e) {
       const why = e instanceof Reject ? e.message : `${info.name} didn't answer right now`;
@@ -153,6 +176,12 @@ export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: un
   }
   const nansen = await nansenRowFor(tool.name, parsed.data);
   const preview: Preview = { title: prep.title, rows: nansen ? [...prep.rows, nansen] : prep.rows, network: netOf(prep.chain), plan: prep.plan, summary: prep.summary };
+  if (ctx.proposal) {
+    preview.rows = [["Proposed by", ctx.proposal.label], ...preview.rows, ["Agent caps", `$${ctx.proposal.perTxUsd} each, $${ctx.proposal.dailyUsd} a day for third-party agents`]];
+    preview.dev = { listingId: ctx.proposal.listingId, label: ctx.proposal.label, perTxUsd: ctx.proposal.perTxUsd, dailyUsd: ctx.proposal.dailyUsd };
+    const over = await devCapExceeded(ctx.userId, ctx.agent.slug, prep.usdMicros, ctx.proposal);
+    if (over) { await record(ctx, tool, parsed.data, "rejected", { preview, usdMicros: prep.usdMicros, error: over, chain: prep.chain }); return { kind: "refused", tool: tool.name, text: over }; }
+  }
   if (!isBuiltin(tool.connector)) {
     const denied = await scopeDenied(ctx.userId, grant, tool, prep.plan);
     if (denied) {
@@ -216,6 +245,17 @@ async function overLimit(userId: string, name: string, g: Grant, micros: number,
   return null;
 }
 
+/** Third-party caps: per proposal, and today's total of everything this agent proposed that is being sent or was sent. */
+export async function devCapExceeded(userId: string, agentSlug: string, micros: number, caps: { perTxUsd: number; dailyUsd: number }, tx = db()) {
+  if (micros > caps.perTxUsd * 1e6) return `That's ${usd(micros)}, over the $${caps.perTxUsd} cap for payments a third-party agent proposes.`;
+  const start = new Date(); start.setUTCHours(0, 0, 0, 0);
+  const [r] = await tx.select({ v: sql<string>`coalesce(sum(${integrationActions.usdMicros}), 0)` }).from(integrationActions)
+    .where(and(eq(integrationActions.userId, userId), eq(integrationActions.agentSlug, agentSlug), inArray(integrationActions.status, [...COUNTED]), gte(integrationActions.createdAt, start), sql`${integrationActions.preview} ? 'dev'`));
+  const spent = Number(r?.v || 0);
+  if (spent + micros > caps.dailyUsd * 1e6) return `That would take today's proposals from this agent to ${usd(spent + micros)}, over the $${caps.dailyUsd} daily cap for third-party agents.`;
+  return null;
+}
+
 async function ownAction(userId: string, id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(404, "There's no such action.");
   const [a] = await db().select().from(integrationActions).where(and(eq(integrationActions.userId, userId), eq(integrationActions.id, id))).limit(1);
@@ -265,6 +305,11 @@ export async function confirmAction(userId: string, id: string): Promise<ActionC
     if (denied) return denied;
     const over = await overLimit(userId, info.name, g, a.usdMicros, tx as never);
     if (over) return over;
+    const dev = ((a.preview || {}) as Preview).dev;
+    if (dev) {
+      const devOver = await devCapExceeded(userId, a.agentSlug, a.usdMicros, dev, tx as never);
+      if (devOver) return devOver;
+    }
     const [moved] = await tx.update(integrationActions).set({ status: "submitting" }).where(and(eq(integrationActions.id, a.id), eq(integrationActions.status, "prepared"))).returning({ id: integrationActions.id });
     return moved ? null : "busy";
   });

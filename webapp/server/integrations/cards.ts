@@ -5,7 +5,8 @@ import { TEMPO } from "./tempo";
 import { EVM, isEvmChain } from "./evm";
 
 type Row = typeof integrationActions.$inferSelect;
-export type Preview = { title: string; rows: [string, string][]; network: string; plan?: Record<string, unknown>; summary?: string; result?: [string, string][] };
+/** dev: proposed by a third-party agent (server/market/devtools.ts); its caps are checked again at Confirm */
+export type Preview = { title: string; rows: [string, string][]; network: string; plan?: Record<string, unknown>; summary?: string; result?: [string, string][]; dev?: { listingId: string; label: string; perTxUsd: number; dailyUsd: number } };
 
 const LABEL: Record<string, string> = {
   "solana.wallet": "Checked its Solana wallet", "solana.transfer": "Transfer on Solana", "orca.quote": "Orca quote", "orca.swap": "Swap on Orca",

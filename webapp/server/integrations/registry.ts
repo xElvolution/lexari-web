@@ -29,7 +29,8 @@ import { SOL_RESERVE_LAMPORTS, balances, feePayer, fmtAmount, isDevnet, network,
 
 export type AgentRef = { slug: string; kind: string; name: string; userId: string; keypair: () => Keypair };
 export type GrantLimits = { perTxUsd: number; dailyUsd: number; maxSlippageBps: number };
-export type ReadResult = { text: string; markets?: MarketsCard; summary: string };
+/** intent: only from a third-party agent's tool (server/market/devtools.ts); Lexari turns it into a Confirm card */
+export type ReadResult = { text: string; markets?: MarketsCard; summary: string; intent?: import("@lexari/manifest").Intent };
 export type Prepared = { title: string; rows: [string, string][]; usdMicros: number; chain: string; plan: Record<string, unknown>; summary: string };
 export type Executed = {
   sig: string; confirmed: boolean; rows?: [string, string][];
@@ -44,18 +45,21 @@ export { Reject };
 
 export type ToolDef = {
   name: string;
-  connector: IntegrationId;
+  /** a built-in connector, or "dev:<listingId>" for a third-party agent's webhook tools */
+  connector: IntegrationId | `dev:${string}`;
   risk: "read" | "sign";
   /** one line for the agent's prompt, with the JSON input it takes */
   hint: string;
   input: z.ZodTypeAny;
-  run?: (input: never, agent: AgentRef) => Promise<ReadResult>;
+  run?: (input: never, agent: AgentRef, ctx?: { convo: string; messageId: string }) => Promise<ReadResult>;
   prepare?: (input: never, agent: AgentRef, limits: GrantLimits) => Promise<Prepared>;
   execute?: (plan: never, agent: AgentRef) => Promise<Executed>;
   /** agent payments checked against the agent's budget (server/agentpay/budgets.ts); always a Confirm card, flagged when over budget */
   auto?: boolean;
   /** changes Lexari settings, not a chain (the agent's own name, face, persona, model): no network or money checks */
   offchain?: boolean;
+  /** a third-party agent's tool: whose it is and which intents it may propose */
+  dev?: { listingId: string; label: string; intents: readonly ("transfer" | "swap")[] };
 };
 
 const num = z.union([z.number(), z.string().regex(/^\s*\$?\d+(\.\d+)?\s*$/).transform((s) => Number(s.replace(/[$\s]/g, "")))]);

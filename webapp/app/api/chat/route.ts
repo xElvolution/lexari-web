@@ -19,6 +19,7 @@ import { walletSendGuard } from "@/server/security/walletSend";
 import { chatBody } from "@/server/validate";
 import { lockedSlugs } from "@/server/plans";
 import { SPECIALISTS } from "@/content/appData";
+import { devAgentFor, thirdPartyPersona } from "@/server/market/devtools";
 import { desktopOn, pullDesktop, runInDesktop, runRequests } from "@/server/desktop";
 import { DESKTOP_MARK } from "@/server/engram/grokCli";
 import { CU_BUDGET_MS, computerOn, computerTask, runComputer, stripComputer } from "@/server/computer";
@@ -96,7 +97,11 @@ export async function POST(req: Request) {
     if (locked.includes(body.speaker)) return jsonError(402, `${(speakerRow?.meta as { nick?: string })?.nick || speakerRow?.name || "This agent"} is locked on your plan. Upgrade to keep working with them.`);
   }
   const speakerName = (speakerRow?.meta as { nick?: string })?.nick || speakerRow?.name || body.speaker;
-  const role = speakerRow?.kind === "hired" ? house?.job || speakerRow.role : speakerRow?.role || home.role;
+  // A third-party agent (SDK marketplace): its persona from the approved manifest, always under Lexari's rules, and
+  // none of the personal tools (computer, email, wallet, secrets). Its own tools come through turnTools.
+  const dev = speakerRow?.kind === "hired" && !house ? await devAgentFor(body.speaker).catch(() => null) : null;
+  if (speakerRow?.kind === "hired" && !house && !dev) return jsonError(410, `${speakerName} isn't available right now.`);
+  const role = dev ? dev.manifest.persona.job : speakerRow?.kind === "hired" ? house?.job || speakerRow.role : speakerRow?.role || home.role;
   const tone = speakerRow?.tone || home.tone || "short";
   // The model: this chat's pick, else the agent's, else the account default (Settings > Models), else Lamina.
   // A model on your own key comes with its provider target and is never billed to your Lexari balance.
@@ -124,15 +129,16 @@ export async function POST(req: Request) {
   const priority = queuePriority(level);
   const prompt = buildPrompt({
     agentName: home.name, role, tone, speaker: speakerName,
-    about: speakerRow?.kind === "custom" ? speakerRow.about : house?.back || "",
+    about: speakerRow?.kind === "custom" ? speakerRow.about : dev ? dev.manifest.persona.description : house?.back || "",
     you: (home.meta as { you?: string })?.you || "",
     history, recall: speakerRow?.memoryOn === false ? [] : body.recall, recallMax: recallSize(level), text,
   });
   prompt[0] = { ...prompt[0], content: `${prompt[0].content}\nYour name is ${speakerName}. When the person says your name (even misspelled by speech-to-text), they mean you.${isGroupChat && members.length ? ` You are in a group chat with ${members.join(", ")}${body.call ? " on a group voice call" : ""}. Every member answers in turn in their own voice. Only speak as yourself, never write lines for the others, and don't prefix your reply with your name.` : ""}` };
 
+  if (dev) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${thirdPartyPersona(dev)}` };
   const call = body.call === true;
   if (call) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${CALL_HINT}${cutOff(body.history) ? `\n${INTERRUPT_HINT}` : ""}` };
-  const tools = !call && desktopOn();
+  const tools = !call && !dev && desktopOn();
   if (tools) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${DESKTOP_HINT}\n${FILES_HINT}` };
   // The image tool (a new picture from a description) only exists when an image key is set; otherwise the agent says so.
   const ownImageKey = !call ? await imageKeyFor(userId).catch(() => null) : null;
@@ -143,12 +149,12 @@ export async function POST(req: Request) {
   const integ = !call && !event ? await turnTools(userId, speakerRow?.slug || "home").catch(() => null) : null;
   if (integ) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${integ.hint}` };
   // Email: the agent's own address and newest inbox mail; an <email> tag becomes a draft card only you can send.
-  const mail = !call && !event ? await emailContext(userId, speakerRow?.slug || "home", speakerName).catch((e: Error) => { console.error(`[email] context: ${e.message}`); return null; }) : null;
+  const mail = !call && !event && !dev ? await emailContext(userId, speakerRow?.slug || "home", speakerName).catch((e: Error) => { console.error(`[email] context: ${e.message}`); return null; }) : null;
   if (mail) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${mail}` };
   // Secrets: agents ask for credentials with a secure card and only ever see names, never values.
   const agentSlug = speakerRow?.slug || "home";
   const vaultNames = !call ? await secretNames(userId, agentSlug).catch(() => [] as { name: string; service: string }[]) : [];
-  prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${call ? "Never ask for a password, API key, recovery phrase or private key out loud; say you'll put a secure card in the chat instead." : secretsHint(vaultNames, tools)}` };
+  if (!dev) prompt[0] = { ...prompt[0], content: `${prompt[0].content}\n${call ? "Never ask for a password, API key, recovery phrase or private key out loud; say you'll put a secure card in the chat instead." : secretsHint(vaultNames, tools)}` };
   // Meetings, background jobs and schedules (server/tasks): your own agents, on their computer.
   const taskTools = tools && !event && speakerRow?.kind !== "hired";
   if (taskTools) {
@@ -159,7 +165,7 @@ export async function POST(req: Request) {
   const mailTainted = !!mail && /\n- id=/.test(mail);
   // The wallet tools (send, read) are for chat turns; every turn (calls too) reads the wallet history below.
   const owner = session.wallet || "";
-  const wallet = call ? "" : owner;
+  const wallet = call || dev ? "" : owner;
   // Your agents can use your wallet (with a confirm card). A hired specialist never touches it: it has its own task
   // wallet and asks you to fund it for a task.
   const hiredSpeaker = speakerRow?.kind === "hired";
@@ -276,7 +282,7 @@ export async function POST(req: Request) {
         // A credential the agent needs: a secure card (the value goes straight to the vault, never through chat).
         let secret: SecretCard | null = null;
         if (!call && !event && hasSecretTag(full)) {
-          const sr = secretRequestTag(full);
+          const sr = dev ? null : secretRequestTag(full); // a third-party agent never asks for credentials
           full = stripSecretTags(full);
           if (sr) {
             secret = await createSecretRequest(userId, { agent: agentSlug, convo: body.convo, messageId: body.replyMsgId }, sr).catch((e: Error) => { console.error(`[secrets] request: ${e.message}`); return null; });
