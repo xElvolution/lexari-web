@@ -156,7 +156,7 @@ Every integration is **off until you add it**, granted to specific agents, and b
 | Bring your own key | 🟢 | OpenAI, Anthropic, Google, xAI, OpenRouter, plus a custom OpenAI-compatible base URL |
 | Kimi and Qwen on your own key | 🟢 | Via the OpenRouter provider (`moonshotai/kimi-k3`, `qwen/qwen3.8-flash`) or any model added by name |
 | Kimi K3 and Qwen 3.8 Max as house models | 🟢 | Live in the model picker on Lexari's own Moonshot and Alibaba Model Studio keys, each with a fallback chain. Kimi K2.5 already powers Lamina |
-| 0G Compute router | 🟡 | In development as a house provider (OpenAI-compatible) |
+| 0G Compute router | 🟢 | A house provider on the 0G Compute Router (OpenAI-compatible). Kimi, Qwen, OpenAI and Claude in the picker run through it with one `ZG_COMPUTE_API_KEY` (direct Moonshot and DashScope keys are optional overrides). Set on the production server and answering |
 | Per-model fallback chains | 🟢 | Each house model has its own chain (Kimi, then Qwen, then OpenAI on 0G, then Lamina), tried only before any text reaches you. `HOUSE_FALLBACKS` reorders or empties a chain per model and `HOUSE_FALLBACK_LAMINA=0` turns off the Lamina last resort |
 | Cost dashboard and per-agent model caps | ⚪ | Model router v2 |
 
