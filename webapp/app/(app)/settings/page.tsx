@@ -324,7 +324,7 @@ export default function SettingsPage() {
   useEffect(() => { const h = window.location.hash.slice(1) as Sec; if (SECTIONS.some((x) => x.id === h)) { setSec(h); setOpen(true); } }, []);
   const pick = (id: Sec) => { setSec(id); setOpen(true); window.history.replaceState(null, "", `#${id}`); window.scrollTo({ top: 0 }); };
   const cur = SECTIONS.find((x) => x.id === sec)!;
-  const body = { general: <General s={s} />, personal: <Personal s={s} />, agents: <Agents s={s} />, models: <ModelsSection s={s} />, notifications: <Notifications s={s} />, data: <Data s={s} />, security: <Security s={s} />, accounts: <Accounts s={s} />, social: <SocialLinks s={s} />, wallets: <WalletsSection s={s} />, integrations: <IntegrationsSection s={s} />, secrets: <SecretsSection s={s} />, billing: <Billing s={s} />, about: <About /> }[sec];
+  const body = { general: <General s={s} />, personal: <Personal s={s} />, agents: <Agents s={s} />, models: <ModelsSection s={s} />, notifications: <Notifications s={s} />, data: <Data s={s} />, security: <Security s={s} />, accounts: <Accounts s={s} />, social: <SocialLinks s={s} />, wallets: <WalletsSection s={s} />, integrations: <><Group><Row title="Protocols on Lexari" desc="Every protocol your agents can use, what they can do with it, and how to bring yours."><Link href="/integrations" className={smallBtn}>Open</Link></Row></Group><div className="mt-6"><IntegrationsSection s={s} /></div></>, secrets: <SecretsSection s={s} />, billing: <Billing s={s} />, about: <About /> }[sec];
 
   return (
     <div data-rise className="grid gap-6 lg:grid-cols-[240px_1fr] lg:gap-10">
