@@ -29,7 +29,7 @@ their team. Their agents call your tools with the same safety rules as every thi
 ## Review
 A Lexari reviewer checks the entry, calls your tools on testnet and reads every intent they can return. On approval we
 set `status` to `live-testnet` or `live-devnet`, run `validate.ts --write` (which refreshes the app's copy and logos),
-merge, and send your webhook signing secret to the contact on file privately. Changes later go through a new pull
+merge, run `webapp/scripts/sync-protocols.ts` on the next deploy (it lists your dApp and creates its secret), and send your webhook signing secret to the contact on file privately. Changes later go through a new pull
 request. Pull requests that ask for keys, move money outside intents, or point tools at private hosts are closed.
 
 Plain language, no em dashes. Entries with `kind: "built-in"` are Lexari's own connectors and only Lexari adds them.
