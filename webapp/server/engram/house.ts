@@ -11,6 +11,11 @@
  * (models ZG_KIMI_MODEL default kimi-k3, ZG_QWEN_MODEL default qwen3.8-max, ids from router-api.0g.ai/v1/models), so one
  * 0G key covers all three. The direct keys are optional overrides.
  * A model with neither key is listed as unavailable and can't be picked.
+ *
+ * Fallback chains (which models a turn tries when the picked one fails before any text):
+ *   HOUSE_FALLBACKS        overrides the chains in content/models.ts, per model: "kimi=qwen,openai;qwen=openai;claude="
+ *                          (an empty list means no fallback; unknown ids, repeats and the model itself are dropped; at most 4)
+ *   HOUSE_FALLBACK_LAMINA  "0" stops a failed chain from answering with Lamina; the person then sees the error instead.
  */
 import { HOUSE, modelById, type HouseProvider, type ModelInfo } from "@/content/models";
 import type { ByoTarget } from "./byo";
@@ -54,14 +59,36 @@ export function houseTarget(m: ModelInfo): ByoTarget | null {
   return { provider: "custom", model: process.env[s.model]?.trim() || s.modelDefault, key, baseUrl: base, label: m.label, who: s.who, extra: s.extra, house: true };
 }
 
+const MAX_FALLBACKS = 4;
+/** HOUSE_FALLBACKS parsed: model id to its fallback ids. Entries for unknown or non-house models are ignored. */
+export function fallbackOverrides(raw = env("HOUSE_FALLBACKS")): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const part of raw.split(/[;\n]/)) {
+    const at = part.indexOf("=");
+    if (at < 0) continue;
+    const id = part.slice(0, at).trim().toLowerCase();
+    if (!modelById(id)?.house) continue;
+    const list = part.slice(at + 1).split(",").map((x) => x.trim().toLowerCase()).filter((x) => x && x !== id && !!modelById(x)?.house);
+    out[id] = [...new Set(list)].slice(0, MAX_FALLBACKS);
+  }
+  return out;
+}
+/** The fallback ids for one model: the HOUSE_FALLBACKS override when it names the model, else content/models.ts. */
+export function fallbacksOf(m: ModelInfo): string[] {
+  if (!m.house) return [];
+  return fallbackOverrides()[m.id] ?? m.house.fallback;
+}
+/** False when HOUSE_FALLBACK_LAMINA=0: a failed chain errors instead of answering with Lamina. */
+export const laminaLastResort = () => env("HOUSE_FALLBACK_LAMINA") !== "0";
+
 /**
  * The order a turn on an open model tries: the model itself, then its fallbacks that are ready on this server.
- * Lamina is the caller's last resort.
+ * Lamina is the caller's last resort (unless HOUSE_FALLBACK_LAMINA=0).
  */
 export function houseChain(m: ModelInfo): ModelInfo[] {
   if (!m.house) return [];
-  const out = [m, ...m.house.fallback.map((id) => modelById(id)).filter((x): x is ModelInfo => !!x && !!x.house)];
+  const out = [m, ...fallbacksOf(m).map((id) => modelById(id)).filter((x): x is ModelInfo => !!x && !!x.house)];
   return out.filter((x, i) => out.findIndex((y) => y.id === x.id) === i && houseReady(x));
 }
 
-export const houseModels = () => HOUSE.map((m) => ({ id: m.id, ready: houseReady(m) }));
+export const houseModels = () => HOUSE.map((m) => ({ id: m.id, ready: houseReady(m), chain: houseChain(m).map((x) => x.id) }));
