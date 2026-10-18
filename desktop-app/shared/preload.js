@@ -3,6 +3,7 @@ contextBridge.exposeInMainWorld("lexari", {
   api: (p) => ipcRenderer.invoke("lexari:api", p),
   chat: (body, onEv) => { const id = Math.random().toString(36).slice(2); const h = (_e, rid, ev) => { if (rid !== id) return; onEv(ev); if (ev.end) ipcRenderer.removeListener("lexari:chat-ev", h); }; ipcRenderer.on("lexari:chat-ev", h); ipcRenderer.send("lexari:chat", id, body); },
   config: () => ipcRenderer.invoke("lexari:config"),
+  about: () => ipcRenderer.send("lexari:about"),
   win: (a) => ipcRenderer.send("lexari:win", a),
   external: (u) => ipcRenderer.send("lexari:external", u),
   openMain: (r) => ipcRenderer.send("lexari:open-main", r),

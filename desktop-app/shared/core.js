@@ -16,7 +16,9 @@ function start(opts = {}) {
   const prefs = readJson(prefsPath(), {});
   const netName = (process.env.LEXARI_NETWORK || prefs.network || NET.default);
   const network = { name: netName, ...(NET.networks[netName] || NET.networks.testnet) };
-  let win, quick, tray, pendingDeepLink = null, lastNotif = 0;
+  let win, quick, tray, about, pendingDeepLink = null, lastNotif = 0;
+  const ICON = path.join(__dirname, "assets", "icons", "256x256.png");
+  const demo = process.env.LEXARI_DEMO || ""; // QA screenshots: splash | offline | error | quick | about | tray
 
   if (!app.requestSingleInstanceLock()) { app.quit(); return; }
   if (process.defaultApp && process.argv[1]) app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
@@ -36,7 +38,7 @@ function start(opts = {}) {
         .then(async (r) => {
           if (r.ok) { win.webContents.send("lexari:navigate", network.appUrl + "/agents"); return; }
           const j = await r.json().catch(() => ({}));
-          new Notification({ title: "Sign-in didn't finish", body: j.error || "Sign in again from the app.", icon: path.join(__dirname, "assets", "icon.png") }).show();
+          new Notification({ title: "Sign-in didn't finish", body: j.error || "Sign in again from the app.", icon: ICON }).show();
         })
         .catch(() => {});
       summon(); return;
@@ -54,7 +56,7 @@ function start(opts = {}) {
     win = new BrowserWindow({
       width: st.width, height: st.height, x: visible ? st.x : undefined, y: visible ? st.y : undefined,
       minWidth: 760, minHeight: 520, show: false, backgroundColor: "#0b0718", frame: false,
-      icon: path.join(__dirname, "assets", "icon.png"),
+      icon: ICON,
       webPreferences: { preload: path.join(__dirname, "preload.js"), webviewTag: true, contextIsolation: true, sandbox: false },
       ...o.windowExtras,
     });
@@ -63,7 +65,7 @@ function start(opts = {}) {
     ["resize", "move", "close"].forEach((e) => win.on(e, save));
     win.on("close", (e) => { if (!app.isQuitting && o.hideOnClose) { e.preventDefault(); win.hide(); } });
     win.once("ready-to-show", () => win.show());
-    win.loadFile(path.join(__dirname, "renderer", "shell.html"), { query: { platform: process.platform, net: network.name } });
+    win.loadFile(path.join(__dirname, "renderer", "shell.html"), { query: { platform: process.platform, net: network.name, demo } });
     win.webContents.on("did-finish-load", () => { if (pendingDeepLink) { const d = pendingDeepLink; pendingDeepLink = null; handleDeepLink(d); } });
     win.on("maximize", () => win.webContents.send("lexari:max", true));
     win.on("unmaximize", () => win.webContents.send("lexari:max", false));
@@ -71,11 +73,11 @@ function start(opts = {}) {
 
   function createQuick() {
     quick = new BrowserWindow({
-      width: 380, height: 520, show: false, frame: false, resizable: false, skipTaskbar: true, alwaysOnTop: true,
+      width: 380, height: 520, icon: ICON, show: false, frame: false, resizable: false, skipTaskbar: true, alwaysOnTop: true,
       backgroundColor: "#120b26", webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
     });
     quick.loadFile(path.join(__dirname, "renderer", "quick.html"));
-    quick.on("blur", () => quick.hide());
+    quick.on("blur", () => { if (!demo) quick.hide(); });
   }
 
   function toggleQuick() {
@@ -87,19 +89,32 @@ function start(opts = {}) {
     quick.setPosition(Math.round(x), Math.round(y)); quick.show(); quick.focus();
   }
 
+  function trayMenu() { return tray && tray._menu; }
+  function openAbout() {
+    if (about && !about.isDestroyed()) return about.focus();
+    about = new BrowserWindow({ width: 420, height: 480, resizable: false, minimizable: false, maximizable: false, frame: false, transparent: process.platform !== "linux",
+      backgroundColor: process.platform === "linux" ? "#000000" : "#00000000", show: false, icon: ICON, title: "About Lexari", parent: win || undefined,
+      webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true } });
+    about.loadFile(path.join(__dirname, "renderer", "about.html"));
+    about.once("ready-to-show", () => about.show());
+  }
+
   function createTray() {
+    // tray.png / tray@2x.png (colour) and trayTemplate.png / @2x (macOS menu bar); Electron picks the @2x on HiDPI.
     const img = nativeImage.createFromPath(path.join(__dirname, "assets", o.trayIcon));
     if (process.platform === "darwin") img.setTemplateImage(true);
-    tray = new Tray(img.resize({ width: 18, height: 18 }));
+    tray = new Tray(img);
     tray.setToolTip("Lexari");
-    tray.setContextMenu(Menu.buildFromTemplate([
+    const menu = Menu.buildFromTemplate([
       { label: "Quick chat", click: toggleQuick },
       { label: "Open Lexari", click: summon },
       { type: "separator" },
       ...ROUTES.map((r) => ({ label: r[0].toUpperCase() + r.slice(1), click: () => { summon(); win.webContents.send("lexari:navigate", network.appUrl + "/" + r); } })),
       { type: "separator" },
+      { label: "About Lexari", click: openAbout },
       { label: "Quit Lexari", click: () => { app.isQuitting = true; app.quit(); } },
-    ]));
+    ]);
+    tray.setContextMenu(menu); tray._menu = menu;
     tray.on("click", toggleQuick);
   }
 
@@ -113,7 +128,7 @@ function start(opts = {}) {
       else app.setBadgeCount && app.setBadgeCount(unread);
       const fresh = items.filter((i) => !i.read && i.at > lastNotif);
       if (lastNotif && Notification.isSupported()) fresh.slice(0, 3).forEach((i) => {
-        const n = new Notification({ title: i.title || "Lexari", body: i.body || "", silent: false });
+        const n = new Notification({ title: i.title || "Lexari", body: i.body || "", silent: false, icon: ICON });
         n.on("click", () => { summon(); if (i.url) win.webContents.send("lexari:navigate", new URL(i.url, network.appUrl).toString()); });
         n.show();
       });
@@ -126,7 +141,7 @@ function start(opts = {}) {
     try {
       const { autoUpdater } = require("electron-updater");
       autoUpdater.autoDownload = true;
-      autoUpdater.on("update-downloaded", (i) => new Notification({ title: "Lexari update ready", body: `Version ${i.version} installs when you restart.` }).show());
+      autoUpdater.on("update-downloaded", (i) => new Notification({ title: "Lexari update ready", body: `Version ${i.version} installs when you restart.`, icon: ICON }).show());
       autoUpdater.checkForUpdatesAndNotify().catch(() => {});
       setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 3600e3);
     } catch {}
@@ -148,6 +163,7 @@ function start(opts = {}) {
     } catch { send({ error: "You're offline.", end: true }); }
   });
   ipcMain.handle("lexari:config", () => ({ network, routes: ROUTES, platform: process.platform, version: app.getVersion(), partition: PARTITION, shortcut: o.shortcut }));
+  ipcMain.on("lexari:about", openAbout);
   ipcMain.on("lexari:win", (_e, a) => { if (!win) return; if (a === "min") win.minimize(); if (a === "max") win.isMaximized() ? win.unmaximize() : win.maximize(); if (a === "close") win.close(); });
   ipcMain.on("lexari:external", (_e, url) => { if (/^https:\/\//.test(url)) shell.openExternal(url); });
   ipcMain.on("lexari:open-main", (_e, route) => { summon(); if (route) win.webContents.send("lexari:navigate", network.appUrl + route); if (quick) quick.hide(); });
@@ -175,6 +191,9 @@ function start(opts = {}) {
     setTimeout(pollNotifications, 8000); setInterval(pollNotifications, 60000);
     setupUpdates();
     handleDeepLink(process.argv.find((a) => a.startsWith(PROTOCOL + "://")));
+    if (demo === "quick") setTimeout(() => { toggleQuick(); const b = win.getBounds(); quick.setPosition(b.x + b.width - 400, Math.max(b.y, Math.min(b.y + 56, b.y + b.height - 528))); }, 1500);
+    if (demo === "about") setTimeout(openAbout, 1500);
+    if (demo === "tray") setTimeout(() => trayMenu() && trayMenu().popup({ window: win, x: win.getBounds().width - 260, y: 48 }), 3000);
     o.onReady({ win: () => win, summon, toggleQuick, network, routes: ROUTES });
   });
 }
