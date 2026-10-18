@@ -51,6 +51,14 @@ export const usageLedger = pgTable("usage_ledger", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Per-agent model caps (migration 0037): the most one agent's turns may bill in a billing cycle. No row = no cap. */
+export const agentModelCaps = pgTable("agent_model_caps", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  agentSlug: text("agent_slug").notNull(),
+  cycleMicros: bigint("cycle_micros", { mode: "number" }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.agentSlug] })]);
+
 export const billingSettings = pgTable("billing_settings", {
   userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
   creditMicros: bigint("credit_micros", { mode: "number" }).notNull().default(0),

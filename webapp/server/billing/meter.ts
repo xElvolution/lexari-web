@@ -11,7 +11,9 @@ import { ENGINE_PRICES, routeFor } from "../engram/engines";
 import type { Usage } from "@/server/engram/gateway";
 import { db } from "../db";
 import { billingSettings, creditLedger, usageHolds, usageLedger, usagePeriods } from "../db/billingSchema";
+import { agents } from "../db/schema";
 import { notify } from "../notify";
+import { agentBilledSince, capFor, overCap } from "./costs";
 import { currentPlan, type CurrentPlan } from "../plans";
 import { cycleWindow } from "./schedule";
 import { costMicros, decide, estimateTokens, share, split, usdToMicros, type BlockReason, type MeterSnapshot, type Pool } from "./math";
@@ -92,6 +94,8 @@ const lock = (tx: Tx, userId: string) => tx.execute(sql`select pg_advisory_xact_
 export type Blocked = {
   reason: BlockReason; model: string; modelLabel: string; plan: PlanId; planName: string;
   resetsAt: number | null; credits: number; spendMode: SpendMode; spendLimit: number;
+  /** agent_cap: the agent that hit its cap, the cap and what it has billed this cycle (micro dollars) */
+  agent?: string; agentName?: string; cap?: number; spent?: number;
 };
 
 export type TurnInput = {
@@ -185,6 +189,21 @@ export async function beginTurn(input: TurnInput): Promise<Turn | Blocked> {
         resetsAt: !cycle.paid ? (model.pool === "lamina" ? cycle.end.getTime() : null) : cycle.end.getTime(),
         credits: Math.max(0, snap.settings.creditMicros), spendMode: meter.spendMode, spendLimit: meter.spendLimit,
       } satisfies Blocked;
+    }
+    // Per-agent cap (Settings > Billing > Costs): checked before the model runs, so a capped agent never overspends.
+    if (input.kind !== "event" && input.agent) {
+      const cap = await capFor(userId, input.agent, tx);
+      if (cap !== null) {
+        const spent = await agentBilledSince(userId, input.agent, cycle.start, tx);
+        if (overCap(spent, d.hold, cap)) {
+          const [a] = await tx.select({ name: agents.name, meta: agents.meta }).from(agents).where(and(eq(agents.userId, userId), eq(agents.slug, input.agent))).limit(1);
+          return {
+            reason: "agent_cap", model: model.id, modelLabel: model.label, plan: cycle.plan.id, planName: cycle.plan.name, resetsAt: cycle.end.getTime(),
+            credits: Math.max(0, snap.settings.creditMicros), spendMode: meter.spendMode, spendLimit: meter.spendLimit,
+            agent: input.agent, agentName: (a?.meta as { nick?: string } | null)?.nick || a?.name || input.agent, cap, spent,
+          } satisfies Blocked;
+        }
+      }
     }
     const [h] = await tx.insert(usageHolds).values({ userId, pool: d.pool, micros: d.hold, expiresAt: new Date(Date.now() + HOLD_TTL_MS) }).returning({ id: usageHolds.id });
     const holdId = h.id;

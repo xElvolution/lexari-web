@@ -13,7 +13,7 @@ import { CREDITS_ON_FREE, LEXARI_MARKUP, MICROS, type SpendMode } from "@/conten
 import type { ModelPool, Price } from "@/content/models";
 
 export type Pool = "free" | "lamina" | "premium" | "credits";
-export type BlockReason = "free_daily" | "premium_locked" | "out_of_usage" | "spend_limit";
+export type BlockReason = "free_daily" | "premium_locked" | "out_of_usage" | "spend_limit" | "agent_cap";
 
 /** Real engine cost of a call, in micro dollars (rounded up so a call is never free by rounding). */
 export function costMicros(price: Price, promptTokens: number, completionTokens: number) {

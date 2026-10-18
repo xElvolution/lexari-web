@@ -30,6 +30,7 @@ export default function OutOfUsageSheet({ info }: { info: OutInfo }) {
       case "free_daily": return { title: "You've used today's free Lamina", body: `Free comes with a small Lamina allowance every day.${resets ? ` It refills at ${timeShort(resets)}.` : ""} Pro keeps Lamina going all month, with $20 of premium models.` };
       case "premium_locked": return { title: `${model.label} is a premium model`, body: free ? (CREDITS_ON_FREE ? "Premium models run on Pro's included usage, or on extra credits. Lamina stays free for your daily messages." : "Premium models come with Pro. Lamina stays free for your daily messages.") : "Your plan's premium usage covers it." };
       case "spend_limit": return { title: "You've hit your spend limit", body: `Extra credits are capped at ${state ? money(state.spend.limit) : "your limit"} a cycle and that's used. Raise the limit, or wait for the next cycle${state?.plan.refillsAt ? ` on ${dateShort(state.plan.refillsAt)}` : ""}.` };
+      case "agent_cap": return { title: `${("agentName" in info && info.agentName) || "This agent"} reached its cap`, body: `You capped it at ${"cap" in info && info.cap !== undefined ? money(info.cap) : "a limit"} a cycle and it has used ${"spent" in info && info.spent !== undefined ? money(info.spent, { cents: true }) : "that"}. Raise the cap in Settings, Billing, or wait for the next cycle${resets ? ` on ${dateShort(resets)}` : ""}.` };
       case "model_unavailable": return { title: `${model.label} isn't available yet`, body: "Premium models are coming soon on this server. Lamina is ready right now." };
       default: return { title: premium ? "Premium usage is used up" : "Included usage is used up", body: `You've used everything included this cycle${state?.plan.refillsAt ? `. It resets on ${dateShort(state.plan.refillsAt)}` : ""}. Top up extra credits to keep going${plan !== "plus" ? ", or move up a plan for more" : ""}.` };
     }
@@ -44,7 +45,7 @@ export default function OutOfUsageSheet({ info }: { info: OutInfo }) {
   };
   const upgradeTo = plan === "pro" ? "plus" : "pro";
   const showUpgrade = plan !== "plus" && plan !== "max";
-  const showTopUp = info.reason !== "model_unavailable" && info.reason !== "spend_limit" && (!free || CREDITS_ON_FREE);
+  const showTopUp = info.reason !== "model_unavailable" && info.reason !== "spend_limit" && info.reason !== "agent_cap" && (!free || CREDITS_ON_FREE);
 
   return (
     <Sheet label="out-of-usage" title={copy.title} sub={copy.body} icon={premium ? <ModelMark m={model} size={26} /> : <LaminaMark size={20} />} onClose={closeBillingSheet}>
@@ -52,9 +53,10 @@ export default function OutOfUsageSheet({ info }: { info: OutInfo }) {
         {canLamina && (
           <Choice icon={<LaminaMark size={18} />} title="Continue on Lamina" body={free ? "Your free daily allowance, included." : "Included in your plan. Fast and tuned for your agents."} onClick={lamina} disabled={busy} primary />
         )}
+        {info.reason === "agent_cap" && <Choice icon={<Icon name="settings" size={18} />} title="Change the cap" body="Settings, Billing, Costs." onClick={() => { closeBillingSheet(); window.location.assign("/settings#billing"); }} primary />}
         {info.reason === "spend_limit" && <Choice icon={<Icon name="settings" size={18} />} title="Raise your spend limit" body="Pick a higher monthly cap, or none." onClick={openSpend} primary={!canLamina} />}
         {showTopUp && <Choice icon={<Icon name="wallet" size={18} />} title="Top up extra credits" body="$5, $10 or $25, by card or USDC. Used after your included usage." onClick={() => openTopUp({ product: "credits" })} primary={!canLamina && info.reason !== "free_daily"} />}
-        {showUpgrade && info.reason !== "model_unavailable" && (
+        {showUpgrade && info.reason !== "model_unavailable" && info.reason !== "agent_cap" && (
           <Choice icon={<Icon name="star" size={18} />} title={`Upgrade to ${upgradeTo === "pro" ? "Pro" : "Max"}`} body={upgradeTo === "pro" ? "$20 a month: Lamina all month plus $20 of premium models." : "$60 a month: 3x the usage of Pro plus $60 of premium models."} onClick={() => { closeBillingSheet(); openUpgrade("plans"); }} primary={info.reason === "free_daily"} />
         )}
         {info.reason === "free_daily" && <button onClick={closeBillingSheet} className="mt-1 h-10 text-[13.5px] font-bold text-ink/60 hover:text-ink">I&apos;ll wait for tomorrow</button>}

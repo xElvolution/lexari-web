@@ -12,6 +12,7 @@ import Icon from "../Icon";
 import { PlansGrid } from "../Plans";
 import { openUpgrade } from "../overlays";
 import UsageMeters from "./UsageMeters";
+import Costs from "./Costs";
 import { LaminaMark, ModelMark, Spinner, dateShort, money } from "./parts";
 
 const box = "rounded-[22px] bg-card ring-1 ring-line";
@@ -74,6 +75,9 @@ export default function BillingSection({ children }: { children?: ReactNode }) {
           <button onClick={() => openTopUp({ product: "credits" })} className={smallBtn}><Icon name="plus" size={14} />Add</button>
         </Line>
       </div>
+
+      <H right={<span className="text-[12px] font-semibold text-ink/50">By agent and model</span>}>Costs</H>
+      <Costs s={s} />
 
       <H>Models</H>
       <div className={`${box} divide-y divide-[var(--line)] px-5`}>
