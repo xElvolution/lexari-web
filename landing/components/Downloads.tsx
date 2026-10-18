@@ -148,15 +148,19 @@ function Action({ p, big = false }: { p: Platform; big?: boolean }) {
 
 function AndroidNote({ wide = false }: { wide?: boolean }) {
   return (
-    <div className={`rounded-[20px] border-2 border-dashed border-line bg-base/60 p-4 ${wide ? "sm:p-5" : ""}`}>
-      <p className="label text-brand-ink">{androidNote.title}</p>
-      <ol className="mt-2.5 grid gap-1.5 text-[14px] leading-snug text-ink/75">
+    <details className={`group/how rounded-[20px] border-2 border-dashed border-line bg-base/60 px-4 py-3 ${wide ? "sm:px-5" : ""}`}>
+      <summary className="label flex cursor-pointer list-none items-center justify-between gap-2 text-brand-ink [&::-webkit-details-marker]:hidden">
+        How to install
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 transition-transform group-open/how:rotate-180" aria-hidden><path d="M6 9l6 6 6-6" /></svg>
+      </summary>
+      <p className="sr-only">{androidNote.title}</p>
+      <ol className="mt-3 grid gap-1.5 text-[14px] leading-snug text-ink/75">
         {androidNote.steps.map((s, i) => (
           <li key={s} className="flex gap-2.5"><span className="display grid h-5 w-5 shrink-0 place-items-center rounded-full bg-tint text-[11px] text-brand-ink">{i + 1}</span>{s}</li>
         ))}
       </ol>
       <a href={DOCS_ANDROID} className="mt-3 inline-flex items-center gap-1 text-[14px] font-bold text-brand-ink underline-offset-4 hover:underline">{androidNote.link} <span aria-hidden>↗</span></a>
-    </div>
+    </details>
   );
 }
 
@@ -193,7 +197,7 @@ function Featured({ p, detected }: { p: Platform; detected: boolean }) {
 function Card({ p }: { p: Platform }) {
   return (
     <article className="dl-card group relative flex w-full flex-col rounded-[30px] bg-card p-5 shadow-[0_0_0_1px_var(--line)] transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_0_0_2px_var(--color-grape-soft),0_24px_50px_-30px_rgba(91,43,255,.6)] sm:p-6">
-      <div className="relative flex h-[170px] items-end justify-center overflow-hidden rounded-[22px] bg-tint px-6 pt-6">
+      <div className="relative flex h-[150px] items-end justify-center overflow-hidden rounded-[22px] bg-tint px-6 pt-6">
         <div className="carpet pointer-events-none absolute inset-0" />
         <div className="relative w-full transition duration-500 group-hover:-translate-y-1.5">
           <Device p={p} className={p.device === "phone" ? "mx-auto -mb-10 w-[86px]" : p.device === "laptop" ? "mx-auto w-[92%]" : "mx-auto w-[78%]"} />
@@ -207,7 +211,7 @@ function Card({ p }: { p: Platform }) {
       <p className="mt-3 text-[15px] leading-relaxed text-ink/70">{p.blurb}</p>
       <div className="mt-3"><Meta p={p} /></div>
       {p.id === "android" && <div className="mt-4"><AndroidNote /></div>}
-      <div className="mt-auto pt-5"><Action p={p} /></div>
+      <div className="mt-auto pt-4"><Action p={p} /></div>
     </article>
   );
 }
