@@ -1,0 +1,9 @@
+{
+  "name": "lexari-sdk",
+  "private": true,
+  "license": "SEE LICENSE IN ../LICENSE",
+  "scripts": {
+    "test": "tsx --test packages/manifest/test/*.test.ts packages/sdk/test/*.test.ts packages/cli/test/*.test.ts",
+    "typecheck": "tsc -p packages/manifest && tsc -p packages/sdk && tsc -p packages/cli"
+  }
+}
