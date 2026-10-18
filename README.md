@@ -121,7 +121,7 @@ flowchart LR
 | Agent manages itself by chat (rename, face, tone, model) | 🟢 | A built-in `self` connector: every change is a Confirm card, applied only on your Confirm and kept in the audit log. Never from email or web content it read. The agent can never change its own grants, limits, wallets or keys |
 | Onchain agent ID card (Metaplex Core + Lexari program) | 🟡 | Mint flow is built and gated: it switches on once the Lexari program is deployed to devnet |
 | Lexari Anchor program | 🟡 | Agent registry, memory records, Hub PDAs. Built with tests. Devnet deploy pending (rent for a ~416 KB program) |
-| ORE Miner gift reveal after your agent is created | ⚪ | Today the ORE Miner is a free specialist in the marketplace. The wrapped gift flow is designed, not built |
+| ORE Miner gift reveal after your agent is created | 🟢 | A wrapped gift opens at the end of web onboarding. One tap claims the ORE bot on a paid plan; on the free plan the gift says it comes with any paid plan and opens Plans |
 | Agent payment card | 🟡 | `CardIssuer` interface plus a TEST-only issuer (4242 numbers that work nowhere). Stripe Issuing or Lithic later |
 
 ### Integrations
