@@ -6,7 +6,7 @@
   "connector": "nansen",
   "category": "data",
   "status": "live-testnet",
-  "description": "Your agents look up any wallet on Nansen and read its current holdings in USD before they answer. Read only. Needs a Nansen API key on the server.",
+  "description": "Your agents look up any wallet on Nansen and read its current holdings in USD before they answer. Read only.",
   "website": "https://www.nansen.ai",
   "docs": "https://docs.nansen.ai",
   "chains": [

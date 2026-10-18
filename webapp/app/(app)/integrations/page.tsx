@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import { PageHead } from "@/components/ui";
-import { APPLY_URL, NEW_PR_URL, PROTOCOLS, PROTOCOL_CATS, PROTOCOL_STATUS, type Protocol } from "@/content/protocols";
+import { APPLY_URL, NEW_PR_URL, PUBLIC_PROTOCOLS as PROTOCOLS, PROTOCOL_CATS, PROTOCOL_STATUS, type Protocol } from "@/content/protocols";
 
 const TONE = {
   live: "bg-[#e6f6ec] text-[#18794e] dark:bg-[#18794e]/25 dark:text-[#7ee2a8]",
@@ -25,8 +25,6 @@ function Status({ p }: { p: Protocol }) {
 function Card({ p, i }: { p: Protocol; i: number }) {
   const [open, setOpen] = useState(false);
   const live = p.actions.filter((a) => a.live);
-  const soon = p.actions.filter((a) => !a.live);
-  const showSoon = open || !live.length;
   return (
     <article
       className="int-card group flex flex-col rounded-[24px] bg-card p-5 ring-1 ring-line transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_50px_-28px_rgba(91,43,255,.45)] hover:ring-grape/40 max-[430px]:p-4"
@@ -52,9 +50,8 @@ function Card({ p, i }: { p: Protocol; i: number }) {
         <p className="label text-[9px] text-ink/50">What agents can do</p>
         <ul className="mt-2 space-y-1.5">
           {(open ? live : live.slice(0, 3)).map((a) => <li key={a.text} className="flex gap-2 text-[13.5px] text-ink/85"><span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-grape text-white"><Icon name="check" size={10} /></span>{a.text}</li>)}
-          {showSoon && soon.map((a) => <li key={a.text} className="flex gap-2 text-[13.5px] text-ink/50"><span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-tint text-ink/50"><Icon name="clock" size={10} /></span>{a.text} <span className="text-[12px]">(soon)</span></li>)}
         </ul>
-        {live.length > 0 && (live.length > 3 || soon.length > 0) && (
+        {live.length > 3 && (
           <button onClick={() => setOpen(!open)} aria-expanded={open} className="mt-2 text-[13px] font-semibold text-grape hover:underline">{open ? "Show less" : `Show all ${p.actions.length}`}</button>
         )}
       </div>
@@ -75,19 +72,19 @@ export default function IntegrationsPage() {
     const t = q.trim().toLowerCase();
     return PROTOCOLS.filter((p) => (cat === "all" || p.category === cat) && (!t || `${p.name} ${p.description} ${p.chains.join(" ")}`.toLowerCase().includes(t)));
   }, [cat, q]);
-  const liveCount = PROTOCOLS.filter((p) => PROTOCOL_STATUS[p.status].tone === "live").length;
+  const actionCount = PROTOCOLS.reduce((n, p) => n + p.actions.length, 0);
   const chainCount = new Set(PROTOCOLS.flatMap((p) => p.chains)).size;
   return (
     <>
       <PageHead
         kicker="Integrations"
         title="Protocols your agents use."
-        body="Every protocol Lexari works with today, what your agents can do with it, and where it runs. Anything that moves money waits for your Confirm."
+        body="The protocols your agents can use today, what they can do with each one, and where it runs. Anything that moves money waits for your Confirm."
         right={<a href={APPLY_URL} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center gap-2 rounded-full bg-grape px-6 text-[15px] font-bold text-white transition hover:bg-grape-deep hover:shadow-[0_14px_30px_-14px_rgba(91,43,255,.8)]"><Icon name="plus" size={17} />Integrate your protocol</a>}
       />
 
       <div data-rise className="mt-6 grid grid-cols-3 gap-3 max-[430px]:gap-2">
-        {[[PROTOCOLS.length, "protocols"], [liveCount, "live now"], [chainCount, "networks"]].map(([n, l]) => (
+        {[[PROTOCOLS.length, "protocols"], [actionCount, "agent actions"], [chainCount, "networks"]].map(([n, l]) => (
           <div key={l as string} className="rounded-[20px] bg-card px-4 py-3.5 ring-1 ring-line max-[430px]:px-3">
             <p className="display text-[34px] leading-none text-ink max-[430px]:text-[28px]">{n}</p>
             <p className="mt-1 text-[13px] font-semibold text-ink/60">{l}</p>

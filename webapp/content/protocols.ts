@@ -45,3 +45,12 @@ export const PROTOCOLS: Protocol[] = (data as Protocol[]).map((p) => {
   return { ...p, status, actions };
 });
 export const protocolBySlug = (slug: string) => PROTOCOLS.find((p) => p.slug === slug);
+
+/**
+ * What the public page shows: only protocols agents can use right now, and only the actions that work today. Anything
+ * waiting on server setup, coming later or in review stays off the page entirely.
+ */
+export const isAvailable = (p: Protocol) => PROTOCOL_STATUS[p.status].tone !== "wait";
+export const publicProtocols = (list: Protocol[] = PROTOCOLS): Protocol[] =>
+  list.filter(isAvailable).map((p) => ({ ...p, actions: p.actions.filter((a) => a.live) })).filter((p) => p.actions.length > 0);
+export const PUBLIC_PROTOCOLS = publicProtocols();

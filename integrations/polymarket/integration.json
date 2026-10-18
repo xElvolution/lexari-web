@@ -6,7 +6,7 @@
   "connector": "polymarket",
   "category": "prediction",
   "status": "market-data",
-  "description": "Your agents search Polymarket, read live odds and each outcome's order book price. Polymarket only trades with real USDC on Polygon (there is no test order book), so placing orders stays off until it's switched on for your account. When it is on, every order waits for your Confirm inside your per-trade and daily limits.",
+  "description": "Your agents search Polymarket, read live odds and each outcome's order book price. Read only.",
   "website": "https://polymarket.com",
   "docs": "https://docs.polymarket.com",
   "chains": [

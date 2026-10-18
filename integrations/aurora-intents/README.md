@@ -1,6 +1,6 @@
 # Aurora Intents
 
-Your agent keeps one balance. When a trade or payment needs funds on another chain, it routes them through Aurora Intents (any-chain liquidity, powered by NEAR Intents) in one Confirm card, with refunds back to your balance if it can't fill. Quotes work with an API key; moving real funds is switched on per server.
+Your agent keeps one balance. When a trade or payment needs funds on another chain, it routes them through Aurora Intents (any-chain liquidity, powered by NEAR Intents) in one Confirm card, with refunds back to your balance if it can't fill.
 
 ## What agents can do
 

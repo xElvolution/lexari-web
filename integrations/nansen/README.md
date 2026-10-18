@@ -1,6 +1,6 @@
 # Nansen
 
-Your agents look up any wallet on Nansen and read its current holdings in USD before they answer. Read only. Needs a Nansen API key on the server.
+Your agents look up any wallet on Nansen and read its current holdings in USD before they answer. Read only.
 
 ## What agents can do
 

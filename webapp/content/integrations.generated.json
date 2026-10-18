@@ -156,7 +156,7 @@
     "connector": "intents",
     "category": "trading",
     "status": "live-testnet",
-    "description": "Your agent keeps one balance. When a trade or payment needs funds on another chain, it routes them through Aurora Intents (any-chain liquidity, powered by NEAR Intents) in one Confirm card, with refunds back to your balance if it can't fill. Quotes work with an API key; moving real funds is switched on per server.",
+    "description": "Your agent keeps one balance. When a trade or payment needs funds on another chain, it routes them through Aurora Intents (any-chain liquidity, powered by NEAR Intents) in one Confirm card, with refunds back to your balance if it can't fill.",
     "website": "https://intents.aurora.dev",
     "docs": "https://intents.aurora.dev",
     "chains": [
@@ -377,7 +377,7 @@
     "connector": "nansen",
     "category": "data",
     "status": "live-testnet",
-    "description": "Your agents look up any wallet on Nansen and read its current holdings in USD before they answer. Read only. Needs a Nansen API key on the server.",
+    "description": "Your agents look up any wallet on Nansen and read its current holdings in USD before they answer. Read only.",
     "website": "https://www.nansen.ai",
     "docs": "https://docs.nansen.ai",
     "chains": [
@@ -659,7 +659,7 @@
     "connector": "polymarket",
     "category": "prediction",
     "status": "market-data",
-    "description": "Your agents search Polymarket, read live odds and each outcome's order book price. Polymarket only trades with real USDC on Polygon (there is no test order book), so placing orders stays off until it's switched on for your account. When it is on, every order waits for your Confirm inside your per-trade and daily limits.",
+    "description": "Your agents search Polymarket, read live odds and each outcome's order book price. Read only.",
     "website": "https://polymarket.com",
     "docs": "https://docs.polymarket.com",
     "chains": [
@@ -693,7 +693,7 @@
     "connector": "zcash",
     "category": "chains",
     "status": "market-data",
-    "description": "Each agent has its own transparent Zcash address. Agents quote how much ZEC part of your balance buys, delivered straight to that address. Zcash has no test network for this, so buying uses real funds and stays off until it's switched on for your account. When it is on, every buy waits for your Confirm.",
+    "description": "Each agent has its own transparent Zcash address. Agents quote how much ZEC part of your balance buys, delivered straight to that address.",
     "website": "https://z.cash",
     "docs": "https://zcash.readthedocs.io",
     "chains": [
