@@ -2,7 +2,7 @@
 
 import Capped from "../Capped";
 import { useEffect, useState } from "react";
-import { INTEGRATIONS, SCOPE_INFO, STATUS_LABEL, integrationById, type ActivityRow, type AddedIntegration, type IntegrationInfo } from "@/content/integrations";
+import { INTEGRATIONS, SCOPE_INFO, STATUS_LABEL, integrationById, isOffered, type ActivityRow, type AddedIntegration, type IntegrationInfo } from "@/content/integrations";
 import { loadIntegrations, removeIntegration, revokeAllIntegrations, updateIntegration, useIntegrations, type IntegrationsState } from "@/lib/integrations";
 import { friendly } from "@/lib/api";
 import { toast, type State } from "@/lib/store";
@@ -113,7 +113,7 @@ export default function IntegrationsSection({ s }: { s: State }) {
         </div>
       )}
       {GROUPS.map(([label, ids]) => {
-        const items = ids.map((id) => integrationById(id as never)).filter((i): i is IntegrationInfo => !!i && i.status !== "soon");
+        const items = ids.map((id) => integrationById(id as never)).filter((i): i is IntegrationInfo => !!i && (isOffered(i) || st.added.some((a) => a.connector === i.id)));
         if (!items.length) return null;
         return (
           <section key={label} className="mt-5">
@@ -122,12 +122,11 @@ export default function IntegrationsSection({ s }: { s: State }) {
               {items.map((i) => {
                 const g = st.added.find((a) => a.connector === i.id);
                 const on = !!g?.enabled || !!i.builtin;
-                const setup = !g && !i.builtin && i.status === "needskey";
                 return (
                   <button key={i.id} data-int-card={i.id} onClick={() => open(i)} className={`flex h-[60px] items-center gap-3 rounded-2xl bg-card px-3 text-left ring-1 transition hover:ring-grape/50 ${fresh === i.id ? "ring-2 ring-grape" : "ring-line"}`}>
                     <IntegrationLogo id={i.id} size={32} />
                     <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-bold text-ink">{i.name}</span><span className="block truncate text-[12px] text-ink/55">{i.blurb}</span></span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold ${on ? "bg-[#e7f8ee] text-[#137a3d]" : setup ? "bg-[rgba(245,165,36,.16)] text-[#9a6700]" : "bg-tint text-ink/60"}`}>{on ? "Connected" : setup ? "Setup" : g ? "Off" : "Available"}</span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold ${on ? "bg-[#e7f8ee] text-[#137a3d]" : "bg-tint text-ink/60"}`}>{on ? "Connected" : g ? "Off" : "Available"}</span>
                   </button>
                 );
               })}
@@ -149,7 +148,7 @@ export default function IntegrationsSection({ s }: { s: State }) {
         <Modal label="integration" title={info.name} sub={info.chains.join(", ")} icon={<IntegrationLogo id={info.id} size={28} />} onClose={() => setInfo(null)}>
           <p className="text-[14px] leading-snug text-ink/75">{info.about}</p>
           <ul className="mt-3 space-y-1.5">{info.can.map((c) => <li key={c.text} className="flex items-start gap-2 text-[13.5px] text-ink/80"><Icon name={c.live ? "check" : "info"} size={14} className="mt-0.5 shrink-0 text-brand-ink" />{c.text}</li>)}</ul>
-          <p className="mt-3 rounded-2xl bg-tint p-3 text-[12.5px] text-ink/65">{info.id === "mera" ? "Link a passkey in Settings, Security." : info.builtin ? "Always on for your agents." : info.status === "needskey" ? "This one needs setting up on the server before agents can use it." : STATUS_LABEL[info.status]}</p>
+          <p className="mt-3 rounded-2xl bg-tint p-3 text-[12.5px] text-ink/65">{info.id === "mera" ? "Link a passkey in Settings, Security." : info.builtin ? "Always on for your agents." : STATUS_LABEL[info.status]}</p>
         </Modal>
       )}
       {sheet?.kind === "catalog" && <CatalogSheet added={st.added} onPick={pick} onClose={() => setSheet(null)} />}

@@ -41,6 +41,9 @@ export const CATEGORIES: { id: IntegrationCategory; label: string }[] = [
   { id: "data", label: "Data" },
 ];
 
+/** Shown to people: only connectors they can use now. Waiting on server setup or coming later stays hidden. */
+export const isOffered = (i: { status: IntegrationStatus }) => i.status !== "needskey" && i.status !== "soon";
+
 export const STATUS_LABEL: Record<IntegrationStatus, string> = {
   devnet: "Live on devnet",
   live: "Live on testnet",
