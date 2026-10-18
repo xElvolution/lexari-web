@@ -115,3 +115,19 @@ export async function cardsForSlugs(slugs: string[]): Promise<StoreCard[]> {
   const list = await rows(and(inArray(agentListings.slug, slugs), eq(agentListings.house, false)));
   return toCards(list);
 }
+
+/** A developer's own listings with every version and its review state (the Developer page). */
+export async function developerListings(developerId: string) {
+  const ls = await db().select().from(agentListings).where(eq(agentListings.developerId, developerId)).orderBy(desc(agentListings.updatedAt));
+  if (!ls.length) return [];
+  const vs = await db().select({ id: listingVersions.id, listingId: listingVersions.listingId, version: listingVersions.version, status: listingVersions.status, notes: listingVersions.reviewNotes, checks: listingVersions.checks, createdAt: listingVersions.createdAt, reviewedAt: listingVersions.reviewedAt, name: sql<string>`${listingVersions.manifest}->>'name'` })
+    .from(listingVersions).where(inArray(listingVersions.listingId, ls.map((l) => l.id))).orderBy(desc(listingVersions.createdAt));
+  const hires = await db().select({ id: hireEvents.listingId, n: sql<number>`count(*)::int`, dev: sql<number>`coalesce(sum(${hireEvents.developerMicros}), 0)::bigint` }).from(hireEvents).where(inArray(hireEvents.listingId, ls.map((l) => l.id))).groupBy(hireEvents.listingId);
+  return ls.map((l) => {
+    const h = hires.find((x) => x.id === l.id);
+    return {
+      id: l.id, slug: l.slug, status: l.status, currentVersionId: l.currentVersionId, hires: Number(h?.n ?? 0), earnedMicros: Number(h?.dev ?? 0),
+      versions: vs.filter((v) => v.listingId === l.id).map((v) => ({ id: v.id, version: v.version, name: v.name, status: v.status, notes: v.notes, checks: v.checks, createdAt: v.createdAt.getTime(), reviewedAt: v.reviewedAt?.getTime() ?? null })),
+    };
+  });
+}
