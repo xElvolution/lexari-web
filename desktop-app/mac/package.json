@@ -1,0 +1,20 @@
+{
+  "name": "lexari-desktop-mac",
+  "productName": "Lexari",
+  "version": "0.1.0",
+  "description": "Lexari desktop for macOS",
+  "author": "Lexari <hello@lexari.ai>",
+  "homepage": "https://lexari.ai",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "sync": "node ../shared/scripts/sync.js",
+    "start": "npm run sync && electron .",
+    "dist": "npm run sync && electron-builder --mac --universal --publish never",
+    "release": "npm run sync && electron-builder --mac --universal --publish always"
+  },
+  "dependencies": { "electron-updater": "^6.3.9" },
+  "devDependencies": { "electron": "^33.2.1", "electron-builder": "^25.1.8" },
+  "build": { "appId": "ai.lexari.desktop", "files": ["main.js", "shared-build/**/*", "!shared-build/**/*.md"], "directories": { "output": "dist", "buildResources": "shared-build/assets" }, "protocols": [{ "name": "Lexari", "schemes": ["lexari"] }], "publish": [{ "provider": "github", "owner": "xElvolution", "repo": "lexari", "releaseType": "draft" }], "mac": { "category": "public.app-category.productivity", "icon": "shared-build/assets/icon.png", "target": [{ "target": "dmg", "arch": ["universal"] }, { "target": "zip", "arch": ["universal"] }], "hardenedRuntime": true, "entitlements": "entitlements.mac.plist", "entitlementsInherit": "entitlements.mac.plist", "identity": null }, "dmg": { "title": "Lexari", "window": { "width": 540, "height": 360 } } }
+}

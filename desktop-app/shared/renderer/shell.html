@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; script-src 'self'">
+<title>Lexari</title><link rel="stylesheet" href="shell.css"></head>
+<body>
+<div class="aurora"><i></i><i></i><i></i></div>
+<header class="titlebar" id="titlebar">
+  <div class="tl-space"></div>
+  <div class="brand"><span class="orb"></span><b>Lexari</b><span class="net" id="net">Testnet</span></div>
+  <div class="crumbs" id="crumb">Agents</div>
+  <button class="search" id="openPalette"><span>Search or jump to</span><kbd id="kbd">Ctrl K</kbd></button>
+  <div class="spacer"></div>
+  <div class="winbtns" id="winbtns">
+    <button data-a="min" aria-label="Minimize"><svg viewBox="0 0 10 10"><path d="M1 5h8"/></svg></button>
+    <button data-a="max" aria-label="Maximize"><svg viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7"/></svg></button>
+    <button data-a="close" class="x" aria-label="Close"><svg viewBox="0 0 10 10"><path d="M1 1l8 8M9 1l-8 8"/></svg></button>
+  </div>
+</header>
+<div class="body">
+  <nav class="rail" id="rail"><div class="pill" id="pill"></div></nav>
+  <main class="stage">
+    <webview id="view" partition="persist:lexari" allowpopups></webview>
+    <div class="loadbar" id="loadbar"></div>
+    <section class="splash" id="splash">
+      <div class="rings"><span></span><span></span><span></span><div class="core"></div></div>
+      <h1>Lexari</h1><p>Your onchain agents are waking up</p>
+    </section>
+    <section class="offline hidden" id="offline">
+      <div class="glyph"><svg viewBox="0 0 64 64"><path d="M8 24a34 34 0 0 1 48 0M16 33a22 22 0 0 1 32 0M24 42a10 10 0 0 1 16 0"/><circle cx="32" cy="50" r="3"/><path class="slash" d="M10 10l44 44"/></svg></div>
+      <h2 id="offTitle">You're offline</h2>
+      <p id="offBody">Lexari needs a connection to reach your agents. We'll reconnect as soon as you're back.</p>
+      <div class="row"><button class="primary" id="retry">Try again</button><button id="browser">Open in browser</button></div>
+    </section>
+  </main>
+</div>
+<div class="palette hidden" id="palette"><div class="card"><input id="pq" placeholder="Jump to agents, brain, wallets..." autocomplete="off"><ul id="plist"></ul></div></div>
+<script src="shell.js"></script>
+</body></html>

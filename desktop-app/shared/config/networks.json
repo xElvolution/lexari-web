@@ -1,0 +1,7 @@
+{
+  "default": "testnet",
+  "networks": {
+    "testnet": { "label": "Testnet", "appUrl": "https://app.lexari.ai", "apiUrl": "https://app.lexari.ai/api", "solanaCluster": "devnet" },
+    "mainnet": { "label": "Mainnet", "appUrl": "https://app.lexari.ai", "apiUrl": "https://app.lexari.ai/api", "solanaCluster": "mainnet-beta", "enabled": false }
+  }
+}
