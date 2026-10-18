@@ -10,7 +10,7 @@ import { cheer, isWarm, isWarmReaction, setMood } from "./mood";
 import type { FaceLook } from "@shared/components/avatar";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
-  FREE_SLUGS, PLANS, SPECIALISTS, WALLETS, registerCustom, shortAddr,
+  FREE_SLUGS, PLANS, SPECIALISTS, WALLETS, registerCustom, registerListings, shortAddr,
   type CustomAgent, type Job, type MemoryTag, type PlanId, type ToneId, type WalletId,
 } from "@/content/appData";
 import type { Account } from "@/server/account";
@@ -272,6 +272,7 @@ export function hydrate(): Promise<void> {
       // The theme you picked on another device (or before this browser's storage was cleared).
       try { const t = next.prefs.theme; if (t && !localStorage.getItem("lexari-theme")) applyTheme(t); } catch {}
       registerCustom(next.custom);
+      registerListings(acc.devListings ?? []);
       state = next;
       loadError = "";
       emit();

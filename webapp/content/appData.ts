@@ -84,6 +84,18 @@ export type Specialist = {
   face?: Partial<Variant>; // custom agents pick their own shape, eyes and mouth
   custom?: boolean; // made by you in Create an agent
   free?: boolean; // hired for free and doesn't take a team seat
+  listing?: ListingInfo; // a third-party agent from the SDK (house specialists have none)
+};
+/** A third-party listing's details (server/market/listings.ts). */
+export type ListingInfo = {
+  id: string;
+  developer: { handle: string; name: string; verified: boolean };
+  version: string;
+  priceUsd: number;
+  hires: number;
+  updatedAt: number;
+  /** star distribution in percent, 5 stars first */
+  dist: number[];
 };
 
 const ROSTER_COLORS: ColorKey[] = ["orange", "blue", "green", "yellow", "red", "teal", "pink", "sky"];
@@ -207,7 +219,14 @@ let CUSTOM: Specialist[] = [];
 export function registerCustom(list: CustomAgent[]) { CUSTOM = list.map(customToSpecialist); }
 /** Free specialists (the ORE Miner): no hire price and no team seat. */
 export const FREE_SLUGS: string[] = SPECIALISTS.filter((s) => s.free).map((s) => s.slug);
-export const specialistBySlug = (slug: string) => SPECIALISTS.find((s) => s.slug === slug) ?? CUSTOM.find((s) => s.slug === slug);
+let LISTED: Specialist[] = [];
+/** Third-party marketplace agents (from /api/market/listings and /api/me), so faces, chats and the team find them. */
+export function registerListings(list: Specialist[]) {
+  const next = new Map(LISTED.map((s) => [s.slug, s]));
+  for (const s of list) if (s.listing && !SPECIALISTS.some((h) => h.slug === s.slug)) next.set(s.slug, s);
+  LISTED = [...next.values()];
+}
+export const specialistBySlug = (slug: string) => SPECIALISTS.find((s) => s.slug === slug) ?? LISTED.find((s) => s.slug === slug) ?? CUSTOM.find((s) => s.slug === slug);
 
 /* ---------- memory ---------- */
 export const MEMORY_TAGS = ["About you", "Preferences", "People", "Tools", "Habits"] as const;
@@ -358,8 +377,19 @@ export const STORE_CATS = [
 export type StoreCat = (typeof STORE_CATS)[number]["id"];
 const MAKERS = ["Lexari Labs", "Northwind AI", "Kite & Co", "Mosaic Studio", "Basalt Works", "Oyo Digital"];
 export const compact = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n));
+const ago = (t: number) => { const d = Math.floor((Date.now() - t) / 86_400_000); return d <= 0 ? "today" : d === 1 ? "yesterday" : `${d} days ago`; };
 export function storeMeta(sp: Specialist) {
-  const i = SPECIALISTS.indexOf(sp);
+  if (sp.listing) {
+    const l = sp.listing;
+    const cat = (STORE_CATS.find((c) => (c.from as readonly string[]).includes(sp.cat))?.id ?? "Research") as StoreCat;
+    return {
+      maker: l.developer.name, cat, hires: l.hires, free: l.priceUsd === 0, isNew: true,
+      age: sp.cat === "Onchain" || sp.cat === "Social" ? "12+" : "4+", rising: l.hires + sp.reviews,
+      dist: l.dist, updated: ago(l.updatedAt), version: l.version, languages: "English",
+    };
+  }
+  // house cards may be fresh objects from the database: match by slug, not by reference
+  const i = SPECIALISTS.findIndex((x) => x.slug === sp.slug);
   const cat = (STORE_CATS.find((c) => (c.from as readonly string[]).includes(sp.cat))?.id ?? "Research") as StoreCat;
   const hires = sp.jobs * 7 + 400 + i * 131;
   const r = sp.rating;

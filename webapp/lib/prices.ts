@@ -3,7 +3,9 @@ export const HIRE_USD = Number(process.env.NEXT_PUBLIC_HIRE_USD || 1);
 export const CARD_USD = Number(process.env.NEXT_PUBLIC_CARD_USD || 2);
 
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
-export const hirePriceLabel = () => money(HIRE_USD);
+/** The hire price of a listing: house specialists cost HIRE_USD; a third-party listing sets its own. */
+export const hirePriceOf = (sp?: { listing?: { priceUsd: number } } | null) => (sp?.listing ? sp.listing.priceUsd : HIRE_USD);
+export const hirePriceLabel = (usd: number = HIRE_USD) => money(usd);
 export const cardPriceLabel = () => money(CARD_USD);
 export const usdLabel = (micros: number) => `$${(Math.max(0, micros) / 1e6).toFixed(2)}`;
 

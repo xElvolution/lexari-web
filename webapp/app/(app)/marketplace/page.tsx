@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PALETTE } from "@shared/components/avatar";
-import { SPECIALISTS, STORE_CATS, compact, storeMeta, type StoreCat } from "@/content/appData";
+import { STORE_CATS, compact, storeMeta, type Specialist, type StoreCat } from "@/content/appData";
+import { useListings } from "@/lib/listings";
 import { useApp } from "@/lib/store";
 import Icon from "@/components/Icon";
 import { AgentTile } from "@/components/faces";
@@ -11,10 +12,12 @@ import { Empty } from "@/components/ui";
 import { AppCard, HireBtn, ShelfRow } from "@/components/market/parts";
 
 const FEATURED = ["scout", "frame", "atlas"];
-const byHires = [...SPECIALISTS].sort((a, b) => storeMeta(b).hires - storeMeta(a).hires);
+const byHires = (all: Specialist[]) => [...all].sort((a, b) => storeMeta(b).hires - storeMeta(a).hires);
+/** reviews per hire, safe for a brand new listing with no hires yet */
+const buzz = (a: Specialist) => a.reviews / Math.max(1, a.jobs);
 
-function Hero() {
-  const list = FEATURED.map((f) => SPECIALISTS.find((x) => x.slug === f)!);
+function Hero({ all }: { all: Specialist[] }) {
+  const list = FEATURED.map((f) => all.find((x) => x.slug === f)).filter((x): x is Specialist => !!x);
   const [i, setI] = useState(0);
   const track = useRef<HTMLDivElement>(null);
   const paused = useRef(false);
@@ -55,14 +58,14 @@ function Hero() {
 }
 
 const CHART_TABS = [{ id: "free", label: "Free" }, { id: "hired", label: "Top hired" }, { id: "rising", label: "Rising" }] as const;
-function TopCharts() {
+function TopCharts({ all: everyone }: { all: Specialist[] }) {
   const [tab, setTab] = useState<(typeof CHART_TABS)[number]["id"]>("hired");
   const list = useMemo(() => {
-    const all = [...SPECIALISTS];
+    const all = [...everyone];
     if (tab === "free") return all.filter((a) => storeMeta(a).free).sort((a, b) => b.rating - a.rating || storeMeta(b).hires - storeMeta(a).hires);
     if (tab === "rising") return all.sort((a, b) => storeMeta(b).rising - storeMeta(a).rising);
-    return byHires;
-  }, [tab]).slice(0, 10);
+    return byHires(everyone);
+  }, [tab, everyone]).slice(0, 10);
   return (
     <section data-rise className="mt-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -87,7 +90,7 @@ function TopCharts() {
   );
 }
 
-function Picks() {
+function Picks({ all }: { all: Specialist[] }) {
   const picks = [
     { title: "A research desk in two hires", body: "Scout reads everything, Sonar watches the market. Together they turn a week of reading into a page.", who: ["scout", "sonar"], tag: "Editors' pick" },
     { title: "Ship your launch week", body: "Quill writes the post, Frame makes the cards, Pulse schedules it all. You just say go.", who: ["quill", "frame", "pulse"], tag: "Collection" },
@@ -103,7 +106,7 @@ function Picks() {
             <p className="mt-2 max-w-[28rem] text-[14.5px] text-ink/65">{p.body}</p>
             <div className="mt-5 flex items-center gap-3">
               <div className="flex -space-x-3">{p.who.map((w) => <Link key={w} href={`/marketplace/${w}`} className="transition hover:z-10 hover:-translate-y-1"><AgentTile id={w} look={null} size={52} className="ring-4 ring-[var(--card)]" /></Link>)}</div>
-              <span className="text-[13.5px] font-semibold text-ink/65">{p.who.map((w) => SPECIALISTS.find((x) => x.slug === w)!.name).join(", ")}</span>
+              <span className="text-[13.5px] font-semibold text-ink/65">{p.who.map((w) => all.find((x) => x.slug === w)?.name ?? w).join(", ")}</span>
             </div>
           </article>
         ))}
@@ -113,17 +116,18 @@ function Picks() {
 }
 
 export default function Marketplace() {
-  const s = useApp()!;
+  useApp();
+  const all = useListings();
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<StoreCat | "All">("All");
   useEffect(() => { const c = new URLSearchParams(window.location.search).get("cat"); const hit = STORE_CATS.find((x) => x.id.toLowerCase() === c?.toLowerCase()); if (hit) setCat(hit.id); }, []);
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return SPECIALISTS.filter((a) => (cat === "All" || storeMeta(a).cat === cat) && (!t || `${a.name} ${a.job} ${a.cat} ${a.back} ${storeMeta(a).maker}`.toLowerCase().includes(t)));
-  }, [q, cat]);
+    return all.filter((a) => (cat === "All" || storeMeta(a).cat === cat) && (!t || `${a.name} ${a.job} ${a.cat} ${a.back} ${storeMeta(a).maker}`.toLowerCase().includes(t)));
+  }, [q, cat, all]);
   const browsing = !!q.trim() || cat !== "All";
-  const trending = [...SPECIALISTS].sort((a, b) => b.reviews / b.jobs - a.reviews / a.jobs);
-  const fresh = SPECIALISTS.filter((a) => storeMeta(a).isNew).concat(SPECIALISTS.slice(4, 6));
+  const trending = [...all].sort((a, b) => buzz(b) - buzz(a));
+  const fresh = all.filter((a) => storeMeta(a).isNew).concat(all.slice(4, 6));
 
   return (
     <>
@@ -156,15 +160,15 @@ export default function Marketplace() {
         </section>
       ) : (
         <>
-          <Hero />
+          <Hero all={all} />
           <ShelfRow title="Trending now" sub="What people are hiring this week">{trending.map((a) => <AppCard key={a.slug} a={a} />)}</ShelfRow>
-          <TopCharts />
+          <TopCharts all={all} />
           <ShelfRow title="New & notable" sub="Fresh on the marketplace">{fresh.map((a) => <AppCard key={a.slug} a={a} wide />)}</ShelfRow>
-          <Picks />
+          <Picks all={all} />
           <section data-rise className="mt-12">
             <h2 className="text-[22px] font-bold tracking-tight text-ink sm:text-[24px]">Browse categories</h2>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {STORE_CATS.map((c) => { const n = SPECIALISTS.filter((a) => storeMeta(a).cat === c.id).length; return (
+              {STORE_CATS.map((c) => { const n = all.filter((a) => storeMeta(a).cat === c.id).length; return (
                 <button key={c.id} onClick={() => { setCat(c.id); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="group flex items-center gap-3 rounded-[20px] bg-card p-4 text-left ring-1 ring-line transition hover:ring-grape/60">
                   <span className="grid h-11 w-11 place-items-center rounded-2xl bg-tint text-brand-ink transition group-hover:bg-grape group-hover:text-white"><Icon name={c.icon} size={20} /></span>
                   <span><span className="block text-[15px] font-bold text-ink">{c.id}</span><span className="text-[12.5px] text-ink/55">{n} agent{n === 1 ? "" : "s"}</span></span>
