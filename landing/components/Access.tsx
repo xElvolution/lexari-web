@@ -31,7 +31,6 @@ export default function Access() {
             <SectionIntro label={O.label} title={O.title} body={O.body} tone="base" />
             <div className="reveal mt-8 flex flex-col gap-3 sm:flex-row">
               <a href={SIGNIN} className="btn btn-brand">Sign in with Google</a>
-              <a href={SIGNIN} className="btn btn-line text-ink">Use a crypto wallet</a>
             </div>
           </div>
 
@@ -57,7 +56,7 @@ export default function Access() {
           </div>
         </div>
 
-        <div className="mt-16 grid gap-4 md:grid-cols-3">
+        <div className="mt-16 grid gap-4 md:grid-cols-2">
           {O.chapters.map((c) => (
             <div key={c.n} className="reveal rounded-[26px] bg-card p-6 ring-1 ring-line">
               <span className="display text-[44px] text-brand-ink">{c.n}</span>
