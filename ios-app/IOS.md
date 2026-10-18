@@ -1,6 +1,6 @@
 # Lexari for iPhone (ios-app/)
 
-A standalone, iOS-only Expo project (Expo SDK 57). It has the same features, backend (`https://app.lexari.ai`) and endpoints as the Android app in `../mobileapp`, which stays untouched. The UI uses the iOS 26 Liquid Glass style everywhere through `src/components/Glass.tsx`:
+A standalone, iOS-only Expo project (Expo SDK 57). It has the same features, backend (`https://app.lexari.ai`) and endpoints as the Android app in `../android-app`, which stays untouched. The UI uses the iOS 26 Liquid Glass style everywhere through `src/components/Glass.tsx`:
 
 - iOS 26 and later: real refractive glass (`expo-glass-effect` `GlassView`).
 - iOS 18 and earlier: a system chrome blur material (`expo-blur`).

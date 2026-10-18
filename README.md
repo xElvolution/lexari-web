@@ -416,7 +416,7 @@ flowchart LR
 
 ## ◆ Mobile
 
-`mobileapp/` is a native **Expo** app for Android, built for Solana Mobile and any Android phone. It has its own `package.json` and is not part of the root workspaces.
+`android-app/` is a native **Expo** app for Android, built for Solana Mobile and any Android phone. It has its own `package.json` and is not part of the root workspaces.
 
 | Area | Status | Notes |
 | --- | :---: | --- |
@@ -515,7 +515,7 @@ lexari-web/
 │       ├── miner/           ORE host agent and host tokens
 │       ├── hub/             Offchain Hub, attestor
 │       └── db/              Drizzle schema and SQL migrations
-├── mobileapp/               Expo Android app (own package.json)
+├── android-app/               Expo Android app (own package.json)
 │   ├── app/                 (auth), (tabs), agents, chat, call, desktop, settings
 │   └── src/                 lib (MWA, Privy, session, lock), components, theme, brain
 ├── shared/                  Faces, logo, theme, badge copy and ID backgrounds for both web apps
@@ -567,7 +567,7 @@ Without `DATABASE_URL` and `SESSION_SECRET`, sign-in and data routes return 503 
 ### Mobile
 
 ```bash
-cd mobileapp
+cd android-app
 npm install
 npm test
 npm run typecheck

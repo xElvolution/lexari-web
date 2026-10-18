@@ -15,7 +15,7 @@ Package ids: `ai.lexari.app` for production, `ai.lexari.app.testnet` for preview
 ## Commands
 
 ```bash
-cd mobileapp
+cd android-app
 npm test
 npm run typecheck
 npx expo start
@@ -45,7 +45,7 @@ optional Fingerprint/Face ID + 6-digit PIN → Hub. App lock asks on open and af
 The app targets **devnet only** for now (mainnet is paused).
 
 ```bash
-cd mobileapp
+cd android-app
 npm install
 npx expo start --web             # browser preview (no biometrics on web; PIN path works)
 npx expo start --android         # dev build on a device/emulator (needs expo-dev-client build)
