@@ -202,7 +202,7 @@ export const INTEGRATIONS: IntegrationInfo[] = [
     id: "panta", name: "Panta", category: "prediction", status: process.env.NEXT_PUBLIC_PANTA_READY === "1" ? "devnet" : "needskey", addable: true, moves: true, chains: ["Solana"],
     blurb: "Prediction markets on Solana: research and YES / NO positions.",
     about: "Your agents browse Panta markets, read live YES / NO prices and get real quotes. On devnet a position you confirm is recorded as a paper position at Panta's real quote (Panta settles in mainnet USDC, so no money moves yet).",
-    can: [{ text: "Browse markets and live YES / NO prices", live: true }, { text: "Real quotes for a position", live: true }, { text: "Paper positions on devnet, after you confirm", live: true }, { text: "Real positions and claims (mainnet)", live: false }],
+    can: [{ text: "Browse markets and live YES / NO prices", live: true }, { text: "Real quotes for a position", live: true }, { text: "Paper positions on devnet, after you confirm", live: true }, { text: "Positions marked to live prices, closed with profit and loss", live: true }, { text: "Real positions and claims (mainnet)", live: false }],
     tags: "prediction betting odds yes no markets panta usdc",
   },
   {
@@ -335,7 +335,7 @@ export const defaultScopes = (id: string): Scope[] => scopesOf(id).filter((s) =>
 export function scopeOfTool(tool: string, risk: "read" | "sign"): Scope {
   if (risk === "read") return "read";
   if (/\.transfer$/.test(tool)) return "transfer";
-  if (tool === "panta.position" || tool === "polymarket.order") return "bet";
+  if (tool === "panta.position" || tool === "panta.close" || tool === "polymarket.order") return "bet";
   if (tool.startsWith("ausd.")) return "transfer";
   return "trade";
 }

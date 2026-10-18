@@ -21,7 +21,7 @@ const LABEL: Record<string, string> = {
   "robinhood.wallet": "Checked its Robinhood Chain wallet", "robinhood.transfer": "Send on Robinhood Chain", "monad.transfer": "Send on Monad",
   "uniswap.quote": "Uniswap quote", "uniswap.swap": "Swap on Uniswap", "polymarket.market": "Polymarket market", "polymarket.order": "Order on Polymarket",
   "zcash.wallet": "Checked its Zcash wallet", "zcash.quote": "ZEC quote", "zcash.buy": "Buy ZEC",
-  "panta.markets": "Panta markets", "panta.position": "Position on Panta", "panta.positions": "Panta positions",
+  "panta.markets": "Panta markets", "panta.position": "Position on Panta", "panta.positions": "Panta positions", "panta.close": "Close a Panta position",
 };
 /** A readable title for an action that never got a preview (refused before it was prepared). */
 export function toolLabel(tool: string, input: unknown): string {

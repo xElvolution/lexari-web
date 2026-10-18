@@ -135,7 +135,7 @@ Every integration is **off until you add it**, granted to specific agents, and b
 | Jupiter | Solana mainnet (quotes) | 🟢 | ⚪ swaps | 🟢 read only |
 | Cross-chain quotes (LI.FI) | Solana, Ethereum, Base, Arbitrum, Bitcoin and more | 🟢 | ⚪ bridging | 🟢 read only |
 | Polymarket | Polygon | 🟢 markets and odds | ⚪ orders | 🟢 read only |
-| Panta prediction markets | Solana | 🟢 | 🟡 paper positions on devnet | 🟡 needs API key |
+| Panta prediction markets | Solana | 🟢 | 🟡 paper positions on devnet: open at a real quote, marked to live prices, closed with profit and loss after Confirm (built and tested; stays 🟡 until a Panta API key is set) | 🟡 needs API key |
 | Tempo | Moderato testnet (42431) | 🟢 pathUSD, AlphaUSD | 🟢 faucet, sends, top-ups after Confirm | 🟢 |
 | Base | Base Sepolia | 🟢 balances | 🟢 transfers (ETH, test USDC) and Uniswap v3 swaps, after Confirm | 🟢 |
 | Ethereum | Sepolia | 🟢 balances | 🟢 transfers (ETH, test USDC) and Uniswap v3 swaps, after Confirm | 🟢 |
