@@ -5,8 +5,8 @@ body.quick{display:flex;flex-direction:column;border:1px solid rgba(165,139,255,
 .q-empty{margin:auto;text-align:center;color:var(--mute)}.rings.small{width:70px;height:70px;margin:0 auto 10px}.rings.small .core{inset:24px}
 .m{max-width:85%;padding:8px 12px;border-radius:14px;animation:pop .3s cubic-bezier(.3,1.5,.5,1);white-space:pre-wrap}
 .m.you{align-self:flex-end;background:linear-gradient(135deg,var(--p1),var(--p2))}.m.ai{align-self:flex-start;background:rgba(255,255,255,.06);border:1px solid var(--line)}
-.m.ai.typing::after{content:"";display:inline-block;width:6px;height:12px;margin-left:3px;background:var(--p3);animation:blink 1s infinite}
-@keyframes pop{from{transform:scale(.8) translateY(6px);opacity:0}}@keyframes blink{50%{opacity:0}}
+.m.ai.typing::after{content:"";display:inline-block;width:6px;height:12px;margin-left:3px;background:var(--p3);animation:qblink 1s infinite}
+@keyframes pop{from{transform:scale(.8) translateY(6px);opacity:0}}@keyframes qblink{50%{opacity:0}}
 .q-form{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
 .q-form input{flex:1;height:36px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--text);padding:0 12px;outline:none}
 .q-form input:focus{border-color:var(--p1);box-shadow:0 0 0 3px rgba(143,107,255,.2)}

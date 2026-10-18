@@ -104,7 +104,7 @@ webview.ready{opacity:1;transform:none}
 @keyframes dot{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-7px);opacity:1;background:var(--p3)}}
 /* offline */
 .offline{background:radial-gradient(55% 45% at 50% 40%,rgba(91,43,255,.25),transparent 70%),#000}
-.offline h2{font-family:var(--display);font-weight:800;letter-spacing:-.03em;font-size:34px;font-variation-settings:"wdth" 88}
+.offline h2{font-variant-ligatures:none;font-family:var(--display);font-weight:800;letter-spacing:-.03em;font-size:34px;font-variation-settings:"wdth" 88}
 .offmark{position:relative;margin-bottom:10px;animation:bob 3.4s ease-in-out infinite}
 .sleepy i{animation:sleepy 3.4s ease-in-out infinite}@keyframes sleepy{0%,100%{transform:scaleY(.18)}50%{transform:scaleY(.5)}}
 .offmark .badge{position:absolute;right:-14px;bottom:-10px;width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:var(--grape);box-shadow:0 4px 0 var(--p2),0 8px 20px rgba(91,43,255,.5)}
