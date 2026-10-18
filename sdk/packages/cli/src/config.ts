@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync, chmodSync, existsSync, rmSync }
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const API = (process.env.LEXARI_API_URL || "https://app.hooks247.com").replace(/\/$/, "");
+export const API = (process.env.LEXARI_API_URL || "https://app.lexari.ai").replace(/\/$/, "");
 const dir = () => process.env.LEXARI_HOME || join(homedir(), ".lexari");
 const file = () => join(dir(), "credentials.json");
 
