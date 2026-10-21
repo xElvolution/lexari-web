@@ -11,6 +11,7 @@ import { TourTarget } from "@/components/Tour";
 import { ModelSheet } from "@/web/ModelSheet";
 import { MailSheet, TasksSheet } from "@/web/MailTasks";
 import { api, msgId, streamChat, type ChatEvent } from "@/lib/api";
+import { chatTurnBody } from "@/lib/chatTurn";
 import { cutSecrets, findSecrets, isBlockedKind, SECRET_NAME_RE, toSecretName } from "@/lib/secretScan";
 import { useSession } from "@/state/session";
 import { useData, nameOf, withHello } from "@/web/data";
@@ -202,9 +203,8 @@ export default function Chat() {
     const speaker = group ? (chat?.members[0] || "home") : id;
     setLocal((xs) => [...xs, mine, { id: replyId, from: speaker, text: "", at: Date.now() + 1 }]);
     setText(""); setFile(null); setTyping(true); setMood("thinking");
-    const history = msgs.slice(-12).filter((m) => m.text).map((m) => ({ role: m.from === "you" ? "user" : "assistant", content: m.text }));
     try {
-      await streamChat({ convo: id, text: body, speaker, history, recall: [], userMsgId: mine.id, replyMsgId: replyId, meta: {}, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", ...(mine.file?.id ? { file: mine.file } : {}) }, token, (ev: ChatEvent) => {
+      await streamChat(chatTurnBody({ convo: id, speaker, text: body, file: mine.file, history: msgs, userMsgId: mine.id, replyMsgId: replyId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }), token, (ev: ChatEvent) => {
         const up = (f: (m: M) => M) => setLocal((xs) => xs.map((l) => (l.id === replyId ? f(l) : l)));
         if (ev.token) { setTyping(false); setMood("speaking"); up((l) => ({ ...l, text: (l.text || "") + ev.token })); }
         if (ev.replace !== undefined) up((l) => ({ ...l, text: ev.replace }));

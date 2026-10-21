@@ -3,6 +3,7 @@ import test from "node:test";
 import { isSolanaMobile, userAgent } from "../src/lib/device.ts";
 import { asCluster, networkBadge, solscanTx } from "../src/lib/network.ts";
 import { takeSse } from "../src/lib/sse.ts";
+import { chatTurnBody } from "../src/lib/chatTurn.ts";
 import { findSecrets, isBlockedKind, scanSecrets } from "../src/lib/secretScan.ts";
 
 test("seeker and saga are solana mobile, a pixel is not", () => {
@@ -18,6 +19,29 @@ test("badges and solscan", () => {
   assert.equal(networkBadge("devnet").label.includes("TESTNET"), true);
   assert.equal(solscanTx("abc", "mainnet-beta").includes("cluster"), false);
   assert.match(solscanTx("abc", "devnet"), /cluster=devnet/);
+});
+
+test("chat body matches the server's chatBody: history is { from, text }, files go in meta", () => {
+  const msgs = [
+    { id: "hello", from: "home", text: "Hi, I'm Nova. Ask me anything." },
+    { id: "m1", from: "you", text: "hi" },
+    { id: "s1", from: "system", text: "Voice call" },
+    { id: "m2", from: "home", text: "" },
+    { id: "m3", from: "home", text: "Hello!" },
+  ];
+  const b = chatTurnBody({ convo: "home", speaker: "home", text: " next ", history: msgs, userMsgId: "mabcd", replyMsgId: "mefgh", tz: "Africa/Lagos" });
+  assert.deepEqual(b.history, [{ from: "you", text: "hi" }, { from: "home", text: "Hello!" }]);
+  assert.equal(b.text, "next");
+  assert.deepEqual(b.meta, {});
+  assert.equal("file" in b, false);
+  assert.equal(b.tz, "Africa/Lagos");
+  const f = chatTurnBody({ convo: "home", speaker: "home", text: "", file: { name: "notes.pdf", size: "12 KB", id: "3f2a1b4c-0000-4000-8000-000000000000" }, history: [], userMsgId: "mabcd", replyMsgId: "mefgh" });
+  assert.equal(f.text, "Attachment: notes.pdf");
+  assert.deepEqual(f.meta, { file: { name: "notes.pdf", size: "12 KB", id: "3f2a1b4c-0000-4000-8000-000000000000" } });
+  const many = Array.from({ length: 30 }, (_, i) => ({ id: `m${i}`, from: i % 2 ? "home" : "you", text: "x".repeat(3000) }));
+  const h = chatTurnBody({ convo: "home", speaker: "home", text: "a", history: many, userMsgId: "mabcd", replyMsgId: "mefgh" }).history;
+  assert.equal(h.length, 12);
+  assert.equal(h[0].text.length, 2000);
 });
 
 test("sse frames", () => {
