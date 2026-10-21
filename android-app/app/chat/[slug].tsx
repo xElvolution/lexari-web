@@ -2,7 +2,7 @@
  * chip; the thread with day labels, avatars that think/talk/smile on the newest bubble, receipts and every chat card;
  * paste guard; composer with desktop, attach, voice note, call and send. Same words and sizes as app.lexari.ai at 390px. */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
@@ -242,7 +242,8 @@ export default function Chat() {
   const ready = (!!text.trim() || !!file) && !file?.uploading;
   const iconBtn = { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" } as const;
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: k.bg }}>
+    // Android runs edge-to-edge (edgeToEdgeEnabled), so adjustResize no longer shrinks the window: pad for the keyboard on both platforms.
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: k.bg }}>
       <View style={{ paddingTop: insets.top, height: 54 + insets.top, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: k.line }}>
         <Pressable accessibilityLabel="Back to chats" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/agents"))} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}><Icon name="back" size={20} color={k.ink} /></Pressable>
         <Pressable onPress={() => !group && router.push(`/agents/${id}`)} style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 12 }}>
