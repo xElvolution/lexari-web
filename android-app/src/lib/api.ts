@@ -82,7 +82,10 @@ export async function streamChat(body: Record<string, unknown>, token: string, o
   });
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => "");
-    throw new ApiError(res.status, text.slice(0, 180) || "Chat did not start");
+    let data: unknown = null;
+    try { data = JSON.parse(text); } catch { /* not JSON */ }
+    const error = data && typeof data === "object" && typeof (data as { error?: unknown }).error === "string" ? (data as { error: string }).error : "";
+    throw new ApiError(res.status, error.slice(0, 180) || "Chat did not start", data);
   }
   const reader = res.body.getReader();
   const dec = new TextDecoder();

@@ -10,7 +10,7 @@ import Icon from "@/components/Icon";
 import { TourTarget } from "@/components/Tour";
 import { ModelSheet } from "@/web/ModelSheet";
 import { MailSheet, TasksSheet } from "@/web/MailTasks";
-import { api, msgId, streamChat, type ChatEvent } from "@/lib/api";
+import { api, ApiError, msgId, streamChat, type ChatEvent } from "@/lib/api";
 import { chatTurnBody } from "@/lib/chatTurn";
 import { cutSecrets, findSecrets, isBlockedKind, SECRET_NAME_RE, toSecretName } from "@/lib/secretScan";
 import { useSession } from "@/state/session";
@@ -219,7 +219,12 @@ export default function Chat() {
         if (ev.done) { setTyping(false); setMood("happy"); setTimeout(() => setMood("idle"), 1800); }
       });
       reload().catch(() => {});
-    } catch { setTyping(false); setMood("idle"); setLocal((xs) => xs.filter((l) => l.id !== replyId || l.text)); setToast("That message didn't send. Try again."); }
+    } catch (e) {
+      setTyping(false); setMood("idle"); setLocal((xs) => xs.filter((l) => l.id !== replyId || l.text));
+      // The server's own words for a refused message (signed out, plan limit, rate limit, a key in the text), else the generic line.
+      const said = e instanceof ApiError && e.status >= 400 && e.status < 500 && e.data ? e.message : "";
+      setToast(said || "That message didn't send. Try again.");
+    }
   };
 
   const attach = async () => {
