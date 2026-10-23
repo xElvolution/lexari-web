@@ -274,7 +274,7 @@ export default function Downloads() {
               <span className="block overflow-hidden pb-[0.08em] text-brand-ink"><span className="dl-word inline-block">screen</span> <span className="dl-word inline-block">you</span> <span className="dl-word inline-block">own.</span></span>
             </h1>
             <p className="dl-lede mt-6 max-w-[34rem] text-[17px] leading-[1.6] text-ink/75 sm:text-[19px]">
-              One agent, one memory, every device. Android is ready today. iPhone, Mac, Windows and Linux are on the way.
+              One agent, one memory, every device. Android and Linux are ready today. iPhone, Mac and Windows are on the way.
             </p>
             <div className="dl-lede mt-9 flex flex-col gap-4 sm:flex-row">
               {featured.status === "live" && featured.url

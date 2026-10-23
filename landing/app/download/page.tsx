@@ -6,7 +6,7 @@ import Reveal from "@/components/Reveal";
 
 export const metadata: Metadata = {
   title: "Download Lexari",
-  description: "Get Lexari on Android today. iOS, macOS, Windows and Linux are on the way.",
+  description: "Get Lexari on Android and Linux today. iOS, macOS and Windows are on the way.",
   alternates: { canonical: "/download" },
 };
 
