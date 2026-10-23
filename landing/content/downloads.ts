@@ -44,7 +44,9 @@ export const platforms: Platform[] = [
     blurb: "Lexari on your PC, one shortcut away from whatever you are working on.",
   },
   {
-    id: "linux", name: "Linux", device: "monitor", status: "soon",
+    id: "linux", name: "Linux", device: "monitor", status: "live",
+    url: "https://github.com/xElvolution/lexari/releases/download/linux-latest/Lexari-0.1.0.AppImage",
+    version: "0.1.0", size: "About 106 MB", file: "Lexari-0.1.0.AppImage",
     requires: "AppImage and .deb",
     blurb: "For the terminal crowd. Same agent, same memory, your distro.",
   },
