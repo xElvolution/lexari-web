@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Pressable, View } from "react-native";
 import { router } from "expo-router";
+import { openSettings } from "@/lib/nav";
 import Svg, { Path } from "react-native-svg";
 import Icon from "@/components/Icon";
 import { api } from "@/lib/api";
@@ -98,7 +99,7 @@ export function ModelSheet({ open, onClose, convo, agent, agentName, group, onCh
           </View>
           {s.credits.balance > 0 ? <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}><T f="semi" s={14}>Extra credits</T><T f="bold" s={14}>{money(s.credits.balance)}{s.credits.spent > 0 ? <T f="semi" s={14} c={k.ink45}>{`  ${money(s.credits.spent)} used this month`}</T> : null}</T></View> : null}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Pressable onPress={() => { onClose(); router.push("/(tabs)/settings"); }}><T f="bold" s={13} c={k.brandInk}>Usage and billing</T></Pressable>
+            <Pressable onPress={() => { onClose(); openSettings("billing"); }}><T f="bold" s={13} c={k.brandInk}>Usage and billing</T></Pressable>
             <Pressable onPress={() => { onClose(); router.push(s.plan.id === "free" ? "/settings/billing" : { pathname: "/(tabs)/wallets", params: { topup: "1" } }); }} style={{ height: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: k.tint, justifyContent: "center" }}><T f="bold" s={13}>{s.plan.id === "free" ? "Upgrade" : "Top up"}</T></Pressable>
           </View>
         </View>
@@ -116,9 +117,36 @@ export function ModelSheet({ open, onClose, convo, agent, agentName, group, onCh
           {INCLUDED.filter((m) => s.models.available[m.id] && !s.models.prefs.off.includes(m.id)).map((m) => <Row key={m.id} m={m} />)}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4, marginTop: 12 }}><Label s={9.5} c={k.ink45}>More models</Label><T s={11.5} c={k.ink45}>Included · falls back if busy</T></View>
           {HOUSE.filter((m) => !s.models.available[m.id] || !s.models.prefs.off.includes(m.id)).map((m) => <Row key={m.id} m={m} />)}
-          <Pressable onPress={() => { onClose(); router.push("/(tabs)/settings"); }} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 4, marginTop: 4 }}><Icon name="key" size={13} color={k.brandInk} /><T f="bold" s={12.5} c={k.brandInk}>{s.models.keys.length ? "Manage models and API keys" : "Use your own API keys"}</T></Pressable>
+          <Pressable onPress={() => { onClose(); openSettings("models"); }} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 4, marginTop: 4 }}><Icon name="key" size={13} color={k.brandInk} /><T f="bold" s={12.5} c={k.brandInk}>{s.models.keys.length ? "Manage models and API keys" : "Use your own API keys"}</T></Pressable>
         </View>
       )}
     </WSheet>
+  );
+}
+
+/** Port of webapp/components/billing/AgentModelRow.tsx: in the agent page, the model this agent answers with everywhere. Opens the picker. */
+export function AgentModelRow({ agent, name }: { agent: string; name: string }) {
+  const k = useC();
+  const { token } = useSession();
+  const [s, setS] = useState<Billing | null>(null);
+  const [open, setOpen] = useState(false);
+  const load = () => { if (token) api<Billing>("/api/billing", {}, token).then((raw) => setS(normBilling(raw)), () => setS(null)); };
+  useEffect(load, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  const all = [LAMINA, ...INCLUDED, ...HOUSE];
+  const own = s?.models.agents[agent] ? all.find((m) => m.id === s.models.agents[agent]) : undefined;
+  const m = own ?? all.find((x) => x.id === s?.models.default) ?? LAMINA;
+  const short = m.label;
+  return (
+    <>
+      <Pressable accessibilityRole="button" onPress={() => setOpen(true)} style={{ flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 16, backgroundColor: k.card, padding: 14, borderWidth: 1, borderColor: k.line }}>
+        <Mark m={m} size={36} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <T f="bold" s={14} lines={1}>Model<T f="semi" s={14} c={k.ink60}>{` · ${m.label}`}</T></T>
+          <T s={12.5} c={k.ink60}>{own ? `${name} answers with ${short} in chats without their own pick.` : `Your account default. ${name} answers with ${short} unless a chat picks another.`}</T>
+        </View>
+        <Icon name="right" size={16} color={k.ink45} />
+      </Pressable>
+      <ModelSheet open={open} onClose={() => setOpen(false)} convo={agent} agent={agent} agentName={name} group={false} onChange={() => load()} />
+    </>
   );
 }

@@ -19,6 +19,7 @@ import { useSession } from "@/state/session";
 import { env } from "@/lib/env";
 import { nextAfterSignIn } from "@/lib/route";
 import type { SavedSession } from "@/lib/session";
+import { passkeyError, passkeySignIn, passkeySupported } from "@/lib/passkey";
 import { Btn, F, GRAPE, PopIn, Rise, useC } from "@/web/kit";
 
 const SOON = "This sign-in option is being switched on. Please try another way for now.";
@@ -100,7 +101,7 @@ const offline: Methods = {
 };
 
 function WithPrivy(p: { onSession: (s: SavedSession) => Promise<void> }) {
-  return <SignInView methods={usePlatformMethods(p.onSession)} />;
+  return <SignInView methods={usePlatformMethods(p.onSession)} onSession={p.onSession} />;
 }
 
 
@@ -121,7 +122,7 @@ export default function SignIn() {
   };
   return env.privyOn
     ? <WithPrivy onSession={onSession} />
-    : <SignInView methods={offline} />;
+    : <SignInView methods={offline} onSession={onSession} />;
 }
 
 /** The theme toggle on grape (shared ThemeToggle in the hero). */
@@ -135,9 +136,19 @@ function ThemeToggle() {
   );
 }
 
-function SignInView({ methods }: { methods: Methods }) {
+function SignInView({ methods, onSession }: { methods: Methods; onSession: (s: SavedSession) => Promise<void> }) {
   const insets = useSafeAreaInsets();
   const k = useC();
+  const [pkBusy, setPkBusy] = useState(false);
+  const [pkErr, setPkErr] = useState("");
+  // web: "Linked a passkey already? Sign in with it" (Mera passkey, same /api/mera/signin)
+  const passkey = async () => {
+    if (!passkeySupported()) { setPkErr("This phone doesn't support passkeys."); return; }
+    tap(); setPkBusy(true); setPkErr("");
+    try { await onSession(await passkeySignIn()); }
+    catch (e) { setPkErr(passkeyError(e)); }
+    setPkBusy(false);
+  };
   const [busy, setBusy] = useState<"" | "google" | "email">("");
   const [msg, setMsg] = useState("");
   const [authOpen, setAuthOpen] = useState(false);
@@ -241,6 +252,11 @@ function SignInView({ methods }: { methods: Methods }) {
               <Icon name="mail" size={18} color={k.ink} /><Text style={{ fontFamily: F.bold, fontSize: 15, color: k.ink }}>Continue with email</Text>
             </Pressable>
           </Rise>
+          <Text style={{ marginTop: 16, textAlign: "center", fontFamily: F.sans, fontSize: 13, color: k.ink60 }}>
+            {"Linked a passkey already? "}
+            <Text accessibilityRole="button" disabled={pkBusy} onPress={() => void passkey()} style={{ fontFamily: F.bold, color: k.brandInk, textDecorationLine: "underline", opacity: pkBusy ? 0.6 : 1 }}>{pkBusy ? "Waiting for passkey…" : "Sign in with it"}</Text>
+          </Text>
+          {pkErr ? <Text accessibilityLiveRegion="polite" style={{ marginTop: 8, textAlign: "center", fontFamily: F.sans, fontSize: 13, color: "#e5484d" }}>{pkErr}</Text> : null}
           {msg ? <Text accessibilityLiveRegion="polite" style={{ marginTop: 12, fontFamily: F.sans, fontSize: 13, color: "#e5484d" }}>{msg}</Text> : null}
         </View>
         </View>

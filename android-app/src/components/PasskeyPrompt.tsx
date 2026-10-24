@@ -1,5 +1,5 @@
 import { Pressable, View } from "react-native";
-import { router } from "expo-router";
+import { openSettings } from "@/lib/nav";
 import { usePrefs } from "@/state/prefs";
 import { Pill, T, useC } from "@/web/kit";
 
@@ -13,7 +13,7 @@ export default function PasskeyPrompt() {
       <T f="bold" s={15}>Add a passkey</T>
       <T s={13} c={k.ink60}>Sign in faster next time. Link a passkey to this account in Settings, Security.</T>
       <View style={{ flexDirection: "row", gap: 8 }}>
-        <Pill label="Add a passkey" h={40} style={{ flex: 1 }} onPress={() => { dismissPasskey(); router.navigate({ pathname: "/(tabs)/settings", params: { sec: "security" } }); }} />
+        <Pill label="Add a passkey" h={40} style={{ flex: 1 }} onPress={() => { dismissPasskey(); openSettings("security"); }} />
         <Pressable onPress={dismissPasskey} style={{ justifyContent: "center", paddingHorizontal: 12 }}><T f="bold" s={13} c={k.ink60}>Not now</T></Pressable>
       </View>
     </View>

@@ -6,8 +6,9 @@ import { Bounce, Burst, Float, Pop, PopIn, RiseText, Spin, toast, Stage } from "
 import { Pressable, RefreshControl, ScrollView, Share, Text, Vibration, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { router } from "expo-router";
+import { openSettings } from "@/lib/nav";
 import * as Clipboard from "expo-clipboard";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import { ChatBg, MyBubble, bubbleInk } from "@/web/cosmetics";
 import Icon from "@/components/Icon";
 import { api } from "@/lib/api";
@@ -96,7 +97,7 @@ export default function Hub() {
           </Card>
         </View>
 
-        <Quests hub={hub} now={now} busy={busy} onGo={(go) => { if (go === "#level") setSheet("train"); else if (go === "#invite") setSheet("invite"); else if (go === "#store") setSheet("store"); else if (go.startsWith("/")) router.navigate(go === "/agents" ? "/(tabs)/agents" : go === "/brain" ? "/(tabs)/brain" : "/(tabs)/marketplace"); }}
+        <Quests hub={hub} now={now} busy={busy} onGo={(go) => { if (go === "#level") setSheet("train"); else if (go === "#invite") setSheet("invite"); else if (go === "#store") setSheet("store"); else if (go === "/settings#social") openSettings("social"); else if (go.startsWith("/")) router.navigate(go === "/agents" ? "/(tabs)/agents" : go === "/brain" ? "/(tabs)/brain" : "/(tabs)/marketplace"); }}
           onClaim={(id, title) => act({ action: "quest", questId: id }, `quest:${id}`, (r) => `${title} · +${r.coins ?? 0} coins`)} />
 
         <Card style={{ padding: 14, flexDirection: "row", alignItems: "center", gap: 12 }} onPress={() => setSheet("invite")}>
@@ -163,15 +164,18 @@ function BoxModal({ open, onOpen, onClose }: { open: boolean; onOpen: () => Prom
       <Pressable onPress={close} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.75)", alignItems: "center", justifyContent: "center", padding: 20 }}>
         <PopIn style={{ width: "100%", maxWidth: 380 }}>
           <Pressable accessibilityViewIsModal accessibilityLabel="Mystery box" onPress={() => {}} style={{ borderRadius: 30, backgroundColor: "#0a0a0a", padding: 24, alignItems: "center", overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" }}>
-            <View pointerEvents="none" style={{ position: "absolute", top: 70, width: 240, height: 240, borderRadius: 120, backgroundColor: "rgba(91,43,255,0.35)" }} />
+            {/* web: a 224px bg-grape/50 circle under blur(70px), a soft glow rather than a disc. A radial gradient draws the same falloff. */}
+            <Svg pointerEvents="none" width={380} height={380} style={{ position: "absolute", top: 96 + 112 - 190, alignSelf: "center" }}>
+              <Defs><RadialGradient id="boxglow" cx="190" cy="190" r="190" gradientUnits="userSpaceOnUse">
+                <Stop offset="0" stopColor={GRAPE} stopOpacity={0.42} /><Stop offset="0.3" stopColor={GRAPE} stopOpacity={0.32} /><Stop offset="0.6" stopColor={GRAPE} stopOpacity={0.1} /><Stop offset="1" stopColor={GRAPE} stopOpacity={0} />
+              </RadialGradient></Defs>
+              <Rect width={380} height={380} fill="url(#boxglow)" />
+            </Svg>
             <Pressable accessibilityLabel="Close" disabled={phase === "opening"} onPress={onClose} style={{ position: "absolute", right: 12, top: 12, width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", opacity: phase === "opening" ? 0.3 : 1 }}><Icon name="x" size={18} color="rgba(255,255,255,0.7)" /></Pressable>
             <Label s={9.5} c="rgba(255,255,255,0.6)">Mystery box</Label>
             <View style={{ marginTop: 24, width: 180, height: 180, alignItems: "center", justifyContent: "center" }}>
               {phase === "revealed" ? (
-                <>
-                  <Burst n={18} base={90} />
-                  <Pop k={coins} from={0.3} style={{ alignItems: "center" }}><Coin size={96} /><Text style={{ fontFamily: F.display, fontSize: 44, color: "#fff", marginTop: 12 }}>{`+${coins}`}</Text></Pop>
-                </>
+                <Pop k={coins} from={0.3} style={{ alignItems: "center" }}><Coin size={96} /><Text style={{ fontFamily: F.display, fontSize: 44, lineHeight: 44, color: "#fff", marginTop: 12 }}>{`+${coins}`}</Text></Pop>
               ) : (
                 <Bounce mode={phase === "opening" ? "shake" : "box"}><Text style={{ fontSize: 120, lineHeight: 140 }}>🎁</Text></Bounce>
               )}
@@ -455,8 +459,12 @@ function StoreSheet({ open, onClose, hub, coins, onBuy, onWear }: { open: boolea
             </View>
           )}
         </View>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}><T f="bold" s={small ? 12 : 13.5} lines={1}>{it.name}</T></View>
-        {!have ? <Pressable disabled={coins < it.price} onPress={() => onBuy(it.id, it.name)} style={{ marginTop: 6, height: small ? 32 : 36, borderRadius: 18, backgroundColor: coins < it.price ? (k.dark ? "rgba(255,255,255,0.15)" : "rgba(10,10,10,0.15)") : GRAPE, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}><Coin size={11} /><T f="bold" s={12} c={coins < it.price ? k.ink45 : "#fff"}>{String(it.price)}</T></Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 4, marginTop: small ? 6 : 8 }}>
+          <T f="bold" s={small ? 12 : 13.5} lines={1} style={{ flexShrink: 1 }}>{it.name}</T>
+          {!small && !have ? <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}><Coin size={12} /><T f="bold" s={12.5} c={k.ink75}>{String(it.price)}</T></View> : null}
+          {!small && have ? <Label s={8} c={k.brandInk}>Owned</Label> : null}
+        </View>
+        {!have ? <Pressable disabled={coins < it.price} onPress={() => onBuy(it.id, it.name)} style={{ marginTop: 6, height: small ? 32 : 36, borderRadius: 18, backgroundColor: coins < it.price ? (k.dark ? "rgba(255,255,255,0.15)" : "rgba(10,10,10,0.15)") : GRAPE, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>{small ? <><Coin size={11} /><T f="bold" s={12} c={coins < it.price ? k.ink45 : "#fff"}>{String(it.price)}</T></> : <T f="bold" s={13} c={coins < it.price ? k.ink45 : "#fff"}>{coins < it.price ? `Need ${it.price - coins} more` : "Buy"}</T>}</Pressable>
           : on ? <Pressable onPress={() => onWear(it.kind, null)} style={{ marginTop: 6, height: small ? 32 : 36, borderRadius: 18, backgroundColor: k.card, borderWidth: 1, borderColor: GRAPE, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}><Icon name="check" size={13} stroke={3} color={k.brandInk} /><T f="bold" s={12} c={k.brandInk}>{small ? "On" : "Applied"}</T></Pressable>
           : <Pressable onPress={() => onWear(it.kind, it.id)} style={{ marginTop: 6, height: small ? 32 : 36, borderRadius: 18, backgroundColor: k.card, borderWidth: 1, borderColor: k.line, alignItems: "center", justifyContent: "center" }}><T f="bold" s={12}>Apply</T></Pressable>}
       </View>

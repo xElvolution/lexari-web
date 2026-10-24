@@ -1,7 +1,7 @@
 /** Port of webapp/app/(app)/marketplace/page.tsx at phone width: search, category chips, Agent of the week hero, Trending now, Top charts, New & notable, Editors' picks, Browse categories. */
 import { Stage } from "@/web/anim";
-import { useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, TextInput, View, useWindowDimensions } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, ScrollView, TextInput, View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 import Icon from "@/components/Icon";
 import { PALETTE } from "@/components/avatar";
 import { ROSTER, STORE_CATS, compact, storeMeta, type StoreCat } from "@/content/roster";
@@ -12,35 +12,58 @@ import { AppCard, HScroll, HireBtn, HireCtx, Shelf, open } from "@/components/Ma
 
 const FEATURED = ["scout", "frame", "atlas"];
 const byHires = [...ROSTER].sort((a, b) => storeMeta(b).hires - storeMeta(a).hires);
+/**
+ * Agent of the week carousel, like the web's snap track. Slides are as wide as the card itself (measured with onLayout,
+ * not the window), all slides share the tallest slide's height, and the arrows and dots sit inside the card.
+ */
 function Hero() {
-  const { width } = useWindowDimensions();
-  const w = width - 32;
   const list = FEATURED.map((f) => ROSTER.find((x) => x.slug === f)!).filter(Boolean);
   const [i, setI] = useState(0);
+  const [cw, setCw] = useState(0);
+  const [hs, setHs] = useState<number[]>([]);
   const ref = useRef<ScrollView>(null);
-  const go = (n: number) => { const k = (n + list.length) % list.length; setI(k); ref.current?.scrollTo({ x: k * w, animated: true }); };
+  const paused = useRef(false);
+  const h = Math.max(300, ...hs.filter(Boolean));
+  const go = (n: number) => { const k = (n + list.length) % list.length; setI(k); if (cw) ref.current?.scrollTo({ x: k * cw, animated: true }); };
+  // web: moves on every 6.5s unless you are touching it
+  useEffect(() => { const t = setInterval(() => { if (!paused.current) go(i + 1); }, 6500); return () => clearInterval(t); });
+  const onLayout = (e: LayoutChangeEvent) => { const nw = Math.round(e.nativeEvent.layout.width); if (nw && nw !== cw) { setCw(nw); setHs([]); ref.current?.scrollTo({ x: i * nw, animated: false }); } };
+  const settle = (x: number) => { if (!cw) return; const k = Math.max(0, Math.min(list.length - 1, Math.round(x / cw))); if (k !== i) setI(k); };
   return (
-    <View style={{ marginTop: 20, borderRadius: 30, overflow: "hidden" }}>
-      <ScrollView ref={ref} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={(e) => setI(Math.round(e.nativeEvent.contentOffset.x / w))}>
-        {list.map((a, n) => { const m = storeMeta(a); const col = PALETTE[a.face].fill; return (
-          <View key={a.slug} style={{ width: w, minHeight: 300, padding: 22, paddingBottom: 60, justifyContent: "flex-end" }}>
-            <Grad angle={120} stops={[["#0a0a0a", 0], ["#1d0f5c", 0.55], ["#5b2bff", 1]]} radial={[{ cx: "85%", cy: "30%", r: "70%", color: col, opacity: 0.55 }]} />
-            <View style={{ position: "absolute", right: 16, top: 16, transform: [{ rotate: "-6deg" }] }}><AgentTile slug={a.slug} size={72} dot={false} /></View>
-            <View style={{ alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}><Label s={9} c="#fff">{n === 0 ? "Agent of the week" : n === 1 ? "Editors' choice" : "Staff favourite"}</Label></View>
-            <T f="display" s={34} c="#fff" style={{ marginTop: 14, letterSpacing: -1.6 }}>{a.name}</T>
-            <T f="semi" s={16} c="rgba(255,255,255,0.9)" style={{ marginTop: 6 }}>{a.quip}</T>
-            <T s={13.5} c="rgba(255,255,255,0.7)" style={{ marginTop: 8, lineHeight: 19 }}>{a.back}</T>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10, marginTop: 18 }}>
-              <HireBtn a={a} lg />
-              <Pressable onPress={() => open(a.slug)} style={{ height: 48, paddingHorizontal: 20, borderRadius: 24, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center" }}><T f="bold" s={15} c="#fff">View listing</T></Pressable>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><T f="bold" s={13} c="#fff">{String(a.rating)}</T><Icon name="star" size={13} color="#fff" /><T s={13} c="rgba(255,255,255,0.8)">{` · ${compact(m.hires)} hires · ${m.cat}`}</T></View>
+    <View onLayout={onLayout} style={{ marginTop: 20, borderRadius: 30, overflow: "hidden", backgroundColor: "#0a0a0a", minHeight: 300 }}>
+      {cw ? (
+        <ScrollView
+          ref={ref} horizontal pagingEnabled showsHorizontalScrollIndicator={false} scrollEventThrottle={32}
+          onScrollBeginDrag={() => { paused.current = true; }}
+          onScrollEndDrag={() => { paused.current = false; }}
+          onScroll={(e) => settle(e.nativeEvent.contentOffset.x)}
+          onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.x)}
+        >
+          {list.map((a, n) => { const m = storeMeta(a); const col = PALETTE[a.face].fill; return (
+            <View key={a.slug} accessibilityLabel={`${n + 1} of ${list.length}`} style={{ width: cw, height: h, overflow: "hidden" }}>
+              <Grad angle={120} stops={[["#0a0a0a", 0], ["#1d0f5c", 0.55], ["#5b2bff", 1]]} radial={[{ cx: "85%", cy: "30%", r: "70%", color: col, opacity: 0.55 }]} />
+              <View pointerEvents="none" style={{ position: "absolute", right: 16, top: 16, transform: [{ rotate: "-6deg" }] }}><AgentTile slug={a.slug} size={72} dot={false} /></View>
+              <View
+                onLayout={(e) => { const v = Math.ceil(e.nativeEvent.layout.height); setHs((o) => (o[n] === v ? o : Object.assign([...o], { [n]: v }))); }}
+                style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: 22, paddingBottom: 60 }}
+              >
+                <View style={{ alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}><Label s={9} c="#fff">{n === 0 ? "Agent of the week" : n === 1 ? "Editors' choice" : "Staff favourite"}</Label></View>
+                <T f="display" s={34} c="#fff" style={{ marginTop: 14, letterSpacing: -1.6 }}>{a.name}</T>
+                <T f="semi" s={16} c="rgba(255,255,255,0.9)" style={{ marginTop: 6 }}>{a.quip}</T>
+                <T s={13.5} c="rgba(255,255,255,0.7)" style={{ marginTop: 8, lineHeight: 19 }}>{a.back}</T>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10, marginTop: 18 }}>
+                  <HireBtn a={a} lg />
+                  <Pressable onPress={() => open(a.slug)} style={{ height: 48, paddingHorizontal: 20, borderRadius: 24, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center" }}><T f="bold" s={15} c="#fff">View listing</T></Pressable>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><T f="bold" s={13} c="#fff">{String(a.rating)}</T><Icon name="star" size={13} color="#fff" /><T s={13} c="rgba(255,255,255,0.8)">{` · ${compact(m.hires)} hires · ${m.cat}`}</T></View>
+                </View>
+              </View>
             </View>
-          </View>
-        ); })}
-      </ScrollView>
+          ); })}
+        </ScrollView>
+      ) : null}
       <View style={{ position: "absolute", right: 16, bottom: 16, flexDirection: "row", alignItems: "center", gap: 8 }}>
         <Pressable accessibilityLabel="Previous" onPress={() => go(i - 1)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center" }}><Icon name="left" size={17} color="#fff" /></Pressable>
-        <View style={{ flexDirection: "row", gap: 6 }}>{list.map((_, n) => <View key={n} style={{ height: 8, width: n === i ? 24 : 8, borderRadius: 4, backgroundColor: n === i ? "#fff" : "rgba(255,255,255,0.45)" }} />)}</View>
+        <View style={{ flexDirection: "row", gap: 6 }}>{list.map((_, n) => <Pressable key={n} accessibilityLabel={`Slide ${n + 1}`} hitSlop={8} onPress={() => go(n)} style={{ height: 8, width: n === i ? 24 : 8, borderRadius: 4, backgroundColor: n === i ? "#fff" : "rgba(255,255,255,0.45)" }} />)}</View>
         <Pressable accessibilityLabel="Next" onPress={() => go(i + 1)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.4)", alignItems: "center", justifyContent: "center" }}><Icon name="right" size={17} color="#fff" /></Pressable>
       </View>
     </View>

@@ -2,8 +2,9 @@
 import { useIdentityToken, useLinkAccount, usePrivy } from "@privy-io/react-auth";
 import { useRef } from "react";
 import { api } from "./api";
+import { env } from "./env";
 
-export function useWalletLink(token: string | null) {
+function usePrivyWalletLink(token: string | null) {
   const { getAccessToken, ready, user } = usePrivy();
   const { identityToken } = useIdentityToken();
   const done = useRef<((m: string) => void) | null>(null);
@@ -25,3 +26,14 @@ export function useWalletLink(token: string | null) {
     }),
   };
 }
+
+/** Builds without a Privy app id have no PrivyProvider, so the Privy hooks above would crash. Linking finishes on lexari.ai there. */
+function useSiteWalletLink(_token: string | null) {
+  return {
+    inApp: { solana: false, evm: false },
+    link: (_f: "solana" | "evm") => { window.open("https://app.lexari.ai/settings#wallets", "_blank"); return Promise.resolve("Finish on lexari.ai. It shows here right after."); },
+  };
+}
+
+/** The app id is fixed at build time, so the same hook runs on every render. */
+export const useWalletLink = env.privyAppId ? usePrivyWalletLink : useSiteWalletLink;

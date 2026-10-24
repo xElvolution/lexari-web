@@ -42,9 +42,13 @@ function HoloSheen() {
   );
 }
 
-export default function AgentIdCard({ info, faceEl }: { info: IdInfo; faceEl?: ReactNode }) {
-  const [flipped, setFlipped] = useState(false);
+/** Pass `flipped` and `onFlip` to turn the card from outside (the agent page's Flip card button), as on the web. */
+export default function AgentIdCard({ info, faceEl, flipped: ext, onFlip }: { info: IdInfo; faceEl?: ReactNode; flipped?: boolean; onFlip?: (v: boolean) => void }) {
+  const [own, setOwn] = useState(false);
+  const flipped = ext ?? own;
+  const setFlipped = (v: boolean) => { if (ext === undefined) setOwn(v); onFlip?.(v); };
   const f = useSharedValue(0);
+  useEffect(() => { f.value = withTiming(flipped ? 180 : 0, { duration: 700, easing: SPRING }); }, [flipped, f]);
   const sway = useSharedValue(0);
   useEffect(() => {
     let on = true;
@@ -53,7 +57,7 @@ export default function AgentIdCard({ info, faceEl }: { info: IdInfo; faceEl?: R
     });
     return () => { on = false; };
   }, [sway]);
-  const flip = () => { const to = flipped ? 0 : 180; setFlipped(!flipped); f.value = withTiming(to, { duration: 700, easing: SPRING }); };
+  const flip = () => setFlipped(!flipped);
   const rig = useAnimatedStyle(() => ({ transform: [{ rotate: `${sway.value * 1.6}deg` }] }));
   const front = useAnimatedStyle(() => ({ transform: [{ perspective: 1000 }, { rotateY: `${f.value}deg` }], opacity: f.value < 90 ? 1 : 0 }));
   const back = useAnimatedStyle(() => ({ transform: [{ perspective: 1000 }, { rotateY: `${f.value + 180}deg` }], opacity: f.value >= 90 ? 1 : 0 }));

@@ -29,7 +29,8 @@ export default function Wallets() {
   const { me, wallet, reload } = useData();
   const [hideBalances, setHide] = useHideBalance(); const toggleBalances = () => setHide(!hideBalances);
   const [tab, setTab] = useState<"wallet" | "cards">("wallet");
-  const qp = useLocalSearchParams<{ topup?: string }>();
+  const qp = useLocalSearchParams<{ topup?: string; tab?: string }>();
+  useEffect(() => { if (qp.tab === "cards" || qp.tab === "wallet") setTab(qp.tab); }, [qp.tab]);
   const [sheet, setSheet] = useState<"topup" | "history" | null>(qp.topup ? "topup" : null);
   const [fund, setFund] = useState<{ slug: string; name: string } | null>(null);
   const [busy, setBusy] = useState("");
@@ -76,7 +77,7 @@ export default function Wallets() {
               <T f="xbold" s={30} c="#fff" style={{ marginTop: 10 }}>{wallet ? (hideBalances ? "••••" : usd(wallet.balance)) : "…"}</T>
               <T s={13.5} c="rgba(255,255,255,0.8)" style={{ marginTop: 10, lineHeight: 19 }}>Pays for AI usage past your plan, hires, agent cards and funding your agents.</T>
               <View style={{ flexDirection: "row", gap: 8, marginTop: 18 }}>
-                <Pill kind="light" label="Top up" icon="plus" h={44} style={{ flex: 1, backgroundColor: "#fff" }} onPress={() => setSheet("topup")} />
+                <Pill kind="white" label="Top up" icon="plus" h={44} style={{ flex: 1 }} onPress={() => setSheet("topup")} />
                 <Pressable onPress={() => setSheet("history")} style={{ flex: 1, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.15)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
                   <Icon name="clock" size={16} color="#fff" /><T f="bold" s={14} c="#fff">History</T>
                   {wallet?.history.length ? <View style={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 }}><T f="bold" s={11} c="#fff">{String(wallet.history.length)}</T></View> : null}

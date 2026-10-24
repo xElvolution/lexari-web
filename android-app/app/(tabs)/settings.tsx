@@ -2,8 +2,9 @@
 import { Stage, toast } from "@/web/anim";
 import { linkPasskey, loadKeys, passkeyError, passkeySupported, type MeraKeys as MeraKeysT } from "@/lib/passkey";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Linking, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, Share, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { openAdd } from "@/lib/nav";
 import * as Clipboard from "expo-clipboard";
 import Icon from "@/components/Icon";
 import { SecurityRows } from "@/components/SecurityRows";
@@ -17,6 +18,8 @@ import { primaryOf, useData } from "@/web/data";
 import { UpgradeSheet } from "@/web/Plans";
 import { IntegrationsSec, WalletsSec } from "@/web/Access";
 import { SECRET_NAME_RE, findSecrets, isBlockedKind, toSecretName } from "@/lib/secretScan";
+import { useSocialLink, type SocialProvider } from "@/lib/socialLink";
+import { env } from "@/lib/env";
 
 const SECTIONS = [
   { id: "general", label: "General", icon: "settings" },
@@ -54,6 +57,17 @@ function Row({ title, desc, children, danger, last }: { title: string; desc?: st
       {children ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" }}>{children}</View> : null}
     </View>
   );
+}
+/** Web: downloads lexari-export.json like the web app. Phone: opens the share sheet with the same JSON (save to Files, Drive or mail). */
+async function saveExport(acc: Record<string, unknown>) {
+  const json = JSON.stringify({ exported: new Date().toISOString(), ...acc }, null, 2);
+  if (Platform.OS === "web") {
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const a = document.createElement("a"); a.href = url; a.download = "lexari-export.json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  }
+  await Share.share({ title: "lexari-export.json", message: json });
 }
 function Small({ label, icon, onPress }: { label: string; icon?: string; onPress: () => void }) {
   const k = useC();
@@ -166,7 +180,7 @@ function AgentsSec() {
         ))}
       </Group>
       <Group>
-        <Row title="Add an agent" desc="Create your own, or hire a specialist from the marketplace."><Small label="Add agent" onPress={() => router.navigate("/(tabs)/marketplace")} /></Row>
+        <Row title="Add an agent" desc="Create your own, or hire a specialist from the marketplace."><Small label="Add agent" onPress={openAdd} /></Row>
         <Row last title="Your team" desc="Everyone you hired, and the specialists you can bring back for free."><Small label="Team" onPress={() => router.navigate("/(tabs)/team")} /></Row>
       </Group>
     </>
@@ -261,10 +275,34 @@ function Notifs() {
 }
 
 function Data() {
-  const { me } = useData();
+  const k = useC();
+  const { me, reload } = useData();
   const patch = usePatch();
   const { token, signOut } = useSession();
   const p = (me?.prefs ?? {}) as Record<string, unknown>;
+  const [exporting, setExporting] = useState(false);
+  const [clearAsk, setClearAsk] = useState(false);
+  const [del, setDel] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  // Same calls as the web: GET /api/account for the export, DELETE /api/chats, DELETE /api/account.
+  const doExport = async () => {
+    if (!token || exporting) return; setExporting(true);
+    try { await saveExport(await api<Record<string, unknown>>("/api/account", {}, token)); toast(Platform.OS === "web" ? "Export downloaded" : "Export ready"); }
+    catch (e) { toast((e as Error).message || "Export failed. Try again."); }
+    finally { setExporting(false); }
+  };
+  const doClear = () => {
+    if (!token) return;
+    if (!clearAsk) { setClearAsk(true); setTimeout(() => setClearAsk(false), 4000); return; }
+    setClearAsk(false);
+    api("/api/chats", { method: "DELETE" }, token).then(() => { toast("All chats cleared"); void reload(); }, () => toast("Couldn't clear your chats. Try again."));
+  };
+  const doDelete = async () => {
+    if (!token || typed !== "DELETE") return; setDeleting(true);
+    try { await api("/api/account", { method: "DELETE" }, token); await signOut(); router.replace("/welcome"); }
+    catch { toast("Could not delete the account. Try again."); setDeleting(false); }
+  };
   return (
     <>
       <Group title="History">
@@ -272,13 +310,22 @@ function Data() {
         <Row last title="Help improve Lexari" desc="Share anonymous usage to make agents better. Off by default."><Toggle label="Help improve Lexari" on={!!p.improve} set={(v) => patch({ prefs: { improve: v } })} /></Row>
       </Group>
       <Group title="Your data">
-        <Row title="Export data" desc="Download your account, agents, chats, memories and hires as a JSON file."><Small icon="download" label="Export" onPress={() => Linking.openURL("https://app.lexari.ai/settings#data")} /></Row>
-        <Row last title="Clear all chats" desc="Removes every message. Agents and memory stay."><Small label="Clear" onPress={() => token && api("/api/chats", { method: "DELETE" }, token).catch(() => {})} /></Row>
+        <Row title="Export data" desc="Download your account, agents, chats, memories and hires as a JSON file."><Small icon="download" label={exporting ? "Exporting…" : "Export"} onPress={doExport} /></Row>
+        <Row last title="Clear all chats" desc="Removes every message. Agents and memory stay."><Small label={clearAsk ? "Clear every chat?" : "Clear"} onPress={doClear} /></Row>
       </Group>
       <Group title="Danger zone">
-        <Row last danger title="Delete account" desc="Permanently removes your account, agents, chats and memories from Lexari. Onchain records and your wallet stay yours."><Small icon="trash" label="Delete" onPress={() => Linking.openURL("https://app.lexari.ai/settings#data")} /></Row>
+        <Row last={!del} danger title="Delete account" desc="Permanently removes your account, agents, chats and memories from Lexari. Onchain records and your wallet stay yours.">{!del ? <Small icon="trash" label="Delete" onPress={() => setDel(true)} /> : null}</Row>
+        {del ? (
+          <View style={{ paddingBottom: 16 }}>
+            <T s={13.5} c={k.ink75}>Type <T f="monoB" s={13.5}>DELETE</T> to confirm. This cannot be undone.</T>
+            <View style={{ marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              <TextInput value={typed} onChangeText={setTyped} accessibilityLabel="Type DELETE" autoCapitalize="characters" autoCorrect={false} style={{ width: 180, height: 44, borderRadius: 14, backgroundColor: k.tint, borderWidth: 1, borderColor: k.line, paddingHorizontal: 14, color: k.ink, fontFamily: F.semi, fontSize: 15 }} />
+              <Pressable accessibilityRole="button" disabled={typed !== "DELETE" || deleting} onPress={doDelete} style={{ height: 44, borderRadius: 22, backgroundColor: "#e5484d", paddingHorizontal: 16, justifyContent: "center", opacity: typed !== "DELETE" || deleting ? 0.4 : 1 }}><T f="bold" s={14} c="#fff">{deleting ? "Deleting…" : "Delete account"}</T></Pressable>
+              <Small label="Cancel" onPress={() => { setDel(false); setTyped(""); }} />
+            </View>
+          </View>
+        ) : null}
       </Group>
-      {void signOut}
     </>
   );
 }
@@ -363,20 +410,35 @@ function Accounts() {
 function Social() {
   const { token } = useSession();
   const [links, setLinks] = useState<{ provider: string; handle: string | null }[] | null>(null);
-  useEffect(() => { if (token) api<{ links: { provider: string; handle: string | null }[] }>("/api/social", {}, token).then((r) => setLinks(r.links), () => setLinks([])); }, [token]);
+  const load = useCallback(() => { if (token) api<{ links: { provider: string; handle: string | null }[] }>("/api/social", {}, token).then((r) => setLinks(r.links), () => setLinks([])); }, [token]);
+  useEffect(load, [load]);
   const NETS: [string, string][] = [["twitter", "X"], ["discord", "Discord"], ["telegram", "Telegram"]];
   return (
     <>
       <Group title="Accounts">
         {NETS.map(([id, n], i) => {
           const l = links?.find((x) => x.provider === id);
-          // linking runs through Privy on lexari.ai (the same account), then shows here
-          return <Row key={id} last={i === 2} title={n} desc={!links ? "Checking…" : l ? (l.handle ? `Linked · @${l.handle}` : "Linked") : id === "telegram" ? "Telegram linking opens once our Telegram sign-in is switched on." : "Not linked"}>{!l && id !== "telegram" ? <Small icon="link" label="Link" onPress={() => Linking.openURL("https://app.lexari.ai/settings#social")} /> : null}</Row>;
+          // linking runs through Privy in the app (the same account and checks as the web), then shows here
+          return <Row key={id} last={i === 2} title={n} desc={!links ? "Checking…" : l ? (l.handle ? `Linked · @${l.handle}` : "Linked") : id === "telegram" ? "Telegram linking opens once our Telegram sign-in is switched on." : "Not linked"}>{!l && id !== "telegram" ? (env.privyAppId ? <SocialLinkBtn provider={id as SocialProvider} onDone={load} /> : <Small icon="link" label="Link" onPress={() => Linking.openURL("https://app.lexari.ai/settings#social")} />) : null}</Row>;
         })}
       </Group>
       <Group><Row last title="Privacy" desc="Privy checks the account and Lexari keeps only its ID and username. Lexari never posts for you or reads your messages." /></Group>
     </>
   );
+}
+
+/** The Link button when this build has Privy: links X or Discord in the app, then reloads the list. */
+function SocialLinkBtn({ provider, onDone }: { provider: SocialProvider; onDone: () => void }) {
+  const { token } = useSession();
+  const social = useSocialLink(token);
+  const [busy, setBusy] = useState(false);
+  const link = async () => {
+    if (busy) return;
+    setBusy(true);
+    try { toast(await social.link(provider)); } catch (e) { toast(e instanceof Error && e.message ? e.message : "Linking did not finish."); }
+    finally { setBusy(false); onDone(); }
+  };
+  return <Small icon="link" label={busy ? "Linking…" : "Link"} onPress={() => void link()} />;
 }
 
 type SecretInfo = { id: string; name: string; label?: string; service?: string; last4?: string };
@@ -477,8 +539,8 @@ export default function Settings() {
   const k = useC();
   const [sec, setSec] = useState<Sec | null>(null);
   // a deep link into one section (the Add a passkey prompt opens Security)
-  const want = useLocalSearchParams<{ sec?: string }>().sec;
-  useEffect(() => { if (want && SECTIONS.some((x) => x.id === want)) setSec(want as Sec); }, [want]);
+  const { sec: want, at } = useLocalSearchParams<{ sec?: string; at?: string }>();
+  useEffect(() => { if (want && SECTIONS.some((x) => x.id === want)) setSec(want as Sec); }, [want, at]);
   const cur = SECTIONS.find((x) => x.id === sec);
   const body: Record<Sec, ReactNode> = { general: <General />, personal: <Personal />, agents: <AgentsSec />, models: <Models />, notifications: <Notifs />, data: <Data />, security: <Security />, accounts: <Accounts />, social: <Social />, wallets: <WalletsSec />, integrations: <IntegrationsSec />, secrets: <Secrets />, billing: <Billing />, about: <About /> };
   if (!cur) return (

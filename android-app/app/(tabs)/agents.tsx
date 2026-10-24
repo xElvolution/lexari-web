@@ -1,12 +1,14 @@
 /** Port of the web /agents phone view: AgentStrip (tiles with rings, Add, Search) + ConvoList (Chats, Messages, New group chat). */
 import { UpgradeSheet } from "@/web/Plans";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PasskeyPrompt from "@/components/PasskeyPrompt";
-import { Linking, Pressable, RefreshControl, ScrollView, TextInput, View } from "react-native";
-import { router } from "expo-router";
+import { Pressable, RefreshControl, ScrollView, TextInput, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import Icon from "@/components/Icon";
 import { TourTarget } from "@/components/Tour";
-import { AgentTile, F, Label, Pill, T, WSheet, ringOf, useC } from "@/web/kit";
+import { AgentTile, F, GRAPE, Label, Pill, T, WSheet, ringOf, useC } from "@/web/kit";
+import AgentFace from "@/components/AgentFace";
+import { PALETTE, type ColorKey } from "@/components/avatar";
 import { api } from "@/lib/api";
 import { useSession } from "@/state/session";
 import { nameOf, primaryOf, useData, withHello, type Chat, type Me, type Msg } from "@/web/data";
@@ -33,6 +35,8 @@ export default function Agents() {
   const [q, setQ] = useState("");
   const [search, setSearch] = useState(false);
   const [add, setAdd] = useState(false);
+  const { add: addParam, at: addAt } = useLocalSearchParams<{ add?: string; at?: string }>();
+  useEffect(() => { if (addParam === "1") setAdd(true); }, [addParam, addAt]);
   const full = (me?.agents ?? []).filter((a) => !(a.meta as { free?: boolean } | undefined)?.free).length >= (me?.plan.seats ?? 1);
   const [group, setGroup] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -113,21 +117,52 @@ export default function Agents() {
       </ScrollView>
 
       <UpgradeSheet open={add && full} mode="seats" onClose={() => setAdd(false)} />
-      <WSheet open={add && !full} title="Add an agent." onClose={() => setAdd(false)}>
-        <T s={13.5} c={k.ink60}>Make your own from scratch, or hire a specialist someone else built.</T>
-        {[
-          { icon: "plus", title: "Create an agent", body: "Name it, tell it what to do, pick its face and personality.", cta: "Start building", go: () => Linking.openURL("https://app.lexari.ai/agents?add=create") },
-          { icon: "market", title: "Hire an agent", body: "Tell us what you need and get three picks from the marketplace.", cta: "Get recommendations", go: () => router.navigate("/(tabs)/marketplace") },
-        ].map((o) => (
-          <Pressable key={o.title} onPress={() => { setAdd(false); o.go(); }} style={{ marginTop: 12, borderRadius: 18, backgroundColor: k.tint, padding: 14, borderWidth: 1, borderColor: k.line }}>
-            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "#5b2bff", alignItems: "center", justifyContent: "center" }}><Icon name={o.icon} size={19} color="#fff" /></View>
-            <T f="bold" s={16} style={{ marginTop: 10 }}>{o.title}</T>
-            <T s={13} c={k.ink60} style={{ marginTop: 2 }}>{o.body}</T>
-            <T f="bold" s={13.5} c={k.brandInk} style={{ marginTop: 8 }}>{`${o.cta} →`}</T>
-          </Pressable>
-        ))}
+      <WSheet open={add && !full} title="Add an agent." sub="Make your own from scratch, or hire a specialist someone else built." onClose={() => setAdd(false)}>
+        <AddChoices onPick={(m) => { setAdd(false); if (m === "create") router.push("/agents/new"); else router.navigate("/(tabs)/marketplace"); }} />
       </WSheet>
       <GroupSheet open={group} onClose={() => setGroup(false)} />
+    </View>
+  );
+}
+
+/** color-mix(in oklab, a p%, b) stand-in: a plain sRGB mix of two hex colours. */
+const mix = (a: string, b: string, p: number) => {
+  const h = (x: string) => [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16));
+  const [x, y] = [h(a), h(b)];
+  return `#${x.map((v, i) => Math.round(v * p + y[i] * (1 - p)).toString(16).padStart(2, "0")).join("")}`;
+};
+const HIRE_FACES: { seed: number; color: ColorKey }[] = [{ seed: 16, color: "blue" }, { seed: 27, color: "yellow" }, { seed: 49, color: "pink" }];
+
+/** Port of webapp AddAgentDialog Choose: a grape hero card to create, a tint card with three faces to hire. */
+function AddChoices({ onPick }: { onPick: (m: "create" | "hire") => void }) {
+  const k = useC();
+  return (
+    <View style={{ gap: 12, paddingTop: 8, paddingBottom: 8 }}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Create an agent" onPress={() => onPick("create")}
+        style={({ pressed }) => ({ overflow: "hidden", borderRadius: 26, backgroundColor: GRAPE, padding: 20, shadowColor: GRAPE, shadowOpacity: 0.9, shadowRadius: 20, shadowOffset: { width: 0, height: 18 }, elevation: 8, transform: [{ translateY: pressed ? -2 : 0 }] })}>
+        <View pointerEvents="none" style={{ position: "absolute", right: -32, top: -40, width: 160, height: 160, borderRadius: 80, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }} />
+        <View style={{ width: 88, height: 88, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
+          <AgentFace variant={{ shape: "blob", color: "lilac", eyes: "happy", mouth: "grin", extra: "none", blush: true }} size={70} />
+        </View>
+        <T f="bold" s={20} c="#fff" style={{ marginTop: 16 }}>Create an agent</T>
+        <T s={14} c="rgba(255,255,255,0.8)" style={{ marginTop: 4, lineHeight: 19 }}>Name it, tell it what to do, pick its face and personality.</T>
+        <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center", gap: 6 }}><T f="bold" s={14} c="#fff">Start building</T><Icon name="arrow" size={16} color="#fff" /></View>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Hire an agent" onPress={() => onPick("hire")}
+        style={({ pressed }) => ({ overflow: "hidden", borderRadius: 26, backgroundColor: k.tint, padding: 20, borderWidth: 1, borderColor: pressed ? "rgba(91,43,255,0.5)" : k.line })}>
+        <View style={{ height: 88, flexDirection: "row", alignItems: "center" }}>
+          {HIRE_FACES.map((f, i) => (
+            <View key={f.seed} style={{ marginLeft: i ? -12 : 0, width: 72, height: 72, borderRadius: 24, backgroundColor: k.tint, alignItems: "center", justifyContent: "center" }}>
+              <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: mix(PALETTE[f.color].fill, k.card, 0.3), alignItems: "center", justifyContent: "center" }}>
+                <AgentFace seed={f.seed} variant={{ color: f.color }} size={50} />
+              </View>
+            </View>
+          ))}
+        </View>
+        <T f="bold" s={20} style={{ marginTop: 16 }}>Hire an agent</T>
+        <T s={14} c={k.dark ? "rgba(255,255,255,0.65)" : "rgba(10,10,10,0.65)"} style={{ marginTop: 4, lineHeight: 19 }}>Tell us what you need and get three picks from the marketplace.</T>
+        <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center", gap: 6 }}><T f="bold" s={14} c={k.brandInk}>Get recommendations</T><Icon name="arrow" size={16} color={k.brandInk} /></View>
+      </Pressable>
     </View>
   );
 }

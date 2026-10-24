@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Alert, Pressable, ScrollView, TextInput, View } from "react-native";
 import { Avatar, Cover, pickAndUpload, removeMedia, type MediaKind } from "@/web/media";
 import { router } from "expo-router";
+import { openSettings } from "@/lib/nav";
 import Icon from "@/components/Icon";
 import { SecurityRows } from "@/components/SecurityRows";
 import { api } from "@/lib/api";
@@ -95,7 +96,7 @@ export default function Profile() {
               {social.links.map((l) => <View key={l.provider} style={{ height: 32, borderRadius: 16, backgroundColor: k.tint, paddingLeft: 10, paddingRight: 12, flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="verified" size={13} color={k.ink} /><T f="semi" s={13}>{l.handle ? `@${l.handle}` : SOCIAL_NAME[l.provider] ?? l.provider}</T></View>)}
             </View>
           ) : social ? (
-            <Pressable onPress={() => router.navigate("/(tabs)/settings")} style={{ height: 32, borderRadius: 16, backgroundColor: k.tint, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="link" size={14} color={k.ink75} /><T f="semi" s={13} c={k.ink75}>Link X, Discord or Telegram</T></Pressable>
+            <Pressable onPress={() => openSettings("social")} style={{ height: 32, borderRadius: 16, backgroundColor: k.tint, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 6 }}><Icon name="link" size={14} color={k.ink75} /><T f="semi" s={13} c={k.ink75}>Link X, Discord or Telegram</T></Pressable>
           ) : null}
           </View>
           <View style={{ flexDirection: "row", gap: 22, marginTop: 14 }}>
@@ -136,7 +137,7 @@ export default function Profile() {
           <Card title="App lock"><View style={{ marginTop: 6 }}><SecurityRows /></View></Card>
           <Card title="Session">
             <T s={14} c={k.ink60} style={{ marginTop: 4 }}>Signing out keeps your agents, chats and Brain saved for next time.</T>
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}><PillLink icon="out" label="Sign out" onPress={out} /><PillLink label="Privacy and data" onPress={() => router.navigate("/(tabs)/settings")} /></View>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}><PillLink icon="out" label="Sign out" onPress={out} /><PillLink label="Privacy and data" onPress={() => openSettings("data")} /></View>
           </Card>
         </>
       ) : (
@@ -152,7 +153,7 @@ export default function Profile() {
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}>{team.slice(0, 6).map((t) => <PillLink key={t.slug} icon="speaker" label={t.name} onPress={() => router.push(`/agents/${t.slug}`)} />)}</View>
           </Card>
           <Card title="More settings">
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}><PillLink label="Notifications" onPress={() => router.navigate("/(tabs)/settings")} /><PillLink label="All settings" onPress={() => router.navigate("/(tabs)/settings")} /><PillLink label={`${team.find((a) => a.slug === "home")?.name ?? "Your agent"}'s Brain`} onPress={() => router.navigate("/(tabs)/brain")} /></View>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}><PillLink label="Notifications" onPress={() => openSettings("notifications")} /><PillLink label="All settings" onPress={() => router.navigate("/(tabs)/settings")} /><PillLink label={`${team.find((a) => a.slug === "home")?.name ?? "Your agent"}'s Brain`} onPress={() => router.navigate("/(tabs)/brain")} /></View>
           </Card>
         </>
       )}

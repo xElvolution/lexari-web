@@ -69,3 +69,19 @@ export async function linkPasskey(slugs: string[], create: boolean, token: strin
 
 export type MeraKeys = { passkeys: { address: string }[]; keys: { agent: string; address: string }[] };
 export const loadKeys = (token: string) => api<MeraKeys>("/api/mera/keys", {}, token);
+
+/**
+ * Sign in with a passkey already linked to an account (webapp/lib/mera.ts passkeySignIn): the same sign-in key signs the
+ * one-time message from /api/mera/signin, and the server answers with a phone session. Accounts are only made with Google or email.
+ */
+export async function passkeySignIn(): Promise<{ token: string; expires: string; wallet?: string }> {
+  const { prf } = await passkeyRoot(false, "Lexari");
+  const signIn = createEd25519SigningSession({ privateKey: derive(prf, "signin/solana") });
+  const address = getSolanaAddress(signIn.publicKey);
+  const ch = await api<{ linked: boolean; message?: string }>("/api/mera/signin?client=mobile", { method: "POST", body: JSON.stringify({ address }) });
+  if (!ch.linked || !ch.message) throw new Error("Account doesn't exist. Create an account with Google or email first, then add a passkey in Settings, Security.");
+  const signature = b64(await signIn.signMessage(new TextEncoder().encode(ch.message)));
+  const r = await api<{ wallet?: string; token?: string; expires?: string }>("/api/mera/signin?client=mobile", { method: "POST", body: JSON.stringify({ address, message: ch.message, signature }) });
+  if (!r.token || !r.expires) throw new Error("Sign-in did not finish.");
+  return { token: r.token, expires: r.expires, wallet: r.wallet };
+}

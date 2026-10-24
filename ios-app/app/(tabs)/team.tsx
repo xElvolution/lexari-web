@@ -3,6 +3,7 @@ import { Stage } from "@/web/anim";
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { router } from "expo-router";
+import { openAdd } from "@/lib/nav";
 import Icon from "@/components/Icon";
 import { ROSTER } from "@/content/roster";
 import { AgentTile, GOLD, GRAPE, GRAPE_SOFT, Label, Pill, SILVER, T, useC, type Ring } from "@/web/kit";
@@ -72,7 +73,7 @@ export default function Team() {
               );
             }
             if (i >= unlocked) return <Pressable key={i} onPress={() => router.push("/settings/billing")} style={{ width: cell, height: cell, borderRadius: Math.round(cell * 0.22), backgroundColor: k.dark ? "rgba(255,255,255,0.06)" : "rgba(10,10,10,0.06)", alignItems: "center", justifyContent: "center" }}><Icon name="lock" size={16} color={k.ink45} /></Pressable>;
-            return <Pressable key={i} onPress={() => router.navigate("/(tabs)/marketplace")} style={{ width: cell, height: cell, borderRadius: Math.round(cell * 0.22), borderWidth: 2, borderStyle: "dashed", borderColor: k.ink45, alignItems: "center", justifyContent: "center" }}><Icon name="plus" size={18} color={k.ink45} /></Pressable>;
+            return <Pressable key={i} onPress={openAdd} style={{ width: cell, height: cell, borderRadius: Math.round(cell * 0.22), borderWidth: 2, borderStyle: "dashed", borderColor: k.ink45, alignItems: "center", justifyContent: "center" }}><Icon name="plus" size={18} color={k.ink45} /></Pressable>;
           })}
         </View>
         {picked ? (() => { const kd = kindOf(picked.slug, picked.kind); return (
@@ -87,7 +88,7 @@ export default function Team() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><View style={{ width: 14, height: 14, borderRadius: 4, borderWidth: 2, borderStyle: "dashed", borderColor: k.ink45 }} /><T s={12.5} c={k.ink75}>Open seat</T></View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}><View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: k.dark ? "rgba(255,255,255,0.1)" : "rgba(10,10,10,0.1)", alignItems: "center", justifyContent: "center" }}><Icon name="lock" size={9} color={k.ink45} /></View><T s={12.5} c={k.ink75}>Locked</T></View>
           <T s={12.5} c={k.ink45}>Long-press an agent for more</T>
-          <View style={{ marginLeft: "auto" }}><Pill h={40} fs={13.5} icon="plus" label="Add an agent" onPress={() => router.navigate("/(tabs)/marketplace")} /></View>
+          <View style={{ marginLeft: "auto" }}><Pill h={40} fs={13.5} icon="plus" label="Add an agent" onPress={openAdd} /></View>
         </View>
       </View>
 
@@ -95,7 +96,7 @@ export default function Team() {
         <Label c="rgba(255,255,255,0.8)">{`${plan.name} plan`}</Label>
         <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, marginTop: 10 }}><T f="display" s={40} c="#fff">{String(plan.seats)}</T><T s={15} c="rgba(255,255,255,0.8)">{plan.seats === 1 ? "agent: your own" : "seats"}</T></View>
         <T s={15} c="rgba(255,255,255,0.9)" style={{ marginTop: 14, lineHeight: 22 }}>{plan.id === "free" ? "Free plan includes one agent: your own. Upgrade to Pro to hire specialists from the marketplace." : `${used} of ${plan.seats} seats used. Each specialist is a one-time $1 hire.`}</T>
-        {plan.id !== "plus" && plan.id !== "max" ? <Pill kind="light" h={44} label="Upgrade plan" style={{ marginTop: 16, backgroundColor: "#fff" }} onPress={() => router.push("/settings/billing")} /> : null}
+        {plan.id !== "plus" && plan.id !== "max" ? <Pill kind="white" h={44} label="Upgrade plan" style={{ marginTop: 16 }} onPress={() => router.push("/settings/billing")} /> : null}
         <Pressable onPress={() => router.navigate("/(tabs)/marketplace")} style={{ marginTop: 18, height: 44, borderRadius: 22, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}><T f="bold" s={14} c="#0a0a0a">Open the marketplace</T></Pressable>
       </View>
 

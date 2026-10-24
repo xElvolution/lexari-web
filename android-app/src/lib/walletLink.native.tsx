@@ -7,9 +7,10 @@
 import { useIdentityToken, useLinkWithSiws, usePrivy } from "@privy-io/expo";
 import * as WebBrowser from "expo-web-browser";
 import { api } from "./api";
+import { env } from "./env";
 import { authorizeWallet, signMessage } from "./mwa";
 
-export function useWalletLink(token: string | null) {
+function usePrivyWalletLink(token: string | null) {
   const privy = usePrivy();
   const siws = useLinkWithSiws();
   const { getIdentityToken } = useIdentityToken();
@@ -30,3 +31,14 @@ export function useWalletLink(token: string | null) {
     },
   };
 }
+
+/** Builds without a Privy app id have no PrivyProvider, so the Privy hooks above would crash. Linking finishes on lexari.ai there. */
+function useSiteWalletLink(_token: string | null) {
+  return {
+    inApp: { solana: false, evm: false },
+    link: async (_f: "solana" | "evm"): Promise<string> => { await WebBrowser.openAuthSessionAsync("https://app.lexari.ai/settings#wallets"); return "Wallets updated"; },
+  };
+}
+
+/** The app id is fixed at build time, so the same hook runs on every render. */
+export const useWalletLink = env.privyAppId ? usePrivyWalletLink : useSiteWalletLink;

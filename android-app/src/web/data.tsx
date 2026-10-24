@@ -3,14 +3,14 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { api } from "@/lib/api";
 import { useSession } from "@/state/session";
 
-export type Agent = { slug: string; kind: string; name: string; model?: string | null; role?: string; look?: unknown; meta?: Record<string, unknown>; skills?: string[]; about?: string; createdAt?: number };
+export type Agent = { slug: string; kind: string; name: string; model?: string | null; role?: string; look?: unknown; meta?: Record<string, unknown>; skills?: string[]; about?: string; tone?: string; memoryOn?: boolean; createdAt?: number };
 export type Msg = { id: string; from: string; text?: string; at: number; call?: number; voice?: number; file?: { name: string; size?: number } };
 export type Chat = { slug: string; kind: string; title: string; members: string[]; messages: Msg[]; createdAt?: number };
 export type Me = {
   user: { wallet?: string; referralCode?: string; method?: string; email?: string | null; createdAt?: number };
   profile: { name?: string; username?: string; avatar?: number | string; cover?: number | string; bio?: string };
   plan: { id: string; name: string; seats: number };
-  prefs?: { defaultAgent?: string; hideBalance?: boolean; language?: string; voice?: string; tourDone?: boolean };
+  prefs?: { defaultAgent?: string; hideBalance?: boolean; language?: string; voice?: string; tourDone?: boolean; memory?: boolean };
   agents: Agent[]; chats: Chat[]; jobs?: { id: string; assignee?: string; title?: string; prompt: string; status: string; output?: string; startedAt: number; finishedAt?: number }[];
   memories?: { id: string; agent?: string; tag?: string; source?: string; at: number }[]; hires?: { slug: string }[];
   lockOn?: boolean; biometric?: boolean;
