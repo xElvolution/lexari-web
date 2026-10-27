@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Renders every Lexari desktop brand asset from the real mark (shared/components/Logo.tsx: white rounded square,
-black dot) and the Bricolage Grotesque 'lexari' wordmark. Needs google-chrome (headless) and Pillow.
+"""Renders every Lexari desktop brand asset from the real mark (brand/mark.svg = shared/components/Logo.tsx LogoMark:
+the grape tile with the eyes and smile, same art as the web favicon and the Android/iOS icon) and the Bricolage
+Grotesque 'lexari' wordmark. Needs google-chrome (headless) and Pillow.
 Run from desktop-app/shared: python3 brand/make.py"""
 import os, subprocess, tempfile, shutil
 from PIL import Image
@@ -19,11 +20,13 @@ def shot(html, w, h, out):
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     im = Image.open(out); assert im.size == (w, h), im.size
 
-def tile(size):  # app icon: grape tile, white mark, like the PWA icon tile
-    pad = size * 0.09; t = size - 2 * pad; m = t * 0.5
+def tile(size):
+    # macOS app icon grid: the tile is 824/1024 of the canvas (100px margin at 1024) with a soft drop shadow, so the
+    # Dock and Finder show it the same size as other apps. The face is the mark's own art, scaled to the tile.
+    pad = size * 100 / 1024; t = size - 2 * pad
+    face = MARK.replace('<rect width="64" height="64" rx="16" fill="#5b2bff"/>', '').replace("<svg ", '<svg width="100%" height="100%" ')
     return f"""<div style="position:absolute;left:{pad}px;top:{pad}px;width:{t}px;height:{t}px;border-radius:{t*0.225}px;
-      background:radial-gradient(120% 90% at 30% 15%,#8f6bff 0%,#5b2bff 45%,#3514b0 100%);box-shadow:inset 0 {t*0.012}px 0 rgba(255,255,255,.35),inset 0 -{t*0.03}px {t*0.06}px rgba(20,6,80,.5),0 {t*0.02}px {t*0.05}px rgba(0,0,0,.35);
-      display:grid;place-items:center"><div style="width:{m}px;height:{m}px;filter:drop-shadow(0 {t*0.02}px {t*0.03}px rgba(20,6,80,.45))">{MARK.replace('<svg ', '<svg width="100%" height="100%" ')}</div></div>"""
+      background:linear-gradient(160deg,#6a3dff 0%,#5b2bff 55%,#4f22ec 100%);box-shadow:0 {t*0.012}px {t*0.03}px rgba(0,0,0,.28),inset 0 {t*0.006}px 0 rgba(255,255,255,.18)">{face}</div>"""
 
 os.makedirs(os.path.join(A, "icons"), exist_ok=True)
 big = os.path.join(A, "icon.png"); shot(tile(1024), 1024, 1024, big)
@@ -32,6 +35,7 @@ for s in (16, 24, 32, 48, 64, 128, 256, 512, 1024):
     src.resize((s, s), Image.LANCZOS).save(os.path.join(A, "icons", f"{s}x{s}.png"))
 src.save(os.path.join(A, "icon.ico"), sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
 src.save(os.path.join(A, "icon.icns"))
+shutil.copy(os.path.join(HERE, "mark.svg"), os.path.join(A, "mark.svg"))  # the shell's in-app mark
 
 # Tray: the bare mark. Colour for Windows/Linux, black template (alpha only) for the macOS menu bar.
 markpng = os.path.join(A, "mark-512.png"); shot(f'<div style="width:512px;height:512px">{MARK.replace("<svg ", "<svg width=\"100%\" height=\"100%\" ")}</div>', 512, 512, markpng)
@@ -40,7 +44,7 @@ for s, n in ((16, "tray.png"), (32, "tray@2x.png")):
     mk.resize((s, s), Image.LANCZOS).save(os.path.join(A, n))
     a = mk.resize((s, s), Image.LANCZOS)
     # template: opaque square with the dot punched out, black only
-    r, g, b, al = a.split(); lum = Image.eval(r, lambda v: v)  # white=255 (keep), black dot=0 (hole)
+    r, g, b, al = a.split(); lum = Image.eval(g, lambda v: 0 if v > 150 else 255)  # grape tile (keep), white eyes and smile (hole)
     alpha = Image.composite(lum, Image.new("L", (s, s), 0), al)
     t = Image.new("RGBA", (s, s), (0, 0, 0, 0)); t.putalpha(alpha); t.save(os.path.join(A, n.replace("tray", "trayTemplate")))
 
@@ -67,7 +71,7 @@ shot(f"""<div style="position:relative;width:164px;height:314px;background:radia
 Image.open(side).convert("RGB").save(os.path.join(A, "nsis-sidebar.bmp"))
 head = os.path.join(A, "nsis-header.png")
 shot(f"""<div style="position:relative;width:150px;height:57px;background:#fff;display:flex;align-items:center;justify-content:flex-end;padding-right:12px;gap:7px">
-  <div style="width:22px;height:22px">{MARK.replace('fill="#ffffff"', 'fill="#5b2bff"').replace('fill="#000000"', 'fill="#ffffff"').replace("<svg ", "<svg width=\"100%\" height=\"100%\" ")}</div><span class="w" style="font-size:26px;color:#0a0a0a;margin-top:-3px">lexari</span></div>""", 150, 57, head)
+  <div style="width:22px;height:22px">{MARK.replace("<svg ", "<svg width=\"100%\" height=\"100%\" ")}</div><span class="w" style="font-size:26px;color:#0a0a0a;margin-top:-3px">lexari</span></div>""", 150, 57, head)
 Image.open(head).convert("RGB").save(os.path.join(A, "nsis-header.bmp"))
 for f in (side, head): os.remove(f)
 print("brand assets written to", A)

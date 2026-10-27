@@ -9,9 +9,9 @@ const ICONS = {
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
   profile: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/>',
 };
-const LABEL = { agents: "Agents", chat: "Chat", brain: "Brain", marketplace: "Marketplace", team: "Team", hub: "Hub", wallets: "Wallets", settings: "Settings", profile: "Profile" };
+const LABEL = { agents: "Agents", chat: "Chat", brain: "Brain", marketplace: "Market", team: "Team", hub: "Hub", wallets: "Wallets", settings: "Settings", profile: "Profile" };
 const $ = (id) => document.getElementById(id);
-const view = $("view"), rail = $("rail"), pill = $("pill");
+const view = $("view");
 let cfg, current = "agents", firstLoad = true;
 
 (async () => {
@@ -19,10 +19,6 @@ let cfg, current = "agents", firstLoad = true;
   document.body.classList.add(cfg.platform);
   $("net").textContent = cfg.network.label;
   $("kbd").textContent = cfg.platform === "darwin" ? "\u2318 K" : "Ctrl K";
-  const top = ["agents", "chat", "brain", "marketplace", "team", "hub", "wallets"], bottom = ["settings", "profile"];
-  const mk = (r) => { const b = document.createElement("button"); b.dataset.r = r; b.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[r]}</svg><span class="tip">${LABEL[r]}</span>`; b.onclick = () => go(r); rail.appendChild(b); };
-  top.forEach(mk); const g = document.createElement("div"); g.className = "gap"; rail.appendChild(g); bottom.forEach(mk);
-  $("railmark").onclick = () => go("agents");
   markRail("agents");
   const demo = new URLSearchParams(location.search).get("demo") || "";
   if (demo === "splash") return; // QA: hold the splash for screenshots
@@ -36,20 +32,16 @@ let cfg, current = "agents", firstLoad = true;
 
 function routeUrl(r) { return cfg.network.appUrl + "/" + (r === "chat" ? "agents" : r); }
 function go(r) { current = r; markRail(r); if (!navigator.onLine) return showOffline(); view.loadURL(routeUrl(r)).catch(() => {}); }
-function markRail(r) {
-  current = r; $("crumb").textContent = LABEL[r] || "";
-  const b = rail.querySelector(`[data-r="${r}"]`);
-  rail.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-  if (b) { pill.style.opacity = 1; pill.style.top = b.offsetTop + "px"; } else pill.style.opacity = 0;
-}
+// The web app's own sidebar is the only main menu; the title bar just names the section you're in.
+function markRail(r) { current = r; $("crumb").textContent = LABEL[r] || ""; }
 
 view.addEventListener("did-start-loading", () => { const l = $("loadbar"); l.className = "loadbar"; void l.offsetWidth; l.classList.add("go"); });
 view.addEventListener("did-stop-loading", () => { $("loadbar").className = "loadbar done"; });
 view.addEventListener("dom-ready", () => {
   view.classList.add("ready"); $("offline").classList.add("hidden");
-  if (firstLoad) { firstLoad = false; setTimeout(() => $("splash").classList.add("hidden"), 450); }
-  // Light desktop touch: let the web app know it runs inside the desktop shell.
-  view.insertCSS("html{scrollbar-gutter:stable}::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:rgba(143,107,255,.35);border-radius:10px}");
+  if (firstLoad) { firstLoad = false; setTimeout(() => $("splash").classList.add("hidden"), 450); setTimeout(() => document.body.classList.add("live"), 1200); }
+  // Light desktop touch: a slim purple thumb. No forced gutter or track: on macOS that left a strip down the right edge.
+  view.insertCSS("::-webkit-scrollbar{width:8px;height:8px;background:transparent}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(143,107,255,.35);border-radius:8px}");
 });
 view.addEventListener("did-navigate-in-page", syncRoute);
 view.addEventListener("did-navigate", syncRoute);

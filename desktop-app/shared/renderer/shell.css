@@ -31,15 +31,6 @@ kbd{font:11px ui-monospace,monospace;padding:2px 6px;border-radius:5px;backgroun
 .winbtns button:hover{background:rgba(255,255,255,.08)}.winbtns .x:hover{background:#c42b4b}
 .winbtns svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:1.1}
 .body{position:relative;z-index:1;display:flex;height:calc(100% - var(--tb))}
-.rail{position:relative;width:68px;padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:4px;border-right:1px solid var(--line);background:var(--panel);backdrop-filter:blur(24px)}
-.rail button{position:relative;z-index:1;width:48px;height:48px;border:0;border-radius:14px;background:none;color:var(--mute);cursor:pointer;display:grid;place-items:center;transition:color .25s,transform .25s cubic-bezier(.3,1.6,.5,1)}
-.rail button:hover{color:var(--text);transform:scale(1.08)}
-.rail button.on{color:#fff}
-.rail button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.rail button .tip{position:absolute;left:58px;white-space:nowrap;padding:5px 10px;border-radius:8px;background:#1c1238;border:1px solid var(--line);color:var(--text);font-size:12px;opacity:0;transform:translateX(-6px);pointer-events:none;transition:all .2s}
-.rail button:hover .tip{opacity:1;transform:none}
-.rail .gap{flex:1}
-.pill{position:absolute;left:10px;width:48px;height:48px;border-radius:14px;background:var(--grape);box-shadow:0 4px 0 var(--p2),0 10px 28px rgba(91,43,255,.55),inset 0 1px 0 rgba(255,255,255,.28);transition:top .45s cubic-bezier(.3,1.4,.5,1),opacity .3s}
 .stage{position:relative;flex:1;overflow:hidden}
 webview{position:absolute;inset:0;width:100%;height:100%;opacity:0;transform:scale(.985);transition:opacity .5s,transform .6s cubic-bezier(.2,.9,.3,1)}
 webview.ready{opacity:1;transform:none}
@@ -71,19 +62,15 @@ webview.ready{opacity:1;transform:none}
 .palette li{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--mute)}
 .palette li.sel{background:linear-gradient(90deg,rgba(143,107,255,.28),rgba(143,107,255,.06));color:#fff}
 .palette li svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7}
-@media (max-width:900px){.crumbs,.search span{display:none}.search{width:auto}.rail{width:56px}.rail button{width:42px;height:42px}.pill{left:7px;width:42px;height:42px}}
+@media (max-width:900px){.crumbs,.search span{display:none}.search{width:auto}}
 
-/* ---------- Lexari mark: white rounded square with the black dot (shared/components/Logo.tsx) ---------- */
-.mark{--s:28px;position:relative;display:inline-grid;place-items:center;width:var(--s);height:var(--s);border-radius:calc(var(--s)*.32);background:#fff;flex:none;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
-.mark i{width:calc(var(--s)*.357);height:calc(var(--s)*.357);border-radius:50%;background:#000;transition:transform .3s}
-.mark.sm{--s:20px}.mark.xl{--s:92px;box-shadow:0 18px 60px rgba(91,43,255,.55),0 0 0 1px rgba(255,255,255,.1)}
+/* ---------- Lexari mark: the grape tile with the eyes and smile (assets/mark.svg = shared/components/Logo.tsx) ---------- */
+.mark{--s:28px;position:relative;display:inline-block;width:var(--s);height:var(--s);border-radius:calc(var(--s)*.25);background:url(../assets/mark.svg) center/100% 100% no-repeat;flex:none}
+.mark i{display:none}
+.mark.sm{--s:22px}.mark.xl{--s:96px;box-shadow:0 18px 60px rgba(91,43,255,.55)}
 .word{font-family:var(--display);font-weight:800;letter-spacing:-.045em;font-variation-settings:"wdth" 88;line-height:.9;color:#fff}
 .brand .word{font-size:21px;margin-top:-3px}
-.brand .mark i{animation:look 7s ease-in-out infinite}
 @keyframes look{0%,40%,100%{transform:none}45%,55%{transform:translateX(18%)}60%,70%{transform:translateX(-18%)}75%{transform:scaleY(.15)}78%{transform:none}}
-.railmark{margin-bottom:10px;padding:0}.railmark .mark{--s:30px;transition:transform .35s cubic-bezier(.3,1.6,.5,1),box-shadow .3s}
-.railmark:hover .mark{transform:rotate(-8deg) scale(1.08);box-shadow:0 8px 26px rgba(91,43,255,.6)}
-.railmark::after{content:"";position:absolute;bottom:-6px;left:12px;right:12px;height:1px;background:var(--line)}
 /* splash */
 .splash{background:radial-gradient(60% 50% at 50% 45%,rgba(91,43,255,.28),transparent 70%),#000;gap:18px}
 .splash .halo{position:absolute;width:260px;height:260px;top:calc(50% - 170px)}
@@ -114,3 +101,8 @@ webview.ready{opacity:1;transform:none}
 .offline.error .badge{background:#e2335b;box-shadow:0 4px 0 #8f1636,0 8px 20px rgba(226,51,91,.45)}
 @media (max-width:900px){.brand .word{font-size:18px}.splash h1.word{font-size:48px}.mark.xl{--s:72px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Once the app is on screen the aurora and splash stop: a full-window 80px blur animating under the web view (and the
+   title bar's backdrop blur re-sampling it every frame) kept the GPU busy on older Macs. */
+body.live .aurora,body.live .splash{display:none}
+body.live .titlebar{backdrop-filter:none;background:#0b0915}

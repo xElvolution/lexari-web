@@ -127,7 +127,10 @@ function start(opts = {}) {
       if (process.platform === "darwin") app.dock && app.dock.setBadge(unread ? String(unread) : "");
       else app.setBadgeCount && app.setBadgeCount(unread);
       const fresh = items.filter((i) => !i.read && i.at > lastNotif);
-      if (lastNotif && Notification.isSupported()) fresh.slice(0, 3).forEach((i) => {
+      // The web app's Notifications switch sets this cookie (the web view has no web push in Electron, so the shell delivers them).
+      const off = (await session.fromPartition(PARTITION).cookies.get({ url: network.appUrl, name: "lexari_desktop_notify" }).catch(() => [])).some((c) => c.value === "off");
+      const looking = win && win.isVisible() && win.isFocused();
+      if (lastNotif && !off && Notification.isSupported()) fresh.filter((i) => !(looking && i.kind === "reply")).slice(0, 3).forEach((i) => {
         const n = new Notification({ title: i.title || "Lexari", body: i.body || "", silent: false, icon: ICON });
         n.on("click", () => { summon(); if (i.url) win.webContents.send("lexari:navigate", new URL(i.url, network.appUrl).toString()); });
         n.show();
@@ -184,11 +187,13 @@ function start(opts = {}) {
 
   app.whenReady().then(() => {
     session.fromPartition(PARTITION).setUserAgent(session.fromPartition(PARTITION).getUserAgent() + " LexariDesktop/" + app.getVersion());
+    // The web view may ask for notifications (the in-app switch and its test ping); other permissions keep Electron's defaults.
+    session.fromPartition(PARTITION).setPermissionRequestHandler((wc, perm, cb, d) => cb(perm === "notifications" ? String(d && d.requestingUrl || wc.getURL()).startsWith(network.appUrl) : true));
     createMain();
     try { createTray(); } catch {}
     globalShortcut.register(o.shortcut, () => (win && win.isFocused() ? toggleQuick() : summon()));
     globalShortcut.register("CommandOrControl+Shift+Space", toggleQuick);
-    setTimeout(pollNotifications, 8000); setInterval(pollNotifications, 60000);
+    setTimeout(pollNotifications, 8000); setInterval(pollNotifications, 30000);
     setupUpdates();
     handleDeepLink(process.argv.find((a) => a.startsWith(PROTOCOL + "://")));
     if (demo === "quick") setTimeout(() => { toggleQuick(); const b = win.getBounds(); quick.setPosition(b.x + b.width - 400, Math.max(b.y, Math.min(b.y + 56, b.y + b.height - 528))); }, 1500);
