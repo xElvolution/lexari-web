@@ -67,7 +67,7 @@ export function Hero({ s, now, ready }: { s: State; now: number; ready: number }
             return (
               <li key={a.id} className="hub-float relative" style={{ animationDelay: `${i * -0.8}s` }}>
                 <span className={`grid place-items-center rounded-[26px] bg-[#0a0a0a] ring-1 ring-white/15 ${big ? "h-[132px] w-[132px] max-sm:h-[96px] max-sm:w-[96px] max-sm:rounded-[22px]" : "h-[84px] w-[84px] max-sm:h-[58px] max-sm:w-[58px] max-sm:rounded-[18px]"}`}>
-                  <span className={`grid place-items-center max-sm:scale-[0.72]`}><WhoFace who={a.id} look={lookFor(s, a.id)} size={big ? 108 : 64} animated /></span>
+                  <span className={`grid place-items-center max-sm:scale-[0.72]`}><WhoFace who={a.id} look={lookFor(s, a.id)} size={big ? 108 : 64} animated={big} /></span>
                 </span>
                 <LevelBadge level={lv} className="absolute -bottom-2 -right-2" small={!big} />
                 <span className="mt-3 block max-w-[132px] truncate text-center text-[12.5px] font-bold text-white/85 max-sm:max-w-[60px] max-sm:text-[11.5px]">{a.name}</span>

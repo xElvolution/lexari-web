@@ -129,7 +129,7 @@ export default function Hub() {
             <View style={{ height: 8, borderRadius: 4, backgroundColor: k.tint, marginTop: 8, overflow: "hidden" }}><View style={{ height: 8, backgroundColor: GRAPE, width: `${(n / list.length) * 100}%` }} /></View>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
               {list.map((a) => (
-                <View key={a.id} style={{ width: "48.6%", flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: 14, backgroundColor: k.tint, opacity: a.got ? 1 : 0.6 }}>
+                <View key={a.id} style={{ flexBasis: "46%", flexGrow: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderRadius: 14, backgroundColor: k.tint, opacity: a.got ? 1 : 0.6 }}>
                   <View style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}><Svg width={40} height={40} viewBox="0 0 56 56" style={{ position: "absolute" }}><Path d="M28 3 L50 15.5 V40.5 L28 53 L6 40.5 V15.5 Z" fill={a.got ? GRAPE : "none"} stroke={a.got ? "#3514b0" : k.ink45} strokeWidth={3} strokeDasharray={a.got ? undefined : "4 4"} strokeLinejoin="round" /></Svg><Icon name={a.icon} size={16} color={a.got ? "#fff" : k.ink45} /></View>
                   <View style={{ flex: 1 }}><T f="bold" s={13.5} c={a.got ? k.ink : k.ink60}>{a.title}</T><T s={12} c={k.ink60}>{a.body}</T></View>
                 </View>

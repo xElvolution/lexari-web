@@ -3,16 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LOOKS, TONES, shortAddr } from "@/content/appData";
+import { LOOKS, TONES, shortAddr, specialistBySlug, type CustomAgent, type ToneId } from "@/content/appData";
+import { HOME, variantFor, type Variant } from "@shared/components/avatar";
+import NameFields, { firstOf, namesValid, type NameDraft } from "@/components/NameFields";
 import {
-  agentName, clearChats, deleteAccount, exportData, setActive, setNotif, setPrefs, signOut, toast, updateAgent, useApp, type State,
+  agentName, clearChats, deleteAccount, exportData, saveNames, setActive, setMeta, setNotif, setPrefs, signOut, toast, updateAgent, updateCustom, useApp, type State,
 } from "@/lib/store";
 import { LANDING_URL, WEBAPP_URL } from "@shared/sites";
 import { applyTheme, onTheme, savedTheme, watchSystemTheme } from "@shared/components/theme";
 import { hirePriceLabel } from "@/lib/prices";
 import Icon from "@/components/Icon";
 import { AgentFace, AgentTile } from "@/components/faces";
-import { myAgents } from "@/components/agents";
+import { kindOf, myAgents, nameOf } from "@/components/agents";
 import { openAdd, openAgent } from "@/components/overlays";
 import BillingSection from "@/components/billing/BillingSection";
 import LockSettings from "@/components/lock/LockSettings";
@@ -24,7 +26,7 @@ import WalletsSection from "@/components/wallets/WalletsSection";
 import ModelsSection from "@/components/models/ModelsSection";
 import SecretsSection from "@/components/secrets/SecretsSection";
 import EmailNameSetting from "@/components/email/EmailNameSetting";
-import { disablePush, enablePush, pushOnHere, pushPermission } from "@/lib/notifications";
+import { disablePush, enablePush, isDesktopApp, pushOnHere, pushPermission } from "@/lib/notifications";
 
 const SECTIONS = [
   { id: "general", label: "General", icon: "settings" },
@@ -104,30 +106,109 @@ function General({ s }: { s: State }) {
   );
 }
 
+/** Face quick picks: the same generated faces as onboarding. Wraps on small screens, same spacing as the rows. */
+function FacePicker({ isOn, onPick }: { isOn: (l: number | null) => boolean; onPick: (l: number | null) => void }) {
+  return (
+    <div className="@container pb-4"><div data-face-picker className="grid grid-cols-4 gap-2.5 @[300px]:grid-cols-6 @[640px]:grid-cols-12">
+      {LOOKS.map((l) => { const on = isOn(l); return <button key={String(l)} onClick={() => onPick(l)} aria-pressed={on} aria-label={l === null ? "House face" : `Face ${l}`} className={`grid aspect-square min-w-0 place-items-center rounded-2xl transition ${on ? "bg-grape ring-2 ring-grape ring-offset-2 ring-offset-[var(--card)]" : "bg-tint hover:bg-lilac/40"}`}><AgentFace look={l} size={34} /></button>; })}
+    </div></div>
+  );
+}
+
+const sameFace = (c: CustomAgent, v: Variant) => c.shape === v.shape && c.color === v.color && c.eyes === v.eyes && c.mouth === v.mouth;
+const seedVariant = (l: number | null): Variant => (l === null ? { ...HOME } : variantFor(l));
+
+/** One agent's name, face and tone. Your agent and the ones you made change fully; a hired specialist takes a nickname. */
+function AgentEditor({ s, id }: { s: State; id: string }) {
+  const kind = kindOf(id);
+  const c = kind === "custom" ? s.custom.find((x) => x.id === id) : undefined;
+  const current = kind === "home" ? s.agent?.name || "" : kind === "custom" ? c?.name || "" : s.meta[id]?.nick || "";
+  const [name, setName] = useState(current);
+  useEffect(() => setName(current), [current]);
+  const max = kind === "home" ? 12 : kind === "custom" ? 24 : 20;
+  const tone = kind === "home" ? s.agent?.tone : c?.tone;
+  const shown = current || nameOf(s, id);
+  const save = () => {
+    const n = name.trim();
+    if (kind === "home") updateAgent({ name: n });
+    else if (kind === "custom") updateCustom(id, { name: n });
+    else setMeta(id, { nick: n });
+    toast({ text: "Saved", face: kind === "home" ? "home" : undefined });
+  };
+  return (
+    <div data-agent-editor={id} className="pb-1">
+      <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-end">
+        <label className="min-w-0 flex-1"><span className="label text-[9.5px] text-ink/60">{kind === "hired" ? "Nickname" : "Name"}</span>
+          <input value={name} onChange={(e) => setName(e.target.value.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, max))} placeholder={kind === "hired" ? specialistBySlug(id)?.name : ""} className="field mt-1.5 !py-2.5" />
+        </label>
+        <button disabled={name.trim() === current || (kind !== "hired" && !name.trim())} onClick={save} className="btn btn-brand btn-sm !h-11 shrink-0 disabled:opacity-40 disabled:shadow-none">Save</button>
+      </div>
+      {kind === "hired" ? (
+        <Row title="Face and tone" desc={`${specialistBySlug(id)?.name ?? "This specialist"} keeps the face and voice its maker gave it. Your nickname shows everywhere on your team.`} />
+      ) : (
+        <>
+          <Row title="Face" desc={kind === "custom" ? "Pick a generated face, or build one in its ID card." : "Pick a different generated face. It changes everywhere."}>
+            {kind === "custom" && <button onClick={() => openAgent(id)} className={smallBtn}><Icon name="idcard" size={14} />Face creator</button>}
+          </Row>
+          <FacePicker
+            isOn={(l) => (kind === "home" ? s.agent?.look === l : !!c && !c.template && sameFace(c, seedVariant(l)))}
+            onPick={(l) => (kind === "home" ? updateAgent({ look: l }) : updateCustom(id, { ...seedVariant(l), plain: undefined, template: null, brows: undefined, orbit: undefined, dots: undefined, bg: undefined } as Partial<CustomAgent>))} />
+          <Row title="Tone" desc={`How ${shown} talks to you.`}>
+            <Select label={`${shown} tone`} value={tone || "short"} options={TONES.map((t) => [t.id, t.label] as [string, string])} onChange={(v) => (kind === "home" ? updateAgent({ tone: v as ToneId }) : updateCustom(id, { tone: v as ToneId }))} />
+          </Row>
+        </>
+      )}
+    </div>
+  );
+}
+
+function YouNames({ s }: { s: State }) {
+  const init = (): NameDraft => ({ fullName: s.names.fullName, username: s.names.username, callName: s.names.fullName && s.names.callName === firstOf(s.names.fullName) ? "" : s.names.callName });
+  const [d, setD] = useState<NameDraft>(init);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const base = init();
+  const dirty = d.fullName !== base.fullName || d.username !== base.username || d.callName !== base.callName;
+  const save = async () => {
+    setBusy(true); setErr("");
+    try { await saveNames({ fullName: d.fullName.trim(), username: d.username, callName: d.callName.trim() }); toast({ text: "Saved", face: "home" }); }
+    catch (e) { setErr((e as Error).message || "Could not save that."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Group title="You">
+      <div className="py-5">
+        <NameFields compact value={d} onChange={(x) => { setD(x); setErr(""); }} error={err} />
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="text-[12.5px] text-ink/50">Shared by all your agents. They use your name now and then, not in every reply.</span>
+          <button disabled={!dirty || !namesValid(d) || busy} onClick={() => void save()} className="btn btn-brand btn-sm !h-10 shrink-0 disabled:opacity-40 disabled:shadow-none">{busy ? "Saving…" : "Save"}</button>
+        </div>
+      </div>
+    </Group>
+  );
+}
+
 function Personal({ s }: { s: State }) {
-  const a = s.agent!;
-  const [name, setName] = useState(a.name);
-  const [you, setYou] = useState(a.you);
+  const team = myAgents(s);
+  const [open, setOpen] = useState<string | null>(s.prefs.defaultAgent && team.some((a) => a.id === s.prefs.defaultAgent) ? s.prefs.defaultAgent : "home");
   const [ins, setIns] = useState(s.prefs.instructions);
-  const dirty = name.trim() !== a.name || you.trim() !== a.you;
   return (
     <>
-      <Group title="Your agent">
-        <div className="flex flex-col gap-5 py-5 sm:flex-row sm:items-center">
-          <span className="grid h-24 w-24 shrink-0 place-items-center rounded-[26px] bg-[var(--face-tile)] ring-1 ring-line"><AgentFace look={a.look} size={78} /></span>
-          <div className="grid flex-1 gap-3 sm:grid-cols-2">
-            <label><span className="label text-[9.5px] text-ink/60">Agent name</span><input value={name} onChange={(e) => setName(e.target.value.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 12))} className="field mt-1.5 !py-2.5" /></label>
-            <label><span className="label text-[9.5px] text-ink/60">It calls you</span><input value={you} onChange={(e) => setYou(e.target.value.slice(0, 20))} className="field mt-1.5 !py-2.5" placeholder="Ada" /></label>
-            <div className="sm:col-span-2"><button disabled={!dirty || !name.trim()} onClick={() => { updateAgent({ name: name.trim(), you: you.trim() }); toast({ text: "Saved", face: "home" }); }} className="btn btn-brand btn-sm !h-10 disabled:opacity-40 disabled:shadow-none">Save</button></div>
-          </div>
-        </div>
-        <Row title="Face" desc="Pick a different generated face. It changes everywhere." />
-        <div className="grid grid-cols-6 gap-2 pb-5 sm:grid-cols-12">
-          {LOOKS.map((l) => { const on = a.look === l; return <button key={String(l)} onClick={() => updateAgent({ look: l })} aria-pressed={on} aria-label={l === null ? "House face" : `Face ${l}`} className={`grid aspect-square place-items-center rounded-2xl transition ${on ? "bg-grape ring-2 ring-grape ring-offset-2 ring-offset-[var(--card)]" : "bg-tint hover:bg-lilac/40"}`}><AgentFace look={l} size={36} /></button>; })}
-        </div>
-        <Row title="Tone" desc={`How ${agentName(s)} talks to you.`}>
-          <Select label="Tone" value={a.tone} options={TONES.map((t) => [t.id, t.label] as [string, string])} onChange={(v) => updateAgent({ tone: v as typeof a.tone })} />
-        </Row>
+      <YouNames s={s} />
+      <Group title={`Your agents · ${team.length}`}>
+        {team.map((a) => {
+          const on = open === a.id, k = kindOf(a.id);
+          return (
+            <div key={a.id} data-agent-row={a.id}>
+              <button onClick={() => setOpen(on ? null : a.id)} aria-expanded={on} className="flex w-full items-center gap-3 py-3.5 text-left">
+                <AgentTile id={a.id} look={s.agent?.look} size={44} />
+                <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-semibold text-ink">{a.name}</span><span className="block truncate text-[13px] leading-snug text-ink/55">{k === "home" ? "Your personal agent" : k === "custom" ? "Made by you" : `Hired · ${a.role}`} · {k === "hired" ? "nickname" : `${TONES.find((t) => t.id === (k === "home" ? s.agent?.tone : s.custom.find((c) => c.id === a.id)?.tone))?.label ?? "Short and direct"}`}</span></span>
+                <span className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold transition ${on ? "bg-grape text-white" : "bg-tint text-ink"}`}>{on ? "Done" : "Edit"}<Icon name="right" size={13} className={`transition ${on ? "-rotate-90" : "rotate-90"}`} /></span>
+              </button>
+              {on && <AgentEditor s={s} id={a.id} />}
+            </div>
+          );
+        })}
       </Group>
       <Group title="Custom instructions">
         <div className="py-4">
@@ -189,6 +270,7 @@ function DevicePush() {
   };
   const desc = perm === "unsupported" ? "This browser can't show notifications. On iPhone, add Lexari to your Home Screen first."
     : perm === "denied" ? "Blocked in your browser. Allow notifications for app.lexari.ai in site settings, then come back."
+    : isDesktopApp() ? "Get replies, quest rewards, your daily box and payment updates as system notifications while the Lexari app runs, even from the tray."
     : "Get replies, quest rewards, your daily box and payment updates even when Lexari is closed.";
   return (
     <Group title="This device">
