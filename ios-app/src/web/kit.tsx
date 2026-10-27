@@ -1,9 +1,5 @@
 /** Phone kit that mirrors app.lexari.ai at 390px: colours, type scale, top bar, agent tiles with rings, labels, pills. */
-<<<<<<< ours
-=======
-import { Glass } from "@/components/Glass";
 import { LogoMark } from "@/components/Logo";
->>>>>>> theirs
 import { useEffect, useState, type ReactNode } from "react";
 import { useMotion } from "@/lib/motion";
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from "react-native-reanimated";
