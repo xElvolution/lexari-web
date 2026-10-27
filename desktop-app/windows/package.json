@@ -19,7 +19,9 @@
   },
   "devDependencies": {
     "electron": "^33.2.1",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "resedit": "^2.0.3",
+    "pe-library": "^1.0.1"
   },
   "build": {
     "appId": "ai.lexari.desktop",
@@ -53,7 +55,8 @@
       "target": [
         "nsis",
         "msi"
-      ]
+      ],
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
@@ -70,6 +73,7 @@
     "msi": {
       "oneClick": false,
       "perMachine": false
-    }
+    },
+    "afterPack": "./afterPack.js"
   }
 }

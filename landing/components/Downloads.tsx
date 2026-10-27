@@ -133,7 +133,7 @@ function Action({ p, big = false }: { p: Platform; big?: boolean }) {
     return (
       <a href={p.url} className={`btn btn-brand ${big ? "" : "!h-12 !px-5 !text-[15px]"} w-full sm:w-auto`} download={p.file}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14" /></svg>
-        Download for {p.name}
+        {p.button || `Download for ${p.name}`}
       </a>
     );
   }
@@ -141,6 +141,17 @@ function Action({ p, big = false }: { p: Platform; big?: boolean }) {
     <span aria-disabled className={`btn btn-ghost ${big ? "" : "!h-12 !px-5 !text-[15px]"} w-full cursor-default sm:w-auto`}>
       {p.status === "testflight" ? "TestFlight soon" : "Coming soon"}
     </span>
+  );
+}
+
+/** The second build (Intel Mac, .deb) and the first-open note, under the main button. */
+function Extra({ p }: { p: Platform }) {
+  if (p.status !== "live" || (!p.alt && !p.note)) return null;
+  return (
+    <div className="mt-3 grid gap-1.5 text-[13px] text-ink/60">
+      {p.alt && <a href={p.alt.url} download={p.alt.file} className="font-bold text-brand-ink underline-offset-4 hover:underline">Or download for {p.alt.label} <span aria-hidden>↓</span></a>}
+      {p.note && <p>{p.note}</p>}
+    </div>
   );
 }
 
@@ -178,7 +189,7 @@ function Featured({ p, detected }: { p: Platform; detected: boolean }) {
         </h2>
         <p className="mt-4 max-w-[34rem] text-[17px] leading-relaxed text-ink/75">{p.blurb}</p>
         <div className="mt-5"><Meta p={p} /></div>
-        <div className="mt-7"><Action p={p} big /></div>
+        <div className="mt-7"><Action p={p} big /><Extra p={p} /></div>
         {p.id === "android" && <div className="mt-7 max-w-[34rem]"><AndroidNote wide /></div>}
       </div>
       <div className="relative mt-10 flex items-center justify-center lg:mt-0">
@@ -209,7 +220,7 @@ function Card({ p }: { p: Platform }) {
       <p className="mt-3 text-[15px] leading-relaxed text-ink/70">{p.blurb}</p>
       <div className="mt-3"><Meta p={p} /></div>
       {p.id === "android" && <div className="mt-4"><AndroidNote /></div>}
-      <div className="mt-auto pt-4"><Action p={p} /></div>
+      <div className="mt-auto pt-4"><Action p={p} /><Extra p={p} /></div>
     </article>
   );
 }
@@ -276,7 +287,7 @@ export default function Downloads() {
             </p>
             <div className="dl-lede mt-9 flex flex-col gap-4 sm:flex-row">
               {featured.status === "live" && featured.url
-                ? <a href={featured.url} download={featured.file} className="btn btn-brand">Download for {featured.name} <span aria-hidden>↓</span></a>
+                ? <a href={featured.url} download={featured.file} className="btn btn-brand">{featured.button || `Download for ${featured.name}`} <span aria-hidden>↓</span></a>
                 : <a href={android.url} download={android.file} className="btn btn-brand">Get the Android app <span aria-hidden>↓</span></a>}
               <a href="#apps" className="btn btn-line text-ink">See all platforms</a>
             </div>
