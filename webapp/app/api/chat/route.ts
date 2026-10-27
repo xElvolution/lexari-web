@@ -7,6 +7,7 @@ import { gatewayReady } from "@/server/engram/gateway";
 import { accountDefault, imageKeyFor, resolveTurnModel } from "@/server/models";
 import { beginTurn, isBlocked, type Blocked, type Turn } from "@/server/billing/meter";
 import { splitRemember } from "@/server/engram/hippocampus";
+import { addressName } from "@/server/names";
 import { buildPrompt } from "@/server/engram/spinal";
 import { recordEvent } from "@/server/events";
 import { db, retryRead } from "@/server/db";
@@ -127,10 +128,12 @@ export async function POST(req: Request) {
   // Level perks: Quick replies / Priority desk jump the model queue, Bigger memory reads more notes, Second shift runs two at once.
   const level = speakerRow && speakerRow.kind !== "hired" ? await agentLevel(userId, speakerRow.slug) : body.speaker === "home" ? await agentLevel(userId, "home") : 1;
   const priority = queuePriority(level);
+  // What agents call you: your chosen name, else your first name, else nothing. Never your email.
+  const callName = await addressName(userId).catch(() => "");
   const prompt = buildPrompt({
     agentName: home.name, role, tone, speaker: speakerName,
     about: speakerRow?.kind === "custom" ? speakerRow.about : dev ? dev.manifest.persona.description : house?.back || "",
-    you: (home.meta as { you?: string })?.you || "",
+    you: callName,
     history, recall: speakerRow?.memoryOn === false ? [] : body.recall, recallMax: recallSize(level), text,
   });
   prompt[0] = { ...prompt[0], content: `${prompt[0].content}\nYour name is ${speakerName}. When the person says your name (even misspelled by speech-to-text), they mean you.${isGroupChat && members.length ? ` You are in a group chat with ${members.join(", ")}${body.call ? " on a group voice call" : ""}. Every member answers in turn in their own voice. Only speak as yourself, never write lines for the others, and don't prefix your reply with your name.` : ""}` };
@@ -312,7 +315,7 @@ export async function POST(req: Request) {
         // Task tags: a meeting Join card, a background job, or a schedule (each shows as a card under the reply).
         let meet: MeetAsk | undefined, taskCard: TaskRef | undefined;
         if (taskTools && hasTaskTag(full)) {
-          const r = await runTaskTags(userId, { agent: speakerRow?.slug || "home", convo: body.convo, messageId: body.replyMsgId, tz, agentName: speakerName, userName: (home.meta as { you?: string })?.you || "", said: body.text }, full)
+          const r = await runTaskTags(userId, { agent: speakerRow?.slug || "home", convo: body.convo, messageId: body.replyMsgId, tz, agentName: speakerName, userName: callName, said: body.text }, full)
             .catch((e: Error) => { console.error(`[tasks] tags: ${e.message}`); return { meet: undefined, task: undefined, notes: ["that didn't work on my computer"], site: undefined }; });
           meet = r.meet; taskCard = r.task;
           full = stripTaskTags(full);

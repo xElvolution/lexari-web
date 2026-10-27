@@ -21,7 +21,7 @@ const STEPS: Step[] = [
   { id: "primary", action: "next", home: true, target: (c) => `tile-${c.primary}`, text: (c) => `The gold ring marks ${c.primaryName}, your main personal agent.` },
   { id: "tile", action: "click", home: true, target: (c) => `tile-${c.spec}`, text: (c) => `This row is your team. Tap ${c.specName} to open their chat.` },
   { id: "composer", action: "next", target: () => "composer", text: () => "This is where you talk. Type a message, or use the mic, the clip, or the phone." },
-  { id: "brain", action: "click", leaveChat: true, target: () => "nav-brain", text: (c) => `Tap Brain. That's what I remember about you${c.you ? `, ${c.you}` : ""}, and you can edit or delete any of it.` },
+  { id: "brain", action: "click", leaveChat: true, target: () => "nav-brain", text: (c) => `Tap Brain. That's what I remember about you, and you can edit or delete any of it.` },
   { id: "done", action: "next", title: (c) => `That's the tour${c.you ? `, ${c.you}` : ""}.`, text: () => "Bond, Market, Team and Wallets are in the menu. Have fun.", cta: "Finish" },
 ];
 const PRAISE = ["Nice, you're getting the hang of it!", "Perfect.", "That's it.", "Great, keep going.", "Exactly like that."];
