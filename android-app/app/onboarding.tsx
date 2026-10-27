@@ -26,6 +26,8 @@ import { useSession } from "@/state/session";
 import { useData } from "@/web/data";
 import { Btn, Chip, F, GRAPE, Rise, WSheet, useC } from "@/web/kit";
 import { COUNTRIES } from "@/content/countries";
+import NameFields, { draftFrom, firstOf, namesValid, saveNames, type NameDraft } from "@/components/NameFields";
+import { LogoMark } from "@/components/Logo";
 
 type Look = number | null | FaceLook;
 
@@ -136,7 +138,9 @@ export default function Onboarding() {
   const [name, setName] = useState(() => cleanName(params.name || ""));
   const [look, setLook] = useState<Look>(null);
   const [base, setBase] = useState<number | null | undefined>(undefined);
-  const [you, setYou] = useState("");
+  const [names, setNames] = useState<NameDraft>({ fullName: "", username: "", callName: "" });
+  const [nameErr, setNameErr] = useState("");
+  const you = (names.callName.trim() || firstOf(names.fullName)).slice(0, 30);
   const [role, setRole] = useState("");
   const [country, setCountry] = useState("");
   const [picker, setPicker] = useState(false);
@@ -152,7 +156,8 @@ export default function Onboarding() {
   const prog = useSharedValue(0.25);
 
   useEffect(() => {
-    if (me?.user?.method === "google" && me.profile?.name && !you) setYou(me.profile.name.split(" ")[0].slice(0, 20));
+    // Prefill from the account (a Google profile name, never the email).
+    if (me && !names.fullName && !names.username) setNames(draftFrom(me as never));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.profile?.name]);
   useEffect(() => { prog.value = withTiming((step + 1) / 4, { duration: 700, easing: Easing.bezier(0.4, 0, 0.2, 1) }); scroll.current?.scrollTo({ y: 0, animated: true }); }, [step, prog]);
@@ -160,13 +165,23 @@ export default function Onboarding() {
 
   const shown = name.trim() || "your agent";
   const agentName = name.trim() || "Juniper";
-  const can = step === 0 ? !!name.trim() : true;
+  const can = step === 0 ? !!name.trim() : step === 2 ? namesValid(names) : true;
   const knownCount = knows.length + (you ? 1 : 0) + (country ? 1 : 0);
   const v = lookVariant(look);
   const bg = look && typeof look === "object" ? look.bg : undefined;
   const toggleKnow = (t: string) => setKnows((l) => (l.includes(t) ? l.filter((x) => x !== t) : [...l, t].slice(0, 8)));
   const addCustom = () => { const t = custom.trim(); if (t && !knows.includes(t)) setKnows((l) => [...l, t].slice(0, 8)); setCustom(""); };
   const after = () => { startTour(); router.replace(securityAsked ? "/(tabs)/agents" : "/security-setup"); };
+
+  // Step 3 saves your names to your profile first (a taken username stops here, with the reason).
+  const next = async () => {
+    if (step === 2) {
+      if (!token) return;
+      try { await saveNames(token, names); setNameErr(""); }
+      catch (e) { setNameErr(e instanceof Error && e.message ? e.message : "Couldn't save your name. Try again."); return; }
+    }
+    setStep((s) => Math.min(3, s + 1));
+  };
 
   const meet = async () => {
     if (saving || !token) return;
@@ -230,7 +245,7 @@ export default function Onboarding() {
       <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: insets.top, paddingBottom: barH + 28 }}>
         <View style={{ height: 72, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <View accessibilityRole="header" accessibilityLabel="Lexari" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: k.ink, alignItems: "center", justifyContent: "center" }}><View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: k.bg }} /></View>
+            <LogoMark size={28} />
             <Text style={{ fontFamily: F.display, fontSize: 20, letterSpacing: -0.9, color: k.ink }}>lexari</Text>
           </View>
           <ThemeToggle />
@@ -297,7 +312,7 @@ export default function Onboarding() {
               h1(`What should ${shown} know?`),
               lead("These become its first memories. You can edit or forget any of them later in its brain."),
               <View key="form" style={{ marginTop: 20, gap: 16, maxWidth: 560 }}>
-                <View>{small("Your first name")}<TextInput value={you} onChangeText={(t) => setYou(t.slice(0, 20))} placeholder="Ada" placeholderTextColor={k.ink45} accessibilityLabel="Your first name" style={[field, { marginTop: 8 }]} /></View>
+                <NameFields value={names} onChange={(d) => { setNames(d); setNameErr(""); }} error={nameErr} />
                 <View>{small("Where you're based")}
                   <Pressable accessibilityRole="button" accessibilityLabel={country ? `Country, ${country}. Change` : "Choose your country"} onPress={() => setPicker(true)} style={[field, { marginTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
                     <Text style={{ flex: 1, fontFamily: country ? F.semi : F.sans, fontSize: 16, color: country ? k.ink : k.ink45 }}>{country || "Choose your country"}</Text>
@@ -348,7 +363,7 @@ export default function Onboarding() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 16, paddingBottom: Math.max(16, insets.bottom) }}>
           {step > 0 ? <Btn kind="line" h={42} a11y="Back" icon="back" onPress={() => setStep((s) => s - 1)} style={{ alignSelf: "auto" }} /> : null}
           {step < 3
-            ? <Btn kind="brand" h={42} fs={14} drop={4} disabled={!can} onPress={() => { if (can) setStep((s) => Math.min(3, s + 1)); }} style={{ flex: 1, opacity: can ? 1 : 0.4 }}>
+            ? <Btn kind="brand" h={42} fs={14} drop={4} disabled={!can} onPress={() => { if (can) void next(); }} style={{ flex: 1, opacity: can ? 1 : 0.4 }}>
                 <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.bold, fontSize: 14, color: "#fff" }}>{step === 0 ? `Continue with ${shown}` : "Continue"}</Text><Icon name="arrow" size={18} color="#fff" />
               </Btn>
             : <Btn kind="brand" h={64} fs={18} drop={4} disabled={saving} onPress={() => void meet()} style={{ flex: 1, opacity: saving ? 0.6 : 1 }}>

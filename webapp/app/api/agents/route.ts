@@ -8,6 +8,7 @@ import { assertSeat } from "@/server/plans";
 import { agentBody } from "@/server/validate";
 import { agentLevel } from "@/server/hub/levels";
 import { skillSlots } from "@/lib/perks";
+import { cleanName } from "@/server/names";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,8 @@ export const POST = withUser(async (user, req) => {
   const body = await readJson(req, agentBody);
   if (body instanceof Response) return body;
   if (body.kind === "home" && body.slug !== "home") return jsonError(400, "Your home agent's id is home.");
+  // What the agent calls you is a name, never an email address or wallet (older apps prefilled the email).
+  if (body.meta?.you !== undefined) body.meta.you = cleanName(body.meta.you, 30);
   if (body.kind === "custom" && !body.slug.startsWith("c-")) return jsonError(400, "Agents you make have ids that start with c-.");
   const database = db();
   const [existing] = await database.select().from(agents).where(and(eq(agents.userId, user.userId), eq(agents.slug, body.slug))).limit(1);

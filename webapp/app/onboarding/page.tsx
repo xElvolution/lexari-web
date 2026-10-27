@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { KNOW_SUGGESTIONS, LOOKS, ROLES, TONES, type ToneId } from "@/content/appData";
-import { finishOnboarding, toast, useApp, type AgentLook } from "@/lib/store";
+import { finishOnboarding, toast, useApp, saveNames, type AgentLook } from "@/lib/store";
 import FaceCreator from "@/components/agent/FaceCreator";
 import { lookVariant } from "@shared/components/avatar";
 import Badge from "@shared/components/Badge";
@@ -13,6 +13,7 @@ import { LANDING_URL } from "@shared/sites";
 import Logo from "@shared/components/Logo";
 import ThemeToggle from "@shared/components/ThemeToggle";
 import Icon from "@/components/Icon";
+import NameFields, { firstOf, namesValid, type NameDraft } from "@/components/NameFields";
 import { AgentFace } from "@/components/faces";
 import { burst } from "@/components/fly";
 import SetupSequence from "@/components/agent/SetupSequence";
@@ -30,7 +31,9 @@ export default function Onboarding() {
   const [name, setName] = useState("");
   const [look, setLook] = useState<AgentLook>(null);
   const [base, setBase] = useState<number | null>(null); // which starter face you picked
-  const [you, setYou] = useState("");
+  const [names, setNames] = useState<NameDraft>({ fullName: "", username: "", callName: "" });
+  const [nameErr, setNameErr] = useState("");
+  const you = names.callName.trim() || firstOf(names.fullName);
   const [role, setRole] = useState("");
   const [tone, setTone] = useState<ToneId>("short");
   const [knows, setKnows] = useState<string[]>([KNOW_SUGGESTIONS[0]]);
@@ -44,9 +47,10 @@ export default function Onboarding() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("name");
     setName((q || "").replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 12));
-    if (s?.auth?.method === "google") setYou(s.auth.label.split(" ")[0]);
+    // names you already gave (never your email)
+    if (s?.names) setNames((d) => (d.fullName ? d : { fullName: s.names.fullName, username: s.names.username, callName: s.names.fullName && s.names.callName !== firstOf(s.names.fullName) ? s.names.callName : "" }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s?.auth?.label]);
+  }, [s?.names?.fullName]);
 
   // the badge prints out of the slot on the first step and again when you meet
   useLayoutEffect(() => {
@@ -62,8 +66,17 @@ export default function Onboarding() {
   }, [step]);
 
   const shown = name.trim() || "your agent";
-  const can = step === 0 ? !!name.trim() : true;
-  const next = () => setStep((v) => Math.min(3, v + 1));
+  const can = step === 0 ? !!name.trim() : step === 2 ? namesValid(names) : true;
+  const [checking, setChecking] = useState(false);
+  const next = async () => {
+    if (step === 2) { // save your names first: a taken username is caught here, before the finale
+      setChecking(true); setNameErr("");
+      try { await saveNames({ fullName: names.fullName.trim(), username: names.username, callName: names.callName.trim() }); }
+      catch (e) { setNameErr((e as Error).message || "Could not save your name. Try again."); return; }
+      finally { setChecking(false); }
+    }
+    setStep((v) => Math.min(3, v + 1));
+  };
   const toggleKnow = (k: string) => setKnows((l) => (l.includes(k) ? l.filter((x) => x !== k) : [...l, k].slice(0, 8)));
   const addCustom = () => { const t = custom.trim(); if (t && !knows.includes(t)) setKnows((l) => [...l, t].slice(0, 8)); setCustom(""); };
   const meet = () => {
@@ -171,10 +184,10 @@ export default function Onboarding() {
           {step === 2 && (
             <div data-step>
               <p className="label text-brand-ink">Step 3 of 4 · about you</p>
-              <h1 className="display mt-3 text-[clamp(24px,6.8vw,40px)] sm:text-[72px]">What should {shown} know?</h1>
-              <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">These become its first memories. You can edit or forget any of them later in its brain.</p>
+              <h1 className="display mt-3 text-[clamp(24px,6.8vw,40px)] sm:text-[72px]">Who is {shown} working for?</h1>
+              <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-ink/75">Your name and username are on your profile. Your agents use your name now and then, never your email. The rest become first memories you can edit later.</p>
               <div className="mt-7 grid max-w-[560px] gap-6">
-                <label className="block"><span className="label text-[10px] text-ink/70">Your first name</span><input value={you} onChange={(e) => setYou(e.target.value.slice(0, 20))} placeholder="Ada" className="field mt-2" /></label>
+                <NameFields value={names} onChange={(d) => { setNames(d); setNameErr(""); }} error={nameErr} />
                 <div><span className="label text-[10px] text-ink/70">What you do</span><div className="mt-2 flex flex-wrap gap-2">{ROLES.map((r) => <button key={r} onClick={() => setRole(role === r ? "" : r)} aria-pressed={role === r} className="chip">{r}</button>)}</div></div>
                 <div><span className="label text-[10px] text-ink/70">How it should talk</span><div className="mt-2 flex flex-wrap gap-2">{TONES.map((t) => <button key={t.id} onClick={() => setTone(t.id)} aria-pressed={tone === t.id} className="chip">{t.label}</button>)}</div></div>
                 <div>
@@ -201,7 +214,7 @@ export default function Onboarding() {
           <div className="sticky bottom-0 z-30 -mx-4 mt-10 flex items-center gap-3 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)] to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:static sm:mx-0 sm:bg-none sm:p-0">
             {step > 0 && <button onClick={() => setStep((v) => v - 1)} className="btn btn-line text-ink" aria-label="Back"><Icon name="back" size={18} /></button>}
             {step < 3 ? (
-              <button onClick={next} disabled={!can} className="btn btn-brand min-w-0 flex-1 disabled:opacity-40 sm:flex-none"><span className="truncate">{step === 0 ? `Continue with ${shown}` : "Continue"}</span> <Icon name="arrow" size={18} /></button>
+              <button onClick={() => void next()} disabled={!can || checking} className="btn btn-brand min-w-0 flex-1 disabled:opacity-40 sm:flex-none"><span className="truncate">{step === 0 ? `Continue with ${shown}` : checking ? "Saving…" : "Continue"}</span> <Icon name="arrow" size={18} /></button>
             ) : (
               <button ref={cta} onClick={meet} disabled={saving} className="btn btn-brand !h-16 min-w-0 flex-1 !px-6 !text-[18px] disabled:opacity-60 sm:flex-none sm:!px-9">{saving ? "Saving…" : <>Meet {shown} <Icon name="arrow" size={20} /></>}</button>
             )}

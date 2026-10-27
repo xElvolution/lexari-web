@@ -6,6 +6,7 @@ import { currentPlan } from "./plans";
 import { shotsByReply } from "./computer";
 import { cardsForSlugs } from "./market/listings";
 import { SPECIALISTS } from "@/content/appData";
+import { addressOf } from "./names";
 
 /** Everything the app needs on load. Memories stay encrypted; the browser decrypts them. */
 export async function loadAccount(user: SessionUser) {
@@ -44,6 +45,11 @@ export async function loadAccount(user: SessionUser) {
       method: user.privyDid ? ("google" as const) : ("wallet" as const),
       email: me?.email || null,
       createdAt: me?.createdAt?.getTime() ?? Date.now(),
+      /** names: what agents call you comes from these, never from the email */
+      fullName: me?.fullName || "",
+      username: me?.username || "",
+      callName: addressOf(me, (agentRows.find((a) => a.slug === "home")?.meta as { you?: string } | undefined)?.you),
+      needsName: !me?.fullName || !me?.username,
     },
     profile: (me?.profile || {}) as Record<string, unknown>,
     plan,

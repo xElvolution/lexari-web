@@ -98,9 +98,12 @@ export type State = {
   planInfo: { seats: number; expiresAt: number | null };
   lockOn: boolean;
   biometric: boolean;
+  /** your names (Settings > Personalization). Agents call you callName; never your email. */
+  names: Names;
 };
+export type Names = { fullName: string; username: string; callName: string; needsName: boolean };
 
-const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null, custom: [], born: {}, meta: {}, tour: { on: false, step: 0, done: false }, bond: { days: [], coins: 0, claimed: [] }, live: null, paid: [], referralCode: "", memoryLocked: false, planInfo: { seats: 1, expiresAt: null }, lockOn: false, biometric: false };
+const EMPTY: State = { v: 1, auth: null, links: { google: false, wallet: false }, agent: null, onboarded: false, plan: "free", hired: [], memory: [], jobs: [], chat: [], nextJob: 1, threads: {}, groups: [], active: "home", wallets: {}, cards: {}, prefs: DEFAULT_PREFS, profile: null, custom: [], born: {}, meta: {}, tour: { on: false, step: 0, done: false }, bond: { days: [], coins: 0, claimed: [] }, live: null, paid: [], referralCode: "", memoryLocked: false, planInfo: { seats: 1, expiresAt: null }, lockOn: false, biometric: false, names: { fullName: "", username: "", callName: "", needsName: false } };
 
 let state: State | null = null;
 let loading: Promise<void> | null = null;
@@ -198,7 +201,8 @@ function fromAccount(acc: Account): State {
   const auth: Auth = acc.user.method === "google"
     ? { method: "google", label, sub: acc.user.email || "Google or email", address: acc.user.wallet, email: acc.user.email || undefined }
     : { method: "wallet", label, sub: "Solana wallet", address: acc.user.wallet };
-  const agent: Agent | null = home ? { name: home.name, look: (home.look ?? null) as AgentLook, you: String((home.meta as { you?: string }).you || ""), role: home.role, tone: (home.tone || "short") as ToneId } : null;
+  const names: Names = { fullName: acc.user.fullName || "", username: acc.user.username || "", callName: acc.user.callName || "", needsName: !!acc.user.needsName };
+  const agent: Agent | null = home ? { name: home.name, look: (home.look ?? null) as AgentLook, you: names.callName, role: home.role, tone: (home.tone || "short") as ToneId } : null;
   const meta: Record<string, AgentMeta> = {};
   const born: Record<string, number> = {};
   for (const a of acc.agents) {
@@ -235,7 +239,8 @@ function fromAccount(acc: Account): State {
     threads, groups, active,
     wallets: { home: acc.user.wallet },
     prefs,
-    profile: { name: String((acc.profile as Partial<Profile>).name || (acc.user.email ? acc.user.email.split("@")[0] : agent?.you || "You")), username: String((acc.profile as Partial<Profile>).username || ""), bio: String((acc.profile as Partial<Profile>).bio || ""), since: acc.user.createdAt, avatar: acc.media?.avatar, cover: acc.media?.cover },
+    names,
+    profile: { name: names.fullName || names.callName || "You", username: names.username, bio: String((acc.profile as Partial<Profile>).bio || ""), since: acc.user.createdAt, avatar: acc.media?.avatar, cover: acc.media?.cover },
     custom, born, meta,
     tour: { on: !!home && !prefsRaw.tourDone, step: 0, done: !!prefsRaw.tourDone },
     referralCode: acc.user.referralCode,
@@ -469,7 +474,8 @@ export async function finishOnboarding(agent: Agent, knows: string[]) {
     ...s, agent, onboarded: true, born: { ...s.born, home: Date.now() }, threads: { ...s.threads, home: s.threads.home?.length ? s.threads.home : [hello(agent)] },
     tour: { on: !s.tour.done, step: 0, done: s.tour.done },
   }));
-  const notes = [...knows.filter(Boolean), ...(agent.you ? [`Calls you ${agent.you}${agent.role ? `, ${agent.role.toLowerCase()}` : ""}`] : [])];
+  // your name lives on your profile (Settings > Personalization), so it isn't filed as a memory
+  const notes = [...knows.filter(Boolean), ...(agent.role ? [`Works as a ${agent.role.toLowerCase()}`] : [])];
   for (const text of notes) addNote(text, "About you", "You");
 }
 export function updateAgent(p: Partial<Agent>) {
@@ -1020,6 +1026,16 @@ export const primaryOf = (s: State | null) => { const p = s?.prefs.primary; retu
 export function setPrimary(id: string) { const s = get(); if (!s || !isCreated(s, id)) return false; setPrefs({ primary: id }); return true; }
 export function setPrefs(p: Partial<Prefs>) { set((x) => ({ ...x, prefs: { ...x.prefs, ...p } })); savePrefs(); }
 export function setNotif(k: string, v: boolean) { set((x) => ({ ...x, prefs: { ...x.prefs, notif: { ...x.prefs.notif, [k]: v } } })); savePrefs(); }
+/** Saves your full name, username and what agents call you. Throws with the server's message (e.g. a taken username). */
+export async function saveNames(n: Partial<Pick<Names, "fullName" | "username" | "callName">>) {
+  await api("/api/me", { method: "PATCH", body: { names: n } });
+  set((x) => {
+    const names = { ...x.names, ...n, ...(n.username ? { username: n.username.trim().replace(/^@/, "").toLowerCase() } : {}) };
+    names.callName = (n.callName !== undefined ? n.callName.trim() : x.names.callName) || names.fullName.trim().split(/\s+/)[0] || "";
+    names.needsName = !names.fullName.trim() || !names.username;
+    return { ...x, names, agent: x.agent ? { ...x.agent, you: names.callName } : x.agent, profile: x.profile ? { ...x.profile, name: names.fullName || x.profile.name, username: names.username } : x.profile };
+  });
+}
 export function updateProfile(p: Partial<Profile>) {
   set((x) => ({ ...x, profile: { ...(x.profile ?? { name: "You", username: "", bio: "", since: Date.now() }), ...p } }));
   const { name, username, bio } = get().profile!;

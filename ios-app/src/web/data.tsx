@@ -7,7 +7,7 @@ export type Agent = { slug: string; kind: string; name: string; model?: string |
 export type Msg = { id: string; from: string; text?: string; at: number; call?: number; voice?: number; file?: { name: string; size?: number } };
 export type Chat = { slug: string; kind: string; title: string; members: string[]; messages: Msg[]; createdAt?: number };
 export type Me = {
-  user: { wallet?: string; referralCode?: string; method?: string; email?: string | null; createdAt?: number };
+  user: { wallet?: string; referralCode?: string; method?: string; email?: string | null; createdAt?: number; fullName?: string; username?: string; callName?: string; needsName?: boolean };
   profile: { name?: string; username?: string; avatar?: number | string; cover?: number | string; bio?: string };
   plan: { id: string; name: string; seats: number };
   prefs?: { defaultAgent?: string; hideBalance?: boolean; language?: string; voice?: string; tourDone?: boolean; memory?: boolean };
@@ -62,7 +62,8 @@ export function withHello<T extends { id: string; at: number }>(me: Me | null, s
 export const primaryOf = (me: Me | null) => me?.prefs?.defaultAgent || "home";
 /** Your nickname for an agent first (a hired specialist renamed from chat), then its name. Same rule as the web. */
 export const nameOf = (me: Me | null, slug: string) => { const a = me?.agents.find((x) => x.slug === slug); return (typeof a?.meta?.nick === "string" && a.meta.nick) || a?.name || slug; };
-export const youName = (me: Me | null) => me?.profile?.name || (me?.agents.find((a) => a.slug === "home")?.meta?.you as string | undefined) || "You";
+/** Your name for badges and cards: full name, then what agents call you. Never an email. */
+export const youName = (me: Me | null) => [me?.user.fullName, me?.profile?.name, me?.user.callName].find((n) => n && !n.includes("@") && n !== "You") || "You";
 /** AppShell initials(): the profile name, else the sign-in label (email or short wallet address). */
 export const initialsOf = (me: Me | null) => {
   const n = me?.profile?.name?.trim();

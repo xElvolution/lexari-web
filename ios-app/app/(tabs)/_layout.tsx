@@ -10,6 +10,7 @@ import { TourTarget } from "@/components/Tour";
 import { tap } from "@/components/ui";
 import { F, GRAPE, TopBar, useC } from "@/web/kit";
 import { initialsOf, useData } from "@/web/data";
+import { NameGate } from "@/components/NameFields";
 
 /** Same as the web phone nav (AppShell PhoneNav): Agents, Brain, Market, Team, More; More swaps the row for Wallets, Settings, Profile, Hub, Close. */
 const PRIMARY = [
@@ -119,6 +120,7 @@ export default function TabsLayout() {
           <Tabs.Screen name="marketplace/[slug]" options={{ href: null, title: "Listing" }} />
         </Tabs>
       </View>
+      <NameGate />
     </>
   );
 }

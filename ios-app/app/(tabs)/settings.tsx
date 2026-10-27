@@ -1,4 +1,5 @@
 /** Port of webapp/app/(app)/settings/page.tsx at phone width: the section list first, then one section with a back button. */
+import NameFields, { draftFrom, namesValid, saveNames, type NameDraft } from "@/components/NameFields";
 import { Stage, toast } from "@/web/anim";
 import { linkPasskey, loadKeys, passkeyError, passkeySupported, type MeraKeys as MeraKeysT } from "@/lib/passkey";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -133,18 +134,29 @@ function Personal() {
   const patch = usePatch();
   const home = me?.agents.find((a) => a.slug === "home");
   const [name, setName] = useState(home?.name ?? "");
-  const [you, setYou] = useState(String(home?.meta?.you ?? ""));
+  const you = String(home?.meta?.you ?? me?.user.callName ?? "");
+  const [names, setNames] = useState<NameDraft>(() => draftFrom(me as never));
+  const [nameErr, setNameErr] = useState("");
+  const [nameSaved, setNameSaved] = useState(false);
+  const saved0 = draftFrom(me as never);
+  const namesDirty = names.fullName !== saved0.fullName || names.username !== saved0.username || names.callName !== saved0.callName;
+  const saveYou = async () => { if (!token) return; try { await saveNames(token, names); setNameErr(""); setNameSaved(true); await reload(); } catch (e) { setNameErr(e instanceof Error && e.message ? e.message : "Couldn't save. Try again."); } };
   const [ins, setIns] = useState(String((me?.prefs as Record<string, unknown> | undefined)?.instructions ?? ""));
   const save = async (extra: Record<string, unknown> = {}) => { if (!token || !home) return; await api("/api/agents", { method: "POST", body: JSON.stringify({ slug: "home", kind: "home", name: name.trim() || home.name, role: home.role ?? "", tone: (home as { tone?: string }).tone ?? "short", look: home.look ?? null, meta: { you: you.trim() }, ...extra }) }, token).catch(() => {}); await reload(); };
   const field = { marginTop: 6, height: 46, borderRadius: 14, backgroundColor: k.tint, paddingHorizontal: 14, color: k.ink, fontFamily: F.semi, fontSize: 15 } as const;
   return (
     <>
+      <Group title="You">
+        <View style={{ paddingVertical: 16, gap: 12 }}>
+          <NameFields value={names} onChange={(d) => { setNames(d); setNameErr(""); setNameSaved(false); }} error={nameErr} />
+          <Pill label={nameSaved && !namesDirty ? "Saved" : "Save"} h={40} style={{ alignSelf: "flex-start" }} disabled={!namesDirty || !namesValid(names)} onPress={() => void saveYou()} />
+        </View>
+      </Group>
       <Group title="Your agent">
         <View style={{ paddingVertical: 16, gap: 12 }}>
           <View style={{ width: 96, height: 96, borderRadius: 26, backgroundColor: k.faceTile, borderWidth: 1, borderColor: k.line, alignItems: "center", justifyContent: "center" }}><AgentTile slug="home" look={home?.look} size={84} dot={false} /></View>
           <View><Label s={9.5} c={k.ink60}>Agent name</Label><TextInput value={name} onChangeText={(v) => setName(v.slice(0, 12))} style={field} /></View>
-          <View><Label s={9.5} c={k.ink60}>It calls you</Label><TextInput value={you} onChangeText={(v) => setYou(v.slice(0, 20))} placeholder="Ada" placeholderTextColor={k.ink45} style={field} /></View>
-          <Pill label="Save" h={40} style={{ alignSelf: "flex-start" }} disabled={!name.trim() || (name.trim() === home?.name && you.trim() === String(home?.meta?.you ?? ""))} onPress={() => save()} />
+          <Pill label="Save" h={40} style={{ alignSelf: "flex-start" }} disabled={!name.trim() || name.trim() === home?.name} onPress={() => save()} />
         </View>
         <Row last title="Tone" desc={`How ${home?.name ?? "your agent"} talks to you.`}><Select value={(home as { tone?: string } | undefined)?.tone ?? "short"} options={TONES} onChange={(v) => save({ tone: v })} /></Row>
       </Group>
