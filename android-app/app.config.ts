@@ -8,7 +8,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "Lexari",
   slug: "lexari",
   scheme: "lexari",
-  version: "1.0.0",
+  version: "1.1.0",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
   icon: "./assets/icon.png",
@@ -16,7 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: { bundleIdentifier: mainnet ? "ai.lexari.app" : "ai.lexari.app.testnet", supportsTablet: false },
   android: {
     package: mainnet ? "ai.lexari.app" : "ai.lexari.app.testnet",
-    versionCode: 6,
+    versionCode: 7,
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       monochromeImage: "./assets/adaptive-monochrome.png",
