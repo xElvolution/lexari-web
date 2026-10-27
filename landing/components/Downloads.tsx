@@ -283,7 +283,7 @@ export default function Downloads() {
               <span className="block overflow-hidden pb-[0.08em] text-brand-ink"><span className="dl-word inline-block">screen</span> <span className="dl-word inline-block">you</span> <span className="dl-word inline-block">own.</span></span>
             </h1>
             <p className="dl-lede mt-6 max-w-[34rem] text-[17px] leading-[1.6] text-ink/75 sm:text-[19px]">
-              One agent, one memory, every device. Android and Linux are ready today. iPhone, Mac and Windows are on the way.
+              One agent, one memory, every device. Android, Mac, Windows and Linux are ready today. iPhone is on the way.
             </p>
             <div className="dl-lede mt-9 flex flex-col gap-4 sm:flex-row">
               {featured.status === "live" && featured.url
@@ -293,6 +293,7 @@ export default function Downloads() {
             </div>
             <p className="dl-lede label mt-5 text-[10px] text-ink/55">
               {os ? <>We spotted {platforms.find((p) => p.id === os)!.name}. It is first in the list below.</> : <>Pick your platform below.</>}
+              {featured.status === "live" && featured.alt && <> <a href={featured.alt.url} download={featured.alt.file} className="text-brand-ink underline-offset-4 hover:underline">Or get it for {featured.alt.label}</a>.</>}
             </p>
           </div>
 
