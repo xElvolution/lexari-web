@@ -5,6 +5,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepe
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import AgentFace from "./AgentFace";
 import { F } from "@/web/kit";
+import { LogoMark } from "./Logo";
 
 function Dot({ i }: { i: number }) {
   const y = useSharedValue(0);
@@ -34,7 +35,7 @@ export default function SignInLoader({ text = "Signing you in…", sub }: { text
         <View style={{ width: 132, height: 132, borderRadius: 40, backgroundColor: "#1d0f5c", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" }}><AgentFace size={104} animated /></View>
       </View>
       <View style={{ marginTop: 36, flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}><View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#0a0a0a" }} /></View>
+        <LogoMark size={28} />
         <Text style={{ fontFamily: F.display, fontSize: 19, letterSpacing: -0.85, color: "#fff" }}>lexari</Text>
       </View>
       <Text style={{ marginTop: 16, fontFamily: F.semi, fontSize: 15.5, color: "#fff" }}>{text}</Text>

@@ -1,3 +1,4 @@
+import { LogoMark } from "@/components/Logo";
 /** Landing page art (lexari.ai), ported to React Native: the hanging hero ID badge (shared/components/Badge.tsx),
  * the finale face row (landing/components/Finale.tsx), the desk brief screen (Desk.tsx) and a roster card (Roster.tsx). Same faces, colours and words. */
 import Badge from "./Badge";
@@ -256,7 +257,7 @@ export function HeroTitle({ s = 46 }: { s?: number }) {
 export function LandingLogo({ scale = 1 }: { scale?: number }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 * scale }}>
-      <View style={{ width: 25 * scale, height: 25 * scale, borderRadius: 8 * scale, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}><View style={{ width: 9 * scale, height: 9 * scale, borderRadius: 5 * scale, backgroundColor: "#000" }} /></View>
+      <LogoMark size={25 * scale} />
       <T f="display" s={23 * scale} c="#fff" style={{ letterSpacing: -1 * scale }}>lexari</T>
     </View>
   );

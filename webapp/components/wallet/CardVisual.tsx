@@ -5,6 +5,7 @@ import { PALETTE } from "@shared/components/avatar";
 import type React from "react";
 import type { Card } from "@/lib/pay";
 import Icon from "../Icon";
+import { LogoMark } from "@shared/components/Logo";
 
 /**
  * A payment card for one agent. Until a card is really issued this is a preview:
@@ -26,7 +27,7 @@ export default function CardVisual({ id, name, className = "", card = null, onCo
       <div className="pointer-events-none absolute -bottom-20 -left-16 h-48 w-48 rounded-full border border-white/[.07]" />
       <div aria-hidden className="card-sheen pointer-events-none absolute inset-0" />
       <div className="relative flex items-start justify-between">
-        <div className="flex min-w-0 items-center gap-[2cqw]"><span className="grid h-[clamp(18px,6.5cqw,24px)] w-[clamp(18px,6.5cqw,24px)] shrink-0 place-items-center rounded-[7px] bg-white"><span className="h-[30%] w-[30%] rounded-full bg-[#0a0a0a]" /></span><span className="display text-[clamp(15px,5.6cqw,20px)] leading-none">lexari</span></div>
+        <div className="flex min-w-0 items-center gap-[2cqw]"><span className="grid h-[clamp(18px,6.5cqw,24px)] w-[clamp(18px,6.5cqw,24px)] shrink-0 [&>svg]:h-full [&>svg]:w-full"><LogoMark size={24} /></span><span className="display text-[clamp(15px,5.6cqw,20px)] leading-none">lexari</span></div>
         <div className="flex shrink-0 items-center gap-[2cqw]"><span className={`label whitespace-nowrap rounded-full px-2 py-0.5 text-[clamp(6.5px,2.2cqw,8px)] ${card?.test ? "bg-[#ffd84d] text-[#0a0a0a]" : "bg-white/15"}`}>{card ? (card.test ? "Virtual · test" : card.frozen ? "Frozen" : "Virtual") : "Preview"}</span>
           <svg width="18" height="18" style={{ width: "clamp(14px,5cqw,18px)", height: "clamp(14px,5cqw,18px)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="rotate-90 opacity-80" aria-hidden><path d="M8.5 16.5a6 6 0 0 1 0-9M12 19a9.5 9.5 0 0 0 0-14M15.5 21.5a13 13 0 0 0 0-19" /></svg>
         </div>

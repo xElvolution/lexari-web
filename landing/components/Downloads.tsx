@@ -18,18 +18,16 @@ function detectOS(): PlatformId | null {
   return null;
 }
 
-/* ---------- brand mark (rounded square with a dot, brand purple) ---------- */
+/* ---------- brand mark: the grape tile with the eyes and smile (same art as the app icon) ---------- */
 function Mark({ size = 40, className = "" }: { size?: number; className?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 72 72" className={className} aria-hidden>
-      <defs>
-        <linearGradient id="lx-dl" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#8f6bff" />
-          <stop offset="1" stopColor="#5b2bff" />
-        </linearGradient>
-      </defs>
-      <rect width="72" height="72" rx="22" fill="url(#lx-dl)" />
-      <circle cx="36" cy="36" r="12" fill="#fff" />
+    <svg width={size} height={size} viewBox="0 0 64 64" className={className} aria-hidden>
+      <rect width="64" height="64" rx="16" fill="#5b2bff" />
+      <ellipse cx="22.9" cy="26.9" rx="5.1" ry="7.75" fill="#fff" />
+      <ellipse cx="40.9" cy="26.9" rx="5.1" ry="7.75" fill="#fff" />
+      <circle cx="24.4" cy="24.9" r="2.06" fill="#3514b0" />
+      <circle cx="42.4" cy="24.9" r="2.06" fill="#3514b0" />
+      <path d="M21.6 41.4 Q32 49.9 42.4 41.4" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" />
     </svg>
   );
 }

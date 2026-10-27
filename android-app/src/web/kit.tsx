@@ -1,5 +1,6 @@
 /** Phone kit that mirrors app.lexari.ai at 390px: colours, type scale, top bar, agent tiles with rings, labels, pills. */
 import { useEffect, useState, type ReactNode } from "react";
+import { LogoMark } from "@/components/Logo";
 import { useMotion } from "@/lib/motion";
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from "react-native-reanimated";
 import { useData } from "@/web/data";
@@ -72,7 +73,7 @@ export function Logo() {
   const k = useC();
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-      <View style={{ width: 25, height: 25, borderRadius: 9, backgroundColor: k.ink, alignItems: "center", justifyContent: "center" }}><View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: k.bg }} /></View>
+      <LogoMark size={25} />
       {/* web header wordmark: text-[26px] display, which the phone type scale draws at 20px / 19px */}
       <Text style={{ fontFamily: F.display, fontSize: 20, lineHeight: 19, letterSpacing: -0.9, color: k.ink }}>lexari</Text>
     </View>

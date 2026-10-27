@@ -1,19 +1,17 @@
 import { Text, View } from "react-native";
-import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, Ellipse, Path, Rect } from "react-native-svg";
 import { grape } from "@/theme/colors";
 
-/** Lexari mark: the web app's rounded square with a dot, in brand purple. */
+/** Lexari mark: the grape tile with the eyes and smile, same art as the app icon and the web app. */
 export function LogoMark({ size = 72 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 72 72">
-      <Defs>
-        <LinearGradient id="lx" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#8f6bff" />
-          <Stop offset="1" stopColor={grape} />
-        </LinearGradient>
-      </Defs>
-      <Rect x={0} y={0} width={72} height={72} rx={22} fill="url(#lx)" />
-      <Circle cx={36} cy={36} r={12} fill="#fff" />
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <Rect x={0} y={0} width={64} height={64} rx={16} fill={grape} />
+      <Ellipse cx={22.9} cy={26.9} rx={5.1} ry={7.75} fill="#fff" />
+      <Ellipse cx={40.9} cy={26.9} rx={5.1} ry={7.75} fill="#fff" />
+      <Circle cx={24.4} cy={24.9} r={2.06} fill="#3514b0" />
+      <Circle cx={42.4} cy={24.9} r={2.06} fill="#3514b0" />
+      <Path d="M21.6 41.4 Q32 49.9 42.4 41.4" fill="none" stroke="#fff" strokeWidth={4} strokeLinecap="round" />
     </Svg>
   );
 }

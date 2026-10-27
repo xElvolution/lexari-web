@@ -21,6 +21,7 @@ import { nextAfterSignIn } from "@/lib/route";
 import type { SavedSession } from "@/lib/session";
 import { passkeyError, passkeySignIn, passkeySupported } from "@/lib/passkey";
 import { Btn, F, GRAPE, PopIn, Rise, useC } from "@/web/kit";
+import { LogoMark } from "@/components/Logo";
 
 const SOON = "This sign-in option is being switched on. Please try another way for now.";
 
@@ -215,7 +216,7 @@ function SignInView({ methods, onSession }: { methods: Methods; onSession: (s: S
           <Carpet color="rgba(255,255,255,0.2)" />
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <View accessibilityRole="header" accessibilityLabel="Lexari" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}><View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: GRAPE }} /></View>
+              <View style={{ borderRadius: 8, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.85)", overflow: "hidden" }}><LogoMark size={28} /></View>
               <Text style={{ fontFamily: F.display, fontSize: 20, letterSpacing: -0.9, color: "#fff" }}>lexari</Text>
             </View>
             <ThemeToggle />

@@ -4,6 +4,7 @@
  * A tap or a fast sideways flick turns it over (spring) and kicks the lanyard. Physics runs every frame on the UI thread.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { LogoMark } from "./Logo";
 import { Platform, Text, TextInput, View, useWindowDimensions, type LayoutRectangle } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -103,7 +104,7 @@ export function Carpet({ color = "rgba(255,255,255,0.2)" }: { color?: string }) 
 export function CardLogo({ scale = 1 }: { scale?: number }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 * scale }}>
-      <View style={{ width: 28 * scale, height: 28 * scale, borderRadius: 9 * scale, backgroundColor: "#0a0a0a", alignItems: "center", justifyContent: "center" }}><View style={{ width: 10 * scale, height: 10 * scale, borderRadius: 5 * scale, backgroundColor: "#fff" }} /></View>
+      <LogoMark size={28 * scale} />
       <Disp s={26 * scale} style={{ lineHeight: 26 * scale }}>lexari</Disp>
     </View>
   );

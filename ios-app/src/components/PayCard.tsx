@@ -10,6 +10,7 @@ import { MASK, useHideBalance } from "@/lib/privacy";
 import { useSession } from "@/state/session";
 import { F, GRAPE, Label, Pill, T, WSheet, useC } from "@/web/kit";
 import { toast } from "@/web/anim";
+import { LogoMark } from "./Logo";
 
 export type PayCard = { agent: string; last4: string; limit: number; spent: number; frozen: boolean; test?: boolean; number?: string; expMonth?: number; expYear?: number; cvv?: string };
 export type Tempo = { address: string; network?: string; frozen: boolean; perTxUsd: number; dailyUsd: number; spentTodayUsd: number; balances: { symbol: string; amount: number }[] | null };
@@ -53,7 +54,7 @@ export function PayCardFace({ name, card, home, width }: { name: string; card: P
       </Svg>
       <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 2 * u }}>
-          <View style={{ width: Math.max(18, Math.min(24, 6.5 * u)), height: Math.max(18, Math.min(24, 6.5 * u)), borderRadius: 7, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}><View style={{ width: "30%", height: "30%", borderRadius: 99, backgroundColor: "#0a0a0a" }} /></View>
+          <LogoMark size={Math.max(18, Math.min(24, 6.5 * u))} />
           <T f="display" s={Math.max(15, Math.min(20, 5.6 * u))} c="#fff" style={{ lineHeight: Math.max(16, Math.min(22, 6 * u)) }}>lexari</T>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 2 * u }}>

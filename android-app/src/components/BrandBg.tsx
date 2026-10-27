@@ -1,5 +1,5 @@
 /** Lexari brand background: deep violet glow fading to near-black (like the web balance card and the landing glow). */
-import Svg, { Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import { View } from "react-native";
 import Icon from "@/components/Icon";
 import AgentFace from "@/components/AgentFace";
@@ -22,14 +22,15 @@ export function BrandBg({ width, height, cy = "34%" }: { width: number; height: 
 export function LexariMark({ size = 56 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
-      <Rect width={64} height={64} rx={15} fill="#5b2bff" />
+      <Rect width={64} height={64} rx={16} fill="#5b2bff" />
       {/* eyes + smile */}
       <EyeSmile />
     </Svg>
   );
 }
 function EyeSmile() {
-  return <><Ellipse cx={22} cy={26} rx={6} ry={8.5} fill="#fff" /><Ellipse cx={42} cy={26} rx={6} ry={8.5} fill="#fff" /><Path d="M20 41 Q32 51.5 44 41" fill="none" stroke="#fff" strokeWidth={5.5} strokeLinecap="round" /></>;
+  // same face as components/Logo LogoMark and the app icon
+  return <><Ellipse cx={22.9} cy={26.9} rx={5.1} ry={7.75} fill="#fff" /><Ellipse cx={40.9} cy={26.9} rx={5.1} ry={7.75} fill="#fff" /><Circle cx={24.4} cy={24.9} r={2.06} fill="#3514b0" /><Circle cx={42.4} cy={24.9} r={2.06} fill="#3514b0" /><Path d="M21.6 41.4 Q32 49.9 42.4 41.4" fill="none" stroke="#fff" strokeWidth={4} strokeLinecap="round" /></>;
 }
 
 /** Minimal onboarding illustration: a soft glowing circle holding one icon (or the agent face). */
