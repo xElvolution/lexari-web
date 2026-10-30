@@ -1,0 +1,108 @@
+@font-face{font-family:"Bricolage Grotesque";src:url(../assets/fonts/bricolage.woff2) format("woff2");font-weight:200 800;font-stretch:75% 100%}
+@font-face{font-family:Figtree;src:url(../assets/fonts/figtree.woff2) format("woff2");font-weight:300 900}
+@font-face{font-family:"Martian Mono";src:url(../assets/fonts/martian-mono.woff2) format("woff2");font-weight:400}
+/* Lexari identity tokens, same as shared/styles/theme.css (dark) */
+:root{--bg:#000;--alt:#0b0915;--card:#13101f;--tint:#1d1731;--panel:rgba(11,9,21,.78);--line:rgba(255,255,255,.13);--text:#fff;--mute:rgba(255,255,255,.58);
+--grape:#5b2bff;--p1:#8f6bff;--p2:#3514b0;--p3:#c9b8ff;--brand-ink:#a58bff;--gold:#f5c542;--tb:44px;
+--display:"Bricolage Grotesque",system-ui,sans-serif;--sans:Figtree,system-ui,sans-serif;--mono:"Martian Mono",ui-monospace,monospace}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden;user-select:none}
+.aurora{position:fixed;inset:0;z-index:0;filter:blur(80px);opacity:.5;pointer-events:none}
+.aurora i{position:absolute;width:46vw;height:46vw;border-radius:50%;background:radial-gradient(circle,var(--grape),transparent 65%);animation:drift 22s ease-in-out infinite alternate}
+.aurora i:nth-child(2){right:-10vw;top:30vh;background:radial-gradient(circle,var(--p2),transparent 65%);animation-duration:28s}
+.aurora i:nth-child(3){left:30vw;bottom:-25vw;background:radial-gradient(circle,#5a2bd6,transparent 60%);animation-duration:34s}
+@keyframes drift{to{transform:translate(8vw,-6vh) scale(1.2)}}
+.titlebar{position:relative;z-index:3;height:var(--tb);display:flex;align-items:center;gap:14px;padding:0 0 0 14px;-webkit-app-region:drag;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(19,16,31,.82),rgba(0,0,0,.55));backdrop-filter:blur(20px)}
+.tl-space{display:none;width:64px}
+body.darwin .tl-space{display:block}
+body.darwin .winbtns,body.win32 .winbtns{display:none}
+body.win32 .titlebar{padding-right:140px}
+.brand{display:flex;align-items:center;gap:8px;font-size:14px;letter-spacing:.2px}
+.orb{width:16px;height:16px;border-radius:50%;background:conic-gradient(from 0deg,var(--p1),var(--p3),var(--p2),var(--p1));box-shadow:0 0 14px var(--p1);animation:spin 6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.net{font:500 9.5px/1 var(--mono);text-transform:uppercase;letter-spacing:.8px;color:var(--gold);border:1px solid rgba(245,197,66,.4);padding:2px 7px;border-radius:99px;background:rgba(245,197,66,.08)}
+.crumbs{color:var(--mute);font-weight:600;transition:opacity .3s}
+.search{-webkit-app-region:no-drag;margin-left:auto;margin-right:auto;width:min(380px,32vw);display:flex;justify-content:space-between;align-items:center;gap:8px;height:28px;padding:0 6px 0 12px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--mute);cursor:pointer;transition:all .25s}
+.search:hover{border-color:rgba(143,107,255,.5);box-shadow:0 0 0 4px rgba(143,107,255,.12)}
+kbd{font:11px ui-monospace,monospace;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.07)}
+.spacer{display:none}
+.winbtns{display:flex;-webkit-app-region:no-drag;height:100%}
+.winbtns button{width:46px;height:100%;border:0;background:none;color:var(--text);cursor:pointer;transition:background .15s}
+.winbtns button:hover{background:rgba(255,255,255,.08)}.winbtns .x:hover{background:#c42b4b}
+.winbtns svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:1.1}
+.body{position:relative;z-index:1;display:flex;height:calc(100% - var(--tb))}
+.stage{position:relative;flex:1;overflow:hidden}
+webview{position:absolute;inset:0;width:100%;height:100%;opacity:0;transform:scale(.985);transition:opacity .5s,transform .6s cubic-bezier(.2,.9,.3,1)}
+webview.ready{opacity:1;transform:none}
+.loadbar{position:absolute;top:0;left:0;height:2px;width:0;background:linear-gradient(90deg,var(--p3),var(--p1),var(--gold));box-shadow:0 0 12px var(--p1);transition:width .4s,opacity .4s;z-index:4}
+.loadbar.go{width:72%;transition:width 6s cubic-bezier(.1,.7,.2,1)}.loadbar.done{width:100%;opacity:0}
+.splash,.offline{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;transition:opacity .6s,visibility .6s;z-index:3}
+.splash p,.offline p{color:var(--mute);max-width:380px}
+.rings{position:relative;width:120px;height:120px;margin-bottom:12px}
+.rings span{position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(143,107,255,.6);animation:pulse 2.4s ease-out infinite}
+.rings span:nth-child(2){animation-delay:.8s}.rings span:nth-child(3){animation-delay:1.6s}
+@keyframes pulse{from{transform:scale(.35);opacity:1}to{transform:scale(1.3);opacity:0}}
+.core{position:absolute;inset:38px;border-radius:50%;background:conic-gradient(var(--p1),var(--p3),var(--p2),var(--p1));box-shadow:0 0 40px var(--p1);animation:spin 3s linear infinite}
+.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.offline{background:radial-gradient(circle at 50% 40%,rgba(53,20,176,.35),transparent 60%)}
+.glyph svg{width:84px;height:84px;fill:none;stroke:var(--p3);stroke-width:3;stroke-linecap:round;animation:bob 3s ease-in-out infinite}
+.glyph circle{fill:var(--p3)}.glyph .slash{stroke:var(--gold);stroke-dasharray:70;stroke-dashoffset:70;animation:draw 1.2s .3s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}@keyframes bob{50%{transform:translateY(-6px)}}
+.offline h2{font-size:22px}
+.row{display:flex;gap:10px;margin-top:8px}
+.row button{height:36px;padding:0 18px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--text);cursor:pointer;transition:transform .2s,box-shadow .2s}
+.row button:hover{transform:translateY(-2px)}
+.row .primary{border:0;background:var(--grape);font-weight:700;box-shadow:0 4px 0 var(--p2),0 10px 26px rgba(91,43,255,.45)}
+.row .primary:active{transform:translateY(2px);box-shadow:0 2px 0 var(--p2)}
+.palette{position:fixed;inset:0;z-index:10;background:rgba(5,3,12,.55);backdrop-filter:blur(6px);display:flex;justify-content:center;padding-top:14vh;transition:opacity .2s}
+.palette .card{width:min(560px,90vw);height:fit-content;border-radius:18px;background:rgba(19,16,31,.97);border:1px solid rgba(165,139,255,.35);box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.04) inset;overflow:hidden;transform:translateY(0) scale(1);transition:transform .25s cubic-bezier(.3,1.5,.5,1)}
+.palette.hidden .card{transform:translateY(-12px) scale(.97)}
+.palette input{width:100%;height:52px;padding:0 18px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--text);font-size:15px;outline:none}
+.palette ul{list-style:none;padding:6px;max-height:340px;overflow:auto}
+.palette li{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--mute)}
+.palette li.sel{background:linear-gradient(90deg,rgba(143,107,255,.28),rgba(143,107,255,.06));color:#fff}
+.palette li svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7}
+@media (max-width:900px){.crumbs,.search span{display:none}.search{width:auto}}
+
+/* ---------- Lexari mark: the grape tile with the eyes and smile (assets/mark.svg = shared/components/Logo.tsx) ---------- */
+.mark{--s:28px;position:relative;display:inline-block;width:var(--s);height:var(--s);border-radius:calc(var(--s)*.25);background:url(../assets/mark.svg) center/100% 100% no-repeat;flex:none}
+.mark i{display:none}
+.mark.sm{--s:22px}.mark.xl{--s:96px;box-shadow:0 18px 60px rgba(91,43,255,.55)}
+.word{font-family:var(--display);font-weight:800;letter-spacing:-.045em;font-variation-settings:"wdth" 88;line-height:.9;color:#fff}
+.brand .word{font-size:21px;margin-top:-3px}
+@keyframes look{0%,40%,100%{transform:none}45%,55%{transform:translateX(18%)}60%,70%{transform:translateX(-18%)}75%{transform:scaleY(.15)}78%{transform:none}}
+/* splash */
+.splash{background:radial-gradient(60% 50% at 50% 45%,rgba(91,43,255,.28),transparent 70%),#000;gap:18px}
+.splash .halo{position:absolute;width:260px;height:260px;top:calc(50% - 170px)}
+.halo span{position:absolute;inset:0;border-radius:32%;border:1.5px solid rgba(165,139,255,.55);animation:halo 2.8s cubic-bezier(.2,.7,.3,1) infinite}
+.halo span:nth-child(2){animation-delay:.9s}.halo span:nth-child(3){animation-delay:1.8s}
+@keyframes halo{from{transform:scale(.38) rotate(0);opacity:1}to{transform:scale(1.35) rotate(25deg);opacity:0}}
+.pop{animation:pop .9s cubic-bezier(.3,1.7,.45,1) both}
+@keyframes pop{0%{transform:scale(.2) rotate(-30deg);opacity:0}100%{transform:none;opacity:1}}
+.splash .mark i{animation:blink 2.6s 1s ease-in-out infinite}
+@keyframes blink{0%,86%,100%{transform:none}90%{transform:scaleY(.12)}}
+.splash h1.word{font-size:64px;display:flex}
+.reveal span{display:inline-block;animation:rise .7s cubic-bezier(.2,.9,.3,1.2) both}
+.reveal span:nth-child(1){animation-delay:.35s}.reveal span:nth-child(2){animation-delay:.41s}.reveal span:nth-child(3){animation-delay:.47s}.reveal span:nth-child(4){animation-delay:.53s}.reveal span:nth-child(5){animation-delay:.59s}.reveal span:nth-child(6){animation-delay:.65s}
+@keyframes rise{from{transform:translateY(60%);opacity:0;filter:blur(6px)}}
+.fade{animation:fadein .8s .9s both}@keyframes fadein{from{opacity:0;transform:translateY(6px)}}
+.dots{display:flex;gap:6px}.dots i{width:7px;height:7px;border-radius:50%;background:var(--grape);animation:dot 1.1s ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-7px);opacity:1;background:var(--p3)}}
+/* offline */
+.offline{background:radial-gradient(55% 45% at 50% 40%,rgba(91,43,255,.25),transparent 70%),#000}
+.offline h2{font-variant-ligatures:none;font-family:var(--display);font-weight:800;letter-spacing:-.03em;font-size:34px;font-variation-settings:"wdth" 88}
+.offmark{position:relative;margin-bottom:10px;animation:bob 3.4s ease-in-out infinite}
+.sleepy i{animation:sleepy 3.4s ease-in-out infinite}@keyframes sleepy{0%,100%{transform:scaleY(.18)}50%{transform:scaleY(.5)}}
+.offmark .badge{position:absolute;right:-14px;bottom:-10px;width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:var(--grape);box-shadow:0 4px 0 var(--p2),0 8px 20px rgba(91,43,255,.5)}
+.offmark .badge svg{width:22px;height:22px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round}.offmark .badge circle{fill:#fff}
+.offmark .slash{stroke:var(--gold);stroke-dasharray:30;stroke-dashoffset:30;animation:draw 1s .4s forwards}
+.offmark .badge .bang{display:none}.offline.error .badge svg:not(.bang){display:none}.offline.error .badge .bang{display:block;stroke-width:2.6}
+.offline.error .badge{background:#e2335b;box-shadow:0 4px 0 #8f1636,0 8px 20px rgba(226,51,91,.45)}
+@media (max-width:900px){.brand .word{font-size:18px}.splash h1.word{font-size:48px}.mark.xl{--s:72px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Once the app is on screen the aurora and splash stop: a full-window 80px blur animating under the web view (and the
+   title bar's backdrop blur re-sampling it every frame) kept the GPU busy on older Macs. */
+body.live .aurora,body.live .splash{display:none}
+body.live .titlebar{backdrop-filter:none;background:#0b0915}

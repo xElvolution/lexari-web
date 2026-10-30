@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ai.lexari.app.testnet",
+      "sha256_cert_fingerprints": [
+        "DE:A5:85:65:D8:8D:F9:D4:74:A1:3C:79:4A:1B:BA:D7:7F:0D:81:07:A4:98:98:ED:68:E4:23:F1:8B:3A:21:9A",
+        "09:DC:01:76:B9:7C:14:C5:DF:43:9D:87:A1:AC:27:E9:89:BF:DB:6A:E6:5E:AC:61:40:8F:09:F9:34:B5:10:B9"
+      ]
+    }
+  }
+]

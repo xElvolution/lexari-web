@@ -1,0 +1,11 @@
+node_modules
+.expo
+dist
+android
+ios
+*.jks
+*.keystore
+google-services.json
+.env
+.env.*
+!.env.example

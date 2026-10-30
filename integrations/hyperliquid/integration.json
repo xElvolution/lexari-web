@@ -1,0 +1,39 @@
+{
+  "$schema": "../schema.json",
+  "slug": "hyperliquid",
+  "name": "Hyperliquid",
+  "kind": "built-in",
+  "connector": "hyperliquid",
+  "category": "trading",
+  "status": "live-testnet",
+  "description": "Each agent trades from its own Hyperliquid testnet account through an API wallet: a separate key that can place and cancel orders but can never withdraw or move funds. Agents read prices, positions and open orders, and every order waits for your Confirm inside your per-trade and daily limits. Test USDC only.",
+  "website": "https://hyperliquid.xyz",
+  "docs": "https://hyperliquid.gitbook.io/hyperliquid-docs",
+  "chains": [
+    "Hyperliquid testnet"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Live prices, positions and open orders",
+      "live": true
+    },
+    {
+      "text": "Market and limit orders, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Trade-only API wallet, no withdrawals",
+      "live": true
+    },
+    {
+      "text": "Mainnet",
+      "live": false
+    }
+  ]
+}

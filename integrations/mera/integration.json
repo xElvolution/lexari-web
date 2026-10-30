@@ -1,0 +1,36 @@
+{
+  "$schema": "../schema.json",
+  "slug": "mera",
+  "name": "Mera",
+  "kind": "built-in",
+  "connector": "mera",
+  "category": "chains",
+  "status": "live-testnet",
+  "description": "Mera derives keys from a passkey (WebAuthn PRF), with no seed phrase and nothing secret stored. Your passkey signs you in to Lexari and derives a separate EVM key for each agent, so one Face ID or Touch ID covers all of them. Add it in Settings, Security.",
+  "website": "https://mera.category.xyz",
+  "docs": "https://mera.category.xyz",
+  "chains": [
+    "Monad",
+    "Solana"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.svg",
+  "actions": [
+    {
+      "text": "Passkey sign-in",
+      "live": true
+    },
+    {
+      "text": "A separate key for each agent from one passkey",
+      "live": true
+    },
+    {
+      "text": "Same keys on every device your passkey syncs to",
+      "live": true
+    }
+  ]
+}

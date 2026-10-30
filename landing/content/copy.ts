@@ -24,6 +24,7 @@ export const copy = {
       { label: "Roster", href: "#roster" },
       { label: "Seats", href: "#seats" },
       { label: "Questions", href: "#questions" },
+      { label: "Download", href: "/download" },
     ],
     signin: "Sign in",
     cta: "Hire your agent",
@@ -155,8 +156,7 @@ export const copy = {
     letter: {
       head: "Welcome letter",
       lines: [
-        ["Signed in with", "Google or a crypto wallet"],
-        ["Wallet options", "Phantom, Solflare, Backpack"],
+        ["Signed in with", "Google"],
         ["Your agent", "Juniper · Desk 01"],
         ["Next step", "Hire more when you are ready"],
       ],
@@ -165,8 +165,7 @@ export const copy = {
     },
     chapters: [
       { n: "i", head: "Sign in with Google", text: "Use your Google account or an email code. We make a Solana wallet for you, so there is nothing to install." },
-      { n: "ii", head: "Or use a Solana wallet", text: "Connect Phantom, Solflare or Backpack and sign one message. That proves the wallet is yours." },
-      { n: "iii", head: "Meet your agent, then hire more", text: "Name your personalized agent on day one. Add specialists from the roster whenever the work asks for it." },
+      { n: "ii", head: "Meet your agent, then hire more", text: "Name your personalized agent on day one. Add specialists from the roster whenever the work asks for it." },
     ],
   },
 
@@ -209,6 +208,8 @@ export const copy = {
         links: [
           { label: "Open the app", href: APP },
           { label: "Marketplace", href: `${APP}/marketplace` },
+          { label: "Download", href: "/download" },
+          { label: "Docs", href: "https://docs.lexari.ai" },
           { label: "Sign in", href: SIGNIN },
         ],
       },

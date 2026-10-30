@@ -22,7 +22,7 @@ export default function Quests({ s, now }: { s: State; now: number }) {
   const ready = (p: Period) => all.filter((q) => q.period === p && q.done && !q.claimed).length;
   const doneCount = list.filter((q) => q.claimed).length;
   const t = TABS.find((x) => x.id === tab)!;
-  const listRef = useFirstN<HTMLUListElement>(4, tab + list.length);
+  const listRef = useFirstN<HTMLUListElement>(4, tab + list.length, { allFrom: 1024 });
   return (
     <section data-rise id="quests" className="scroll-mt-24 rounded-[30px] bg-card p-5 ring-1 ring-line sm:p-7">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -46,7 +46,7 @@ export default function Quests({ s, now }: { s: State; now: number }) {
       <ul ref={listRef} key={tab} data-quest-list className={`mt-4 grid gap-2.5 overscroll-contain pr-0.5 ${tab === "hard" ? "md:grid-cols-2" : ""}`}>
         {list.map((q, i) => <QuestRow key={q.id} q={q} i={i} hard={tab === "hard"} />)}
       </ul>
-      {list.length > 4 && <p className="pt-2 text-center text-[12.5px] font-semibold text-ink/45">Scroll for {list.length - 4} more</p>}
+      {list.length > 4 && <p className="pt-2 text-center lg:hidden text-[12.5px] font-semibold text-ink/45">Scroll for {list.length - 4} more</p>}
     </section>
   );
 }

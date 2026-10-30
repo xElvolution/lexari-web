@@ -1,0 +1,11 @@
+{
+  "name": "@lexari/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Build agents for the Lexari Marketplace: defineAgent, defineTool, intents, a signed webhook handler and a local test client.",
+  "license": "SEE LICENSE IN ../../../LICENSE",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@lexari/manifest": "0.1.0", "zod": "^3.25.0" }
+}

@@ -118,10 +118,10 @@ flowchart LR
 | Hub (check-in, quests, mystery box, levels, referrals) | 🟢 | Runs offchain in Postgres today, with race-safe claims |
 | Billing and top-up | 🟢 | Plans and credits. Deposits verified on Solana devnet and EVM, Tempo, Bitcoin, Litecoin, Tron and XRPL testnets |
 | Rename your agent from its profile | 🟢 | Nickname and notes on the agent panel |
-| Agent manages itself by chat (rename, face, tone, model) | 🟡 | In active development: a built-in `self` connector where every change is a Confirm card. The agent can never change its own grants, limits, wallets or keys |
+| Agent manages itself by chat (rename, face, tone, model) | 🟢 | A built-in `self` connector: every change is a Confirm card, applied only on your Confirm and kept in the audit log. Never from email or web content it read. The agent can never change its own grants, limits, wallets or keys |
 | Onchain agent ID card (Metaplex Core + Lexari program) | 🟡 | Mint flow is built and gated: it switches on once the Lexari program is deployed to devnet |
 | Lexari Anchor program | 🟡 | Agent registry, memory records, Hub PDAs. Built with tests. Devnet deploy pending (rent for a ~416 KB program) |
-| ORE Miner gift reveal after your agent is created | ⚪ | Today the ORE Miner is a free specialist in the marketplace. The wrapped gift flow is designed, not built |
+| ORE Miner gift reveal after your agent is created | 🟢 | A wrapped gift opens at the end of web onboarding. One tap claims the ORE bot on a paid plan; on the free plan the gift says it comes with any paid plan and opens Plans |
 | Agent payment card | 🟡 | `CardIssuer` interface plus a TEST-only issuer (4242 numbers that work nowhere). Stripe Issuing or Lithic later |
 
 ### Integrations
@@ -135,16 +135,16 @@ Every integration is **off until you add it**, granted to specific agents, and b
 | Jupiter | Solana mainnet (quotes) | 🟢 | ⚪ swaps | 🟢 read only |
 | Cross-chain quotes (LI.FI) | Solana, Ethereum, Base, Arbitrum, Bitcoin and more | 🟢 | ⚪ bridging | 🟢 read only |
 | Polymarket | Polygon | 🟢 markets and odds | ⚪ orders | 🟢 read only |
-| Panta prediction markets | Solana | 🟢 | 🟡 paper positions on devnet | 🟡 needs API key |
+| Panta prediction markets | Solana | 🟢 | 🟡 paper positions on devnet: open at a real quote, marked to live prices, closed with profit and loss after Confirm (built and tested; stays 🟡 until a Panta API key is set) | 🟡 needs API key |
 | Tempo | Moderato testnet (42431) | 🟢 pathUSD, AlphaUSD | 🟢 faucet, sends, top-ups after Confirm | 🟢 |
-| Base | Base Sepolia | 🟢 balances | ⚪ swaps and transfers | 🟢 read only |
-| Ethereum | Sepolia | 🟢 balances | ⚪ swaps and transfers | 🟢 read only |
+| Base | Base Sepolia | 🟢 balances | 🟢 transfers (ETH, test USDC) and Uniswap v3 swaps, after Confirm | 🟢 |
+| Ethereum | Sepolia | 🟢 balances | 🟢 transfers (ETH, test USDC) and Uniswap v3 swaps, after Confirm | 🟢 |
 | Market prices | Any | 🟢 | n/a | 🟢 |
 | Agent payments (x402, agent to agent requests) | Solana devnet | 🟢 | 🟢 auto inside budget, Confirm above it | 🟢 |
 | ORE mining | Your own server | 🟢 | 🟢 install, start, stop, watch (practice mode, no rewards) | 🟢 |
 | Solami (RPC, webhooks, Beam) | Solana mainnet | ⚪ | ⚪ | ⚪ arrives with mainnet |
 | Hyperliquid (trade-only API wallet, perps) | Hyperliquid testnet | 🟢 prices, positions, orders | 🟢 market and limit orders after Confirm | 🟢 |
-| Monad (Kuru, AUSD, Nansen data) | Monad testnet | 🟢 MON balance; 🟡 Nansen wallet reads and Kuru routes (need API keys) | 🟡 Kuru swaps after Confirm (need the Kuru API and router); ⚪ AUSD | 🟡 |
+| Monad (Kuru, AUSD, Nansen data) | Monad testnet | 🟢 MON balance; 🟡 Nansen wallet reads and Kuru routes (need API keys) | 🟡 Kuru swaps after Confirm (need the Kuru API and router); 🟢 AUSD balance, faucet, pay and cross-border sends after Confirm | 🟡 |
 | Tempo agent card | Tempo testnet | 🟢 balance, limits, history | 🟢 merchant payments in stablecoins after Confirm, per payment and daily limits, freeze | 🟢 web and phone |
 
 ### Models
@@ -156,9 +156,9 @@ Every integration is **off until you add it**, granted to specific agents, and b
 | Bring your own key | 🟢 | OpenAI, Anthropic, Google, xAI, OpenRouter, plus a custom OpenAI-compatible base URL |
 | Kimi and Qwen on your own key | 🟢 | Via the OpenRouter provider (`moonshotai/kimi-k3`, `qwen/qwen3.8-flash`) or any model added by name |
 | Kimi K3 and Qwen 3.8 Max as house models | 🟢 | Live in the model picker on Lexari's own Moonshot and Alibaba Model Studio keys, each with a fallback chain. Kimi K2.5 already powers Lamina |
-| 0G Compute router | 🟡 | In development as a house provider (OpenAI-compatible) |
-| Per-model fallback chains | 🟡 | Lamina already falls back. House models get their own chains (for example Kimi, then Qwen, then 0G, then Lamina) |
-| Cost dashboard and per-agent model caps | ⚪ | Model router v2 |
+| 0G Compute router | 🟢 | A house provider on the 0G Compute Router (OpenAI-compatible). Kimi, Qwen, OpenAI and Claude in the picker run through it with one `ZG_COMPUTE_API_KEY` (direct Moonshot and DashScope keys are optional overrides). Set on the production server and answering |
+| Per-model fallback chains | 🟢 | Each house model has its own chain (Kimi, then Qwen, then OpenAI on 0G, then Lamina), tried only before any text reaches you. `HOUSE_FALLBACKS` reorders or empties a chain per model and `HOUSE_FALLBACK_LAMINA=0` turns off the Lamina last resort |
+| Cost dashboard and per-agent model caps | 🟢 | Settings > Billing > Costs: this cycle's model spend by agent, model and day. Each agent can have a cap per cycle, checked before the model runs; your own API keys never count |
 
 <br/>
 
@@ -416,7 +416,7 @@ flowchart LR
 
 ## ◆ Mobile
 
-`mobileapp/` is a native **Expo** app for Android, built for Solana Mobile and any Android phone. It has its own `package.json` and is not part of the root workspaces.
+`android-app/` is a native **Expo** app for Android, built for Solana Mobile and any Android phone. It has its own `package.json` and is not part of the root workspaces.
 
 | Area | Status | Notes |
 | --- | :---: | --- |
@@ -454,7 +454,7 @@ Package ids `ai.lexari.app.testnet` (preview) and `ai.lexari.app` (production), 
 | **ORE Miner** | Never mines on Lexari machines. One-time install code, hashed host token, uninstall on removal | 🟢 |
 | **Agent key custody** | HMAC-derived keys today (testnets only) | 🟡 |
 | **Policy-bound signing** | Trade-only venue keys are live. Privy server wallets with policies are next | 🟡 |
-| **Transaction simulation** | Simulate EVM signs and show the balance diff on the Confirm card | ⚪ |
+| **Transaction simulation** | Every EVM send, Uniswap swap and AUSD payment is simulated (eth_simulateV1) before its Confirm card exists; the card shows your balance change and the fee, and a call that would revert never becomes a card | 🟢 |
 | **Withdraw only to linked wallets, freeze all agents** | Consent with scopes, limits and expiry, audit log, revoke and switch off all | 🟢 |
 
 ### Custody migration plan
@@ -515,7 +515,7 @@ lexari-web/
 │       ├── miner/           ORE host agent and host tokens
 │       ├── hub/             Offchain Hub, attestor
 │       └── db/              Drizzle schema and SQL migrations
-├── mobileapp/               Expo Android app (own package.json)
+├── android-app/               Expo Android app (own package.json)
 │   ├── app/                 (auth), (tabs), agents, chat, call, desktop, settings
 │   └── src/                 lib (MWA, Privy, session, lock), components, theme, brain
 ├── shared/                  Faces, logo, theme, badge copy and ID backgrounds for both web apps
@@ -567,7 +567,7 @@ Without `DATABASE_URL` and `SESSION_SECRET`, sign-in and data routes return 503 
 ### Mobile
 
 ```bash
-cd mobileapp
+cd android-app
 npm install
 npm test
 npm run typecheck
@@ -640,7 +640,7 @@ Lexari gives everyone personalized AI agents that act onchain. These partners an
 | <img src="https://www.google.com/s2/favicons?domain=intents.aurora.dev&sz=64" width="20" height="20" alt="" /> | **Aurora Intents** | Cross-chain engine for the one balance. When a trade needs funds on another chain, the agent routes them through the Aurora Intents Swap API in a single Confirm card. | Signer layer to Adapter Registry (routing) |
 | <img src="https://www.google.com/s2/favicons?domain=nansen.ai&sz=64" width="20" height="20" alt="" /> | **Nansen** | Smart money flows and wallet profiles. Every trade Confirm card carries a Nansen check line, and agents consult it before proposing a trade. | Adapter Registry: data |
 | <img src="https://www.google.com/s2/favicons?domain=kuru.io&sz=64" width="20" height="20" alt="" /> | **Kuru** | Orderbook routes and swaps on Monad testnet through the Kuru SDK, behind Confirm cards. | Adapter Registry: Monad |
-| <img src="https://www.google.com/s2/favicons?domain=agora.finance&sz=64" width="20" height="20" alt="" /> | **Agora AUSD** | Planned stablecoin for holding and paying in the unified balance. | Adapter Registry: Monad |
+| <img src="https://www.google.com/s2/favicons?domain=agora.finance&sz=64" width="20" height="20" alt="" /> | **Agora AUSD** | Hold, pay and send AUSD across borders from the agent's Monad testnet wallet, each after a Confirm card. Test AUSD from Agora's faucet. | Adapter Registry: Monad |
 | <img src="https://www.google.com/s2/favicons?domain=mera.xyz&sz=64" width="20" height="20" alt="" /> | **Mera** | Planned passkey sign-in and per-agent keys. | Sign-in |
 | <img src="https://www.google.com/s2/favicons?domain=alchemy.com&sz=64" width="20" height="20" alt="" /> | **Alchemy** | RPC for Monad and EVM chains when ALCHEMY_API_KEY is set. | Adapter Registry: RPC |
 | <img src="https://www.google.com/s2/favicons?domain=hyperliquid.xyz&sz=64" width="20" height="20" alt="" /> | **Hyperliquid** | Perps on testnet with a trade-only API wallet, market and limit orders, take profit and stop loss. | Signer layer: HL API wallet |

@@ -4,7 +4,7 @@ import Face from "@shared/components/Face";
 import Logo from "@shared/components/Logo";
 
 export default function Finale() {
-  const F = copy.finale, Ft = copy.footer;
+  const F = copy.finale;
   return (
     <>
       <section className="sheet grain overflow-hidden bg-grape pt-24 text-white sm:pt-32">
@@ -18,37 +18,46 @@ export default function Finale() {
         </div>
         <div aria-hidden className="display pointer-events-none -mb-[0.14em] mt-16 select-none text-center text-[31vw] leading-[0.72] text-white/[0.09]">{F.wordmark}</div>
       </section>
-      <footer className="border-t border-line bg-alt text-ink">
-        <div className="mx-auto grid max-w-[1320px] gap-12 px-5 py-14 sm:px-8 lg:grid-cols-[minmax(16rem,22rem)_1fr] lg:gap-20 lg:py-16">
-          <div>
-            <a href="#top" aria-label="Lexari home" className="inline-flex rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-grape"><Logo /></a>
-            <p className="mt-5 max-w-[28ch] text-[16px] leading-relaxed text-ink/70">{Ft.line}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3">
-            {Ft.groups.map((group) => (
-              <nav key={group.title} aria-label={group.title}>
-                <h2 className="display text-[22px]">{group.title}</h2>
-                <ul className="mt-4 grid gap-2.5">
-                  {group.links.map((l) => (
-                    <li key={l.label}>
-                      {l.href.startsWith("/") ? (
-                        <Link href={l.href} className="text-[15px] text-ink/70 transition hover:text-brand-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-grape">{l.label}</Link>
-                      ) : (
-                        <a href={l.href} className="text-[15px] text-ink/70 transition hover:text-brand-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-grape">{l.label}</a>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            ))}
-          </div>
-        </div>
-        <div className="border-t border-line">
-          <div className="mx-auto flex max-w-[1320px] flex-col gap-2 px-5 py-6 text-[13px] leading-relaxed text-ink/60 sm:flex-row sm:items-baseline sm:justify-between sm:px-8">
-            <span>© 2026 Lexari</span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </>
+  );
+}
+
+/** The site footer. base: "/" on pages other than home so section anchors point back home. */
+export function Footer({ base = "" }: { base?: string }) {
+  const Ft = copy.footer;
+  const to = (href: string) => (href.startsWith("#") ? base + href : href);
+  return (
+    <footer className="border-t border-line bg-alt text-ink">
+    <div className="mx-auto grid max-w-[1320px] gap-12 px-5 py-14 sm:px-8 lg:grid-cols-[minmax(16rem,22rem)_1fr] lg:gap-20 lg:py-16">
+      <div>
+        <a href={to("#top")} aria-label="Lexari home" className="inline-flex rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-grape"><Logo /></a>
+        <p className="mt-5 max-w-[28ch] text-[16px] leading-relaxed text-ink/70">{Ft.line}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3">
+        {Ft.groups.map((group) => (
+          <nav key={group.title} aria-label={group.title}>
+            <h2 className="display text-[22px]">{group.title}</h2>
+            <ul className="mt-4 grid gap-2.5">
+              {group.links.map((l) => (
+                <li key={l.label}>
+                  {l.href.startsWith("/") ? (
+                    <Link href={l.href} className="text-[15px] text-ink/70 transition hover:text-brand-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-grape">{l.label}</Link>
+                  ) : (
+                    <a href={to(l.href)} className="text-[15px] text-ink/70 transition hover:text-brand-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-grape">{l.label}</a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+      </div>
+    </div>
+    <div className="border-t border-line">
+      <div className="mx-auto flex max-w-[1320px] flex-col gap-2 px-5 py-6 text-[13px] leading-relaxed text-ink/60 sm:flex-row sm:items-baseline sm:justify-between sm:px-8">
+        <span>© 2026 Lexari</span>
+      </div>
+    </div>
+  </footer>
   );
 }

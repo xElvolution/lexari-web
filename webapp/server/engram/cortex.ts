@@ -15,7 +15,7 @@ import { grokCliConfig, streamGrokCli } from "./grokCli";
 import { houseNote } from "./gateway";
 import { RELAY } from "./engines";
 import { streamByo, type ByoTarget } from "./byo";
-import { houseChain, houseReady, houseTarget } from "./house";
+import { houseChain, houseReady, houseTarget, laminaLastResort } from "./house";
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 export type Provider = "openai" | "xai" | "grok-cli";
@@ -151,7 +151,7 @@ export async function* streamCompletion(messages: ChatMessage[], signal?: AbortS
         console.error(`[house] ${m.id} failed${m.id === model.id ? "" : " (fallback)"}: ${(e as Error).message?.slice(0, 200)}`);
       }
     }
-    if (!llmConfig().ready && !gatewayReady()) throw last instanceof ModelError ? last : new ModelError(`${model.label} isn't available right now. Pick another model.`, "house model: no provider ready");
+    if (!laminaLastResort() || (!llmConfig().ready && !gatewayReady())) throw last instanceof ModelError ? last : new ModelError(`${model.label} isn't available right now. Pick another model.`, "house model: no provider ready");
     console.error(`[house] ${model.id}: answering with Lamina`);
     yield* streamCompletion(messages, signal, { ...opts, model: undefined, byo: null });
     return;

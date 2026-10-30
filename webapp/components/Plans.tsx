@@ -13,17 +13,19 @@ const dateShort = (ms: number, year = false) => new Date(ms).toLocaleDateString(
 /** A smaller plan bought now is booked to start when the current one ends. Never names the current plan (it may be an older plan that is no longer sold). */
 export const queuedNote = (endsAt: number | null | undefined) => endsAt ? `Starts when your current plan ends on ${dateShort(endsAt)}` : "Starts when your current plan ends";
 
-/** Monthly / Yearly segmented switch. The grape thumb slides between the two; Yearly carries a "2 months free" pill. */
+/** Monthly / Yearly segmented switch. The grape thumb slides between the two; Yearly carries a "2 months free" pill.
+ * The pill's size uses !important: the global .label rule (11px, unlayered) otherwise beats Tailwind's text-[..] and
+ * pushed the pill past the toggle's right edge. */
 export function PeriodToggle({ period, onChange, className = "" }: { period: Period; onChange: (p: Period) => void; className?: string }) {
   const keys = (e: React.KeyboardEvent) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); onChange(period === "monthly" ? "yearly" : "monthly"); } };
   return (
-    <div data-period-toggle role="radiogroup" aria-label="Billing period" onKeyDown={keys} className={`relative grid h-12 w-full grid-cols-2 rounded-full bg-tint p-1 ring-1 ring-line ${className}`}>
+    <div data-period-toggle role="radiogroup" aria-label="Billing period" onKeyDown={keys} className={`relative grid h-12 w-full min-w-0 grid-cols-2 rounded-full bg-tint p-1 ring-1 ring-line ${className}`}>
       <span aria-hidden data-period-thumb className="period-thumb absolute bottom-1 left-1 top-1 w-[calc(50%-4px)] rounded-full bg-grape shadow-[0_8px_18px_-8px_rgba(91,43,255,.9)]" style={{ transform: period === "yearly" ? "translateX(100%)" : "translateX(0)" }} />
       {(["monthly", "yearly"] as const).map((p) => (
         <button key={p} type="button" role="radio" aria-checked={period === p} tabIndex={period === p ? 0 : -1} data-period={p} onClick={() => onChange(p)}
-          className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-[14px] max-[430px]:gap-1 font-bold transition-colors duration-300 ${period === p ? "text-white" : "text-ink/65 hover:text-ink"}`}>
+          className={`relative z-10 flex min-w-0 items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full px-3 text-[14px] font-bold transition-colors duration-300 max-[430px]:gap-1 max-[430px]:px-1.5 max-[360px]:gap-0.5 max-[360px]:px-1 max-[360px]:text-[13px] ${period === p ? "text-white" : "text-ink/65 hover:text-ink"}`}>
           {p === "monthly" ? "Monthly" : "Yearly"}
-          {p === "yearly" && <span data-free-pill className={`label whitespace-nowrap rounded-full px-1.5 py-[3px] text-[8px] leading-none max-[430px]:!text-[9px] max-[430px]:!tracking-[.02em] transition-colors duration-300 ${period === p ? "bg-white text-[#137a3d]" : "bg-[#1fbf6a] text-white"}`}>2 months free</span>}
+          {p === "yearly" && <span data-free-pill className={`label shrink-0 whitespace-nowrap rounded-full px-1.5 py-[3px] !text-[9px] leading-none !tracking-[.02em] max-[360px]:!px-1 max-[360px]:!text-[8px] transition-colors duration-300 ${period === p ? "bg-white text-[#137a3d]" : "bg-[#1fbf6a] text-white"}`}>2 months free</span>}
         </button>
       ))}
     </div>
@@ -48,8 +50,8 @@ export function PlansGrid({ onPick }: { onPick?: () => void }) {
   return (
     <div data-plans data-period-now={period} className="@container grid gap-3">
       <div className="grid gap-2 @lg:flex @lg:items-center @lg:justify-between">
-        <PeriodToggle period={period} onChange={setPeriod} className="@lg:w-[340px]" />
-        <p data-period-hint className="px-1 text-center text-[12.5px] font-semibold text-ink/55 @lg:text-right">{yearly ? "Pay for 10 months, get 12. Usage refills every month." : "30 days at a time. Renew whenever you like."}</p>
+        <PeriodToggle period={period} onChange={setPeriod} className="@lg:w-[340px] @lg:shrink-0" />
+        <p data-period-hint className="min-w-0 px-1 text-center text-[12.5px] font-semibold text-ink/55 @lg:text-right">{yearly ? "Pay for 10 months, get 12. Usage refills every month." : "30 days at a time. Renew whenever you like."}</p>
       </div>
       <div className="grid gap-3 @2xl:grid-cols-3">
         {PLANS.filter((p) => !p.later).map((p) => {

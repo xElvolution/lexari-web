@@ -51,3 +51,8 @@ next-env.d.ts
 .qa-*
 /PLAN.md
 /AGENTS.md
+
+# Next dev writes these; never commit them
+AGENTS.md
+CLAUDE.md
+PLAN.md

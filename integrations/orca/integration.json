@@ -1,0 +1,41 @@
+{
+  "$schema": "../schema.json",
+  "slug": "orca",
+  "name": "Orca",
+  "kind": "built-in",
+  "connector": "orca",
+  "category": "trading",
+  "status": "live-devnet",
+  "description": "Live quotes from Orca's SOL / USDC pool, and real swaps on Solana devnet from the agent's own wallet. You see the price and the minimum you get before you confirm.",
+  "website": "https://www.orca.so",
+  "docs": "https://dev.orca.so",
+  "chains": [
+    "Solana"
+  ],
+  "contracts": [
+    {
+      "chain": "Solana devnet",
+      "address": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "label": "Whirlpool program"
+    }
+  ],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Live swap quotes",
+      "live": true
+    },
+    {
+      "text": "Swap SOL and test USDC on devnet, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Mainnet swaps",
+      "live": false
+    }
+  ]
+}

@@ -441,7 +441,7 @@ function AchievementsSheet({ s, now, onClose }: { s: State; now: number; onClose
 /** Shown for the few seconds before the onchain Hub state arrives, so nobody sees a fake 0 balance or taps Check in twice. */
 export function HubLoading() {
   // keep trying until the onchain state arrives (a failed first load used to leave a 0 balance on screen)
-  useEffect(() => { void refreshHub(); const t = setInterval(() => void refreshHub(), 4000); return () => clearInterval(t); }, []);
+  useEffect(() => { void refreshHub(); const t = setInterval(() => { if (document.visibilityState === "visible") void refreshHub(); }, 15_000); return () => clearInterval(t); }, []);
   return (
     <div className="space-y-3 pb-2" aria-busy="true">
       <header className="pt-1"><p className="label text-[9.5px] text-brand-ink">Hub</p><h1 className="mt-1 text-[1.375rem] font-extrabold leading-none tracking-tight text-ink">Earn and level up</h1></header>

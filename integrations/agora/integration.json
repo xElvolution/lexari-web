@@ -1,0 +1,39 @@
+{
+  "$schema": "../schema.json",
+  "slug": "agora",
+  "name": "Agora AUSD",
+  "kind": "built-in",
+  "connector": "agora",
+  "category": "trading",
+  "status": "live-testnet",
+  "description": "AUSD is Agora's fiat-backed dollar stablecoin. Your agent holds AUSD in its own Monad wallet, pays people in it, and sends it across borders with the recipient's local amount shown at today's rate. Every payment waits for your Confirm and stays inside your limits. Test AUSD from Agora's faucet.",
+  "website": "https://agora.finance",
+  "docs": "https://docs.agora.finance",
+  "chains": [
+    "Monad testnet"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "AUSD balance",
+      "live": true
+    },
+    {
+      "text": "Pay in AUSD, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Cross-border sends with the local amount shown",
+      "live": true
+    },
+    {
+      "text": "Test AUSD from the Agora faucet",
+      "live": true
+    }
+  ]
+}

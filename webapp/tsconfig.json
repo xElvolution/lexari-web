@@ -16,7 +16,9 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./*"],
-      "@shared/*": ["../shared/*"]
+      "@shared/*": ["../shared/*"],
+      "@lexari/manifest": ["../sdk/packages/manifest/src/index.ts"],
+      "@lexari/manifest/signature": ["../sdk/packages/manifest/src/signature.ts"]
     }
   },
   "include": [
@@ -26,7 +28,8 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "../shared/**/*.ts",
-    "../shared/**/*.tsx"
+    "../shared/**/*.tsx",
+    "../sdk/packages/manifest/src/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

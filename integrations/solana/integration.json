@@ -1,0 +1,35 @@
+{
+  "$schema": "../schema.json",
+  "slug": "solana",
+  "name": "Solana",
+  "kind": "built-in",
+  "connector": "solana",
+  "category": "chains",
+  "status": "live-devnet",
+  "description": "Your agents use their own Solana wallets: check what they hold and send test USDC or SOL to an address you approve. Every transfer waits for your Confirm in chat.",
+  "website": "https://solana.com",
+  "docs": "https://solana.com/docs",
+  "chains": [
+    "Solana"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Read its wallet address and balances",
+      "live": true
+    },
+    {
+      "text": "Send test USDC or SOL on devnet, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Mainnet transfers",
+      "live": false
+    }
+  ]
+}

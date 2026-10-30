@@ -4,6 +4,9 @@ import { agents, chats, hires, jobs, memories, messages, userMedia, users } from
 import type { SessionUser } from "./auth/session";
 import { currentPlan } from "./plans";
 import { shotsByReply } from "./computer";
+import { cardsForSlugs } from "./market/listings";
+import { SPECIALISTS } from "@/content/appData";
+import { addressOf } from "./names";
 
 /** Everything the app needs on load. Memories stay encrypted; the browser decrypts them. */
 export async function loadAccount(user: SessionUser) {
@@ -32,6 +35,9 @@ export async function loadAccount(user: SessionUser) {
     byChat.set(m.chatId, list);
   }
   const slugOf = new Map(agentRows.map((a) => [a.id, a.slug]));
+  // Third-party agents on your team: their store cards, so the team, faces and chats can draw them.
+  const thirdParty = agentRows.filter((a) => a.kind === "hired" && !SPECIALISTS.some((s) => s.slug === a.slug)).map((a) => a.slug);
+  const devListings = await cardsForSlugs(thirdParty).catch((e: Error) => { console.error(`[account] listings: ${e.message?.slice(0, 160)}`); return []; });
   return {
     user: {
       wallet: user.wallet,
@@ -39,6 +45,11 @@ export async function loadAccount(user: SessionUser) {
       method: user.privyDid ? ("google" as const) : ("wallet" as const),
       email: me?.email || null,
       createdAt: me?.createdAt?.getTime() ?? Date.now(),
+      /** names: what agents call you comes from these, never from the email */
+      fullName: me?.fullName || "",
+      username: me?.username || "",
+      callName: addressOf(me, (agentRows.find((a) => a.slug === "home")?.meta as { you?: string } | undefined)?.you),
+      needsName: !me?.fullName || !me?.username,
     },
     profile: (me?.profile || {}) as Record<string, unknown>,
     plan,
@@ -64,6 +75,7 @@ export async function loadAccount(user: SessionUser) {
       startedAt: j.startedAt?.getTime() ?? j.createdAt.getTime(), finishedAt: j.finishedAt?.getTime() ?? null,
     })),
     hires: hireRows.map((h) => ({ slug: h.slug, tx: h.tx, at: h.createdAt.getTime() })),
+    devListings,
   };
 }
 export type Account = Awaited<ReturnType<typeof loadAccount>>;

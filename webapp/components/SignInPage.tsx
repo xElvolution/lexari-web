@@ -22,6 +22,14 @@ import ThemeToggle from "@shared/components/ThemeToggle";
 import Face from "@shared/components/Face";
 import Icon from "@/components/Icon";
 import { SpecFace } from "@/components/faces";
+import { desktopReturn, handoffToDesktop } from "@/lib/desktopHandoff";
+
+/** Where to go after sign-in. From the desktop app (?desktop=1) the session is handed back via a lexari:// code. */
+function finishSignIn(router: { push: (href: string) => void }, href: string) {
+  const ret = desktopReturn();
+  if (!ret) return router.push(href);
+  void handoffToDesktop(ret).then((ok) => { if (!ok) router.push(href); });
+}
 
 type Flow = null | { method: "wallet"; wallet: WalletId };
 type Phase = "connect" | "sign" | "signing" | "done" | "error";
@@ -154,7 +162,7 @@ function Sheet({ flow, onClose }: { flow: NonNullable<Flow>; onClose: () => void
     void signIn().then(() => {
       if (cancel) return;
       const wait = Math.max(0, 1100 - (Date.now() - started));
-      setTimeout(() => { if (!cancel) router.push(get().onboarded ? "/agents" : `/onboarding${name ? `?name=${encodeURIComponent(name)}` : ""}`); }, wait);
+      setTimeout(() => { if (!cancel) finishSignIn(router, get().onboarded ? "/agents" : `/onboarding${name ? `?name=${encodeURIComponent(name)}` : ""}`); }, wait);
     });
     return () => { cancel = true; };
   }, [phase, router, address]);
@@ -237,7 +245,7 @@ export default function SignIn() {
         await signIn();
         // A new account: offer a passkey right after it's made (Settings, Security can link one any time).
         if (!get().onboarded) { try { localStorage.setItem("lexari:ask-passkey", "1"); } catch { /* private mode */ } }
-        router.push(get().onboarded ? "/agents" : `/onboarding${first ? `?name=${encodeURIComponent(first)}` : ""}`);
+        finishSignIn(router, get().onboarded ? "/agents" : `/onboarding${first ? `?name=${encodeURIComponent(first)}` : ""}`);
       } catch (e) {
         entered.current = false;
         setPrivyErr(friendly(e, "Sign-in did not finish."));
@@ -252,7 +260,7 @@ export default function SignIn() {
   const passkey = async (create = false) => {
     if (!passkeySupported()) { setPkErr("This browser doesn't support passkeys."); return; }
     setPkBusy(true); setPkErr("");
-    try { await passkeySignIn(false); void create; await signIn(); router.push(get().onboarded ? "/agents" : "/onboarding"); }
+    try { await passkeySignIn(false); void create; await signIn(); finishSignIn(router, get().onboarded ? "/agents" : "/onboarding"); }
     catch (e) { setPkErr(friendly(e, "The passkey didn't finish.")); }
     setPkBusy(false);
   };

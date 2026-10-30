@@ -1,0 +1,31 @@
+{
+  "$schema": "../schema.json",
+  "slug": "solami",
+  "name": "Solami",
+  "kind": "built-in",
+  "connector": "solami",
+  "category": "data",
+  "status": "coming-soon",
+  "description": "Solami's RPC, webhooks and Beam power wallet history, incoming transfers and faster transaction landing. Solami serves Solana mainnet, so it switches on with Lexari mainnet.",
+  "website": "https://solami.dev",
+  "docs": "https://solami.dev",
+  "chains": [
+    "Solana mainnet"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Incoming transfers by webhook",
+      "live": false
+    },
+    {
+      "text": "Transactions landed through Beam",
+      "live": false
+    }
+  ]
+}

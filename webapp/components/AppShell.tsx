@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { PLANS } from "@/content/appData";
-import { get, seatsLeft, tick, useApp, useLoadError, type State } from "@/lib/store";
+import { get, seatsLeft, useApp, useLoadError, type State } from "@/lib/store";
 import { LANDING_URL } from "@shared/sites";
-import Logo from "@shared/components/Logo";
+import Logo, { LogoMark } from "@shared/components/Logo";
 import ThemeToggle from "@shared/components/ThemeToggle";
 import Face from "@shared/components/Face";
 import Icon from "./Icon";
@@ -26,6 +26,7 @@ import AppLock from "./lock/AppLock";
 import StepUpSheet from "./security/StepUpSheet";
 import MemoryChain from "./MemoryChain";
 import NotifyBell from "./NotifyBell";
+import NameGate from "./NameGate";
 
 export const NAV = [
   { href: "/agents", label: "Agents", icon: "home" },
@@ -44,7 +45,7 @@ function Rail({ s, path }: { s: State; path: string }) {
   const onProfile = path.startsWith("/profile");
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[84px] flex-col items-center border-r border-line bg-alt pb-4 pt-5 lg:flex">
-      <Link href={LANDING_URL} aria-label="Lexari home" title="Lexari" className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-ink transition hover:scale-105"><span className="h-3.5 w-3.5 rounded-full bg-base" /></Link>
+      <Link href={LANDING_URL} aria-label="Lexari home" title="Lexari" className="grid h-10 w-10 shrink-0 place-items-center transition hover:scale-105"><LogoMark size={40} /></Link>
       <nav className="no-bar mt-4 flex min-h-0 w-full flex-1 flex-col gap-0.5 overflow-y-auto px-2" aria-label="App">
         {NAV.map((n) => {
           const on = isOn(path, n.href);
@@ -181,7 +182,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const main = useRef<HTMLDivElement>(null);
   const ready = !!(s && s.auth && s.onboarded && s.agent);
 
-  useEffect(() => { if (!ready) return; tick(); const id = setInterval(() => tick(), 1000); return () => clearInterval(id); }, [ready]);
   useEffect(() => { window.scrollTo(0, 0); }, [section]);
   useEffect(() => { setSeatGate(() => seatsLeft(get()) > 0); }, []);
   // preferences that change the whole app
@@ -220,7 +220,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Celebrate />
       <AppLock />
       <StepUpSheet />
-      {s.tour?.on && <Tour s={s} />}
+      {s.names?.needsName ? <NameGate s={s} /> : s.tour?.on && <Tour s={s} />}
       <MemoryChain />
       <Toaster />
     </div>

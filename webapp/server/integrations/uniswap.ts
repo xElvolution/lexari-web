@@ -11,6 +11,7 @@ import { encodeFunctionData, erc20Abi, parseUnits, type Hex } from "viem";
 import { EVM, evmAddress, evmBalances, evmChainOf, type EvmChain } from "./evm";
 import { fmtUnits, nativeUsd, publicClient, sendAndWait, walletClient } from "./evmchains";
 import { Reject } from "./reject";
+import { simulateEvm, type SimCall } from "./evmsim";
 import type { AgentRef, Executed, GrantLimits, Prepared, ToolDef } from "./registry";
 
 type UniChain = "ethereum" | "base" | "arbitrum";
@@ -70,6 +71,22 @@ const quoteTool: ToolDef = {
   },
 };
 
+/** The exact calls a swap sends (approve first when the router can't spend enough USDC yet). Used by the simulation and the send. */
+function swapCalls(c: UniChain, a: Side, b: Side, me: Hex, amountIn: bigint, minOut: bigint, fee: number, approve: boolean): SimCall[] {
+  const u = UNI[c];
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
+  if (a.sym === "ETH") {
+    const swap = encodeFunctionData({ abi: routerAbi, functionName: "exactInputSingle", args: [{ tokenIn: u.weth, tokenOut: b.addr, fee, recipient: me, amountIn, amountOutMinimum: minOut, sqrtPriceLimitX96: BigInt(0) }] });
+    return [{ to: u.router, value: amountIn, data: encodeFunctionData({ abi: routerAbi, functionName: "multicall", args: [deadline, [swap]] }) }];
+  }
+  const swap = encodeFunctionData({ abi: routerAbi, functionName: "exactInputSingle", args: [{ tokenIn: a.addr, tokenOut: u.weth, fee, recipient: ROUTER_SELF, amountIn, amountOutMinimum: minOut, sqrtPriceLimitX96: BigInt(0) }] });
+  const unwrap = encodeFunctionData({ abi: routerAbi, functionName: "unwrapWETH9", args: [minOut, me] });
+  return [
+    ...(approve ? [{ to: a.addr, data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [u.router, amountIn] }) }] : []),
+    { to: u.router, data: encodeFunctionData({ abi: routerAbi, functionName: "multicall", args: [deadline, [swap, unwrap]] }) },
+  ];
+}
+
 type SwapPlan = { kind: "uni-swap"; chain: UniChain; sell: "ETH" | "USDC"; buy: "ETH" | "USDC"; amountIn: string; minOut: string; fee: number; amount: number };
 const swapTool: ToolDef = {
   name: "uniswap.swap", connector: "uniswap", risk: "sign", input: uIn,
@@ -91,9 +108,11 @@ const swapTool: ToolDef = {
     const amountIn = parseUnits(String(p.amount), a.decimals);
     const q = await uniQuote(c, a, b, amountIn);
     const minOut = (q.out * BigInt(Math.round((100 - slip) * 100))) / BigInt(10000);
+    const approve = a.sym === "USDC" && (await publicClient(c).readContract({ address: a.addr, abi: erc20Abi, functionName: "allowance", args: [addr as Hex, UNI[c].router] })) < amountIn;
+    const sim = await simulateEvm(c, addr as Hex, swapCalls(c, a, b, addr as Hex, amountIn, minOut, q.fee, approve), [{ sym: "USDC", addr: EVM[c].usdc as Hex, decimals: 6 }]);
     return {
       title: `Swap ${p.amount} ${a.sym} for ${b.sym} on Uniswap`, chain: c, usdMicros: Math.round(usd * 1e6), summary: `Uniswap swap ${a.sym} to ${b.sym}`,
-      rows: [["You pay", `${p.amount} ${a.sym}`], ["You get", `About ${fmtUnits(q.out, b.decimals)} ${b.sym}`], ["Minimum", `${fmtUnits(minOut, b.decimals)} ${b.sym} (${slip}% slippage)`], ["Pool", `Uniswap v3, ${q.fee / 10000}% fee`], ["Prices", "Testnet pool price, not a market price"], ["Wallet", `${addr.slice(0, 6)}…${addr.slice(-4)}`], ["Network", e.network]],
+      rows: [["You pay", `${p.amount} ${a.sym}`], ["You get", `About ${fmtUnits(q.out, b.decimals)} ${b.sym}`], ["Minimum", `${fmtUnits(minOut, b.decimals)} ${b.sym} (${slip}% slippage)`], ["Pool", `Uniswap v3, ${q.fee / 10000}% fee`], ["Prices", "Testnet pool price, not a market price"], ["Wallet", `${addr.slice(0, 6)}…${addr.slice(-4)}`], ["Network", e.network], ...sim.rows],
       plan: { kind: "uni-swap", chain: c, sell: a.sym, buy: b.sym, amountIn: amountIn.toString(), minOut: minOut.toString(), fee: q.fee, amount: p.amount } satisfies SwapPlan,
     };
   },
@@ -105,22 +124,15 @@ const swapTool: ToolDef = {
     const w = walletClient(c, agent), pc = publicClient(c);
     const me = w.account.address;
     const amountIn = BigInt(p.amountIn), minOut = BigInt(p.minOut);
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
-    let hash: Hex;
-    if (a.sym === "ETH") {
-      const swap = encodeFunctionData({ abi: routerAbi, functionName: "exactInputSingle", args: [{ tokenIn: u.weth, tokenOut: b.addr, fee: p.fee, recipient: me, amountIn, amountOutMinimum: minOut, sqrtPriceLimitX96: BigInt(0) }] });
-      hash = await w.sendTransaction({ to: u.router, value: amountIn, data: encodeFunctionData({ abi: routerAbi, functionName: "multicall", args: [deadline, [swap]] }) });
-    } else {
-      const allowance = await pc.readContract({ address: a.addr, abi: erc20Abi, functionName: "allowance", args: [me, u.router] });
-      if (allowance < amountIn) {
-        const ah = await w.sendTransaction({ to: a.addr, data: encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [u.router, amountIn] }) });
-        const st = await sendAndWait(c, ah);
-        if (!st.confirmed) throw new Reject(`Approving USDC for Uniswap didn't confirm (${e.txExplorer}${ah}). The swap was not sent.`);
-      }
-      const swap = encodeFunctionData({ abi: routerAbi, functionName: "exactInputSingle", args: [{ tokenIn: a.addr, tokenOut: u.weth, fee: p.fee, recipient: ROUTER_SELF, amountIn, amountOutMinimum: minOut, sqrtPriceLimitX96: BigInt(0) }] });
-      const unwrap = encodeFunctionData({ abi: routerAbi, functionName: "unwrapWETH9", args: [minOut, me] });
-      hash = await w.sendTransaction({ to: u.router, data: encodeFunctionData({ abi: routerAbi, functionName: "multicall", args: [deadline, [swap, unwrap]] }) });
+    const approve = a.sym === "USDC" && (await pc.readContract({ address: a.addr, abi: erc20Abi, functionName: "allowance", args: [me, u.router] })) < amountIn;
+    const calls = swapCalls(c, a, b, me, amountIn, minOut, p.fee, approve);
+    const main = calls[calls.length - 1];
+    if (approve) {
+      const ah = await w.sendTransaction({ to: calls[0].to, data: calls[0].data });
+      const st = await sendAndWait(c, ah);
+      if (!st.confirmed) throw new Reject(`Approving USDC for Uniswap didn't confirm (${e.txExplorer}${ah}). The swap was not sent.`);
     }
+    const hash: Hex = await w.sendTransaction({ to: main.to, data: main.data, ...(main.value ? { value: main.value } : {}) });
     const st = await sendAndWait(c, hash);
     if (st.failed) throw new Reject(`The swap reverted on ${e.network}, most likely the price moved past your minimum (${e.txExplorer}${hash}). Only the network fee was spent.`);
     return { sig: hash, confirmed: st.confirmed, rows: [["Swapped", `${p.amount} ${a.sym} to ${b.sym}`], ["Explorer", `${e.txExplorer}${hash}`]], receipt: { amount: `${p.amount} ${a.sym}`, label: `Uniswap swap on ${e.network}`, url: `${e.txExplorer}${hash}` } };

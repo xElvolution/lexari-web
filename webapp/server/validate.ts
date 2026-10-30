@@ -48,6 +48,7 @@ export const hireBody = z.union([
 ]);
 
 export const mePatch = z.object({
+  names: z.object({ fullName: z.string().max(80), username: z.string().max(40), callName: z.string().max(40) }).partial().optional(),
   profile: z.object({ name: z.string().max(60), username: z.string().max(30), bio: z.string().max(300), coverFit: z.string().max(20) }).partial().optional(),
   prefs: z.record(z.string(), z.union([z.string().max(2000), z.boolean(), z.number(), z.array(z.string().max(80)).max(50), z.record(z.string(), z.boolean())])).optional(),
 }).strict();

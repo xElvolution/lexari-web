@@ -5,7 +5,8 @@ import { TEMPO } from "./tempo";
 import { EVM, isEvmChain } from "./evm";
 
 type Row = typeof integrationActions.$inferSelect;
-export type Preview = { title: string; rows: [string, string][]; network: string; plan?: Record<string, unknown>; summary?: string; result?: [string, string][] };
+/** dev: proposed by a third-party agent (server/market/devtools.ts); its caps are checked again at Confirm */
+export type Preview = { title: string; rows: [string, string][]; network: string; plan?: Record<string, unknown>; summary?: string; result?: [string, string][]; dev?: { listingId: string; label: string; perTxUsd: number; dailyUsd: number } };
 
 const LABEL: Record<string, string> = {
   "solana.wallet": "Checked its Solana wallet", "solana.transfer": "Transfer on Solana", "orca.quote": "Orca quote", "orca.swap": "Swap on Orca",
@@ -21,7 +22,7 @@ const LABEL: Record<string, string> = {
   "robinhood.wallet": "Checked its Robinhood Chain wallet", "robinhood.transfer": "Send on Robinhood Chain", "monad.transfer": "Send on Monad",
   "uniswap.quote": "Uniswap quote", "uniswap.swap": "Swap on Uniswap", "polymarket.market": "Polymarket market", "polymarket.order": "Order on Polymarket",
   "zcash.wallet": "Checked its Zcash wallet", "zcash.quote": "ZEC quote", "zcash.buy": "Buy ZEC",
-  "panta.markets": "Panta markets", "panta.position": "Position on Panta", "panta.positions": "Panta positions",
+  "panta.markets": "Panta markets", "panta.position": "Position on Panta", "panta.positions": "Panta positions", "panta.close": "Close a Panta position",
 };
 /** A readable title for an action that never got a preview (refused before it was prepared). */
 export function toolLabel(tool: string, input: unknown): string {

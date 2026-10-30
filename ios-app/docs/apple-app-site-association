@@ -1,0 +1,10 @@
+{
+  "webcredentials": {
+    "apps": ["TEAMID.ai.lexari.app.testnet", "TEAMID.ai.lexari.app"]
+  },
+  "applinks": {
+    "details": [
+      { "appIDs": ["TEAMID.ai.lexari.app.testnet", "TEAMID.ai.lexari.app"], "components": [{ "/": "/*" }] }
+    ]
+  }
+}

@@ -14,6 +14,7 @@ import { agents, chats, messages, users } from "../db/schema";
 import { desktopOn, jobStart, jobStatus, jobStop, pullDesktop, runInDesktop, shq, type JobStatus } from "../desktop";
 import { complete, streamCompletion, type ChatMessage } from "../engram/cortex";
 import { buildPrompt } from "../engram/spinal";
+import { addressName, cleanName } from "../names";
 import { notify } from "../notify";
 import { attachFromComputer, type FileItem } from "../agentFiles";
 import { HttpError } from "../http";
@@ -46,14 +47,11 @@ const jobId = () => `t-${crypto.randomBytes(6).toString("hex")}`;
 
 export async function names(userId: string, agent: string) {
   const [[u], [a]] = await Promise.all([
-    db().select({ profile: users.profile }).from(users).where(eq(users.id, userId)).limit(1),
+    db().select({ fullName: users.fullName }).from(users).where(eq(users.id, userId)).limit(1),
     db().select().from(agents).where(and(eq(agents.userId, userId), eq(agents.slug, agent))).limit(1),
   ]);
-  let userName = String((u?.profile as { name?: string })?.name || "").trim();
-  if (!userName) { // what the person told their home agent to call them
-    const [h] = await db().select({ meta: agents.meta }).from(agents).where(and(eq(agents.userId, userId), eq(agents.slug, "home"))).limit(1);
-    userName = String((h?.meta as { you?: string })?.you || "").trim();
-  }
+  // your full name, else what your agents call you; never your email
+  const userName = cleanName(u?.fullName, 60) || await addressName(userId).catch(() => "");
   const agentName = String((a?.meta as { nick?: string })?.nick || a?.name || "Your agent");
   return { userName, agentName, row: a };
 }
@@ -306,7 +304,7 @@ async function runSchedule(row: Row) {
   const local = new Intl.DateTimeFormat("en-GB", { timeZone: tz, dateStyle: "full", timeStyle: "short" }).format(new Date());
   const prompt: ChatMessage[] = buildPrompt({
     agentName: home?.name || agentName, role: a?.role || home?.role || "", tone: a?.tone || home?.tone || "short", speaker: agentName,
-    about: a?.kind === "custom" ? a.about : "", you: (home?.meta as { you?: string })?.you || "", history: [], recall: [],
+    about: a?.kind === "custom" ? a.about : "", you: await addressName(row.userId).catch(() => ""), history: [], recall: [],
     text: `[Scheduled task you agreed to run ${e ? everyLabel(e).toLowerCase() : ""}. It is ${local} for the person.] ${sp.prompt}\n\nDo it now and write the result for the person, short and useful. Don't say this is a scheduled message.`,
   });
   // the agent's own inbox, for tasks like "summarize my email"

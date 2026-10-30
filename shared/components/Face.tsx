@@ -5,16 +5,25 @@ import { HOME, PALETTE, safeExtra, variantFor, type FaceState, type Shape, type 
 
 type Props = { seed?: number; variant?: Partial<Variant>; size?: number; track?: boolean; look?: boolean; className?: string; state?: FaceState; animated?: boolean };
 
-/** seconds since mount at ~30 fps while `on` (paused when the tab is hidden or motion is reduced) */
-function useClock(on: boolean) {
+/**
+ * Seconds since mount at ~24 fps while `on`. Paused when the tab is hidden, the face is scrolled off screen, motion is
+ * reduced or Animations is off in Settings. Each tick re-renders the SVG, so idle faces must not tick (desktop lag).
+ */
+function useClock(on: boolean, el: React.RefObject<SVGSVGElement | null>) {
   const [t, setT] = useState(0);
   useEffect(() => {
-    if (!on || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let raf = 0, last = 0; const t0 = performance.now();
-    const loop = (now: number) => { raf = requestAnimationFrame(loop); if (now - last < 33 || document.hidden) return; last = now; setT((now - t0) / 1000); };
+    if (!on || window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "off") return;
+    let raf = 0, last = 0, seen = true; const t0 = performance.now();
+    const io = typeof IntersectionObserver !== "undefined" && el.current ? new IntersectionObserver(([e]) => { seen = e.isIntersecting; if (seen && !raf) raf = requestAnimationFrame(loop); }) : null;
+    if (io && el.current) io.observe(el.current);
+    const loop = (now: number) => {
+      if (!seen || document.hidden) { raf = 0; if (document.hidden) document.addEventListener("visibilitychange", wake, { once: true }); return; }
+      raf = requestAnimationFrame(loop); if (now - last < 42) return; last = now; setT((now - t0) / 1000);
+    };
+    const wake = () => { if (!raf && seen) raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [on]);
+    return () => { cancelAnimationFrame(raf); raf = -1; io?.disconnect(); document.removeEventListener("visibilitychange", wake); };
+  }, [on, el]);
   return t;
 }
 const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
@@ -48,7 +57,8 @@ export default function Face({ seed, variant, size = 96, track = false, look = f
     return () => window.removeEventListener("pointermove", onMove);
   }, [track]);
 
-  const tRaw = useClock(animated);
+  const root = useRef<SVGSVGElement>(null);
+  const tRaw = useClock(animated, root);
   const live = animated && tRaw > 0;
   const t = live ? tRaw : 0.6; // still faces use a pleasant frame
   const v0: Variant = { ...(seed === undefined ? HOME : variantFor(seed)), ...variant };
@@ -210,7 +220,7 @@ export default function Face({ seed, variant, size = 96, track = false, look = f
   const pivotY = L.top + 4;
 
   return (
-    <svg viewBox={v.plain && !orb ? "0 0 100 100" : "-8 -12 116 116"} width={size} height={size} className={className} aria-hidden overflow="visible">
+    <svg ref={root} viewBox={v.plain && !orb ? "0 0 100 100" : "-8 -12 116 116"} width={size} height={size} className={className} aria-hidden overflow="visible">
       <g transform={`translate(0 ${bob}) rotate(${tilt} 50 90)`}>
         {back}
         <g transform={wig && v.extra !== "antenna" ? `rotate(${wig * 0.4} 50 ${pivotY})` : undefined}>{behind[v.extra]}</g>

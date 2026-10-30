@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true,
+    "allowImportingTsExtensions": true, "skipLibCheck": true, "types": ["node"], "baseUrl": ".",
+    "paths": {
+      "@lexari/manifest": ["packages/manifest/src/index.ts"],
+      "@lexari/manifest/signature": ["packages/manifest/src/signature.ts"],
+      "@lexari/sdk": ["packages/sdk/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "examples/*/*.ts"]
+}

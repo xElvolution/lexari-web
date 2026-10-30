@@ -23,11 +23,11 @@ export default function Hub() {
   const h = hubOf(s);
   const [store, setStore] = useState(false);
   // Quest progress changes from other screens and the server (replies, jobs, friends joining): fetch it when the Hub
-  // opens, when you come back to the tab, and every few seconds while it's on screen.
+  // opens, when you come back to the tab, and every 15 s while it's on screen (5 s re-rendered the whole Hub constantly).
   useEffect(() => {
     const go = () => { if (document.visibilityState === "visible") void refreshHub(); };
     void refreshHub();
-    const t = setInterval(go, 5000);
+    const t = setInterval(go, 15_000);
     window.addEventListener("focus", go);
     document.addEventListener("visibilitychange", go);
     return () => { clearInterval(t); window.removeEventListener("focus", go); document.removeEventListener("visibilitychange", go); };

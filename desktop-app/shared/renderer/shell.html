@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; script-src 'self'">
+<title>Lexari</title><link rel="stylesheet" href="shell.css"></head>
+<body>
+<div class="aurora"><i></i><i></i><i></i></div>
+<header class="titlebar" id="titlebar">
+  <div class="tl-space"></div>
+  <div class="brand"><span class="mark sm"><i></i></span><span class="word">lexari</span><span class="net" id="net">Testnet</span></div>
+  <div class="crumbs" id="crumb">Agents</div>
+  <button class="search" id="openPalette"><span>Search or jump to</span><kbd id="kbd">Ctrl K</kbd></button>
+  <div class="spacer"></div>
+  <div class="winbtns" id="winbtns">
+    <button data-a="min" aria-label="Minimize"><svg viewBox="0 0 10 10"><path d="M1 5h8"/></svg></button>
+    <button data-a="max" aria-label="Maximize"><svg viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7"/></svg></button>
+    <button data-a="close" class="x" aria-label="Close"><svg viewBox="0 0 10 10"><path d="M1 1l8 8M9 1l-8 8"/></svg></button>
+  </div>
+</header>
+<div class="body">
+  <main class="stage">
+    <webview id="view" partition="persist:lexari" allowpopups></webview>
+    <div class="loadbar" id="loadbar"></div>
+    <section class="splash" id="splash">
+      <div class="halo"><span></span><span></span><span></span></div>
+      <div class="mark xl pop"><i></i></div>
+      <h1 class="word reveal" aria-label="lexari"><span>l</span><span>e</span><span>x</span><span>a</span><span>r</span><span>i</span></h1>
+      <p class="fade">Your onchain agents are waking up</p>
+      <div class="dots"><i></i><i></i><i></i></div>
+    </section>
+    <section class="offline hidden" id="offline">
+      <div class="offmark"><div class="mark xl sleepy"><i></i></div><span class="badge" id="offBadge"><svg viewBox="0 0 24 24"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"/><circle cx="12" cy="19" r="1.4"/><path class="slash" d="M3 3l18 18"/></svg><svg class="bang" viewBox="0 0 24 24"><path d="M12 5v9"/><circle cx="12" cy="18.5" r="1.4"/></svg></span></div>
+      <h2 id="offTitle">You're offline</h2>
+      <p id="offBody">Lexari needs a connection to reach your agents. We'll reconnect as soon as you're back.</p>
+      <div class="row"><button class="primary" id="retry">Try again</button><button id="browser">Open in browser</button></div>
+    </section>
+  </main>
+</div>
+<div class="palette hidden" id="palette"><div class="card"><input id="pq" placeholder="Jump to agents, brain, wallets..." autocomplete="off"><ul id="plist"></ul></div></div>
+<script src="shell.js"></script>
+</body></html>

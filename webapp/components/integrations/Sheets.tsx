@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CATEGORIES, INTEGRATIONS, LIMITS, type AddedIntegration, type IntegrationCategory, type IntegrationInfo } from "@/content/integrations";
+import { CATEGORIES, INTEGRATIONS, isOffered, LIMITS, type AddedIntegration, type IntegrationCategory, type IntegrationInfo } from "@/content/integrations";
 import { addIntegration, updateIntegration, type IntegrationsState } from "@/lib/integrations";
 import { friendly } from "@/lib/api";
 import { toast, useApp } from "@/lib/store";
@@ -51,7 +51,7 @@ export function CatalogSheet({ added, onPick, onClose }: { added: AddedIntegrati
   const has = (id: string) => added.some((a) => a.connector === id);
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return INTEGRATIONS.filter((i) => !i.builtin && (cat === "all" || i.category === cat) && (!t || `${i.name} ${i.blurb} ${i.chains.join(" ")} ${i.tags}`.toLowerCase().includes(t)));
+    return INTEGRATIONS.filter((i) => !i.builtin && isOffered(i) && (cat === "all" || i.category === cat) && (!t || `${i.name} ${i.blurb} ${i.chains.join(" ")} ${i.tags}`.toLowerCase().includes(t)));
   }, [q, cat]);
   const groups = cat === "all" && !q.trim() ? CATEGORIES.map((c) => ({ c, items: list.filter((i) => i.category === c.id) })).filter((g) => g.items.length) : [{ c: null, items: list }];
   let idx = 0;

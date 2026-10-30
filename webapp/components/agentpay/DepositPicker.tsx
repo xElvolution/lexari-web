@@ -64,7 +64,7 @@ export default function DepositPicker({ agent, name, onClose }: { agent: string;
             {chain?.direct ? <p className="rounded-2xl bg-tint p-3 text-[12.5px] text-ink/70"><b>{chain.network}.</b> {chain.note}</p> : <label className="block text-[12px] font-semibold text-ink/60">Amount of {coin.symbol}
               <input value={amount} onChange={(e) => { setAmount(e.target.value.replace(/[^0-9.]/g, "")); setAddr(null); }} inputMode="decimal" placeholder="0.00" className="mt-1 w-full rounded-2xl bg-tint px-3 py-2.5 text-[14px] text-ink outline-none" />
             </label>}
-            {!ready && !chain?.direct && <p className="rounded-2xl bg-tint p-3 text-[12.5px] text-ink/70"><b>Setup needed.</b> Deposit addresses come from Aurora Intents, which isn&apos;t set up on this server yet.</p>}
+            {!ready && !chain?.direct && <p className="rounded-2xl bg-tint p-3 text-[12.5px] text-ink/70">Deposits from other chains aren&apos;t available right now.</p>}
             <button disabled={busy || (!chain?.direct && (!ready || !(Number(amount) > 0)))} onClick={go} className="w-full rounded-2xl bg-grape py-3 text-[14px] font-bold text-white disabled:opacity-40">{busy ? "Getting address…" : chain?.direct ? `Show ${name}'s ${chain.network} address` : "Get deposit address"}</button>
             {addr?.address && (
               <div className="rounded-2xl bg-tint p-4 text-center">

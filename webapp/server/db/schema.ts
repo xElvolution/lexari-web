@@ -26,6 +26,10 @@ export const users = pgTable("users", {
   emailHandleChosen: boolean("email_handle_chosen").notNull().default(false),
   /** Settings > Models switches: { on, off, extra } (content/models.ts ModelPrefs) */
   modelPrefs: jsonb("model_prefs").$type<{ on?: string[]; off?: string[]; extra?: string[] }>().notNull().default({}),
+  /** names (0039): agents call you callName (else the first word of fullName), never your email */
+  fullName: text("full_name"),
+  username: text("username"),
+  callName: text("call_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

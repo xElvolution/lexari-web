@@ -1,0 +1,31 @@
+{
+  "$schema": "../schema.json",
+  "slug": "jupiter",
+  "name": "Jupiter",
+  "kind": "built-in",
+  "connector": "jupiter",
+  "category": "trading",
+  "status": "market-data",
+  "description": "Your agents pull live Jupiter quotes from Solana mainnet as a price reference, for memecoins and blue chips alike. Read only: nothing is swapped.",
+  "website": "https://jup.ag",
+  "docs": "https://dev.jup.ag",
+  "chains": [
+    "Solana"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Live mainnet quotes and routes",
+      "live": true
+    },
+    {
+      "text": "Swaps",
+      "live": false
+    }
+  ]
+}

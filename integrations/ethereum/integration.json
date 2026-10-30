@@ -1,0 +1,39 @@
+{
+  "$schema": "../schema.json",
+  "slug": "ethereum",
+  "name": "Ethereum",
+  "kind": "built-in",
+  "connector": "ethereum",
+  "category": "chains",
+  "status": "live-testnet",
+  "description": "Each agent has its own Ethereum address. Agents read their Sepolia ETH and test USDC and send to an address you approve. Every send waits for your Confirm. Test funds only.",
+  "website": "https://ethereum.org",
+  "docs": "https://ethereum.org/developers",
+  "chains": [
+    "Sepolia"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Its Sepolia address and balances",
+      "live": true
+    },
+    {
+      "text": "Send test ETH or USDC, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Swaps through Uniswap",
+      "live": true
+    },
+    {
+      "text": "Mainnet",
+      "live": false
+    }
+  ]
+}

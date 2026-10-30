@@ -1,0 +1,52 @@
+name: desktop-app
+
+# Builds each platform folder on its matching runner. Unsigned for now (see desktop-app/README.md).
+on:
+  push:
+    branches: [main]
+    tags: ["desktop-v*"]   # path filters are not evaluated for tag pushes, so tags always build
+    paths: ["desktop-app/**", ".github/workflows/desktop-app.yml"]
+  pull_request:
+    paths: ["desktop-app/**", ".github/workflows/desktop-app.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { folder: mac, os: macos-14 }
+          - { folder: windows, os: windows-latest }
+          - { folder: linux, os: ubuntu-22.04 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop-app/${{ matrix.folder }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - name: Build (draft release on tag)
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/desktop-v* ]]; then npm run release; else npm run dist; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lexari-${{ matrix.folder }}
+          path: |
+            desktop-app/${{ matrix.folder }}/dist/*.dmg
+            desktop-app/${{ matrix.folder }}/dist/*.zip
+            desktop-app/${{ matrix.folder }}/dist/*.exe
+            desktop-app/${{ matrix.folder }}/dist/*.msi
+            desktop-app/${{ matrix.folder }}/dist/*.AppImage
+            desktop-app/${{ matrix.folder }}/dist/*.deb
+            desktop-app/${{ matrix.folder }}/dist/latest*.yml
+          if-no-files-found: warn

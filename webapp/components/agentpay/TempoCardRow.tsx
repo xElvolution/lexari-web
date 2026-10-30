@@ -19,13 +19,34 @@ const DAY = [10, 20, 50, 100];
 const total = (c: Card) => (c.balances || []).reduce((s, b) => s + b.amount, 0);
 
 /** The agent's Tempo card face: balance, limits, frozen state. Opens the card sheet. */
-export default function TempoCardRow({ agent, name }: { agent: string; name: string }) {
+export default function TempoCardRow({ agent, name, summary }: { agent: string; name: string; /** Wallets > Cards: balance and limits as a tidy strip under the card face, not a second card */ summary?: boolean }) {
   const mask = useMask();
   const [c, setC] = useState<Card | null>(null);
   const [open, setOpen] = useState(false);
   const load = useCallback(() => api<Card>(`/api/agents/card?agent=${encodeURIComponent(agent)}`).then(setC).catch(() => setC(null)), [agent]);
   useEffect(() => { void load(); }, [load]);
   if (!c) return null;
+  if (summary) {
+    const stats: [string, string][] = [["Balance", c.balances ? mask(`$${total(c).toFixed(2)}`) : "Unavailable"], ["Per payment", usd(c.perTxUsd)], ["Per day", usd(c.dailyUsd)], ["Spent today", mask(usd(c.spentTodayUsd))]];
+    return (
+      <>
+        <div data-tempo-summary={agent} className="w-full rounded-2xl bg-tint/60 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="label text-[10px] text-ink/55">Tempo card</span>
+            <span className={`label rounded-full px-2 py-0.5 text-[9.5px] ${c.frozen ? "bg-ink/10 text-ink/70" : "bg-[#22c55e]/15 text-[#15803d] dark:text-[#4ade80]"}`}>{c.frozen ? "Frozen" : "Active"}</span>
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
+            {stats.map(([k, v]) => <div key={k} className="min-w-0"><dt className="text-[11.5px] text-ink/55">{k}</dt><dd className="truncate text-[15px] font-bold tabular-nums text-ink">{v}</dd></div>)}
+          </dl>
+          <button type="button" data-tempo-card={agent} onClick={() => setOpen(true)} className="mt-2.5 flex w-full items-center justify-between gap-2 rounded-xl px-1 py-1 text-left text-[12.5px] font-semibold text-ink/70 transition hover:text-ink">
+            <span className="truncate font-mono text-[11.5px]">{c.address.slice(0, 6)}…{c.address.slice(-4)}</span>
+            <span className="flex shrink-0 items-center gap-1 text-grape">Limits and history<Icon name="right" size={14} /></span>
+          </button>
+        </div>
+        {open && <CardSheet agent={agent} name={name} c={c} onSaved={setC} onClose={() => setOpen(false)} />}
+      </>
+    );
+  }
   return (
     <>
       <button type="button" data-tempo-card={agent} onClick={() => setOpen(true)} className={`relative w-full overflow-hidden rounded-2xl p-4 text-left text-white ring-1 ring-black/10 transition hover:opacity-95 ${c.frozen ? "bg-[#5b5b66]" : "bg-gradient-to-br from-[#1b1b2f] via-[#3b2a8f] to-[#6d4aff]"}`}>

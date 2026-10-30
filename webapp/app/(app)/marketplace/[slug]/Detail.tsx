@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { PALETTE } from "@shared/components/avatar";
-import { SPECIALISTS, cannedReply, compact, specialistBySlug, storeMeta } from "@/content/appData";
+import { cannedReply, compact, specialistBySlug, storeMeta } from "@/content/appData";
+import { useListings } from "@/lib/listings";
 import { release, sendTo, toast, useApp } from "@/lib/store";
 import Face from "@shared/components/Face";
 import Icon from "@/components/Icon";
@@ -22,7 +23,8 @@ const EXTRA_REVIEWS = [
 export default function Detail({ slug }: { slug: string }) {
   const s = useApp()!;
   const router = useRouter();
-  const a = specialistBySlug(slug);
+  const all = useListings();
+  const a = all.find((x) => x.slug === slug) ?? specialistBySlug(slug);
   const face = useRef<HTMLDivElement>(null);
   const bars = useRef<HTMLDivElement>(null);
   const [more, setMore] = useState(false);
@@ -37,14 +39,14 @@ export default function Detail({ slug }: { slug: string }) {
   const m = storeMeta(a);
   const hired = s.hired.includes(a.slug);
   const col = PALETTE[a.color].fill;
-  const similar = SPECIALISTS.filter((x) => x.slug !== a.slug && storeMeta(x).cat === m.cat).concat(SPECIALISTS.filter((x) => x.slug !== a.slug)).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 8);
+  const similar = all.filter((x) => x.slug !== a.slug && storeMeta(x).cat === m.cat).concat(all.filter((x) => x.slug !== a.slug)).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 8);
   const tryJob = (ex: string) => {
     void (async () => {
       if (!hired) { const r = await hireWithFx(a.slug, face.current, () => router.push("/team")); if (r !== "ok") return; }
       sendTo(a.slug, ex); router.push(`/agents/${a.slug}`);
     })();
   };
-  const reviews = [...a.review.map((r, i) => ({ ...r, when: i ? "1 week ago" : "3 days ago" })), ...EXTRA_REVIEWS];
+  const reviews = [...a.review.map((r, i) => ({ ...r, when: i ? "1 week ago" : "3 days ago" })), ...(a.listing ? [] : EXTRA_REVIEWS)];
   const stats = [
     { top: <>{a.rating}<Icon name="star" size={14} className="text-brand-ink" /></>, sub: `${a.reviews} reviews` },
     a.free ? { top: "Free", sub: "No seat" } : { top: compact(m.hires), sub: "Hires" },

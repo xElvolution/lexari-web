@@ -5,13 +5,12 @@
  */
 import { z } from "zod";
 import { PublicKey } from "@solana/web3.js";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { SPECIALISTS, specialistBySlug } from "@/content/appData";
 import { railById } from "@/content/topup";
 import { appOrigin } from "../config";
 import { db } from "../db";
 import { agents } from "../db/schema";
-import { integrationActions } from "../db/integrationsSchema";
 import { rateLimit } from "../http";
 import { solanaKeypair } from "../agentWallets";
 import { complete } from "../engram/cortex";
@@ -23,6 +22,7 @@ import { describeHosts, hostByRef, listHosts, queueCommand } from "../miner/host
 import { evmAddress, evmKey } from "./evm";
 import { TEMPO, TEMPO_TOKENS, TempoError, tempoBalances, tempoFund, tempoToken, tempoTransfer } from "./tempo";
 import { PantaError, pantaMarket, pantaMarkets, pantaQuote, pantaReady } from "./panta";
+import { pantaClose, pantaPositions } from "./pantaPaper";
 import { balances, network, parseAddress, transfer, txExplorer } from "./solana";
 import { Reject } from "./reject";
 import type { AgentRef, ToolDef } from "./registry";
@@ -267,20 +267,4 @@ const pantaPosition: ToolDef = {
   },
   execute: async (p: { shares: number; avgPrice: number }) => ({ sig: "", confirmed: true, rows: [["Recorded", `Paper position, ${+p.shares.toFixed(4)} shares at ${(p.avgPrice * 100).toFixed(1)}¢`]] }),
 };
-const pantaPositions: ToolDef = {
-  name: "panta.positions", connector: "panta", risk: "read", input: z.object({}).passthrough(),
-  hint: `panta.positions {} : your Panta positions (paper on devnet) with today's YES / NO prices.`,
-  run: async (_i: never, agent) => {
-    const rows = await db().select().from(integrationActions).where(and(eq(integrationActions.userId, agent.userId), eq(integrationActions.agentSlug, agent.slug), eq(integrationActions.tool, "panta.position"), eq(integrationActions.status, "confirmed"))).orderBy(desc(integrationActions.createdAt)).limit(10);
-    if (!rows.length) return { summary: "Checked its Panta positions", text: "No Panta positions yet." };
-    const out = await Promise.all(rows.map(async (r) => {
-      const p = ((r.preview as { plan?: Record<string, unknown> } | null)?.plan || {}) as { market?: string; title?: string; side?: string; amount?: number; shares?: number; avgPrice?: number };
-      const m = pantaReady() && p.market ? await pantaMarket(p.market).catch(() => null) : null;
-      const now = m ? (p.side === "yes" ? m.yes : m.no) : null;
-      return `${p.side?.toUpperCase()} "${p.title}": $${p.amount} for ${p.shares} shares at ${((p.avgPrice || 0) * 100).toFixed(1)}¢${now !== null ? `, now ${(now * 100).toFixed(1)}¢ (worth ≈ $${((p.shares || 0) * now).toFixed(2)})` : ""}`;
-    }));
-    return { summary: "Checked its Panta positions", text: `Your Panta positions (paper, devnet):\n${out.join("\n")}` };
-  },
-};
-
-export const EXTRA_TOOLS: ToolDef[] = [payServices, payService, payAgent, tempoWallet, tempoFaucet, tempoSend, tempoTopup, oreServers, oreControl, pantaMarketsTool, pantaPosition, pantaPositions];
+export const EXTRA_TOOLS: ToolDef[] = [payServices, payService, payAgent, tempoWallet, tempoFaucet, tempoSend, tempoTopup, oreServers, oreControl, pantaMarketsTool, pantaPosition, pantaPositions, pantaClose];

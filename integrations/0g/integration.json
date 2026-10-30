@@ -1,0 +1,27 @@
+{
+  "$schema": "../schema.json",
+  "slug": "0g",
+  "name": "0G Compute",
+  "kind": "built-in",
+  "connector": "0g",
+  "category": "compute",
+  "status": "live",
+  "description": "Lexari runs the Kimi, Qwen and GLM models through the 0G Compute router, so agents can answer on decentralized inference. Nothing on chain is signed by agents here.",
+  "website": "https://0g.ai",
+  "docs": "https://docs.0g.ai",
+  "chains": [
+    "0G"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Chat on Kimi, Qwen and GLM through 0G Compute",
+      "live": true
+    }
+  ]
+}

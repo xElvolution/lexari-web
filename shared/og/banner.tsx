@@ -48,9 +48,14 @@ export function OgBanner({ inviter, avatar }: { inviter?: string; avatar?: strin
       {/* left column */}
       <div style={{ position: "absolute", left: 72, top: 60, bottom: 58, width: 660, display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center" }}>
-          <div style={{ width: 52, height: 52, borderRadius: 16, background: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ width: 18, height: 18, borderRadius: 18, background: "#5b2bff" }} />
-          </div>
+          <svg width="52" height="52" viewBox="0 0 64 64">
+            <rect width="64" height="64" rx="16" fill="#5b2bff" />
+            <ellipse cx="22.9" cy="26.9" rx="5.1" ry="7.75" fill="#fff" />
+            <ellipse cx="40.9" cy="26.9" rx="5.1" ry="7.75" fill="#fff" />
+            <circle cx="24.4" cy="24.9" r="2.06" fill="#3514b0" />
+            <circle cx="42.4" cy="24.9" r="2.06" fill="#3514b0" />
+            <path d="M21.6 41.4 Q32 49.9 42.4 41.4" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" />
+          </svg>
           <div style={{ marginLeft: 16, fontFamily: "Bricolage", fontSize: 46, color: "#ffffff", letterSpacing: -1.5, lineHeight: 1 }}>lexari</div>
         </div>
 

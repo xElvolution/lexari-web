@@ -37,6 +37,7 @@ export default function Hero() {
           <div className="mt-9 flex flex-col gap-4 sm:flex-row">
             <a href={`${SIGNIN}?name=${encodeURIComponent(name)}`} className="btn btn-brand">{H.primary} {name || "your agent"} <span aria-hidden>→</span></a>
             <a href="#desk" className="btn btn-line text-ink">{H.secondary}</a>
+            <a href="/download" className="btn btn-line text-ink">Download <span aria-hidden>↓</span></a>
           </div>
           <dl className="mt-12 grid max-w-[36rem] grid-cols-3 border-t-2 border-line pt-5">
             {H.proof.map((p, i) => (

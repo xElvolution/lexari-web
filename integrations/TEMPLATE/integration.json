@@ -1,0 +1,52 @@
+{
+  "$schema": "../schema.json",
+  "slug": "your-protocol",
+  "name": "Your Protocol",
+  "kind": "dapp",
+  "category": "trading",
+  "status": "in-review",
+  "description": "One or two plain sentences: what your protocol is and what a Lexari agent can do with it for a person.",
+  "website": "https://your-protocol.example.com",
+  "docs": "https://docs.your-protocol.example.com",
+  "api": "https://api.your-protocol.example.com",
+  "chains": ["Solana devnet"],
+  "contracts": [
+    { "chain": "Solana devnet", "address": "11111111111111111111111111111111", "label": "Main program" }
+  ],
+  "contact": { "name": "Your Name", "github": "your-github", "email": "you@your-protocol.example.com" },
+  "logo": "logo.svg",
+  "actions": [
+    { "text": "Live quotes for a swap", "live": true },
+    { "text": "Prepare a swap you confirm in chat", "live": true }
+  ],
+  "agent": {
+    "manifestVersion": 1,
+    "id": "your-protocol",
+    "name": "Your Protocol",
+    "version": "0.1.0",
+    "category": "Onchain",
+    "face": { "seed": 11, "color": "teal" },
+    "persona": {
+      "job": "Swaps on Your Protocol",
+      "quip": "Best price, you confirm.",
+      "description": "Gets live quotes from Your Protocol and proposes swaps for the person to confirm.",
+      "examples": ["Quote 1 SOL to USDC", "Swap 2 USDC to SOL"]
+    },
+    "tools": [
+      {
+        "name": "quote",
+        "description": "A live quote for selling one token for another.",
+        "url": "https://api.your-protocol.example.com/lexari",
+        "input": { "type": "object", "properties": { "sell": { "type": "string" }, "buy": { "type": "string" }, "amount": { "type": "number" } }, "required": ["sell", "buy", "amount"] }
+      },
+      {
+        "name": "swap",
+        "description": "Proposes a swap; the person confirms it on a Confirm card.",
+        "url": "https://api.your-protocol.example.com/lexari",
+        "input": { "type": "object", "properties": { "sell": { "type": "string" }, "buy": { "type": "string" }, "amount": { "type": "number" } }, "required": ["sell", "buy", "amount"] },
+        "intents": ["swap"]
+      }
+    ],
+    "pricing": { "type": "free", "usd": 0 }
+  }
+}

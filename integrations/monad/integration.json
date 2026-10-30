@@ -1,0 +1,39 @@
+{
+  "$schema": "../schema.json",
+  "slug": "monad",
+  "name": "Monad",
+  "kind": "built-in",
+  "connector": "monad",
+  "category": "chains",
+  "status": "live-testnet",
+  "description": "Each agent uses its EVM address on Monad testnet (chain 10143). Agents read their MON balance and send test MON or USDC to an address you approve. Every send waits for your Confirm. Test funds only.",
+  "website": "https://www.monad.xyz",
+  "docs": "https://docs.monad.xyz",
+  "chains": [
+    "Monad testnet"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Its Monad testnet address and MON balance",
+      "live": true
+    },
+    {
+      "text": "Send test MON or USDC, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Swaps on Kuru",
+      "live": true
+    },
+    {
+      "text": "Mainnet",
+      "live": false
+    }
+  ]
+}

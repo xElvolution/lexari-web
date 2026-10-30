@@ -1,0 +1,39 @@
+{
+  "$schema": "../schema.json",
+  "slug": "robinhood-chain",
+  "name": "Robinhood Chain",
+  "kind": "built-in",
+  "connector": "robinhood",
+  "category": "chains",
+  "status": "live-testnet",
+  "description": "Each agent uses its EVM address on Robinhood Chain testnet (chain 46630). Agents read their test ETH and send to an address you approve. Every send waits for your Confirm. Test funds only.",
+  "website": "https://robinhood.com",
+  "docs": "https://docs.robinhood.com/chain",
+  "chains": [
+    "Robinhood Chain testnet"
+  ],
+  "contracts": [],
+  "contact": {
+    "name": "Lexari",
+    "github": "xElvolution"
+  },
+  "logo": "logo.png",
+  "actions": [
+    {
+      "text": "Its Robinhood Chain testnet address and ETH balance",
+      "live": true
+    },
+    {
+      "text": "Send test ETH, after you confirm",
+      "live": true
+    },
+    {
+      "text": "Tokenized stocks",
+      "live": false
+    },
+    {
+      "text": "Mainnet",
+      "live": false
+    }
+  ]
+}
