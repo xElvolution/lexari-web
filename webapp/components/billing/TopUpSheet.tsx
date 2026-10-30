@@ -1,5 +1,6 @@
 "use client";
 
+import { AGENT_CARDS_ENABLED } from "@/lib/network";
 import { useCallback, useEffect, useState } from "react";
 import { TOPUP_MAX_USD } from "@/content/billing";
 import { api, friendly } from "@/lib/api";
@@ -86,7 +87,7 @@ export default function TopUpSheet({ intent }: { intent: TopUpIntent }) {
           : opt.o.kind === "rail" ? <RailPay key={`${opt.o.key}-${usd}`} usd={usd} railKey={opt.o.key} />
           : <AuroraPay key={`${opt.o.assetId}-${usd}`} usd={usd} assetId={opt.o.assetId} symbol={opt.symbol} />}
       </div>
-      <p className="mt-3 text-center text-[11.5px] leading-snug text-ink/45">Your balance pays for AI usage, hires, agent cards and funding agents. It can&apos;t be withdrawn.</p>
+      <p className="mt-3 text-center text-[11.5px] leading-snug text-ink/45">{`Your balance pays for AI usage, ${AGENT_CARDS_ENABLED ? "hires, agent cards and funding" : "hires and funding"} agents. It can't be withdrawn.`}</p>
     </Sheet>
   );
 }
@@ -161,7 +162,7 @@ function CryptoPay({ usd, intent, title, setBusy, after }: { usd: number; intent
     if (after) {
       setTimeout(() => { closeBillingSheet(); toast({ text: `$${usd} added to your balance` }); after(); }, 500);
     } else {
-      setTimeout(() => { closeBillingSheet(); celebrate({ confetti: true, title: `$${usd} added to your balance`, body: "It pays for AI usage past your plan, hires, agent cards and funding agents.", tx }); }, 700);
+      setTimeout(() => { closeBillingSheet(); celebrate({ confetti: true, title: `$${usd} added to your balance`, body: `It pays for AI usage past your plan, ${AGENT_CARDS_ENABLED ? "hires, agent cards and funding" : "hires and funding"} agents.`, tx }); }, 700);
     }
   };
   const pay = async () => {

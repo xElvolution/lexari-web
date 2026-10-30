@@ -18,6 +18,7 @@ import { QUEST_RULES, periodNumber } from "./catalog";
 import { fetchMany, utcDay } from "./chain";
 import { boxRoll } from "./claims";
 import { boxDayFor } from "./state";
+import { IS_MAINNET } from "@/lib/network";
 import { progressFrom, qualifiedReferrals, questCounts } from "./rules";
 
 type User = { userId: string; wallet: string; referralCode: string };
@@ -35,7 +36,8 @@ export async function ensurePlayer(user: User) {
   let coins = 0, lifetime = 0, streak = 0, lastCheckIn = 0, from = "new";
   const levels: { slug: string; level: number; xp: number }[] = [];
   const claims: string[] = [];
-  try {
+  // Mainnet never had the onchain Hub, so there is nothing to carry over: everyone starts from a fresh row.
+  if (!IS_MAINNET) try {
     const owner = new PublicKey(user.wallet);
     const player = playerPda(owner);
     const rows = await database.select({ slug: agents.slug, asset: agents.asset }).from(agents).where(eq(agents.userId, user.userId));
