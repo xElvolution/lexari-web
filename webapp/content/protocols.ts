@@ -5,6 +5,7 @@
  */
 import data from "./integrations.generated.json";
 import { INTEGRATIONS } from "./integrations";
+import { IS_MAINNET } from "@/lib/network";
 
 export type ProtocolStatus = "live-devnet" | "live-testnet" | "live" | "market-data" | "setup-needed" | "coming-soon" | "in-review";
 export type ProtocolCategory = "chains" | "trading" | "prediction" | "data" | "compute" | "payments";
@@ -34,9 +35,24 @@ export const PROTOCOL_CATS: { id: ProtocolCategory | "all"; label: string }[] = 
   { id: "prediction", label: "Prediction" }, { id: "data", label: "Data" }, { id: "compute", label: "Compute" }, { id: "payments", label: "Payments" },
 ];
 
-const FROM_CONNECTOR: Record<string, ProtocolStatus> = { devnet: "live-devnet", live: "live-testnet", testnet: "live-testnet", market: "market-data", needskey: "setup-needed", soon: "coming-soon" };
+const FROM_CONNECTOR: Record<string, ProtocolStatus> = IS_MAINNET
+  ? { devnet: "live", live: "live", testnet: "coming-soon", market: "market-data", needskey: "setup-needed", soon: "coming-soon" }
+  : { devnet: "live-devnet", live: "live-testnet", testnet: "live-testnet", market: "market-data", needskey: "setup-needed", soon: "coming-soon" };
+const TEST_CHAIN = /devnet|testnet|sepolia|moderato/i;
+
+/**
+ * Mainnet: a built-in entry takes its wording, chains and actions from the mainnet connector catalog; an entry whose
+ * connector is hidden on mainnet, or a dApp that is live on testnet only, is not available (hidden from the page).
+ */
+function forMainnet(p: Protocol): Protocol {
+  const c = p.connector ? INTEGRATIONS.find((i) => i.id === p.connector) : undefined;
+  const contracts = p.contracts.filter((k) => !TEST_CHAIN.test(k.chain));
+  if (!c) return { ...p, contracts, status: p.status === "live-devnet" || p.status === "live-testnet" ? "coming-soon" : p.status };
+  return { ...p, contracts, status: FROM_CONNECTOR[c.status] ?? p.status, description: c.about, chains: c.chains, actions: c.can.map((a) => ({ text: a.text, live: a.live })) };
+}
 
 export const PROTOCOLS: Protocol[] = (data as Protocol[]).map((p) => {
+  if (IS_MAINNET) return forMainnet(p);
   const c = p.connector ? INTEGRATIONS.find((i) => i.id === p.connector) : undefined;
   if (!c) return p;
   const status = FROM_CONNECTOR[c.status] ?? p.status;

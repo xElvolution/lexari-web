@@ -1,8 +1,10 @@
+import { IS_MAINNET } from "@/lib/network";
+
 /** Wallets you link (Settings > Wallets) and the chains you can make active. Shared by the web app, the API and the phone app. */
 export type WalletFamily = "solana" | "evm";
 export type WalletChain = { id: string; name: string; family: WalletFamily; network: string };
 
-export const WALLET_CHAINS: WalletChain[] = [
+const TESTNET_WALLET_CHAINS: WalletChain[] = [
   { id: "solana", name: "Solana", family: "solana", network: "Devnet" },
   { id: "base", name: "Base", family: "evm", network: "Base Sepolia" },
   { id: "ethereum", name: "Ethereum", family: "evm", network: "Sepolia" },
@@ -10,6 +12,14 @@ export const WALLET_CHAINS: WalletChain[] = [
   { id: "hyperliquid", name: "Hyperliquid", family: "evm", network: "Testnet" },
   { id: "monad", name: "Monad", family: "evm", network: "Testnet" },
 ];
+/** Mainnet: Tempo and Hyperliquid are testnet-only in Lexari today (lib/network.ts), so they are not offered. */
+const MAINNET_WALLET_CHAINS: WalletChain[] = [
+  { id: "solana", name: "Solana", family: "solana", network: "Mainnet" },
+  { id: "base", name: "Base", family: "evm", network: "Base" },
+  { id: "ethereum", name: "Ethereum", family: "evm", network: "Ethereum" },
+  { id: "monad", name: "Monad", family: "evm", network: "Monad" },
+];
+export const WALLET_CHAINS: WalletChain[] = IS_MAINNET ? MAINNET_WALLET_CHAINS : TESTNET_WALLET_CHAINS;
 export const chainById = (id: string) => WALLET_CHAINS.find((c) => c.id === id);
 export const chainsFor = (family: WalletFamily) => WALLET_CHAINS.filter((c) => c.family === family);
 

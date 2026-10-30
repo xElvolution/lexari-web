@@ -20,6 +20,11 @@ export const SOL_RESERVE_LAMPORTS = 1_000_000;
 export const ORCA_DEVNET_POOL = process.env.ORCA_SOL_USDC_POOL || "5GPCnpWwoDayCP5FVCJT1cS7dePufC5FrjPTVvPoUYnm";
 
 export const isDevnet = () => cluster() === "devnet";
+/**
+ * Sign tools execute on devnet and testnets. On a mainnet server they move REAL funds, so they run only when the
+ * server opts in with LEXARI_MAINNET_EXECUTION=1 (still behind every Confirm card and the per trade and daily limits).
+ */
+export const executionOn = () => isDevnet() || (cluster() === "mainnet-beta" && (process.env.LEXARI_MAINNET_EXECUTION || "").trim() === "1");
 export const network = () => (isDevnet() ? "Solana devnet" : "Solana");
 export const txExplorer = (sig: string) => `https://explorer.solana.com/tx/${sig}${isDevnet() ? "?cluster=devnet" : ""}`;
 export const addrExplorer = (a: string) => `https://explorer.solana.com/address/${a}${isDevnet() ? "?cluster=devnet" : ""}`;
@@ -36,9 +41,9 @@ export async function balances(owner: PublicKey, c: Connection = connection()): 
   return { address: owner.toBase58(), lamports, usdcMicros, sol: lamports / LAMPORTS_PER_SOL, usdc: usdcMicros / 10 ** USDC_DECIMALS };
 }
 
-/** Who pays the network fee: Lexari's devnet payout wallet when it is set up, otherwise the agent itself. */
+/** Who pays the network fee: Lexari's payout wallet when it is set up (devnet, or mainnet with execution on), otherwise the agent itself. */
 export function feePayer(agent: Keypair): Keypair {
-  const p = isDevnet() ? payoutKey() : null;
+  const p = executionOn() ? payoutKey() : null;
   return p ?? agent;
 }
 

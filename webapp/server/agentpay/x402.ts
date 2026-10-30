@@ -1,5 +1,5 @@
 /**
- * x402 on Solana devnet, both sides.
+ * x402 on Solana, both sides: "solana-devnet" on a testnet build, "solana" (mainnet-beta) on a mainnet build.
  *
  * Seller (Lexari's own paid services, /api/x402/<service>): no X-PAYMENT header answers 402 with the payment
  * requirements (scheme "exact", network "solana-devnet", USDC, payTo the treasury, extra.feePayer = Lexari's
@@ -20,8 +20,16 @@ import { db } from "../db";
 import { x402Receipts } from "../db/agentPaySchema";
 import { connection } from "../hub/chain";
 import { payoutKey } from "../agentWallets";
+import { DEVNET_WORD, IS_MAINNET } from "@/lib/network";
 
-export const X402_NETWORK = "solana-devnet";
+/** x402 network id for this build's mode (lib/network.ts). A mainnet build never accepts or sends a devnet payment. */
+export const X402_NETWORK = IS_MAINNET ? "solana" : "solana-devnet";
+/**
+ * A payment counts only once Solana reports it "confirmed" (or "finalized"). Testnet keeps its old behaviour (devnet
+ * confirmation can lag, so a sent payment is served); mainnet never serves a resource for an unconfirmed transaction.
+ */
+export const REQUIRE_CONFIRMED = IS_MAINNET;
+const CONFIRM_WAIT_MS = IS_MAINNET ? 60_000 : 40_000;
 export type Requirements = { scheme: "exact"; network: string; maxAmountRequired: string; resource: string; description: string; mimeType: string; payTo: string; maxTimeoutSeconds: number; asset: string; extra: { feePayer: string; decimals: number } };
 
 export function requirements(resource: string, priceAtoms: number, description: string): Requirements {
@@ -68,14 +76,20 @@ export async function settlePayment(header: string, req: Requirements, service: 
   const sig = await c.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 5 });
   const inserted = await db().insert(x402Receipts).values({ sig, service, payer, amountAtoms: Number(paid) }).onConflictDoNothing().returning({ sig: x402Receipts.sig });
   if (!inserted.length) return { ok: false, error: "payment already used" };
-  const end = Date.now() + 40_000;
+  const end = Date.now() + CONFIRM_WAIT_MS;
   while (Date.now() < end) {
     await new Promise((r) => setTimeout(r, 800));
     const st = (await c.getSignatureStatuses([sig]).catch(() => null))?.value[0];
     if (st?.err) { await db().delete(x402Receipts).where(eqSig(sig)); return { ok: false, error: "payment failed on Solana" }; }
     if (st?.confirmationStatus === "confirmed" || st?.confirmationStatus === "finalized") return { ok: true, sig, payer };
   }
-  return { ok: true, sig, payer }; // sent and recorded; treat as paid (devnet confirmation can lag)
+  if (REQUIRE_CONFIRMED) {
+    // Not confirmed in time: nothing is served. The receipt is released so the same signed payment can be retried
+    // (a Solana transaction lands at most once, so a retry can never charge twice).
+    await db().delete(x402Receipts).where(eqSig(sig));
+    return { ok: false, error: "payment is not confirmed on Solana yet; nothing was served, retry the same payment" };
+  }
+  return { ok: true, sig, payer }; // testnet: sent and recorded; treat as paid (devnet confirmation can lag)
 }
 const eqSig = (sig: string) => eq(x402Receipts.sig, sig);
 
@@ -103,7 +117,7 @@ export async function quote(url: string): Promise<{ req: Requirements; free?: un
   if (r.status !== 402) throw new X402Error(`The service answered ${r.status}.`);
   const j = (await r.json().catch(() => ({}))) as { accepts?: Requirements[] };
   const req = (j.accepts || []).find((a) => a.scheme === "exact" && a.network === X402_NETWORK && a.asset === usdcMint());
-  if (!req) throw new X402Error("That service doesn't take devnet USDC on Solana.");
+  if (!req) throw new X402Error(`That service doesn't take ${DEVNET_WORD}USDC on Solana.`);
   if (!req.extra?.feePayer) throw new X402Error("That service has no fee payer.");
   return { req };
 }
@@ -122,5 +136,11 @@ export async function payAndFetch(url: string, req: Requirements, agent: Keypair
   if (r.status !== 200) throw new X402Error((body as { error?: string } | null)?.error || `The service answered ${r.status}.`);
   let sig = "";
   try { sig = JSON.parse(Buffer.from(r.headers.get("x-payment-response") || "", "base64").toString("utf8")).transaction || ""; } catch {}
+  if (REQUIRE_CONFIRMED) {
+    // Mainnet: the buyer checks the chain too, so a receipt is only written for a payment Solana has confirmed.
+    if (!sig) throw new X402Error("The service didn't return a payment signature, so the payment can't be checked.");
+    const st = (await c.getSignatureStatuses([sig], { searchTransactionHistory: true }).catch(() => null))?.value[0];
+    if (!st || st.err || (st.confirmationStatus !== "confirmed" && st.confirmationStatus !== "finalized")) throw new X402Error("The payment isn't confirmed on Solana.");
+  }
   return { body, sig };
 }

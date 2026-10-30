@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { legacyPath } from "./lib/routes";
+import { AGENT_CARDS_ENABLED, DEVELOPER_ALPHA_ENABLED } from "./lib/network";
 
 const SAFE = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -31,6 +32,8 @@ function cors(req: NextRequest, res: NextResponse) {
  */
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  // Testnet-only APIs do not exist on a mainnet build: agent test cards and the developer alpha.
+  if ((!AGENT_CARDS_ENABLED && /^\/api\/cards(\/|$)/.test(pathname)) || (!DEVELOPER_ALPHA_ENABLED && /^\/api\/developer(\/|$)/.test(pathname))) return NextResponse.json({ error: "Not found." }, { status: 404 });
   if (!pathname.startsWith("/api/")) return legacy(req);
   if (req.method === "OPTIONS" && localPreviewOrigin(req.headers.get("origin"))) return cors(req, new NextResponse(null, { status: 204 }));
   if (SAFE.has(req.method)) return cors(req, NextResponse.next());

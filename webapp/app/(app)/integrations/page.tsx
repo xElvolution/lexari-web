@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import { PageHead } from "@/components/ui";
 import { APPLY_URL, NEW_PR_URL, PUBLIC_PROTOCOLS as PROTOCOLS, PROTOCOL_CATS, PROTOCOL_STATUS, type Protocol } from "@/content/protocols";
+import { IS_TESTNET } from "@/lib/network";
 
 const TONE = {
   live: "bg-[#e6f6ec] text-[#18794e] dark:bg-[#18794e]/25 dark:text-[#7ee2a8]",
@@ -114,7 +115,7 @@ export default function IntegrationsPage() {
         <div className="relative z-10 max-w-[620px]">
           <span className="label rounded-full bg-white/15 px-2.5 py-1 text-[9px] backdrop-blur">For protocols</span>
           <h2 className="display mt-4 text-[40px] leading-[.95] sm:text-[56px]">Bring your protocol to Lexari.</h2>
-          <p className="mt-3 text-[15.5px] text-white/75">Open a pull request with your protocol&apos;s entry in the integrations folder. Once it&apos;s reviewed and merged, your protocol becomes a dApp people add to their team. Your tools run on your servers, never see a key, and every payment is a Confirm card the person approves. Testnet only during the alpha.</p>
+          <p className="mt-3 text-[15.5px] text-white/75">Open a pull request with your protocol&apos;s entry in the integrations folder. Once it&apos;s reviewed and merged, your protocol becomes a dApp people add to their team. Your tools run on your servers, never see a key, and every payment is a Confirm card the person approves.{IS_TESTNET ? " Testnet only during the alpha." : ""}</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <a href={APPLY_URL} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-[15px] font-bold text-[#0a0a0a] transition hover:scale-[1.03]">Read the apply guide</a>
             <a href={NEW_PR_URL} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center rounded-full bg-white/15 px-6 text-[15px] font-bold text-white backdrop-blur transition hover:bg-white/25">Open a pull request</a>

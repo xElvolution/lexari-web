@@ -7,6 +7,7 @@ import Icon from "../Icon";
 import GetCardDialog from "./GetCardDialog";
 import { cardFor, useCards } from "./useCards";
 import { AgentWalletCard, useWallet } from "./agentWallet";
+import { AGENT_CARDS_ENABLED } from "@/lib/network";
 
 /** The agent's own wallet (and, for agents you made, its card), shown on its page. Never your balance. */
 export default function AgentMoney({ s, id, name }: { s: State; id: string; name: string }) {
@@ -20,7 +21,7 @@ export default function AgentMoney({ s, id, name }: { s: State; id: string; name
   return (
     <div data-agent-money={id}>
       <AgentWalletCard a={a} name={name} look={id === "home" ? s.agent?.look : undefined} funding={d.funding} fundings={d.fundings} compact>
-        {created && (
+        {created && AGENT_CARDS_ENABLED && (
           <div className="mt-3 flex items-center gap-3 border-t border-line pt-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-tint text-brand-ink"><Icon name="file" size={16} /></span>
             <div className="min-w-0 flex-1"><div className="text-[14px] font-bold text-ink">Card</div><div className="truncate text-[12px] text-ink/60">{card ? `Test card ·· ${card.last4} · $${card.limit}/mo${card.frozen ? " · frozen" : ""}` : "No card yet"}</div></div>

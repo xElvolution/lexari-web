@@ -16,6 +16,17 @@ const sql = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
 
 try {
   await sql`create table if not exists schema_migrations (name text primary key, applied_at timestamptz not null default now())`;
+  // Network lock first: a database already stamped for the other mode is refused before any migration touches it.
+  const mode = (process.env.LEXARI_NETWORK || "testnet").trim().toLowerCase();
+  const [lock] = await sql`select to_regclass('public.lexari_network') as t`;
+  if (lock.t) {
+    const [stamp] = await sql`select network from lexari_network where id = 1`;
+    if (stamp && stamp.network !== mode) {
+      console.error(`This database belongs to ${stamp.network}; LEXARI_NETWORK is ${mode}. Nothing was changed.`);
+      process.exitCode = 1;
+      throw new Error("network lock");
+    }
+  }
   const done = new Set((await sql`select name from schema_migrations`).map((r) => r.name));
   for (const name of files) {
     if (done.has(name)) { console.log(`skip ${name}`); continue; }
@@ -35,6 +46,8 @@ try {
     console.error(`This database belongs to ${row.network}; LEXARI_NETWORK is ${network}. Nothing else was changed.`);
     process.exitCode = 1;
   } else console.log(`network ${network}`);
+} catch (e) {
+  if (e.message !== "network lock") throw e;
 } finally {
   await sql.end();
 }

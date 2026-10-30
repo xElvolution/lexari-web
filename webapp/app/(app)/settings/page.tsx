@@ -27,6 +27,7 @@ import ModelsSection from "@/components/models/ModelsSection";
 import SecretsSection from "@/components/secrets/SecretsSection";
 import EmailNameSetting from "@/components/email/EmailNameSetting";
 import { disablePush, enablePush, isDesktopApp, pushOnHere, pushPermission } from "@/lib/notifications";
+import { DEVELOPER_ALPHA_ENABLED } from "@/lib/network";
 
 const SECTIONS = [
   { id: "general", label: "General", icon: "settings" },
@@ -385,9 +386,9 @@ function About() {
       <Group>
         <Row title="Version" desc="Lexari web"><span className="font-mono text-[13px] text-ink/60">1.0.0</span></Row>
       </Group>
-      <Group title="Build">
+      {DEVELOPER_ALPHA_ENABLED && <Group title="Build">
         <Row title="Developer" desc="Build agents with the Lexari SDK and publish them to the Marketplace. Invite-only alpha on testnet."><Link href="/developer" className={smallBtn}><Icon name="terminal" size={14} />Open</Link></Row>
-      </Group>
+      </Group>}
       <Group title="Legal">
         <Row title="Terms of use"><Link href={`${LANDING_URL}/legal/terms`} className={smallBtn}>Read</Link></Row>
         <Row title="Privacy policy"><Link href={`${LANDING_URL}/legal/privacy`} className={smallBtn}>Read</Link></Row>

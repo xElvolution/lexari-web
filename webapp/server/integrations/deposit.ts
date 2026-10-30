@@ -7,6 +7,7 @@
 import QR from "qrcode";
 import { cluster } from "../config";
 import { intentsReady, intentsDepositQuote, intentsTokens } from "./intents";
+import { IS_MAINNET } from "@/lib/network";
 
 const CONNECT = () => (process.env.AURORA_INTENTS_CONNECT_URL || "https://intents-connect-api.aurora.dev").replace(/\/+$/, "");
 type Raw = { assetId: string; symbol: string; blockchain: string; decimals: number; price: number; coingeckoId?: string; contractAddress?: string };
@@ -17,7 +18,7 @@ export const chainName = (c: string) => CHAIN_NAME[c] || c;
 const EXTRA_CG: Record<string, string> = { BTC: "bitcoin", XRP: "ripple", DOGE: "dogecoin", LTC: "litecoin", BCH: "bitcoin-cash", ADA: "cardano", APT: "aptos", SUI: "sui", TON: "the-open-network", DASH: "dash", STRK: "starknet", ALEO: "aleo", MOVE: "movement", ETH: "ethereum", SOL: "solana", BNB: "binancecoin", MON: "monad", USDC: "usd-coin", USDT: "tether", TRX: "tron", XLM: "stellar", ZEC: "zcash", NEAR: "near", AVAX: "avalanche-2", POL: "polygon-ecosystem-token", HYPE: "hyperliquid" };
 type Direct = { id: string; symbol: string; name: string; chain: string; wallet: "evm" | "solana"; network: () => string; note: string; cg?: string; logo?: string; price: number };
 const solNet = () => (cluster() === "devnet" ? "Solana devnet" : "Solana");
-const DIRECT: Direct[] = [
+const ALL_DIRECT: Direct[] = [
   { id: "ausd-monad", symbol: "AUSD", name: "Agora USD", chain: "monad", wallet: "evm", network: () => "Monad testnet", note: "Send Agora AUSD on Monad testnet only. It lands in the agent's own wallet and counts in its balance.", cg: "agora-dollar", price: 1 },
   { id: "mon-monad", symbol: "MON", name: "Monad", chain: "monad", wallet: "evm", network: () => "Monad testnet", note: "Send test MON on Monad testnet. It also pays gas for the agent's Monad actions.", cg: "monad", price: 0 },
   { id: "ore-solana", symbol: "ORE", name: "ORE", chain: "sol", wallet: "solana", network: solNet, note: "Send ORE on Solana to the agent's own Solana wallet.", cg: "ore", price: 0 },
@@ -26,6 +27,15 @@ const DIRECT: Direct[] = [
   { id: "hype-hyperliquid", symbol: "HYPE", name: "Hyperliquid", chain: "hypercore", wallet: "evm", network: () => "Hyperliquid testnet", note: "Send HYPE inside Hyperliquid testnet (a Hyperliquid spot transfer to this address). Don't send from another chain.", cg: "hyperliquid", price: 0 },
   { id: "usdc-hyperliquid", symbol: "USDC", name: "USD Coin", chain: "hypercore", wallet: "evm", network: () => "Hyperliquid testnet", note: "Send USDC as a Hyperliquid testnet transfer (Send in the Hyperliquid app) to this address. From another chain, use the Hyperliquid bridge on Arbitrum, not a plain transfer.", cg: "usd-coin", price: 1 },
 ];
+/**
+ * Mainnet: AUSD (Agora testnet address), Tempo (Moderato) and Hyperliquid (testnet API) are testnet-only here, so only
+ * MON on Monad (chain 143) and ORE on Solana stay, with mainnet wording.
+ */
+const MAINNET_DIRECT: Record<string, Partial<Direct>> = {
+  "mon-monad": { network: () => "Monad", note: "Send MON on Monad. It also pays gas for the agent's Monad actions." },
+  "ore-solana": {},
+};
+const DIRECT: Direct[] = IS_MAINNET ? ALL_DIRECT.filter((d) => d.id in MAINNET_DIRECT).map((d) => ({ ...d, ...MAINNET_DIRECT[d.id] })) : ALL_DIRECT;
 let cache: { at: number; coins: DepositCoin[] } | null = null;
 
 export async function depositCoins(): Promise<DepositCoin[]> {

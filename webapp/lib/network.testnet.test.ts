@@ -23,3 +23,12 @@ test("testnet: a mainnet-only env check never fires", async () => {
   assert.deepEqual(networkConfigProblems({ LEXARI_NETWORK: "testnet", LEXARI_FAUCET_KEY: "x" } as unknown as NodeJS.ProcessEnv), []);
   assert.equal(networkConfigProblems({ LEXARI_NETWORK: "mainnet" } as unknown as NodeJS.ProcessEnv).length, 1);
 });
+
+test("testnet: x402 stays on Solana devnet and test wording stays", async () => {
+  const x = await import("@/server/agentpay/x402");
+  assert.equal(x.X402_NETWORK, "solana-devnet");
+  assert.equal(x.REQUIRE_CONFIRMED, false);
+  const n = await import("./network");
+  assert.equal(n.TEST_WORD, "test ");
+  assert.equal(n.AGENT_CARDS_ENABLED, true);
+});

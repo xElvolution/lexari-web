@@ -15,6 +15,7 @@ import { refreshBilling } from "@/lib/billing";
 import { returnToBalance } from "../wallet/agentWallet";
 import { confirmItsYou } from "@/lib/api";
 import { PhraseBadge, usePhrase } from "../security/PhraseBadge";
+import { IS_TESTNET } from "@/lib/network";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -65,7 +66,7 @@ function FundCard({ convo, m }: { convo: string; m: Msg & { send: NonNullable<Ms
   const done = sd.status !== "pending";
   return (
     <div data-send-card data-fund-card className="mt-2 w-[min(300px,100%)] rounded-2xl bg-tint p-3.5 ring-1 ring-line">
-      <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-grape text-white"><Icon name="wallet" size={15} /></span><span className="text-[14px] font-bold text-ink">Fund {who}</span><span className="label ml-auto rounded-full bg-[#ffd84d] px-2 py-0.5 text-[8px] text-[#0a0a0a]">Test funds</span></div>
+      <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-grape text-white"><Icon name="wallet" size={15} /></span><span className="text-[14px] font-bold text-ink">Fund {who}</span>{IS_TESTNET && <span className="label ml-auto rounded-full bg-[#ffd84d] px-2 py-0.5 text-[8px] text-[#0a0a0a]">Test funds</span>}</div>
       <dl className="mt-3 space-y-1.5 text-[13.5px]">
         <div className="flex justify-between gap-3"><dt className="text-ink/60">Amount</dt><dd className="tab-num font-bold text-ink">{legacy ? `${sd.sol} SOL` : `$${usd.toFixed(2)}`}</dd></div>
         {sd.reason && <div className="flex justify-between gap-3"><dt className="text-ink/60">For</dt><dd className="min-w-0 text-right text-ink">{sd.reason}</dd></div>}

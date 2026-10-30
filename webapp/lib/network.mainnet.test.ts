@@ -55,3 +55,50 @@ test("mainnet: env that would cross networks is refused", async () => {
   assert.equal(check({ ...ok, NEXT_PUBLIC_SOLANA_CLUSTER: "devnet" }).length, 1);
   assert.equal(check({ ...ok, NEXT_PUBLIC_USDC_MINT: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU" }).length, 1);
 });
+
+test("mainnet: x402 uses Solana mainnet and needs a confirmed payment", async () => {
+  const x = await import("@/server/agentpay/x402");
+  assert.equal(x.X402_NETWORK, "solana");
+  assert.equal(x.REQUIRE_CONFIRMED, true);
+});
+
+test("mainnet: no testnet wording or testnet-only feature reaches the UI catalogs", async () => {
+  const n = await import("./network");
+  assert.equal(n.TEST_WORD, "");
+  assert.equal(n.DEVNET_WORD, "");
+  assert.equal(n.SOLANA_NET_NAME, "Solana");
+  assert.equal(n.AGENT_CARDS_ENABLED, false);
+  assert.equal(n.DEVELOPER_ALPHA_ENABLED, false);
+  const { WALLET_CHAINS } = await import("@/content/wallets");
+  assert.doesNotMatch(JSON.stringify(WALLET_CHAINS), /devnet|testnet|sepolia/i);
+  const { PUBLIC_PROTOCOLS, PROTOCOL_STATUS } = await import("@/content/protocols");
+  assert.ok(PUBLIC_PROTOCOLS.length > 0);
+  for (const p of PUBLIC_PROTOCOLS) {
+    assert.doesNotMatch(PROTOCOL_STATUS[p.status].label, /devnet|testnet/i, p.slug);
+    assert.doesNotMatch(JSON.stringify({ d: p.description, c: p.chains, a: p.actions, k: p.contracts }), /devnet|testnet|sepolia|test (USDC|ETH|MON|funds)/i, p.slug);
+  }
+  const { INTEGRATIONS, STATUS_LABEL } = await import("@/content/integrations");
+  for (const i of INTEGRATIONS) assert.doesNotMatch(STATUS_LABEL[i.status], /devnet|testnet/i, i.id);
+  const { LIVE_DAPP } = await import("@/server/market/protocols");
+  assert.equal(LIVE_DAPP.size, 0);
+});
+
+test("mainnet: sign tools stay off unless the server opts in", async () => {
+  const s = await import("@/server/integrations/solana");
+  delete process.env.LEXARI_MAINNET_EXECUTION;
+  assert.equal(s.executionOn(), false);
+  process.env.LEXARI_MAINNET_EXECUTION = "1";
+  assert.equal(s.executionOn(), true);
+  delete process.env.LEXARI_MAINNET_EXECUTION;
+});
+
+test("mainnet: card rail refuses test keys", async () => {
+  const { cardProvider } = await import("@/server/billing/payments/card");
+  process.env.CARD_PROVIDER = "stripe"; process.env.STRIPE_SECRET_KEY = "sk_test_x"; process.env.STRIPE_WEBHOOK_SECRET = "whsec_x";
+  assert.equal(cardProvider(), null);
+  process.env.STRIPE_SECRET_KEY = "sk_live_x";
+  assert.equal(cardProvider()?.id, "stripe");
+  process.env.CARD_PROVIDER = "paystack"; process.env.PAYSTACK_SECRET_KEY = "sk_test_x";
+  assert.equal(cardProvider(), null);
+  for (const k of ["CARD_PROVIDER", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "PAYSTACK_SECRET_KEY"]) delete process.env[k];
+});

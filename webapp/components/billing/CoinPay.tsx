@@ -15,6 +15,7 @@ import { celebrate } from "../Celebrate";
 import Icon from "../Icon";
 import { Spinner } from "./parts";
 import { CoinLogo, CoinWithNetwork } from "../Logos";
+import { IS_MAINNET } from "@/lib/network";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-6)}`;
 const fmt = (n: number, r: Pick<Rail, "decimals" | "coin">) => (+n.toFixed(coinDigits(r))).toLocaleString("en-US", { maximumFractionDigits: coinDigits(r) });
@@ -260,7 +261,7 @@ export function DepositPay({ usd, railKey }: { usd: number; railKey: string }) {
         {added ? <><Icon name="check" size={17} />${added.usd.toFixed(2)} added to your balance</>
           : v?.status === "incoming" ? <><Spinner />{v.incoming ? `${fmt(v.incoming, r)} ${c.symbol} on its way, confirming…` : "Arrived, confirming…"}</>
           : v?.status === "below" ? <><Icon name="info" size={16} />{fmt(v.waitingUi, r)} {c.symbol} arrived. Send at least {fmt(r.min, r)} in total.</>
-          : v?.status === "capped" ? <><Icon name="info" size={16} />Arrived. Testnet top ups are capped at $50 a day; it&apos;s added tomorrow.</>
+          : v?.status === "capped" ? <><Icon name="info" size={16} />{IS_MAINNET ? "Arrived. Today's top up limit is reached; it's added tomorrow." : <>Arrived. Testnet top ups are capped at $50 a day; it&apos;s added tomorrow.</>}</>
           : <><i className="h-2 w-2 animate-pulse rounded-full bg-grape" />Waiting for your deposit…</>}
       </div>
       {err && <p role="alert" className="mt-2 text-[12.5px] text-[#e5484d]">{err}</p>}

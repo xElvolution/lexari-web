@@ -109,3 +109,17 @@ export const ORE_PRACTICE_ENABLED = IS_TESTNET;
 
 /** Short label for UI copy. */
 export const NETWORK_LABEL = IS_MAINNET ? "Mainnet" : "Testnet";
+
+/** Test-asset wording: "test USDC" on testnet, plain "USDC" on mainnet. */
+export const TEST_WORD = IS_MAINNET ? "" : "test ";
+/** "Solana devnet" on testnet, "Solana" on mainnet. */
+export const SOLANA_NET_NAME = IS_MAINNET ? "Solana" : "Solana devnet";
+/**
+ * Agent cards: the only issuer today makes TEST card numbers (server/cards/issuer.ts), so cards exist on testnet only
+ * until a real issuer (Stripe Issuing, Lithic, ...) is wired. Mainnet hides the Cards tab and refuses to sell one.
+ */
+export const AGENT_CARDS_ENABLED = IS_TESTNET;
+/** The developer Marketplace alpha (server/market/config.ts) runs on testnet only. */
+export const DEVELOPER_ALPHA_ENABLED = IS_TESTNET;
+/** "devnet " on testnet, "" on mainnet: for "devnet USDC" style wording. */
+export const DEVNET_WORD = IS_MAINNET ? "" : "devnet ";

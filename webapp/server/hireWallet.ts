@@ -10,6 +10,7 @@
 import { createHmac } from "node:crypto";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { connection } from "./hub/chain";
+import { IS_MAINNET, SOLANA_NET_NAME, TEST_WORD } from "@/lib/network";
 
 const FEE = 5000;
 
@@ -55,9 +56,9 @@ export const FUND_MARK = "[lexari-fund]";
 export const MAX_FUND_USD = 10;
 export const FUND_HINT = (name: string) => [
   FUND_MARK,
-  `You are a hired specialist with your own task wallet on Solana devnet. You never touch the person's money directly.`,
-  `If a task really needs money (paid API credits, compute, a domain, test tokens), ask for it in US dollars with one tag: <fund usd="AMOUNT" for="what it pays for"/> (at most $${MAX_FUND_USD}; keep it small, like 1 to 3).`,
-  `Lexari shows the person a Confirm card. If they approve, the dollars come from their Lexari balance and arrive in your wallet as test USDC on devnet. Anything you don't use goes back to their balance.`,
+  `You are a hired specialist with your own task wallet on ${SOLANA_NET_NAME}. You never touch the person's money directly.`,
+  `If a task really needs money (paid API credits, compute, a domain${IS_MAINNET ? "" : ", test tokens"}), ask for it in US dollars with one tag: <fund usd="AMOUNT" for="what it pays for"/> (at most $${MAX_FUND_USD}; keep it small, like 1 to 3).`,
+  `Lexari shows the person a Confirm card. If they approve, the dollars come from their Lexari balance and arrive in your wallet as ${TEST_WORD}USDC${IS_MAINNET ? "" : " on devnet"}. Anything you don't use goes back to their balance.`,
   `After a fund tag say briefly what it is for and that they need to confirm. Never claim money arrived. Don't ask for funds unless the task needs them. You are ${name}.`,
 ].join(" ");
 

@@ -22,6 +22,7 @@ import { Reject, type AgentRef, type ReadResult, type ToolDef } from "../integra
 import { DEV_CAPS, DEV_INTENT_TOOLS, WEBHOOK } from "./config";
 import { listingBySlug } from "./listings";
 import { webhookSecretOf } from "./publish";
+import { DEVELOPER_ALPHA_ENABLED } from "@/lib/network";
 
 export type DevAgent = { listingId: string; slug: string; manifest: Manifest; developer: string; label: string; secret: string | null };
 export type DevProposal = { label: string; listingId: string; perTxUsd: number; dailyUsd: number };
@@ -34,6 +35,7 @@ export const forgetDevAgent = (slug?: string) => { if (slug) cache.delete(slug);
 
 /** The live third-party agent behind a hired slug, or null (house specialists, delisted or unapproved agents). */
 export async function devAgentFor(slug: string): Promise<DevAgent | null> {
+  if (!DEVELOPER_ALPHA_ENABLED) return null; // the developer alpha is testnet only (server/market/config.ts)
   const hit = cache.get(slug);
   if (hit && Date.now() - hit.at < TTL) return hit.v;
   let v: DevAgent | null = null;

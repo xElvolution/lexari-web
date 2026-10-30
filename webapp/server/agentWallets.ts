@@ -36,8 +36,11 @@ export const CHAINS: { id: ChainId; name: string; live: boolean }[] = [
 const USDC_DECIMALS = 6;
 export const FUND_AMOUNTS = [1, 5, 10] as const;
 export const MAX_FUND_USD = 25;
-/** Test funds only while the app runs on devnet. */
-export const fundingOn = () => cluster() === "devnet" && !!usdcMint() && !!payoutKey();
+/**
+ * Test funds on devnet. On mainnet, funding sends REAL USDC from Lexari's payout wallet, so it runs only when the server
+ * opts in with LEXARI_MAINNET_FUNDING=1 and a funded LEXARI_PAYOUT_KEY is set.
+ */
+export const fundingOn = () => (cluster() === "devnet" || (cluster() === "mainnet-beta" && (process.env.LEXARI_MAINNET_FUNDING || "").trim() === "1")) && !!usdcMint() && !!payoutKey();
 
 function secret() {
   const s = process.env.SESSION_SECRET || "";

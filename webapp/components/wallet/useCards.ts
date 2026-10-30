@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { api } from "@/lib/api";
 import type { Card } from "@/lib/pay";
+import { AGENT_CARDS_ENABLED } from "@/lib/network";
 
 /** Your agents' cards, shared by every screen that shows them. */
 let cards: Card[] | null = null;
@@ -11,6 +12,7 @@ const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 
 export async function refreshCards() {
+  if (!AGENT_CARDS_ENABLED) { cards = []; emit(); return; }
   if (loading) return;
   loading = true;
   try { cards = (await api<{ cards: Card[] }>("/api/cards")).cards; } catch { cards = cards ?? []; } finally { loading = false; emit(); }

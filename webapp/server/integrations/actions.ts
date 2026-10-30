@@ -35,7 +35,7 @@ async function nansenRowFor(tool: string, input: unknown): Promise<[string, stri
 }
 import type { Executed } from "./registry";
 import { Reject, toolByName, type AgentRef, type ToolDef } from "./registry";
-import { ChainError, SimError, isDevnet, network } from "./solana";
+import { ChainError, SimError, executionOn, isDevnet, network } from "./solana";
 import { EVM, isEvmChain } from "./evm";
 import { evmTxState } from "./evmchains";
 import { cardOf, type Preview } from "./cards";
@@ -166,7 +166,7 @@ export async function runCall(ctx: Ctx, grants: Grant[], name: string, input: un
   // sign: prepare a confirm card, inside the limits
   let prep;
   try {
-    if (!isDevnet() && !tool.offchain) throw new Reject("Lexari runs integrations on devnet and testnets only right now, so nothing can execute here.");
+    if (!executionOn() && !tool.offchain) throw new Reject(isDevnet() ? "Lexari runs integrations on devnet and testnets only right now, so nothing can execute here." : "Transactions with real funds are switched off on this server, so nothing can execute here.");
     prep = await tool.prepare!(parsed.data as never, ctx.agent, limits);
   } catch (e) {
     const why = e instanceof Reject ? e.message : "I couldn't get a live quote right now. Try again in a moment.";
@@ -285,7 +285,7 @@ export async function confirmAction(userId: string, id: string): Promise<ActionC
   const info = integrationById(a.connector);
   if (!tool?.execute || !info) return cardOf(await finish(a.id, { status: "failed", error: "This integration can't run that any more." }));
   if (Date.now() - a.createdAt.getTime() > EXPIRE_MS) return cardOf(await finish(a.id, { status: "expired", error: "This quote expired. Ask again for a fresh one." }));
-  if (!isDevnet() && !tool.offchain) return cardOf(await finish(a.id, { status: "rejected", error: "Execution is off: devnet and testnets only." }));
+  if (!executionOn() && !tool.offchain) return cardOf(await finish(a.id, { status: "rejected", error: isDevnet() ? "Execution is off: devnet and testnets only." : "Execution with real funds is switched off on this server." }));
   if (!(await rateLimit(`int:confirm:${userId}`, CONFIRMS_PER_HOUR, 3_600_000))) throw new HttpError(429, "That's a lot of transactions this hour. Wait a bit and try again.");
   const agentRow = await ownAgent(userId, a.agentSlug).catch(() => null);
   if (!agentRow) return cardOf(await finish(a.id, { status: "rejected", error: "That agent isn't on your team any more." }));

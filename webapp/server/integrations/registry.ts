@@ -26,7 +26,7 @@ import { AUSD_TOOLS } from "./ausd";
 import { ALCHEMY_TOOLS } from "./alchemy";
 import { cardMpp } from "./mpp";
 import { bridgeQuote } from "./bridge";
-import { SOL_RESERVE_LAMPORTS, balances, feePayer, fmtAmount, isDevnet, network, orcaQuote, orcaSwap, parseAddress, transfer, type Asset } from "./solana";
+import { SOL_RESERVE_LAMPORTS, balances, executionOn, feePayer, fmtAmount, isDevnet, network, orcaQuote, orcaSwap, parseAddress, transfer, type Asset } from "./solana";
 
 export type AgentRef = { slug: string; kind: string; name: string; userId: string; keypair: () => Keypair };
 export type GrantLimits = { perTxUsd: number; dailyUsd: number; maxSlippageBps: number };
@@ -42,6 +42,7 @@ export type Executed = {
 };
 
 import { Reject } from "./reject";
+import { TEST_WORD } from "@/lib/network";
 export { Reject };
 
 export type ToolDef = {
@@ -77,7 +78,7 @@ async function solUsd() {
   try { return await spotUsd("SOL"); } catch { throw new Reject("I couldn't get a live SOL price to check your limits, so nothing was prepared. Try again in a moment."); }
 }
 
-const feeRow = (agent: AgentRef): [string, string] => ["Network fee", feePayer(agent.keypair()).publicKey.equals(agent.keypair().publicKey) ? "About 0.000005 SOL" : "Paid by Lexari on devnet"];
+const feeRow = (agent: AgentRef): [string, string] => ["Network fee", feePayer(agent.keypair()).publicKey.equals(agent.keypair().publicKey) ? "About 0.000005 SOL" : isDevnet() ? "Paid by Lexari on devnet" : "Paid by Lexari"];
 
 /* ---------- Solana ---------- */
 const solanaWallet: ToolDef = {
@@ -85,7 +86,7 @@ const solanaWallet: ToolDef = {
   hint: `solana.wallet {} : your own Solana wallet address and what it holds (${isDevnet() ? "devnet" : "mainnet"}).`,
   run: async (_i: never, agent) => {
     const b = await balances(agent.keypair().publicKey);
-    return { summary: "Checked its Solana wallet", text: `Your Solana wallet (${network()}): ${b.address}. It holds ${fmtAmount("SOL", b.sol)} SOL and ${b.usdc.toFixed(2)} test USDC.` };
+    return { summary: "Checked its Solana wallet", text: `Your Solana wallet (${network()}): ${b.address}. It holds ${fmtAmount("SOL", b.sol)} SOL and ${b.usdc.toFixed(2)} ${TEST_WORD}USDC.` };
   },
 };
 
@@ -94,7 +95,7 @@ const solanaTransfer: ToolDef = {
   name: "solana.transfer", connector: "solana", risk: "sign", input: transferInput,
   hint: `solana.transfer {"to":"ADDRESS","asset":"USDC" or "SOL","amount":1.5} : prepare a transfer from YOUR wallet; the person confirms it. "to":"me" sends to the person's own linked wallet.`,
   prepare: async (i: z.output<typeof transferInput>, agent, limits) => {
-    if (!isDevnet()) throw new Reject("Transfers run on devnet only right now.");
+    if (!executionOn()) throw new Reject(isDevnet() ? "Transfers run on devnet only right now." : "Transfers with real funds are switched off on this server.");
     const to = parseAddress(i.to);
     if (!to) throw new Reject("That isn't a valid Solana wallet address.");
     const kp = agent.keypair();
@@ -104,7 +105,7 @@ const solanaTransfer: ToolDef = {
     perTradeFirst(a === "USDC" ? i.amount : i.amount * (await solUsd()), limits, "Solana");
     const b = await balances(kp.publicKey);
     if (a === "USDC") {
-      if (Math.round(i.amount * 1e6) > b.usdcMicros) throw new Reject(`My wallet only holds ${b.usdc.toFixed(2)} test USDC.`);
+      if (Math.round(i.amount * 1e6) > b.usdcMicros) throw new Reject(`My wallet only holds ${b.usdc.toFixed(2)} ${TEST_WORD}USDC.`);
     } else {
       const lamports = Math.round(i.amount * 1e9);
       if (lamports > b.lamports) throw new Reject(`My wallet only holds ${fmtAmount("SOL", b.sol)} SOL.`);
@@ -115,7 +116,7 @@ const solanaTransfer: ToolDef = {
     const amount = a === "USDC" ? Math.round(i.amount * 1e6) / 1e6 : Math.round(i.amount * 1e9) / 1e9;
     return {
       title: `Send ${fmtAmount(a, amount)} ${a}`, chain: "solana", usdMicros: usdMicros(usd), summary: `Send ${fmtAmount(a, amount)} ${a}`,
-      rows: [["Send", `${fmtAmount(a, amount)} ${a === "USDC" ? "test USDC" : "SOL"}`], ["Value", a === "USDC" ? money(usd) : `≈ ${money(usd)} at market price`], ["To", `${to.toBase58().slice(0, 4)}…${to.toBase58().slice(-4)}`], ["From", `${agent.name}'s wallet`], ["Network", network()], feeRow(agent)],
+      rows: [["Send", `${fmtAmount(a, amount)} ${a === "USDC" ? `${TEST_WORD}USDC` : "SOL"}`], ["Value", a === "USDC" ? money(usd) : `≈ ${money(usd)} at market price`], ["To", `${to.toBase58().slice(0, 4)}…${to.toBase58().slice(-4)}`], ["From", `${agent.name}'s wallet`], ["Network", network()], feeRow(agent)],
       plan: { kind: "transfer", to: to.toBase58(), asset: a, amount },
     };
   },
@@ -238,5 +239,5 @@ const pricesTool: ToolDef = {
 };
 
 /** Every tool for this build's network mode: tools of integrations hidden on mainnet are left out. */
-export const TOOLS: ToolDef[] = ([solanaWallet, solanaTransfer, orcaQuoteTool, orcaSwapTool, jupiterQuoteTool, bridgeQuoteTool, polymarketTool, ...POLYMARKET_TOOLS, ...EVMCHAIN_TOOLS, ...UNISWAP_TOOLS, ...ZCASH_TOOLS, pricesTool, ...EXTRA_TOOLS, ...HL_TOOLS, ...MONAD_TOOLS, cardPay, cardMpp, ...INTENTS_TOOLS, ...AUSD_TOOLS, ...ALCHEMY_TOOLS, ...SELF_TOOLS] as ToolDef[]).filter((t) => availableOnNetwork(t.connector));
+export const TOOLS: ToolDef[] = ([solanaWallet, solanaTransfer, orcaQuoteTool, orcaSwapTool, jupiterQuoteTool, bridgeQuoteTool, polymarketTool, ...POLYMARKET_TOOLS, ...EVMCHAIN_TOOLS, ...UNISWAP_TOOLS, ...ZCASH_TOOLS, pricesTool, ...EXTRA_TOOLS, ...HL_TOOLS, ...MONAD_TOOLS, cardPay, cardMpp, ...INTENTS_TOOLS, ...AUSD_TOOLS, ...ALCHEMY_TOOLS, ...SELF_TOOLS] as ToolDef[]).filter((t) => !t.connector.startsWith("dev:") && availableOnNetwork(t.connector as IntegrationId));
 export const toolByName = (name: string) => TOOLS.find((t) => t.name === name.trim().toLowerCase());

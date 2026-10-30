@@ -13,6 +13,7 @@ import { CatalogSheet, GrantSheet, IntToggle } from "./Sheets";
 import { STATUS_CHIP } from "./ChatCards";
 import { AuditSheet, ConsentSheet } from "./Consent";
 import { Sheet as Modal } from "../billing/parts";
+import { IS_MAINNET } from "@/lib/network";
 
 type Sheet = null | { kind: "catalog" } | { kind: "grant"; info: IntegrationInfo; grant?: AddedIntegration; fromCatalog: boolean } | { kind: "consent"; info: IntegrationInfo; grant: AddedIntegration } | { kind: "audit"; connector?: string };
 const DAY = 86_400_000;
@@ -40,7 +41,7 @@ const TRY: Partial<Record<string, string>> = {
   jupiter: "“Quote 1 SOL to BONK on Jupiter”",
   polymarket: "“What's trending on Polymarket?”",
   base: "“What's your Base address?”",
-  ethereum: "“Check your Sepolia balance”",
+  ethereum: IS_MAINNET ? "“Check your Ethereum balance”" : "“Check your Sepolia balance”",
   prices: "“What's BTC at right now?”",
 };
 

@@ -13,6 +13,7 @@ import { agentSpentToday, budgetOf } from "../agentpay/budgets";
 import type { AgentRef } from "./registry";
 import { SELF_HINT } from "./self";
 import { HL_HINT } from "./hyperliquid";
+import { IS_MAINNET } from "@/lib/network";
 
 export const INTEGRATIONS_MARK = "[lexari-integrations]";
 const MAX_CALLS = 2;
@@ -53,7 +54,7 @@ export async function turnTools(userId: string, slug: string): Promise<TurnTools
     ...(grants.some((g) => g.connector === "hyperliquid") ? [HL_HINT] : []),
     ...(grants.some((g) => g.connector === "nansen") ? ["Nansen: before you propose any trade or swap, call nansen.smartmoney for the token and mention what smart money is doing. Every trade Confirm card also shows a Nansen check line."] : []),
     "One balance: the person's money is one balance, kept on Solana. Chains are routes, not accounts. When a trade or payment needs funds on another chain, propose intents.route (Aurora Intents) first as one Confirm card, then the trade. Never ask the person to pick or switch a chain.",
-    "Read tools return live data to you, then you answer. Sign tools only prepare a Confirm card for the person: nothing moves until they tap Confirm, so say it's ready to confirm and never claim it went through. Everything runs on devnet or testnets with test funds, not real money.",
+    `Read tools return live data to you, then you answer. Sign tools only prepare a Confirm card for the person: nothing moves until they tap Confirm, so say it's ready to confirm and never claim it went through. ${IS_MAINNET ? "This is mainnet: everything moves real funds, so be exact." : "Everything runs on devnet or testnets with test funds, not real money."}`,
     "Only use a tool when the person asks for something it does. Never invent addresses, prices or results.",
     `For anything not listed: ${none}`,
   ].join("\n");
@@ -80,7 +81,7 @@ async function thirdPartyTools(userId: string, slug: string, dev: NonNullable<Aw
     "<tool name=\"TOOL\">{...json...}</tool>",
     devHint(dev),
     ...(reads.length ? ["Read-only Lexari integrations the person gave you:", ...reads.map((t) => `- ${t.hint}`)] : []),
-    "You cannot send, swap, trade or pay with any other tool. Never claim money moved: proposals only become a Confirm card the person approves. Everything runs on devnet or testnets with test funds.",
+    `You cannot send, swap, trade or pay with any other tool. Never claim money moved: proposals only become a Confirm card the person approves. ${IS_MAINNET ? "This is mainnet: proposals move real funds." : "Everything runs on devnet or testnets with test funds."}`,
     "Only use a tool when the person asks for something it does. Never invent addresses, prices or results.",
   ].join("\n");
   return { grants, hint, extra, thirdParty: true };

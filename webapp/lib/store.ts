@@ -5,7 +5,7 @@
  * This module loads it once from /api/me, keeps it in memory for the UI, and sends every change
  * to the API. Memories are encrypted in the browser (lib/vault.ts) before they leave it.
  */
-import { SOLANA_EXPLORER_QS } from "@/lib/network";
+import { IS_MAINNET, SOLANA_EXPLORER_QS } from "@/lib/network";
 import { applyServerHide } from "./privacy";
 import { cheer, isWarm, isWarmReaction, setMood } from "./mood";
 import type { FaceLook } from "@shared/components/avatar";
@@ -893,7 +893,7 @@ function noteTx(convo: string, t: TxReceipt) {
     pay: `Paid ${t.amount || amt} for ${t.label || "a service"}`, topup: `Topped up the Lexari balance with ${t.amount || amt}`,
   };
   const agent = isGroup(convo) ? "home" : isCustom(convo) ? convo : "home";
-  addNote(`${what[t.kind]} on ${day} (devnet, tx ${shortA(t.sig)})`, "Habits", "Wallet", false, agent);
+  addNote(`${what[t.kind]} on ${day} (${IS_MAINNET ? "" : "devnet, "}tx ${shortA(t.sig)})`, "Habits", "Wallet", false, agent);
 }
 export type TxInput = { id: string; kind: Exclude<TxKind, "incoming" | "return" | "pay" | "topup">; status: TxStatus; sol: number; to?: string; sig?: string; error?: string; agent?: string; label?: string };
 /** Writes a Confirm card's outcome into the chat as a receipt (the server checks it on chain). */

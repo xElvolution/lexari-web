@@ -18,8 +18,10 @@ import { seal, secretBoxReady } from "../secretBox";
 import { automatedChecks, contentHash } from "./publish";
 import { cardFromManifest, invalidateListings } from "./listings";
 import { forgetDevAgent } from "./devtools";
+import { DEVELOPER_ALPHA_ENABLED } from "@/lib/network";
 
-export const LIVE_DAPP = new Set(["live-testnet", "live-devnet"]);
+/** Protocol dApps run as third-party agents, which are testnet only for now (DEVELOPER_ALPHA_ENABLED): none list on mainnet. */
+export const LIVE_DAPP = new Set(DEVELOPER_ALPHA_ENABLED ? ["live-testnet", "live-devnet"] : []);
 export const PROTOCOL_DEV_PREFIX = "protocol-";
 
 export type ProtocolEntry = { slug: string; name: string; kind: string; status: string; website?: string; agent?: unknown };

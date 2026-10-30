@@ -1,5 +1,6 @@
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { connection } from "./hub/chain";
+import { IS_MAINNET, SOLANA_NET_NAME } from "@/lib/network";
 
 /** Marker in the system prompt: the agent can use the person's wallet through tags (see app/api/chat). */
 export const WALLET_MARK = "[lexari-wallet]";
@@ -7,7 +8,7 @@ export const MAX_SEND_SOL = 0.5;
 
 export const WALLET_HINT = [
   WALLET_MARK,
-  "You can use the person's Lexari wallet on Solana devnet through tags that Lexari handles:",
+  `You can use the person's Lexari wallet on ${SOLANA_NET_NAME} through tags that Lexari handles:`,
   "write <wallet>balance</wallet> to read the balance, <wallet>address</wallet> to get the address,",
   `and <send to="ADDRESS" sol="AMOUNT"/> to prepare a SOL transfer (at most ${MAX_SEND_SOL} SOL).`,
   "A send is never automatic: Lexari shows the person a confirm card with the amount and recipient, and only they can tap Confirm.",
@@ -38,7 +39,7 @@ export async function walletFacts(address: string, reads: ("balance" | "address"
   const out: string[] = [];
   if (reads.includes("address")) out.push(`Wallet address: ${address}`);
   if (reads.includes("balance")) {
-    try { out.push(`Balance: ${(await connection().getBalance(new PublicKey(address), "confirmed")) / LAMPORTS_PER_SOL} SOL (devnet)`); }
+    try { out.push(`Balance: ${(await connection().getBalance(new PublicKey(address), "confirmed")) / LAMPORTS_PER_SOL} SOL${IS_MAINNET ? "" : " (devnet)"}`); }
     catch { out.push("Balance: could not be read right now."); }
   }
   return out.join("\n");

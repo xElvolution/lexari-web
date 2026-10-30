@@ -1,5 +1,7 @@
 "use client";
 
+import { IS_MAINNET } from "@/lib/network";
+
 /** A failed API call, with the server's friendly message. */
 export class ApiError extends Error {
   constructor(public status: number, message: string, public data?: unknown) { super(message); }
@@ -44,7 +46,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
 export function friendly(error: unknown, fallback = "Something went wrong.") {
   const m = (error as Error)?.message || fallback;
   if (/reject|denied|cancel|declined/i.test(m)) return "You cancelled it in your wallet.";
-  if (/insufficient|0x1\b|no record of a prior credit/i.test(m)) return "Not enough devnet SOL for the fee. Get some from the faucet on the Wallets page.";
+  if (/insufficient|0x1\b|no record of a prior credit/i.test(m)) return IS_MAINNET ? "Not enough SOL for the network fee." : "Not enough devnet SOL for the fee. Get some from the faucet on the Wallets page.";
   if (/blockhash|expired/i.test(m)) return "It took too long. Try again.";
   if (/\b429\b|too many requests|rate.?limit/i.test(m)) return "Solana is busy right now. Wait a few seconds and try again.";
   if (/failed to fetch|network ?error|fetch failed|ECONNRESET|timed? ?out/i.test(m)) return "Couldn't reach Solana. Check your connection and try again.";

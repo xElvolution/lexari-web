@@ -13,6 +13,7 @@ import { nameOf } from "../agents";
 import Icon from "../Icon";
 import { IntegrationLogo } from "./Logos";
 import { PhraseBadge, usePhrase } from "../security/PhraseBadge";
+import { IS_MAINNET } from "@/lib/network";
 
 const short = (a: string) => (a.length > 14 ? `${a.slice(0, 5)}…${a.slice(-5)}` : a);
 const LIVE: ActionStatus[] = ["submitting", "submitted"];
@@ -100,7 +101,7 @@ export function ActionCardView({ convo, m }: { convo: string; m: Msg & { action:
         {a.usd > 0 && <div className="flex justify-between gap-3"><dt className="text-ink/55">Counts toward limits</dt><dd className="tab-num font-semibold text-ink">${a.usd.toFixed(2)}</dd></div>}
       </dl>
       <div className="px-3.5 pb-3.5 pt-2.5">
-        <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink/50"><span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />{self ? "Only this agent's own settings. Nothing else changes." : `${a.network} · test funds only`}</p>
+        <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink/50"><span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />{self ? "Only this agent's own settings. Nothing else changes." : `${a.network} · ${IS_MAINNET ? "real funds" : "test funds only"}`}</p>
         {a.status === "prepared" && (
           <div className="mt-3 flex gap-2">
             <button data-action-cancel onClick={() => void run("cancel")} disabled={!!busy} className="btn btn-line btn-sm !h-10 flex-1 text-ink disabled:opacity-50">{busy === "cancel" ? "Cancelling…" : "Cancel"}</button>

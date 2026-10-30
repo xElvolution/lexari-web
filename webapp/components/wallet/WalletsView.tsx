@@ -17,6 +17,7 @@ import CardSheet from "./CardSheet";
 import { cardPriceLabel } from "@/lib/prices";
 import { AgentWalletCard, useWallet, type WalletData } from "./agentWallet";
 import HistorySheet from "./HistorySheet";
+import { AGENT_CARDS_ENABLED } from "@/lib/network";
 
 /** Your Lexari balance in dollars: Top up by card or USDC, and History in its own sheet. */
 function Balance({ d }: { d: WalletData | null | undefined }) {
@@ -82,7 +83,7 @@ function CardRow({ a, card, onGet, onOpen }: { a: MyAgent; card: Card | null; on
 export default function WalletsView() {
   const s = useApp()!;
   const params = useSearchParams();
-  const [tab, setTab] = useState<"wallets" | "cards">(params.get("tab") === "cards" ? "cards" : "wallets");
+  const [tab, setTab] = useState<"wallets" | "cards">(AGENT_CARDS_ENABLED && params.get("tab") === "cards" ? "cards" : "wallets");
   const [getFor, setGetFor] = useState<string | null>(null);
   const [openFor, setOpenFor] = useState<string | null>(null);
   const d = useWallet();
@@ -98,11 +99,11 @@ export default function WalletsView() {
           <h1 className="display mt-3 text-[44px] text-ink sm:text-[60px]">{tab === "wallets" ? "Wallet." : "Cards."}</h1>
           <p className="mt-2 max-w-[38rem] text-[16px] text-ink/70">{tab === "wallets" ? "Your Lexari balance, and the wallets your agents hold." : "A card lets an agent pay for tools and compute inside a limit you set. Each agent gets its own."}</p>
         </div>
-        <div className="inline-flex shrink-0 self-start rounded-full bg-tint p-1 sm:self-end" role="tablist" aria-label="Wallet or cards">
+        {AGENT_CARDS_ENABLED && <div className="inline-flex shrink-0 self-start rounded-full bg-tint p-1 sm:self-end" role="tablist" aria-label="Wallet or cards">
           {([["wallets", "wallet", "Wallet"], ["cards", "file", "Cards"]] as const).map(([id, ic, l]) => (
             <button key={id} role="tab" aria-selected={tab === id} onClick={() => go(id)} className={`flex items-center gap-2 rounded-full px-4 py-2 text-[14px] font-bold transition ${tab === id ? "bg-card text-ink shadow-[0_2px_0_var(--color-grape)]" : "text-ink/65 hover:text-ink"}`}><Icon name={ic} size={15} />{l}</button>
           ))}
-        </div>
+        </div>}
       </div>
       {tab === "wallets" ? (
         <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6">

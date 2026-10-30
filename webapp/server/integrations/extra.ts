@@ -26,6 +26,7 @@ import { pantaClose, pantaPositions } from "./pantaPaper";
 import { balances, network, parseAddress, transfer, txExplorer } from "./solana";
 import { Reject } from "./reject";
 import type { AgentRef, ToolDef } from "./registry";
+import { DEVNET_WORD, SOLANA_NET_NAME, TEST_WORD } from "@/lib/network";
 
 const num = z.union([z.number(), z.string().regex(/^\s*\$?\d+(\.\d+)?\s*$/).transform((s) => Number(s.replace(/[$\s]/g, "")))]);
 const money = (usd: number) => `$${usd.toFixed(usd < 1 ? 3 : 2).replace(/(\.\d\d)\d*?0+$/, "$1")}`;
@@ -39,7 +40,7 @@ async function usdcOf(agent: AgentRef) {
 }
 async function needUsdc(agent: AgentRef, micros: number) {
   const have = await usdcOf(agent);
-  if (have < micros) throw new Reject(`My wallet holds ${(have / 1e6).toFixed(2)} test USDC and this costs ${money(micros / 1e6)}. Fund me from your balance first (my wallet, Fund).`);
+  if (have < micros) throw new Reject(`My wallet holds ${(have / 1e6).toFixed(2)} ${TEST_WORD}USDC and this costs ${money(micros / 1e6)}. Fund me from your balance first (my wallet, Fund).`);
 }
 
 /* ---------- Agent payments: x402 services ---------- */
@@ -50,7 +51,7 @@ const payServices: ToolDef = {
   hint: `pay.services {} : the paid x402 services you can buy, your budget and what you've spent today.`,
   run: async (_i: never, agent) => {
     const [b, spent, usdc] = await Promise.all([budgetOf(agent.userId, agent.slug), agentSpentToday(agent.userId, agent.slug), usdcOf(agent).catch(() => 0)]);
-    return { summary: "Checked its budget and services", text: `x402 services (paid per request in devnet USDC from your wallet): ${SERVICES.map((s) => `${s.id}: ${s.description}, ${money(s.priceAtoms / 1e6)}`).join("; ")}. Hiring another agent for one task costs ${money(AGENT_TASK_USD)}. Your budget: ${money(b.perTaskMicros / 1e6)} per task, ${money(b.dailyMicros / 1e6)} a day; ${money(spent / 1e6)} spent today. Your wallet holds ${(usdc / 1e6).toFixed(2)} test USDC.` };
+    return { summary: "Checked its budget and services", text: `x402 services (paid per request in ${DEVNET_WORD}USDC from your wallet): ${SERVICES.map((s) => `${s.id}: ${s.description}, ${money(s.priceAtoms / 1e6)}`).join("; ")}. Hiring another agent for one task costs ${money(AGENT_TASK_USD)}. Your budget: ${money(b.perTaskMicros / 1e6)} per task, ${money(b.dailyMicros / 1e6)} a day; ${money(spent / 1e6)} spent today. Your wallet holds ${(usdc / 1e6).toFixed(2)} ${TEST_WORD}USDC.` };
   },
 };
 const payService: ToolDef = {
@@ -63,7 +64,7 @@ const payService: ToolDef = {
     const q = new URLSearchParams(i.symbol ? { symbol: i.symbol.toUpperCase().replace(/[^A-Z0-9]/g, "") } : {});
     return {
       title: `Pay for ${s.name}`, chain: "solana", usdMicros: s.priceAtoms, summary: `Paid for ${s.name}`,
-      rows: [["Service", s.name], ["Price", `${money(s.priceAtoms / 1e6)} test USDC`], ["Protocol", "x402 (exact, Solana devnet)"], ["From", `${agent.name}'s wallet`], ["Network", network()]],
+      rows: [["Service", s.name], ["Price", `${money(s.priceAtoms / 1e6)} ${TEST_WORD}USDC`], ["Protocol", `x402 (exact, ${SOLANA_NET_NAME})`], ["From", `${agent.name}'s wallet`], ["Network", network()]],
       plan: { kind: "x402", url: svcUrl(s.id, q), service: s.id, name: s.name, atoms: s.priceAtoms },
     };
   },
@@ -73,7 +74,7 @@ const payService: ToolDef = {
       if (free) return { sig: "", confirmed: true, text: `${p.name} answered for free: ${JSON.stringify(free).slice(0, 1500)}` };
       if (Number(req.maxAmountRequired) > p.atoms) throw new Reject("The service raised its price, so I didn't pay.");
       const { body, sig } = await payAndFetch(p.url, req, agent.keypair());
-      return { sig, confirmed: !!sig, rows: [["Paid", `${money(p.atoms / 1e6)} test USDC`]], text: `Paid ${money(p.atoms / 1e6)} for ${p.name} (x402, devnet USDC, tx ${sig ? short(sig) : "pending"}). The data: ${JSON.stringify((body as { data?: unknown })?.data ?? body).slice(0, 1800)}`,
+      return { sig, confirmed: !!sig, rows: [["Paid", `${money(p.atoms / 1e6)} ${TEST_WORD}USDC`]], text: `Paid ${money(p.atoms / 1e6)} for ${p.name} (x402, ${DEVNET_WORD}USDC, tx ${sig ? short(sig) : "pending"}). The data: ${JSON.stringify((body as { data?: unknown })?.data ?? body).slice(0, 1800)}`,
         receipt: { amount: `${money(p.atoms / 1e6)} USDC`, label: p.name, url: sig ? txExplorer(sig) : undefined } };
     } catch (e) {
       if (e instanceof X402Error) throw new Reject(e.message);
@@ -96,7 +97,7 @@ async function targetOf(userId: string, ref: string, self: string): Promise<Targ
 const hireInput = z.object({ agent: z.string().min(1).max(40), task: z.string().min(3).max(600) }).passthrough();
 const payAgent: ToolDef = {
   name: "pay.agent", connector: "payments", risk: "sign", auto: true, input: hireInput,
-  hint: `pay.agent {"agent":"scout","task":"three facts about ORE mining, with links"} : hire another agent (on your team or in the marketplace) for one task, ${money(AGENT_TASK_USD)} in test USDC from your wallet; the person confirms it, then its answer comes back to you.`,
+  hint: `pay.agent {"agent":"scout","task":"three facts about ORE mining, with links"} : hire another agent (on your team or in the marketplace) for one task, ${money(AGENT_TASK_USD)} in ${TEST_WORD}USDC from your wallet; the person confirms it, then its answer comes back to you.`,
   prepare: async (i: z.output<typeof hireInput>, agent) => {
     const t = await targetOf(agent.userId, i.agent, agent.slug);
     const micros = Math.round(AGENT_TASK_USD * 1e6);
@@ -104,7 +105,7 @@ const payAgent: ToolDef = {
     const to = solanaKeypair(agent.userId, t.slug, t.kind).publicKey.toBase58();
     return {
       title: `Hire ${t.name} for a task`, chain: "solana", usdMicros: micros, summary: `Hired ${t.name} for a task`,
-      rows: [["Agent", `${t.name} · ${t.role}`], ["Task", i.task.slice(0, 80)], ["Price", `${money(AGENT_TASK_USD)} test USDC`], ["To", `${t.name}'s wallet ${short(to)}`], ["From", `${agent.name}'s wallet`], ["Network", network()]],
+      rows: [["Agent", `${t.name} · ${t.role}`], ["Task", i.task.slice(0, 80)], ["Price", `${money(AGENT_TASK_USD)} ${TEST_WORD}USDC`], ["To", `${t.name}'s wallet ${short(to)}`], ["From", `${agent.name}'s wallet`], ["Network", network()]],
       plan: { kind: "hire", to, slug: t.slug, name: t.name, role: t.role, about: t.about, task: i.task, usd: AGENT_TASK_USD },
     };
   },
@@ -119,8 +120,8 @@ const payAgent: ToolDef = {
         { role: "user", content: p.task },
       ], AbortSignal.timeout(45000));
     } catch { answer = ""; }
-    return { sig: tx.sig, confirmed: tx.confirmed, rows: [["Paid", `${money(p.usd)} test USDC`]],
-      text: `Paid ${p.name} ${money(p.usd)} (devnet USDC, tx ${short(tx.sig)}). ${answer ? `${p.name}'s answer: ${answer.slice(0, 1500)}` : `${p.name} didn't answer in time; the payment went through.`}`,
+    return { sig: tx.sig, confirmed: tx.confirmed, rows: [["Paid", `${money(p.usd)} ${TEST_WORD}USDC`]],
+      text: `Paid ${p.name} ${money(p.usd)} (${DEVNET_WORD}USDC, tx ${short(tx.sig)}). ${answer ? `${p.name}'s answer: ${answer.slice(0, 1500)}` : `${p.name} didn't answer in time; the payment went through.`}`,
       receipt: { amount: `${money(p.usd)} USDC`, label: `${p.name} (task)`, url: txExplorer(tx.sig) } };
   },
 };
