@@ -10,6 +10,10 @@ lexari = "BbnD28xf3kwfQRiRA6VQmw4p2R55WivUgozSoo81M6Po"
 [programs.devnet]
 lexari = "BbnD28xf3kwfQRiRA6VQmw4p2R55WivUgozSoo81M6Po"
 
+# Same program id on mainnet-beta (deployed with the same program keypair). NOT deployed yet: see scripts/deploy-mainnet.sh.
+[programs.mainnet]
+lexari = "BbnD28xf3kwfQRiRA6VQmw4p2R55WivUgozSoo81M6Po"
+
 [registry]
 url = "https://api.apr.dev"
 

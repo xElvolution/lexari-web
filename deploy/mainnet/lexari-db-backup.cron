@@ -1,0 +1,8 @@
+# Lexari database backups (installed as /etc/cron.d/lexari-db-backup). Times are server local (CET).
+# Daily dumps of testnet (lexari) and mainnet (lexari_mainnet), 14-day retention, two directories; weekly restore tests.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+20 3 * * * root /usr/local/sbin/lexari-db-backup.sh lexari >/dev/null 2>&1
+35 3 * * * root /usr/local/sbin/lexari-db-backup.sh lexari_mainnet >/dev/null 2>&1
+50 4 * * 0 root /usr/local/sbin/lexari-db-backup.sh --restore-test lexari >/dev/null 2>&1
+10 5 * * 0 root /usr/local/sbin/lexari-db-backup.sh --restore-test lexari_mainnet >/dev/null 2>&1
