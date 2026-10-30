@@ -75,8 +75,12 @@ else
   as_app "touch $REL/.built"
 fi
 
-log "backup $dbname before migrating"
-/usr/local/sbin/lexari-db-backup.sh "$dbname" "pre-deploy-$SHA" || die "backup failed; nothing migrated, live site unchanged"
+if [ "$(sudo -u postgres psql -p 5433 -d "$dbname" -Atc "select to_regclass('public.schema_migrations') is not null")" = "t" ]; then
+  log "backup $dbname before migrating"
+  /usr/local/sbin/lexari-db-backup.sh "$dbname" "pre-deploy-$SHA" || die "backup failed; nothing migrated, live site unchanged"
+else
+  log "$dbname is new and empty: nothing to back up"
+fi
 
 log "migrate"
 out=$(as_app "cd $REL/webapp && LEXARI_NETWORK=mainnet node --env-file=.env.production.local server/db/migrate.mjs" 2>&1) || { echo "MIGRATION FAILED; live site unchanged"; echo "$out" | sed -E 's#postgres(ql)?://[^ ]+#<url>#g' | tail -5; exit 1; }

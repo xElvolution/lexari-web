@@ -16,7 +16,8 @@ PRIMARY=/var/backups/lexari
 MIRROR=/srv/lexari-backups-mirror
 KEEP_DAYS=14
 LOG=/var/log/lexari-db-backup.log
-pg() { sudo -u postgres "$@"; }
+BIN=/usr/lib/postgresql/18/bin   # match the server version (the default wrapper may pick PG16 tools)
+pg() { local c=$1; shift; sudo -u postgres "$BIN/$c" "$@"; }
 log() { echo "$(date -Is) $*" | tee -a "$LOG"; }
 
 if [ "${1:-}" = "--restore-test" ]; then
@@ -24,8 +25,8 @@ if [ "${1:-}" = "--restore-test" ]; then
   f=$(ls -1t "$PRIMARY/$db"/*.dump 2>/dev/null | head -1); [ -n "$f" ] || { log "restore-test $db: no dump"; exit 1; }
   tmp="lexari_restore_test_$(date +%s)"
   pg createdb -p $PORT "$tmp"
-  trap "sudo -u postgres dropdb -p $PORT --if-exists $tmp" EXIT
-  pg pg_restore -p $PORT --no-owner --no-acl -d "$tmp" "$f" 2>>"$LOG"
+  trap "sudo -u postgres $BIN/dropdb -p $PORT --if-exists $tmp" EXIT
+  pg pg_restore -p $PORT --no-owner --no-acl -d "$tmp" "$f" 2>>"$LOG" || log "restore-test $db: pg_restore reported errors (see above)"
   q="select count(*) from information_schema.tables where table_schema='public'"
   live=$(pg psql -p $PORT -d "$db" -Atc "$q"); rest=$(pg psql -p $PORT -d "$tmp" -Atc "$q")
   mig=$(pg psql -p $PORT -d "$tmp" -Atc "select count(*) from schema_migrations" 2>/dev/null || echo 0)
@@ -39,6 +40,7 @@ label=${2:-daily}
 install -d -m 700 -o postgres -g postgres "$PRIMARY" "$PRIMARY/$db" "$MIRROR" "$MIRROR/$db"
 out="$PRIMARY/$db/$db-$(date +%Y%m%d-%H%M%S)-$label.dump"
 pg pg_dump -p $PORT -Fc -Z 6 -f "$out" "$db"
+chmod 600 "$out"
 size=$(stat -c %s "$out")
 entries=$(pg pg_restore --list "$out" | grep -c ' TABLE DATA ' || true)
 if [ "$size" -lt 1024 ] || [ "$entries" -lt 1 ]; then log "backup $db FAILED: $out is $size bytes, $entries table data entries"; exit 1; fi
